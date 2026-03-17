@@ -84,6 +84,16 @@ Different projects need different subsets. Pick your profile:
 | [crypto-library](profiles/crypto-library.md) | Security-critical library |
 | [cli-tool](profiles/cli-tool.md) | Command-line tool |
 
+### Conventions & Enforcement
+
+| File | Purpose |
+|------|---------|
+| [conventions.md](conventions.md) | Branch naming, commit messages, file headers, contract review checklist |
+| [scripts/](scripts/) | Enforcement scripts — contract headers, refs, TODOs, freshness, registry |
+| [scripts/ci-check.sh](scripts/ci-check.sh) | Atomic CI entrypoint that runs all checks |
+| [scripts/pre-commit.sh](scripts/pre-commit.sh) | Git pre-commit hook (fast checks only) |
+| [.github/pull_request_template.md](.github/pull_request_template.md) | PR template with contract checklist |
+
 ### Supporting
 
 | Directory | Purpose |

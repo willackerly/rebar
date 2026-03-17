@@ -45,6 +45,16 @@ cp -r architecture/          "$PROJECT/architecture/"
 
 # Agent orchestration (recommended)
 cp -r agents/                "$PROJECT/agents/"
+
+# Enforcement scripts and conventions (recommended)
+cp -r scripts/               "$PROJECT/scripts/"
+cp conventions.md            "$PROJECT/conventions.md"
+mkdir -p "$PROJECT/.github"
+cp .github/pull_request_template.md "$PROJECT/.github/"
+chmod +x "$PROJECT/scripts/"*.sh
+
+# Install pre-commit hook
+ln -sf ../../scripts/pre-commit.sh "$PROJECT/.git/hooks/pre-commit"
 ```
 
 If you already have `README.md`, `AGENTS.md`, or `CLAUDE.md`, diff the
