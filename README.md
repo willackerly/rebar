@@ -2,9 +2,38 @@
 
 A complete starter kit for contract-driven, agent-powered software development.
 
-**Start here:** [methodology.md](methodology.md) — the full philosophy.
-Contracts are the operating system. BDD first. Max autonomy within contracts.
-Trust but verify. Everything else implements this.
+---
+
+### So you're a human:
+
+Read [methodology.md](methodology.md) for the philosophy, then
+[SETUP.md](SETUP.md) to adopt it in your project. Pick your
+[project profile](profiles/) to know what to copy and what to skip.
+
+### So you're an agent:
+
+**a) Starting a new project?**
+Read [methodology.md](methodology.md) first — contracts are the operating
+system, everything flows from there. Then follow [SETUP.md](SETUP.md)
+step by step. Pick the [profile](profiles/) that matches your project type.
+Copy the templates, customize per the `<!-- comments -->`, write your first
+contracts in `architecture/`, then start building.
+
+**b) Aligning an existing project to this standard?**
+Read [methodology.md](methodology.md), then diff your existing docs against
+the templates. Start with the highest-leverage gaps: add `CONTRACT:` headers
+to source files, create `architecture/` with your most important interface
+contracts, adopt the [Cold Start Quad](#the-cold-start-quad) reading order.
+You don't have to adopt everything at once — see your [profile](profiles/)
+for what matters most for your project type.
+
+**c) Improving this methodology based on your learnings?**
+Drop a file in [feedback/](feedback/) describing what you learned, what's
+missing, or what didn't work. Include the project type, the situation, and
+a concrete suggestion. If you have domain-specific expertise (security,
+distributed systems, ML pipelines, etc.) that should inform the templates
+or methodology, document it as feedback — the maintainers will integrate
+what's broadly applicable.
 
 ---
 
