@@ -1,6 +1,6 @@
 # Learnings from OpenDocKit: Drift Prevention, Agent Patterns, and Contract-First Methodology
 
-**Source project:** OpenDocKit — a progressive-fidelity, client-side OOXML document renderer. Monorepo with 8 packages, 5,187+ tests, developed extensively using Claude Code agents with worktree isolation, fan-out strategies, and multi-wave execution plans.
+**Source project:** OpenDocKit — a progressive-fidelity, client-side OOXML document renderer. Monorepo with 8 packages, 5,824+ tests, developed extensively using Claude Code agents with worktree isolation, fan-out strategies, and multi-wave execution plans.
 
 ---
 
@@ -242,6 +242,99 @@ Worktree agents cannot see each other's work. This is a feature (isolation preve
 **Use main-thread sub-agents for:** read-only research and exploration, validation (running tests, typechecks, linting), synthesizing information from multiple files.
 
 **Never use worktrees for:** changes that require modifying a single shared file (the merge will conflict), changes that require real-time coordination between agents, changes where the scope is unclear (agents will expand scope into each other's territory).
+
+---
+
+## 8. Trust-but-Verify: The Agent Correction Pattern (2026-03-16)
+
+A second fan-out session (3 parallel worktree agents) revealed a distinct failure mode: **agents complete their task but against wrong assumptions about the codebase state.** This is different from the pre-launch audit problem (launching redundant agents). Here, the agents do genuinely new work, but their output needs correction before merge.
+
+### The Cases
+
+**PDF export test agent** — Tasked with adding test coverage for connectors, tables, and groups in `pdf-slide-renderer.ts`. The agent read the code, confirmed the implementations exist, then wrote 24 tests. But 14 of 24 tests asserted that connectors are "silently skipped (not yet implemented)" and tables render as "placeholder rectangles." Both were fully implemented. The agent wrote tests for a codebase state that didn't match reality — likely confused by comments, TODOs, or its own assumptions about what "new test coverage" means.
+
+**Inter/Aptos font agent** — Tasked with downloading Inter TTFs and regenerating the metrics bundle. Succeeded at the primary task but its `regenerate-metrics.sh` lost the dual-name entries (Carlito, Caladea, Liberation families) that main already had. The worktree branched from an older commit that predated those entries. The agent regenerated the file from its worktree's state, not main's.
+
+**DOCX field evaluation agent** — Clean success. All 39 new tests passed on main without modification. The difference: this agent created new files (`field-evaluator.ts`) rather than modifying existing ones, so there was no state mismatch.
+
+### The Pattern
+
+| Agent task type | Success rate without correction |
+|-----------------|-------------------------------|
+| Create new files | High (no existing state to misunderstand) |
+| Modify existing files | Medium (worktree state may diverge from main) |
+| Write tests for existing code | Low (agents assume wrong behavior 50%+ of the time) |
+
+### Prevention
+
+1. **Always review agent test assertions against actual code behavior.** Run the tests on main before committing — if they fail, the agent's assumptions were wrong.
+2. **For worktree agents modifying existing files, check the diff against main** (not just the worktree base). `diff main_file worktree_file` catches lost changes.
+3. **Agents creating new files are safest** — no existing state to conflict with, easy cherry-pick.
+4. **The orchestrating agent must plan post-merge correction time.** Budget ~30% of agent time for fix-up, not 0%.
+
+### Underlying Principle
+
+Worktree agents are like contractors working from blueprints: they build exactly what the blueprints say, but if the blueprints are from last month and the building has changed, the new work won't fit. The orchestrator's job is to be the site foreman who checks each delivery against the actual building, not the old blueprints.
+
+---
+
+## 9. Metrics Bundle as High-Blast-Radius Asset (2026-03-16)
+
+The font metrics bundle (`metrics-bundle.ts`) emerged as the single highest-blast-radius file in the monorepo. Every time it changes, tests break across 3+ packages:
+
+- **core**: decoder test thresholds (family count, face count)
+- **render**: metrics-sync test (compares core dist vs render import)
+- **pptx**: font census snapshots (Aptos→Inter changes snapshot output)
+
+In this session, adding Inter/Aptos metrics required: rebuild core (`pnpm build`), update 3 test files, update 1 snapshot. Each step was discoverable only by running `pnpm test` and seeing what broke.
+
+### Recommendation
+
+Create a `pnpm fonts:sync-tests` command that:
+1. Reads the metrics bundle's actual family/face counts
+2. Updates `metrics-decoder.test.ts` thresholds automatically
+3. Rebuilds core dist so render package sees the update
+4. Runs `--update` on snapshot tests that reference font data
+
+This turns a 4-step manual process (where missing any step breaks CI) into a single command.
+
+### Underlying Principle
+
+When a single file change reliably breaks N>2 other files, the fix-up should be automated. Manual multi-file coordination is exactly the kind of task agents (and humans) forget steps on.
+
+---
+
+## 10. Visual Inspection Over Metrics — The SBS Protocol (2026-03-16)
+
+A critical discovery during DOCX rendering development: **RMSE scores are nearly useless for guiding rendering improvements.** A page with RMSE 0.26 could mean "slight font antialiasing differences across every pixel" or "the entire cover page banner, logo, and title are completely missing." These are radically different problems requiring radically different solutions, but the metric treats them identically.
+
+### What We Found
+
+When we stopped looking at RMSE numbers and started viewing rendered pages side-by-side with Word reference output, three things happened:
+
+1. **Feature gaps became immediately obvious.** Tab stops + dot leaders were completely missing (breaking every TOC page), headers/footers weren't rendering, cover page backgrounds were absent, heading sizes were wrong. None of these showed up clearly in RMSE.
+
+2. **Priority ordering became clear.** Body text layout was actually 80-85% correct — lines breaking at nearly the same points, paragraph spacing approximately right. The remaining 20% was discrete missing features, each of which would produce a visible quality jump when added.
+
+3. **Root cause analysis became trivial.** Seeing that the TOC page has text but no dot leaders immediately tells you "tab stop rendering isn't implemented." Seeing that body text wraps slightly differently tells you "font metrics are close but column width might be slightly off." The visual tells you *what kind of fix* is needed.
+
+### The Protocol
+
+After any rendering change:
+
+1. Generate SBS reports for representative fixtures
+2. **Extract and view key pages directly** (cover, TOC, body, tables) using the Read tool on image files
+3. Write a structured assessment: what matches, what's missing, root causes, bang-for-buck priorities
+4. Use visual gaps — not RMSE deltas — to set the next round of priorities
+5. Cast progressively wider nets: fix the worst pages, re-render, inspect the next tier
+
+### Underlying Principle
+
+Quantitative metrics are useful for regression detection (did this change make things worse?), but qualitative visual inspection is essential for **direction setting** (what should I work on next?). A number can tell you the magnitude of error but not its *character*. For rendering work, the character of the error is more important than its magnitude — a missing feature is categorically different from an imprecise feature, and the fix is categorically different too.
+
+### Applicability Beyond Rendering
+
+This principle generalizes: whenever you're evaluating the quality of a complex output, look at the output directly before looking at aggregate metrics. Metrics compress information; that compression discards the structure of errors. Looking directly preserves structure and enables better decisions about what to fix.
 
 ---
 
