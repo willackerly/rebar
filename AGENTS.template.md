@@ -125,6 +125,19 @@ agents/
   findings/                    # architectural/security findings from subagents
 ```
 
+### Use Subagents Aggressively
+
+**Default to delegation, not doing it yourself.** When there is a backlog of
+work, consider fan-out strategies before deploying subagents — plan the
+sharding, check for conflicts, then launch in parallel. A single orchestrator
+doing 10 tasks sequentially is almost always slower than 10 subagents doing
+them in parallel.
+
+**Two hard rules:**
+1. **Subagents writing code MUST use worktree isolation.** No exceptions.
+2. **Subagents MUST commit before completing.** Uncommitted work in an
+   ephemeral worktree is lost work.
+
 ### When to Use Templates
 
 - **Single invocation:** Point one subagent at a template for a task you want

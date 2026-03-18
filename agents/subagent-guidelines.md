@@ -19,10 +19,12 @@ When you start, read files in this order:
 
 Do not skip steps. Do not start working before reading your template.
 
-## Isolation & Branching
+## Isolation & Branching (MANDATORY)
 
-- **Use worktree isolation** for any task that modifies files. Read-only
-  research tasks may run in the main working tree.
+- **If you are writing ANY code, you MUST use worktree isolation.** This is
+  non-negotiable. No exceptions.
+- Read-only research tasks (exploration, analysis, audits) may run in the
+  main working tree.
 - Work in your worktree branch. Do not modify the main working tree.
 - Name your branch descriptively: `agent/<template-name>-<shard-or-scope>`
 
@@ -31,8 +33,8 @@ Do not skip steps. Do not start working before reading your template.
 - Write results to the location specified in your parameters.
 - If no output path is specified, write to
   `agents/results/<template-name>-<scope>.md`
-- **Commit results before completing.** Your worktree is ephemeral —
-  uncommitted work is lost.
+- **You MUST commit before completing.** Your worktree is ephemeral —
+  uncommitted work is lost. No commit = no work happened.
 - Use a descriptive commit message:
   `agents/<template-name>: <brief description of what was done>`
 
