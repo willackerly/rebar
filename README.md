@@ -100,6 +100,7 @@ Different projects need different subsets. Pick your profile:
 |------|---------|
 | [AGENT-RUNTIME.md](AGENT-RUNTIME.md) | Proposal: turn contract-driven docs into contract-driven multi-agent execution. Agents as long-lived processes with scoped memory, filesystem boundaries, and a query interface. |
 | [ASK-SHELL.md](ASK-SHELL.md) | Proposal: Unix-like shell for agent interaction. `ask` is to agents what `grep` is to code. |
+| [IMPLEMENTATION.md](IMPLEMENTATION.md) | Implementation roadmap: bash v0 (afternoon) → bash v1 (week) → Go v2 (mature). Includes working code, architecture, interfaces, testing strategy. |
 
 ### Supporting
 
