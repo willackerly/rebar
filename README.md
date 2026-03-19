@@ -1,79 +1,702 @@
 # agent-templates
 
-A complete starter kit for contract-driven, agent-powered software development.
+A complete system for contract-driven, agent-powered software development.
+
+This is not a framework you install. It's a set of files you copy into your
+project that give AI agents (and humans) the structure they need to build
+software correctly. Contracts define what components should do. Agents read
+contracts before writing code. Automated scans catch drift between intent and
+reality. Everything is plain text — bash, markdown, grep, jq.
 
 ---
 
-### So you're a human:
+## Table of Contents
 
-Read [methodology.md](methodology.md) for the philosophy, then
-[SETUP.md](SETUP.md) to adopt it in your project. Pick your
-[project profile](profiles/) to know what to copy and what to skip.
-
-### So you're an agent:
-
-**a) Starting a new project?**
-Read [methodology.md](methodology.md) first — contracts are the operating
-system, everything flows from there. Then follow [SETUP.md](SETUP.md)
-step by step. Pick the [profile](profiles/) that matches your project type.
-Copy the templates, customize per the `<!-- comments -->`, write your first
-contracts in `architecture/`, then start building.
-
-**b) Aligning an existing project to this standard?**
-Read [methodology.md](methodology.md), then diff your existing docs against
-the templates. Start with the highest-leverage gaps: add `CONTRACT:` headers
-to source files, create `architecture/` with your most important interface
-contracts, adopt the [Cold Start Quad](#the-cold-start-quad) reading order.
-You don't have to adopt everything at once — see your [profile](profiles/)
-for what matters most for your project type.
-
-**c) Improving this methodology based on your learnings?**
-Drop a file in [feedback/](feedback/) describing what you learned, what's
-missing, or what didn't work. Include the project type, the situation, and
-a concrete suggestion. If you have domain-specific expertise (security,
-distributed systems, ML pipelines, etc.) that should inform the templates
-or methodology, document it as feedback — the maintainers will integrate
-what's broadly applicable.
+- [The Problem](#the-problem)
+- [The Core Idea: Contracts](#the-core-idea-contracts)
+- [How Contracts Work](#how-contracts-work)
+- [The Cold Start Quad](#the-cold-start-quad)
+- [The Agent Team (ASK)](#the-agent-team-ask)
+- [Quality Infrastructure](#quality-infrastructure)
+- [Anti-Drift Mechanisms](#anti-drift-mechanisms)
+- [Getting Started](#getting-started)
+- [Project Structure](#project-structure)
+- [Design Decisions](#design-decisions)
+- [Related Work](#related-work)
+- [Future Concepts](#future-concepts)
 
 ---
 
-## What's Included
+## The Problem
 
-### The Methodology
+AI coding agents are fast, capable, and confidently wrong. They break things
+in a specific way: they make changes that are **locally correct but globally
+wrong**. The function works. The tests pass. But the change violates an
+architectural boundary, contradicts a design decision made weeks ago, or
+introduces behavior that conflicts with another component's assumptions.
 
-| File | Purpose |
-|------|---------|
-| [methodology.md](methodology.md) | **The philosophy.** Contract-driven development, BDD-first, agent autonomy model, anti-drift mechanisms. Read this to understand *why* everything else is structured the way it is. |
+This happens because agents don't have access to **architectural intent**.
+Code tells you what exists right now. Tests tell you if it works. But neither
+tells you:
 
-### The Cold Start Quad
+- What was **intended** vs. accidentally implemented
+- What was **deliberately excluded** vs. forgotten
+- Where the **boundaries** are vs. what just hasn't been tested yet
+- What the **dependencies** are vs. what happens to work
+- **Who** this serves and **why** they need it
 
-Four files every agent reads on session start, in order:
+Without this information, agents fill in the gaps with assumptions. Those
+assumptions compound across sessions, across agents, and across time. The
+result is a codebase that technically works but has lost its architectural
+coherence — the design equivalent of a game of telephone.
 
-| Order | Template | Purpose |
-|-------|----------|---------|
-| 1 | [README.template.md](README.template.md) | Universal first-read — project orientation, architecture overview, cold start instructions |
-| 2 | [QUICKCONTEXT.template.md](QUICKCONTEXT.template.md) | What's true right now — branch, test counts, active work, blockers |
-| 3 | [TODO.template.md](TODO.template.md) | Tasks + known issues + blockers (two-tag tracking system) |
-| 4 | [AGENTS.template.md](AGENTS.template.md) | How we work — norms, testing cascade, contracts, agent collaboration |
+**The fix is simple in concept:** write down the architectural intent in a
+format agents can find and understand, link it bidirectionally to the code
+that implements it, and automate the verification that they stay in sync.
 
-Plus: [CLAUDE.template.md](CLAUDE.template.md) — Claude Code-specific configuration.
+That's what this repo provides.
 
-### The Contract System
+---
 
-| File | Purpose |
-|------|---------|
-| [architecture/README.md](architecture/README.md) | How the contract system works — naming, linking, versioning |
-| [architecture/CONTRACT-TEMPLATE.md](architecture/CONTRACT-TEMPLATE.md) | Annotated template for new contracts |
-| [architecture/CONTRACT-REGISTRY.template.md](architecture/CONTRACT-REGISTRY.template.md) | Index of all contracts |
+## The Core Idea: Contracts
 
-### Agent Orchestration
+A **contract** is a versioned markdown document that defines what a component
+does, who it serves, why it exists, and how it interfaces with other
+components. Contracts live in `architecture/` and are the single source of
+truth for system behavior.
 
-| Directory | Purpose |
-|-----------|---------|
-| [agents/](agents/) | Subagent guidelines, prompt index, and templates |
-| [agents/subagent-prompts/](agents/subagent-prompts/) | UX review, security scan, code review, contract audit, doc drift, feature inventory, test sharding |
+Here's what makes contracts different from regular documentation:
 
-### Project Profiles
+**1. They're doubly-linked to code.** Every source file has a header comment
+declaring which contract it implements. Every contract lists its implementing
+files. You can go from code to spec or spec to code with a single `grep`.
+
+```go
+// Package blobstore implements encrypted blob storage.
+//
+// CONTRACT:C1-BLOBSTORE.2.1
+package blobstore
+```
+
+```bash
+# Find all code implementing a contract
+grep -rn "CONTRACT:C1-BLOBSTORE" src/ internal/
+
+# Find what contract a file implements
+head -10 internal/blobstore/file.go
+```
+
+**2. They're versioned.** Breaking changes bump the major version. Additive
+changes bump the minor. Old versions are kept (marked superseded) so you can
+trace evolution. When a contract version bumps, `grep` finds every file that
+needs updating.
+
+**3. They define behavior, not just interfaces.** A contract doesn't just list
+function signatures — it specifies what happens on edge cases, what errors are
+returned, what guarantees are made. These behavioral contracts are what tests
+verify.
+
+| Behavior | Specification |
+|----------|--------------|
+| `Get` on missing key | Returns `ErrNotFound` (not generic error) |
+| `Put` with empty data | Returns `ErrInvalidInput` |
+| `Delete` on missing key | No-op (idempotent), returns nil |
+| Concurrent safety | All methods safe for concurrent use |
+
+**4. They have a computed lifecycle.** The [Steward](#the-steward) scans
+the codebase and derives each contract's status from what actually exists:
+
+| Status | How It's Determined |
+|--------|-------------------|
+| **DRAFT** | Contract file exists but is missing required sections |
+| **ACTIVE** | All sections present, no implementing code found yet |
+| **TESTING** | Implementing code exists, but no test files found |
+| **VERIFIED** | Implementing code AND test files exist |
+
+Status is never declared manually — it's always computed from reality.
+
+**5. They're the unit of agent autonomy.** Agents have full authority to
+write, edit, refactor, delete, test, commit, and push — as long as they're
+working within existing contracts. Creating or breaking a contract requires
+discussion (plan mode). This makes autonomy safe: agents move fast within
+boundaries, and the system forces a pause when boundaries need to change.
+
+### The Rules
+
+These are non-negotiable:
+
+1. **Don't implement without a contract.** If there's no contract for what
+   you're building, write the contract first.
+2. **Don't modify code without checking its contract.** Every source file
+   declares which contract it implements. Read it before changing behavior.
+3. **Don't update a contract without searching implementations.**
+   `grep -rn "CONTRACT:{id}"` finds all implementing code. Update them all.
+4. **Contract changes that break interfaces require plan mode.**
+
+### What a Contract Contains
+
+Every contract has these required sections:
+
+| Section | Purpose |
+|---------|---------|
+| **Interfaces** | The public API — function signatures, types, protocols |
+| **Behavioral Contracts** | Edge cases, guarantees, ordering — what tests verify |
+| **Error Contracts** | Which errors, when, with what codes |
+| **Test Requirements** | What must be tested for the contract to be satisfied |
+| **Implementing Files** | Which source files implement this contract |
+
+Optional sections include **Scenarios** (Gherkin-style Given/When/Then for
+UI/API contracts) and a **Companion File** (tribal knowledge that supports
+the contract but doesn't define behavior — see [conventions.md](conventions.md)).
+
+See [architecture/CONTRACT-TEMPLATE.md](architecture/CONTRACT-TEMPLATE.md)
+for the annotated template.
+
+---
+
+## How Contracts Work
+
+### The Full Chain: Who/Why → Contract → Code → Verify
+
+The methodology flows in one direction:
+
+```
+1. BDD First    → Who needs this? Why? What does success look like?
+2. Contract     → Formalize into a versioned architecture document
+3. Implement    → Write code that references the contract
+4. Verify       → Tests validate contract conformance
+5. Evolve       → Update contract, search implementations, propagate changes
+```
+
+**BDD first** means every contract traces back to a user need. Before writing
+a contract, you answer: who is the persona? What scenario are they in? What
+does success look like? This lives in `product/` (personas, epics, features)
+and contracts reference their source: `**Source:** product/features/encrypted-storage.feature`.
+
+This chain prevents the most common failure mode in agent-driven development:
+building technically correct things that nobody asked for.
+
+### Naming Convention
+
+```
+CONTRACT-{ID}-{NAME}.{MAJOR}.{MINOR}.md
+```
+
+| Prefix | Meaning | Example |
+|--------|---------|---------|
+| `S` | Service (top-level system boundary) | `S1-AUTH`, `S4-STORAGE` |
+| `C` | Component (internal module) | `C1-BLOBSTORE`, `C2-RELAY` |
+| `I` | Interface (shared between components) | `I1-SESSION`, `I2-KEY-EXCHANGE` |
+| `P` | Protocol (wire format, messaging) | `P1-WIRE-FORMAT`, `P2-SIGNALING` |
+
+### The Discovery Taxonomy
+
+When reality diverges from contracts, that gap has a name:
+
+| Type | What It Means | Who Resolves |
+|------|---------------|-------------|
+| **BUG** | Behavior contradicts a contract | Developer fixes the code |
+| **DISCOVERY** | Behavior exists but no contract covers it | Architect writes a contract |
+| **DRIFT** | Behavior matches contract literally but misses intent | Architect + Developer refine both |
+| **DISPUTE** | The contract itself is wrong | Architect + Product update the contract |
+
+Discoveries live in the `## Discoveries` section of `TODO.md` and are parsed
+by the Steward. They're the feedback loop that keeps contracts honest.
+
+---
+
+## The Cold Start Quad
+
+Every agent session starts by reading four files, in this order:
+
+| Order | File | Purpose | Drift Risk |
+|-------|------|---------|-----------|
+| 1 | `README.md` | What this project is, how to navigate | Low |
+| 2 | `QUICKCONTEXT.md` | What's true right now — branch, test counts, active work | **High** |
+| 3 | `TODO.md` | Tasks, known issues, blockers, discoveries | Medium-High |
+| 4 | `AGENTS.md` | How we work — norms, testing cascade, contracts | Low |
+
+Plus `CLAUDE.md` for Claude Code-specific configuration.
+
+**Why this order:** Orientation first (README), then current state
+(QUICKCONTEXT), then tasks (TODO), then norms (AGENTS). An agent that
+understands what the project is before diving into what's happening now makes
+better decisions. The order goes from stable/strategic to volatile/tactical.
+
+After the quad, agents should verify what they read:
+
+```bash
+# Cross-reference QUICKCONTEXT claims against reality
+git log --oneline -10
+grep -i "branch" QUICKCONTEXT.md
+
+# Verify ground truth metrics
+[ -x scripts/check-ground-truth.sh ] && ./scripts/check-ground-truth.sh
+```
+
+This takes 2 minutes and prevents hours of wasted effort on stale information.
+
+This repo provides templates for all four files:
+[README.template.md](README.template.md),
+[QUICKCONTEXT.template.md](QUICKCONTEXT.template.md),
+[TODO.template.md](TODO.template.md),
+[AGENTS.template.md](AGENTS.template.md),
+[CLAUDE.template.md](CLAUDE.template.md).
+
+---
+
+## The Agent Team (ASK)
+
+**ASK** (Agent Scoped Knowledge) is a CLI that gives each agent role its
+own persona, memory, and bounded context. It's a bash script in `bin/ask`.
+
+### Built-In Roles
+
+| Role | What It Owns | Default Command |
+|------|-------------|----------------|
+| **Architect** | Contracts, system design, architecture/ | `ask architect` → contract audit |
+| **Product** | Requirements, BDD scenarios, product/ | `ask product` → gap analysis |
+| **Eng Lead** | Implementation, QA, TODO, QUICKCONTEXT | `ask englead` → enforcement status |
+| **Steward** | Quality scanning, architecture/.state/ | `ask steward` → full health scan |
+
+### Two Interaction Modes
+
+**Questions** — ask an agent something in natural language:
+
+```bash
+ask architect "What contract governs authentication?"
+ask product "What are the current requirements for file storage?"
+ask -v architect "Why was RSA chosen over ECDH?"   # verbose: answer + rationale + refs
+```
+
+**Commands** — run an agent's built-in action (unquoted single word):
+
+```bash
+ask steward              # full quality scan
+ask steward summary      # one-line health check
+ask steward json         # aggregate JSON to stdout
+ask steward check C1     # scan a single contract
+
+ask architect            # contract audit (DRAFTs, DISPUTEs, action items)
+ask architect audit      # same thing, explicit
+
+ask englead              # enforcement results, TESTING contracts
+ask englead check        # run ci-check.sh
+ask englead qa           # full QA flow: steward scan + enforcement
+
+ask product              # gap analysis (DISCOVERYs, missing BDD refs)
+ask product gaps         # same thing, explicit
+```
+
+The convention: **quoted = question, unquoted = command.** Under the hood,
+each agent has a `commands/` directory with executable scripts. Drop a new
+`.sh` file in `agents/<role>/commands/` and it's immediately available as
+`ask <role> <command-name>`.
+
+### Other ASK Commands
+
+```bash
+ask who                  # list available agents
+ask init                 # initialize directory structure + create agents
+ask status architect     # check if an agent is running
+ask log architect        # view interaction history
+ask reset architect      # clear session, start fresh next question
+ask register myproject   # register project for cross-project queries
+ask myproject:architect "what is the architecture?"   # cross-project query
+```
+
+### Session Persistence
+
+Agents maintain sessions across questions. The first question pays the full
+context cost; follow-ups resume the session. When context usage hits 70%
+(configurable via `ASK_CONTEXT_LIMIT`), the session auto-resets.
+
+### How Agents Are Structured
+
+Each agent is a directory under `agents/` with:
+
+```
+agents/architect/
+  AGENT.md              # Role definition, responsibilities, context loading rules
+  commands/             # Executable command scripts (default.sh, audit.sh, etc.)
+  memory.md             # Distilled current state (persists across sessions)
+  memory.log.md         # Append-only interaction history
+  inbox/                # Incoming messages (when running via `ask up`)
+  outbox/               # Outgoing responses
+```
+
+See [bin/README.md](bin/README.md) for the full ASK reference.
+
+### Subagent Templates
+
+For delegation (one agent assigning work to others), the system includes
+reusable prompt templates in `agents/subagent-prompts/`:
+
+| Template | Purpose |
+|----------|---------|
+| [code-review.md](agents/subagent-prompts/code-review.md) | Multi-dimension code review |
+| [contract-audit.md](agents/subagent-prompts/contract-audit.md) | Interface conformance check |
+| [security-surface-scan.md](agents/subagent-prompts/security-surface-scan.md) | Security audit |
+| [ux-review.md](agents/subagent-prompts/ux-review.md) | UX, accessibility, responsive |
+| [doc-drift-detector.md](agents/subagent-prompts/doc-drift-detector.md) | Doc-vs-code consistency |
+| [feature-inventory.md](agents/subagent-prompts/feature-inventory.md) | Behavioral inventory for safe refactoring |
+| [test-shard-runner.md](agents/subagent-prompts/test-shard-runner.md) | Parallel test execution |
+
+Templates encode **your** definition of how a task should be done. If you've
+ever corrected an agent ("no, not like that — here's how we do reviews"),
+that correction belongs in a template. See [agents/README.md](agents/README.md).
+
+---
+
+## Quality Infrastructure
+
+### The Steward
+
+The Steward is the project's technical program manager in code form. It scans
+the contract system, runs enforcement checks, and produces per-role action
+items. It reports facts — it doesn't prescribe solutions.
+
+```bash
+scripts/steward.sh             # full scan → JSON + markdown report
+scripts/steward.sh --json      # aggregate JSON to stdout
+scripts/steward.sh --summary   # one-line summary
+scripts/steward.sh --check C1  # single contract
+
+# Or through ASK:
+ask steward                    # same as scripts/steward.sh
+ask steward summary            # one-liner
+```
+
+**What it checks per contract:**
+- Spec gate: are all required sections present?
+- Impl gate: do any source files reference this contract? Are there tests?
+- Lifecycle: computed from the above (DRAFT → ACTIVE → TESTING → VERIFIED)
+- Discoveries: any BUG/DISCOVERY/DRIFT/DISPUTE entries in TODO.md?
+
+**What it checks globally:**
+- Enforcement: runs all `check-*.sh` scripts, captures pass/fail
+- Ground truth: runs metric verification against the METRICS file
+
+**What it produces:**
+- Per-contract JSON: `architecture/.state/<id>.<version>.json`
+- Aggregate JSON: `architecture/.state/steward-report.json`
+- Human-readable: `STEWARD_REPORT.md`
+
+The JSON schema is designed so a future single-file HTML dashboard could
+`fetch()` the report and render it — no server, no build step.
+
+**Role-based action items:**
+
+| Role | Sees | Acts On |
+|------|------|---------|
+| Architect | DRAFT contracts, DISPUTEs | Complete contracts, resolve disputes |
+| Eng Lead | Enforcement failures, TESTING contracts | Fix failures, coordinate verification |
+| Product | DISCOVERYs, missing BDD refs | Write requirements, fill coverage gaps |
+| Developer | ACTIVE contracts, BUGs | Implement contracts, fix bugs |
+
+### Enforcement Scripts
+
+Individual checks, each standalone and fast (<5s):
+
+| Script | What It Checks |
+|--------|---------------|
+| `check-contract-headers.sh` | Every source file has a `CONTRACT:` header |
+| `check-contract-refs.sh` | Every `CONTRACT:` ref points to a real contract file |
+| `check-todos.sh` | No untracked `TODO:` comments (two-tag system) |
+| `check-freshness.sh` | Doc freshness dates aren't stale (>14 days) |
+| `check-registry.sh` | Contract registry matches actual files |
+| `check-ground-truth.sh` | METRICS file matches codebase reality |
+
+Composite runners:
+
+| Script | When |
+|--------|------|
+| `ci-check.sh` | CI pipeline — runs all checks, reports summary |
+| `pre-commit.sh` | Git hook — runs fast checks before commit |
+| `steward.sh` | Full quality scan — everything above + contract lifecycle |
+
+See [scripts/README.md](scripts/README.md) for installation and configuration.
+
+### Ground Truth Metrics
+
+Quantitative claims (test counts, contract counts, endpoint counts) drift
+faster than any other documentation. The `METRICS` file is the single source
+of truth for project-wide numbers, and `check-ground-truth.sh` verifies it
+against code. This catches the failure mode where everything works but
+documented numbers describe a different reality.
+
+---
+
+## Anti-Drift Mechanisms
+
+Documentation drifts from reality at the speed of code changes. Agents both
+suffer from and contribute to drift. These mechanisms fight it:
+
+| Mechanism | How It Works |
+|-----------|-------------|
+| **Freshness timestamps** | Every status-bearing doc has a date. >2 weeks old = treat with skepticism. |
+| **Two-tag TODO system** | `TODO:` in code = untracked = blocks commit. `TRACKED-TASK:` = tracked in TODO.md = allowed. |
+| **Doubly-linked contracts** | Code references contracts, contracts list implementing files. Either direction is searchable. |
+| **Contract version bumps** | Changing a contract forces you to grep all implementing code and update it. |
+| **Ground truth script** | Computes metrics from code and compares against documented claims. |
+| **Pre-launch audits** | Before fan-out, grep for existing implementations. Prevents 50% waste. |
+| **Cold start verification** | Every new session verifies QUICKCONTEXT claims against `git log`. |
+| **Steward scans** | Automated quality scan catches lifecycle gaps, missing tests, stale contracts. |
+| **Discovery taxonomy** | BUG/DISCOVERY/DRIFT/DISPUTE captures the full spectrum of spec-reality gaps. |
+
+The underlying principle: **the filesystem is the source of truth.** When docs
+say one thing and `ls` + `grep` say another, the filesystem wins. Docs
+describe intent; the filesystem describes reality. Both matter, but reality
+takes precedence when they conflict.
+
+---
+
+## Getting Started
+
+### For Humans
+
+1. Read [methodology.md](methodology.md) — the philosophy
+2. Pick your [project profile](profiles/) — tells you what to adopt
+3. Follow [SETUP.md](SETUP.md) — step-by-step adoption guide
+4. Customize the templates per the `<!-- comments -->` in each file
+
+### For Agents
+
+**Starting a new project:** Read [methodology.md](methodology.md) first, then
+follow [SETUP.md](SETUP.md) step by step. Contracts are the operating system —
+everything flows from there.
+
+**Aligning an existing project:** Diff your docs against the templates. Start
+with `CONTRACT:` headers in source files and an `architecture/` directory with
+your most important contracts. See your [profile](profiles/) for priorities.
+
+**Improving this methodology:** Drop a file in [feedback/](feedback/)
+describing what you learned, what's missing, or what didn't work.
+
+### Quick Start
+
+```bash
+PROJECT=/path/to/your/project
+
+# Core docs (the Cold Start Quad + Claude config)
+cp README.template.md       "$PROJECT/README.md"
+cp QUICKCONTEXT.template.md "$PROJECT/QUICKCONTEXT.md"
+cp TODO.template.md         "$PROJECT/TODO.md"
+cp AGENTS.template.md       "$PROJECT/AGENTS.md"
+cp CLAUDE.template.md       "$PROJECT/CLAUDE.md"
+cp methodology.md           "$PROJECT/methodology.md"
+
+# Contract system
+cp -r architecture/         "$PROJECT/architecture/"
+mkdir -p "$PROJECT/architecture/.state"
+
+# Agent orchestration
+cp -r agents/               "$PROJECT/agents/"
+
+# Enforcement scripts
+cp -r scripts/              "$PROJECT/scripts/"
+cp conventions.md           "$PROJECT/conventions.md"
+cp METRICS.template         "$PROJECT/METRICS"
+chmod +x "$PROJECT/scripts/"*.sh
+
+# ASK CLI
+cp -r bin/                  "$PROJECT/bin/"
+chmod +x "$PROJECT/bin/"*
+
+# Pre-commit hook
+ln -sf ../../scripts/pre-commit.sh "$PROJECT/.git/hooks/pre-commit"
+
+# Initialize ASK agents
+cd "$PROJECT" && bin/ask init
+```
+
+See [SETUP.md](SETUP.md) for the detailed guide with customization steps.
+
+---
+
+## Project Structure
+
+```
+agent-templates/
+│
+├── methodology.md                  # The philosophy — read this first
+├── conventions.md                  # Branch naming, commits, file headers, reviews
+├── SETUP.md                        # Step-by-step adoption guide
+├── learnings-from-opendockit.md    # War stories from 5,800+ tests & 9 agents
+│
+├── # Templates (copy these into your project)
+├── README.template.md              # Cold Start Quad #1 — project orientation
+├── QUICKCONTEXT.template.md        # Cold Start Quad #2 — current state
+├── TODO.template.md                # Cold Start Quad #3 — tasks + discoveries
+├── AGENTS.template.md              # Cold Start Quad #4 — norms + collaboration
+├── CLAUDE.template.md              # Claude Code config
+├── METRICS.template                # Ground truth metrics (key=value)
+├── STEWARD_REPORT.template.md      # Steward report format reference
+│
+├── architecture/                   # The contract system
+│   ├── README.md                   # How contracts work
+│   ├── CONTRACT-TEMPLATE.md        # Annotated contract template
+│   ├── CONTRACT-REGISTRY.template.md  # Contract index
+│   └── .state/                     # Steward output (per-contract + aggregate JSON)
+│
+├── agents/                         # Agent orchestration
+│   ├── README.md                   # How agent templates work
+│   ├── subagent-guidelines.md      # Shared behavioral rules for all subagents
+│   ├── subagent-prompts-index.md   # Catalog of available templates
+│   ├── subagent-prompts/           # Reusable prompt templates
+│   │   ├── code-review.md
+│   │   ├── contract-audit.md
+│   │   ├── security-surface-scan.md
+│   │   ├── ux-review.md
+│   │   ├── doc-drift-detector.md
+│   │   ├── feature-inventory.md
+│   │   └── test-shard-runner.md
+│   ├── architect/                  # Architect agent
+│   │   ├── AGENT.md                #   Role definition
+│   │   └── commands/               #   audit, default
+│   ├── product/                    # Product agent
+│   │   ├── AGENT.md
+│   │   └── commands/               #   gaps, default
+│   ├── englead/                    # Engineering Lead agent
+│   │   ├── AGENT.md
+│   │   └── commands/               #   check, qa, default
+│   ├── steward/                    # Steward agent (quality scanner)
+│   │   ├── AGENT.md
+│   │   └── commands/               #   scan, json, summary, check, default
+│   ├── findings/                   # Architectural findings from subagents
+│   └── results/                    # Subagent output files
+│
+├── bin/                            # ASK CLI
+│   ├── README.md                   # Full ASK reference
+│   ├── ask                         # The CLI script
+│   └── ask-agent-loop              # Background agent loop runner
+│
+├── scripts/                        # Enforcement + quality
+│   ├── README.md                   # Script reference
+│   ├── steward.sh                  # Full quality scan
+│   ├── ci-check.sh                 # CI entrypoint (runs all checks)
+│   ├── pre-commit.sh               # Git pre-commit hook
+│   ├── check-contract-headers.sh   # Source files have CONTRACT: headers
+│   ├── check-contract-refs.sh      # CONTRACT: refs point to real files
+│   ├── check-todos.sh              # No untracked TODO: comments
+│   ├── check-freshness.sh          # Doc freshness dates aren't stale
+│   ├── check-registry.sh           # Registry matches actual files
+│   └── check-ground-truth.sh       # METRICS matches codebase reality
+│
+├── profiles/                       # Project-type adoption guides
+│   ├── README.md
+│   ├── web-app.md
+│   ├── api-service.md
+│   ├── crypto-library.md
+│   └── cli-tool.md
+│
+├── feedback/                       # Agent/human feedback on methodology
+│   └── README.md
+│
+├── # Design documents (proposals, roadmap)
+├── AGENT-RUNTIME.md                # Proposal: multi-agent execution runtime
+├── ASK-SHELL.md                    # Proposal: Unix shell for agent interaction
+└── IMPLEMENTATION.md               # Implementation roadmap: bash v0 → Go v2
+```
+
+---
+
+## Design Decisions
+
+This repo was built iteratively from real agent-driven development. Each
+decision emerged from a failure that the previous approach didn't prevent.
+
+### Why contracts became the center, not docs or tests
+
+We started with documentation templates (QUICKCONTEXT, AGENTS, TODO) and they
+worked — agents oriented faster, drift decreased. But agents kept changing
+code that *technically worked* but violated architectural intent. They'd
+refactor a function in a way that broke an implicit contract with another
+module, or add a feature that contradicted a design decision from weeks ago.
+
+The problem: no document answered "what is this code *supposed to do*
+according to the architecture?" Tests answer "does it work?" Code answers
+"what does it do right now?" But neither answers "what was intended, and what
+boundaries must be respected?" That's what contracts do.
+
+### Why grep-based linking over tooling
+
+`// CONTRACT:C1-BLOBSTORE.2.1` in code headers + `grep -rn` to find
+implementations. No build plugins, no custom linters, no databases.
+
+- **Zero adoption cost.** Any project can start using it today.
+- **Tool-agnostic.** Works with any editor, any AI agent, any CI.
+- **Transparent.** The linking mechanism is visible in the code.
+- **Resilient.** No tool to break, update, or configure.
+
+The value comes from the *practice* of writing and referencing contracts, not
+from tooling. Start with grep. Add tooling later if scale demands it.
+
+### Why subagent templates matter for single invocations
+
+We built `agents/subagent-prompts/` for parallel fan-out. But the bigger
+insight: **templates are just as valuable for single tasks.** When you ask an
+agent to do a "UX review" without a template, it guesses what you mean. A
+`ux-review.md` template encodes *your* definition — your criteria, heuristics,
+and output format. If you've ever corrected an agent, that correction belongs
+in a template. This is how agents learn across sessions.
+
+### Why TODO absorbed KNOWN_ISSUES
+
+We had QUICKCONTEXT, KNOWN_ISSUES, TODO, AGENTS, CLAUDE — five files. In
+practice, KNOWN_ISSUES and TODO overlapped and agents had to maintain both.
+Every additional file is a drift surface. Merging known issues into TODO as a
+section reduced maintenance without losing information. Fewer files actually
+maintained beats more files that drift.
+
+### Why README is the universal first-read
+
+Previously QUICKCONTEXT was first. But it answers "what's happening now," not
+"what is this project?" An agent that dives into current state without
+understanding the project's identity makes worse decisions. README provides
+stable orientation; QUICKCONTEXT is volatile and tactical. The reading order
+goes from stable/strategic to volatile/tactical.
+
+### Why lifecycle is computed, not declared
+
+We adopted lifecycle tracking from [Purlin](#related-work), but with a key
+difference: status is derived from what exists in the codebase (do implementing
+files exist? do test files exist? are all spec sections present?) rather than
+manually declared. Computed status can't drift — it's always accurate because
+it's always recomputed from reality.
+
+### Why agent commands are unquoted
+
+`ask steward "what needs attention?"` asks a question. `ask steward` runs a
+scan. The convention — quoted = question, unquoted = command — emerged from
+wanting each role to own a slice of project health without requiring the full
+persona invocation. Each agent has a `commands/` directory; drop a `.sh` file
+in it and it's immediately available. Zero changes to `bin/ask` needed.
+
+### How this repo was built
+
+This repo emerged from a single conversation about Claude Code subagent
+concurrency limits, evolved through prompt templates as version-controlled
+infrastructure, and grew into a complete methodology for contract-driven
+agent development. Each idea built on the last:
+
+- Subagent fan-out → reusable prompt templates
+- Templates → single-invocation value (not just fan-out)
+- Templates need shared rules → behavioral contracts for agents
+- Agent contracts → why not contracts for code?
+- Code contracts → BDD first (who/why before what/how)
+- Docs needed → Cold Start Quad
+- Docs drifted → anti-drift mechanisms
+- Different projects → profiles
+- Quality gaps → Steward + enforcement scripts
+- Agent roles → ASK CLI with commands
+
+The [learnings document](learnings-from-opendockit.md) captures the raw
+failure analysis and war stories from 5,800+ tests and 9 simultaneous agents.
+
+---
+
+## Adoption Profiles
 
 Different projects need different subsets. Pick your profile:
 
@@ -84,350 +707,8 @@ Different projects need different subsets. Pick your profile:
 | [crypto-library](profiles/crypto-library.md) | Security-critical library |
 | [cli-tool](profiles/cli-tool.md) | Command-line tool |
 
-### Conventions & Enforcement
-
-| File | Purpose |
-|------|---------|
-| [conventions.md](conventions.md) | Branch naming, commit messages, file headers, contract review checklist |
-| [scripts/](scripts/) | Enforcement scripts — contract headers, refs, TODOs, freshness, registry |
-| [scripts/ci-check.sh](scripts/ci-check.sh) | Atomic CI entrypoint that runs all checks |
-| [scripts/pre-commit.sh](scripts/pre-commit.sh) | Git pre-commit hook (fast checks only) |
-| [.github/pull_request_template.md](.github/pull_request_template.md) | PR template with contract checklist |
-
-### Agent Runtime (Proposed)
-
-| File | Purpose |
-|------|---------|
-| [AGENT-RUNTIME.md](AGENT-RUNTIME.md) | Proposal: turn contract-driven docs into contract-driven multi-agent execution. Agents as long-lived processes with scoped memory, filesystem boundaries, and a query interface. |
-| [ASK-SHELL.md](ASK-SHELL.md) | Proposal: Unix-like shell for agent interaction. `ask` is to agents what `grep` is to code. |
-| [IMPLEMENTATION.md](IMPLEMENTATION.md) | Implementation roadmap: bash v0 (afternoon) → bash v1 (week) → Go v2 (mature). Includes working code, architecture, interfaces, testing strategy. |
-
-### Supporting
-
-| Directory | Purpose |
-|-----------|---------|
-| [feedback/](feedback/) | Lightweight feedback mechanism — agents drop suggestions here |
-| [profiles/](profiles/) | Project-type adoption guides |
-| [learnings-from-opendockit.md](learnings-from-opendockit.md) | Battle-tested patterns and failure analysis from 5,800+ tests and 9 simultaneous agents |
-
-## Quick Start
-
-See [SETUP.md](SETUP.md) for the full adoption guide. The short version:
-
-```bash
-PROJECT=/path/to/your/project
-
-# Core docs
-cp README.template.md       "$PROJECT/README.md"
-cp QUICKCONTEXT.template.md "$PROJECT/QUICKCONTEXT.md"
-cp TODO.template.md         "$PROJECT/TODO.md"
-cp AGENTS.template.md       "$PROJECT/AGENTS.md"
-cp CLAUDE.template.md       "$PROJECT/CLAUDE.md"
-cp methodology.md           "$PROJECT/methodology.md"
-
-# Contract system
-cp -r architecture/         "$PROJECT/architecture/"
-
-# Agent orchestration (optional)
-cp -r agents/               "$PROJECT/agents/"
-
-# Customize everything (follow the <!-- comments --> in each template)
-```
-
-## Design Philosophy
-
-See [methodology.md](methodology.md) for the complete philosophy. In brief:
-
-1. **Contracts are the operating system** — don't implement without a contract
-2. **BDD first** — encode who and why before writing contracts
-3. **Max autonomy within contracts** — agents are unrestricted inside contract boundaries
-4. **Trust but verify** — freshness markers, pre-launch audits, filesystem as truth
-5. **Encode corrections as infrastructure** — if you've corrected an agent, put it in a template
-6. **Fast inner loops** — Testing Cascade T0-T5, iterate at the speed of a single test
-
-## Design Decisions
-
-This repo was built iteratively — each decision emerged from the last. If
-you're evaluating whether to adopt it, these are the non-obvious choices
-and why we made them.
-
-### Why contracts became the center, not docs or tests
-
-We started with documentation templates (QUICKCONTEXT, AGENTS, TODO) and they
-worked — agents oriented faster, drift decreased. But we kept hitting the same
-failure mode: agents would change code that *technically worked* but violated
-the architectural intent. They'd refactor a function in a way that broke an
-implicit contract with another module, or add a feature that contradicted a
-design decision made months ago.
-
-The problem wasn't missing docs. It was that no document answered the question
-"what is this code *supposed to do* according to the architecture?" Tests
-answer "does it work?" Code answers "what does it do right now?" But neither
-answers "what was intended, and what boundaries must be respected?" That's
-what contracts do. Once we made contracts explicit, versioned, and
-doubly-linked to code, agents stopped making locally-correct but
-globally-wrong decisions.
-
-### Why grep-based linking over tooling
-
-The contract system uses `// CONTRACT:C1-BLOBSTORE.2.1` in code headers and
-`grep -rn "CONTRACT:C1-BLOBSTORE"` to find implementations. No build plugins,
-no custom linters, no databases. This is deliberate:
-
-- **Zero adoption cost.** Any project can start using it immediately.
-- **Tool-agnostic.** Works with any editor, any AI agent, any CI system.
-- **Transparent.** The linking mechanism is visible in the code itself.
-- **Resilient.** No tool to break, update, or configure.
-
-A dedicated tool could provide richer features (link validation, dependency
-graphs, automatic registry updates), but the value of the contract system
-comes from the *practice* of writing and referencing contracts, not from
-tooling. Start with grep. Add tooling later if the scale demands it.
-
-### Why subagent templates matter for single invocations, not just fan-out
-
-We originally built the `agents/subagent-prompts/` system for parallel
-fan-out — sharding test runs across 20 agents, auditing packages in parallel.
-That works well, but the bigger insight was simpler: **templates are just as
-valuable when you invoke a single agent for a single task.**
-
-When you ask an agent to do a "UX review" without a template, it uses its
-general knowledge of what UX reviews cover. That general knowledge may not
-match your standards — it might skip accessibility, or not check against your
-design system, or format findings differently each time. A `ux-review.md`
-template encodes *your* definition: your criteria, your heuristics, your
-output format. The agent doesn't guess.
-
-The pattern generalizes: **if you've ever corrected an agent ("no, not like
-that — here's how we do X"), that correction belongs in a template.** Next
-time, the agent reads the template and gets it right. This is how agents
-learn across sessions.
-
-### Why TODO absorbed KNOWN_ISSUES
-
-We originally had five core files: QUICKCONTEXT, KNOWN_ISSUES, TODO, AGENTS,
-CLAUDE. In practice, KNOWN_ISSUES and TODO had overlapping concerns (both
-track "things that need attention") and agents had to maintain both. Every
-additional file is a drift surface — a place where reality and documentation
-can diverge. Merging known issues into TODO as a section (blockers, gotchas,
-workarounds) reduced the maintenance burden without losing information.
-
-The principle: fewer files that are actually maintained beats more files that
-drift.
-
-### Why README is the universal first-read
-
-Previously, QUICKCONTEXT was the first file agents read. But QUICKCONTEXT
-answers "what's happening now" — it doesn't answer "what is this project?"
-An agent that jumps straight into current state without understanding the
-project's identity, architecture, and core tenets makes worse decisions.
-
-README provides orientation: what the project is, how it's structured, what
-the core tenets are, where the contracts live. It's stable (changes rarely)
-and foundational (everything else depends on understanding it). QUICKCONTEXT
-is volatile and tactical. The reading order should go from stable/strategic
-to volatile/tactical: README → QUICKCONTEXT → TODO → AGENTS.
-
-### Why profiles exist
-
-A crypto library team and a web app team have fundamentally different needs.
-The crypto team needs strict algorithm auditing, cross-validation reviews,
-and interop testing. The web app team needs UX reviews, responsive testing,
-and deployment gotcha documentation. Without profiles, every team copies
-all templates and then guesses which sections to customize vs. skip.
-
-Profiles are adoption guides: "for your project type, here's what to copy,
-what to customize, what to skip, and what to add." They reduce time-to-value
-and prevent teams from ignoring the templates because they feel too heavy.
-
-### How this repo was built
-
-This repo emerged from a single conversation. It started with a question
-about Claude Code subagent concurrency limits, evolved into a discussion of
-prompt templates as version-controlled infrastructure, then grew into a
-complete methodology for contract-driven agent development.
-
-Each idea built on the previous one:
-- Subagent fan-out → reusable prompt templates
-- Prompt templates → single-invocation value (not just fan-out)
-- Templates need shared guidelines → behavioral contracts for agents
-- Behavioral contracts → why not contracts for the code itself?
-- Code contracts → BDD first (who and why before what and how)
-- All of this needs documentation → Cold Start Quad
-- Documentation drifts → anti-drift mechanisms
-- Different projects need different things → profiles
-
-The iterative nature is the point. This isn't a top-down framework designed
-in isolation — it's a bottom-up collection of patterns that proved their
-value in real agent-driven development, organized into a coherent system
-after the fact. The [learnings document](learnings-from-opendockit.md)
-captures the raw failure analysis and war stories that motivated each pattern.
-
----
-
-## Future Concepts
-
-Ideas we believe are directionally correct but haven't built yet.
-These are design sketches, not specifications.
-
-### Contract Vendoring
-
-**Problem:** When multiple repos implement the same contracts (e.g., a
-client SDK and a server both implement `CONTRACT:P1-WIRE-FORMAT.1.0`),
-each repo needs a local copy of the contract to reference. But copies drift.
-
-**Concept:** Vendor contracts the way Go vendors dependencies. A project's
-`architecture/` directory contains contracts it *owns* (authored here) and
-contracts it *vendors* (copied from an upstream source). Vendored contracts
-are read-only locally — updates come from the upstream, not from local edits.
-
-```
-architecture/
-  CONTRACT-C1-BLOBSTORE.2.1.md          # owned — authored in this repo
-  vendor/
-    CONTRACT-P1-WIRE-FORMAT.1.0.md      # vendored — from shared-contracts repo
-    CONTRACT-I1-SESSION.1.0.md          # vendored — from shared-contracts repo
-    VENDOR.lock                          # source repo, commit hash, date
-```
-
-A `scripts/vendor-contracts.sh` would pull from the upstream repo and update
-the lock file. CI would verify vendored contracts match their upstream source.
-
-### Cryptographic Contract Signing
-
-**Problem:** Vendored contracts could be tampered with — a child repo could
-modify a vendored contract to weaken security requirements or change interface
-boundaries, and downstream consumers would have no way to detect it.
-
-**Concept:** Contracts get cryptographically signed when they pass a deep
-trust checklist. The signature covers the contract content and version. Child
-repos can vendor the contract but cannot modify it without invalidating the
-signature.
-
-```
-architecture/
-  CONTRACT-P1-WIRE-FORMAT.1.0.md        # the contract
-  CONTRACT-P1-WIRE-FORMAT.1.0.md.sig    # detached signature
-```
-
-**The trust checklist (signing requires all):**
-- [ ] BDD scenarios reviewed and approved by product owner
-- [ ] Contract reviewed by architect (behavioral contracts, error contracts)
-- [ ] Security review complete (if security-relevant)
-- [ ] Contract tests written and passing
-- [ ] At least one reference implementation exists
-- [ ] Cross-repo impact assessment complete (who else implements this?)
-
-**Verification:** `scripts/verify-contract-signatures.sh` checks all
-signatures in CI. A failed signature = someone modified a vendored contract
-without going through the trust process.
-
-**Why this matters:** In high-assurance environments (financial services,
-healthcare, defense), the integrity of architectural contracts is a
-compliance concern. Signing makes contract provenance auditable.
-
-### Expert Agent Hierarchy
-
-**Problem:** Today, the orchestrating agent (the one you talk to) does
-everything: reads BDD, understands architecture, knows the code, delegates
-to subagents. This works for small-to-medium projects, but at scale the
-context requirements exceed what a single agent can hold. The orchestrator
-becomes a bottleneck — it can't deeply understand product intent, architecture,
-and all the code simultaneously.
-
-**Concept:** A hierarchy of long-lived expert agents, each with a discrete
-role, persistent context, and clear communication boundaries:
-
-```
-┌─────────────────────────────────────────────────────┐
-│                    PRODUCT AGENT                     │
-│  Reads: BDD features, epics, stories, personas      │
-│  Reads: Contract SUMMARIES (not full contracts)      │
-│  Answers: "What should we build and why?"            │
-│  Talks to: Architect (down)                          │
-└──────────────────────┬──────────────────────────────┘
-                       │
-┌──────────────────────▼──────────────────────────────┐
-│                   ARCHITECT AGENT                    │
-│  Reads: Product summaries (from Product Agent)       │
-│  Reads: Contract documents IN DETAIL                 │
-│  Reads: Contract registry, implementation map        │
-│  Does: grep CONTRACT:{id} at session start           │
-│  Answers: "How should it be structured?"             │
-│  Talks to: Product (up), Eng Lead (down)             │
-└──────────────────────┬──────────────────────────────┘
-                       │
-┌──────────────────────▼──────────────────────────────┐
-│                  ENG LEAD AGENT                      │
-│  Reads: Product + Architecture SUMMARIES             │
-│  Reads: ALL THE CODE (if viable)                     │
-│  Reads: Test results, CI status, QUICKCONTEXT        │
-│  Answers: "How do we implement this?"                │
-│  Talks to: Architect (up), Engineers (down)          │
-│  DEFAULT PERSONA — this is the agent you talk to     │
-└──────────────────────┬──────────────────────────────┘
-                       │
-┌──────────────────────▼──────────────────────────────┐
-│               ENGINEER AGENTS (subagents)            │
-│  Receive: Repo pointers, contract pointers,          │
-│           task description, subagent template         │
-│  Read: subagent-guidelines.md + assigned template    │
-│  Do: The actual implementation work                  │
-│  Report: Results to Eng Lead via results files       │
-│  Isolation: Always worktree                          │
-└─────────────────────────────────────────────────────┘
-```
-
-**Key design principles:**
-
-1. **Each level reads summaries from above, detail at its own level.** The
-   Product Agent doesn't read code. The Architect doesn't read BDD scenarios
-   in detail. The Eng Lead doesn't read contract behavioral specifications
-   in detail. Each layer trusts the layer above to have done its job.
-
-2. **Communication is structured, not conversational.** The Architect
-   doesn't chat with the Eng Lead — it writes a structured brief: "Implement
-   CONTRACT:C4-WHATEVER.1.0. Here are the relevant repos, here's the
-   contract, here are the constraints." The Eng Lead doesn't chat with
-   Engineers — it writes a subagent invocation with template, parameters,
-   and context files.
-
-3. **The Eng Lead is the default persona.** When a human opens Claude Code
-   and starts working, they're talking to the Eng Lead. It reads the Cold
-   Start Quad, understands the code, and delegates down to Engineer
-   subagents. It escalates up to Architect (plan mode) when contracts need
-   to change.
-
-4. **Engineers are subagents, not peers.** They receive fully specified
-   tasks via subagent templates. They don't make architectural decisions.
-   They don't expand scope. They do their assigned work and report results.
-   This is the subagent template system we already have — the hierarchy
-   just formalizes who delegates and how.
-
-5. **Each expert agent could be a Claude Code skill or a long-lived session.**
-   The Product Agent could be a `/product` skill that loads BDD context and
-   produces product briefs. The Architect could be a `/architect` skill that
-   loads contracts and produces implementation briefs. Or they could be
-   persistent sessions that maintain state across conversations.
-
-**What this enables at scale:**
-- A Product Agent that deeply understands 50 user stories doesn't need to
-  also understand 200 source files
-- An Architect that deeply understands 30 contracts doesn't need to also
-  track sprint status
-- An Eng Lead that knows all the code doesn't need to also know the
-  competitive landscape or regulatory requirements
-- Engineers that implement one task at a time don't need any of the above —
-  they just need their contract, their template, and their assigned files
-
-**Open questions:**
-- How do expert agents persist context across sessions? Claude Code memory?
-  Dedicated context files per agent role?
-- How are summaries generated and kept fresh? Same drift problem as docs.
-- What's the minimum project size where this hierarchy pays off vs. a single
-  orchestrating agent?
-- Can the hierarchy be dynamic — starting flat and adding layers as the
-  project grows?
+Profiles tell you what to copy, what to customize, and what to skip. If your
+project spans multiple types, combine the relevant parts.
 
 ---
 
@@ -436,44 +717,62 @@ role, persistent context, and clear communication boundaries:
 ### Purlin
 
 [Purlin](https://github.com/purlin) is a spec-driven development framework
-that influenced several concepts in agent-templates. We share key principles
-but differ on implementation approach.
+that influenced several concepts in agent-templates.
 
-#### Where We Align
+**Where we align:** specs before code, contract lifecycle, quality gates,
+companion docs, discovery taxonomy.
 
-| Concept | Purlin | agent-templates |
-|---------|--------|-----------------|
-| Specs before code | Core principle | Core principle (contracts are the operating system) |
-| Contract lifecycle | Explicit status tracking | Computed lifecycle (DRAFT → ACTIVE → TESTING → VERIFIED) |
-| Quality gates | Automated scanning | Steward (`scripts/steward.sh`) |
-| Companion docs | Implementation notes alongside specs | `.impl.md` companion files |
-| Discovery taxonomy | Gap tracking between spec and reality | BUG / DISCOVERY / DRIFT / DISPUTE in TODO.md |
+**Where we diverge:**
 
-#### Where We Diverge
+| Aspect | Purlin | agent-templates | Why |
+|--------|--------|-----------------|-----|
+| Role rigidity | Fixed hierarchy, formal handoffs | Fluid roles | Small teams wear multiple hats |
+| Scenarios | Gherkin-only, required | Gherkin optional | Infrastructure contracts don't benefit from Given/When/Then |
+| Code philosophy | "Code is disposable, specs are permanent" | Code and contracts are co-equal | Contracts become stale when not grounded in implementation |
+| Repo structure | Git submodules | Flat vendoring (proposed) | Submodules add complexity small teams can't absorb |
+| Dashboard | Required web UI | JSON-first, dashboard optional | `jq` should answer what a dashboard can |
+| Tooling | Purpose-built CLI | bash + jq + grep | Zero dependencies beyond a Unix shell |
 
-| Aspect | Purlin | agent-templates | Why We Differ |
-|--------|--------|-----------------|---------------|
-| **Role rigidity** | Fixed role hierarchy, formal handoffs | Fluid roles, any agent can read anything | We optimize for small teams where one person wears multiple hats |
-| **Scenario format** | Gherkin-only, required for all contracts | Gherkin optional, recommended for UI/API | Infrastructure and crypto contracts don't benefit from Given/When/Then |
-| **Code disposability** | "Code is disposable, specs are permanent" | Code and contracts are co-equal | We've seen contracts become as stale as code when not grounded in implementation |
-| **Repository structure** | Git submodules for shared contracts | Flat vendoring (proposed) | Submodules add operational complexity that small teams can't absorb |
-| **Dashboard** | Required web UI for project health | JSON-first, dashboard optional | A `jq` query or `cat` should answer any question the dashboard can |
-| **Tooling weight** | Purpose-built CLI tools | bash + jq + grep | We want zero dependencies beyond a Unix shell |
+**What we adopted and adapted:**
+- Computed lifecycle status (derived from code, never declared)
+- Discovery taxonomy (BUG/DISCOVERY/DRIFT/DISPUTE)
+- Companion files (`.impl.md` for tribal knowledge)
+- Role-based action items (Steward routes findings to the right role)
+- Quality scanning as infrastructure (Steward = TPM in code form)
 
-#### What We Adopted
+---
 
-These concepts from Purlin were adapted into agent-templates:
+## Future Concepts
 
-- **Computed lifecycle status** — contracts have a lifecycle, but it's derived
-  from what exists (implementing files, test files, section completeness), never
-  manually declared. This prevents lifecycle status from drifting.
-- **Discovery taxonomy** — the BUG/DISCOVERY/DRIFT/DISPUTE classification
-  captures the full spectrum of spec-reality gaps, not just "bug or not bug."
-- **Companion files** — tribal knowledge belongs alongside contracts, not in
-  them. The `.impl.md` convention lets you document implementation notes
-  without touching the contract's version.
-- **Role-based action items** — the Steward report routes findings to the
-  right role (architect sees DISPUTEs, dev sees BUGs, product sees DISCOVERYs)
-  instead of dumping everything into a single TODO list.
-- **Quality scanning as infrastructure** — automated quality gates that run as
-  part of CI, not as a manual review step. The Steward is the TPM in code form.
+Ideas we believe are directionally correct but haven't built yet.
+
+### Contract Vendoring
+
+When multiple repos implement the same contracts, each needs a local copy.
+Copies drift. **Concept:** Vendor contracts like Go vendors dependencies —
+`architecture/vendor/` contains read-only copies with a lock file pointing
+to the upstream source. `scripts/vendor-contracts.sh` pulls updates.
+
+### Cryptographic Contract Signing
+
+Vendored contracts could be tampered with. **Concept:** Sign contracts when
+they pass a trust checklist (BDD reviewed, architect approved, security
+reviewed, tests passing, reference implementation exists). Child repos can
+vendor but not modify without invalidating the signature. Matters for
+high-assurance environments (financial, healthcare, defense).
+
+### Expert Agent Hierarchy
+
+At scale, a single orchestrating agent can't deeply understand product intent,
+architecture, and all code simultaneously. **Concept:** A hierarchy of expert
+agents — Product (reads BDD, answers "what and why"), Architect (reads
+contracts, answers "how should it be structured"), Eng Lead (reads code,
+answers "how to implement"), Engineers (subagents, do the work). Each level
+reads summaries from above, detail at its own level. The Eng Lead is the
+default persona you talk to.
+
+This is partially realized through ASK roles and agent commands, but the full
+hierarchy with structured inter-agent communication is future work.
+
+See [AGENT-RUNTIME.md](AGENT-RUNTIME.md), [ASK-SHELL.md](ASK-SHELL.md), and
+[IMPLEMENTATION.md](IMPLEMENTATION.md) for detailed proposals.

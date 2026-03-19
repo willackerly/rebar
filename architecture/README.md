@@ -1,10 +1,9 @@
 # Architecture Directory
 
-This directory contains the project's **contracts** — versioned architecture
-documents that define component interfaces, behaviors, and boundaries.
+Contracts, lifecycle state, and the contract registry.
 
-**Contracts are the operating system of this project.** See
-[methodology.md](../methodology.md) for the full philosophy.
+See the [root README](../README.md) for how contracts fit into the overall system,
+and [methodology.md](../methodology.md) for the full philosophy.
 
 ## Quick Reference
 
@@ -13,16 +12,29 @@ documents that define component interfaces, behaviors, and boundaries.
 ls architecture/CONTRACT-*.md
 
 # Find all code implementing a specific contract
-grep -rn "CONTRACT:C1-BLOBSTORE" src/ internal/ client/
+grep -rn "CONTRACT:C1-BLOBSTORE" src/ internal/
 
 # Find what contract a code file implements
-head -10 path/to/file.go    # read the CONTRACT: header comment
+head -10 path/to/file.go
 
-# Find all contract references in the codebase
-grep -rn "CONTRACT:" --include="*.go" --include="*.ts" --include="*.py" .
+# Run a quality scan across all contracts
+ask steward
+# or: ./scripts/steward.sh
 
-# Check the registry for an overview
-cat architecture/CONTRACT-REGISTRY.md
+# Check a single contract
+ask steward check C1
+```
+
+## What's In Here
+
+```
+architecture/
+  README.md                         # this file
+  CONTRACT-TEMPLATE.md              # annotated template for new contracts
+  CONTRACT-REGISTRY.template.md     # contract index
+  .state/                           # steward output (gitkeep tracked)
+    <contract-id>.<version>.json    # per-contract lifecycle state
+    steward-report.json             # aggregate quality report
 ```
 
 ## Naming Convention
@@ -31,70 +43,70 @@ cat architecture/CONTRACT-REGISTRY.md
 CONTRACT-{ID}-{NAME}.{MAJOR}.{MINOR}.md
 ```
 
-| Part | Meaning | Examples |
-|------|---------|---------|
-| `CONTRACT` | Searchable prefix | Always `CONTRACT` |
-| `{ID}` | Unique short identifier | `S1`, `C3`, `I2`, `P1` |
-| `{NAME}` | Descriptive name (SCREAMING-KEBAB) | `STORAGE`, `API-GATEWAY` |
-| `{MAJOR}.{MINOR}` | Version | `1.0`, `2.1` |
+| Prefix | Meaning | Example |
+|--------|---------|---------|
+| `S` | Service | `S1-AUTH`, `S4-STORAGE` |
+| `C` | Component | `C1-BLOBSTORE`, `C2-RELAY` |
+| `I` | Interface | `I1-SESSION`, `I2-KEY-EXCHANGE` |
+| `P` | Protocol | `P1-WIRE-FORMAT`, `P2-SIGNALING` |
 
-**ID prefix conventions:**
-- `S` = Service (top-level system boundary)
-- `C` = Component (internal module)
-- `I` = Interface (shared contract between components)
-- `P` = Protocol (wire format, messaging)
+## Contract Lifecycle
 
-## File Template
+Computed by the [Steward](../scripts/steward.sh), never declared manually:
 
-See [CONTRACT-TEMPLATE.md](CONTRACT-TEMPLATE.md) for the annotated template.
+| Status | Criteria |
+|--------|----------|
+| **DRAFT** | Missing required sections (Interfaces, Behavioral, Errors, Tests, Implementing) |
+| **ACTIVE** | All sections present, no `CONTRACT:{id}` found in source |
+| **TESTING** | Implementing files exist, no test files found |
+| **VERIFIED** | Implementing files AND test files exist |
 
-## Contract Registry
+## Companion Files
 
-See [CONTRACT-REGISTRY.md](CONTRACT-REGISTRY.md) for the index of all contracts.
+Contracts may have companion files for tribal knowledge (implementation notes,
+debugging tips, performance characteristics). Companions don't affect lifecycle.
 
-## Versioning Rules
+```
+CONTRACT-C1-BLOBSTORE.2.1.md         # the contract
+CONTRACT-C1-BLOBSTORE.impl.md        # the companion (no version in filename)
+```
 
-| Change Type | Version Bump | Agent Autonomy |
-|-------------|-------------|----------------|
-| Bug fix in contract doc (no behavior change) | None | Full autonomy |
-| New optional method, field, or capability | Bump minor (1.0 → 1.1) | Full autonomy |
-| Changed signature, removed method, new requirement | Bump major (1.1 → 2.0) | **Plan mode** |
-| New contract for new component | New ID + 1.0 | **Plan mode** |
+See [conventions.md](../conventions.md) for naming rules.
 
-When bumping:
+## Versioning
+
+| Change | Version Bump | Autonomy |
+|--------|-------------|----------|
+| Doc fix (no behavior change) | None | Full |
+| New optional method/field | Minor (1.0 → 1.1) | Full |
+| Changed signature, removed method | Major (1.1 → 2.0) | **Plan mode** |
+| New contract | New ID + 1.0 | **Plan mode** |
+
+When bumping major:
 1. Create the new version file
-2. Mark the old version: `<!-- SUPERSEDED BY: CONTRACT-{ID}-{NAME}.{NEW} -->`
-3. `grep -rn "CONTRACT:{ID}-{NAME}.{OLD}"` → update all implementing code
-4. Keep the old version for historical reference
+2. Mark old: `<!-- SUPERSEDED BY: CONTRACT-{ID}.{NEW} -->`
+3. `grep -rn "CONTRACT:{ID}.{OLD}"` → update all code
+4. Keep old version for history
 
 ## Code-to-Contract Linking
 
-**Every source file** must have a header comment declaring which contract(s)
-it implements or belongs to:
+Every source file declares its contract in a header comment:
 
 ```go
-// Package blobstore implements encrypted blob storage.
-//
 // CONTRACT:C1-BLOBSTORE.2.1
 package blobstore
 ```
 
 ```typescript
-/**
- * @contract CONTRACT:C3-CRYPTO-BRIDGE.1.0
- */
+/** @contract CONTRACT:C3-CRYPTO-BRIDGE.1.0 */
 ```
 
-For utility/helper code that doesn't directly implement a contract, reference
-the parent service:
+For helpers that don't directly implement a contract:
 
 ```go
-// Package httputil provides HTTP helpers for the API gateway.
-//
 // Architecture: CONTRACT:S2-API-GATEWAY.1.0
 package httputil
 ```
 
-This creates **doubly-linked traceability**: code points to contracts,
-contracts list their implementing files. Either direction is searchable
-with grep.
+This creates doubly-linked traceability — searchable in either direction
+with `grep`.
