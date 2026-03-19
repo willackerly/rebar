@@ -310,6 +310,29 @@ beside code or inside `__tests__`. E2E specs should be tagged
 updated when coverage changes >=2 pts.
 -->
 
+### The Scout Rule: Zero Tolerance for Broken Tests
+
+**"You're a scout. You leave the camp cleaner than when you came."**
+
+| Situation | Action |
+|-----------|--------|
+| Skipped test | Fix the skip. Scope it properly or delete it. Never leave a `skip`. |
+| Failing test | P0. Fix it before continuing your task. No exceptions. |
+| Flaky test | Stabilize it or delete it. Flaky = lying about coverage. |
+| Obsolete test (OBE) | Remove it carefully. Verify the behavior is gone or covered elsewhere. |
+| Platform-specific test | Use proper conditions (`if platform == X`), not `skip`. The test should run where it applies and be absent where it doesn't. |
+
+**Why this is absolute:**
+- A skipped test is invisible debt. It rots. It gives false confidence.
+- A test suite with 50 skipped tests is lying about coverage.
+- Every agent session that encounters a broken test and walks past it makes the problem worse.
+- Fixing a test you didn't break is not extra work — it's the cost of working in a shared codebase.
+
+**The rule in practice:**
+1. Before starting your task, run the relevant test tier. If anything is red or skipped, fix it first.
+2. After finishing your task, run the tests again. Leave them greener than you found them.
+3. If fixing a broken test would take >30 minutes and block your current task, create a P0 entry in TODO.md and flag it — but this is the exception, not the norm.
+
 ### Contract-Driven Development
 
 **Contracts are the operating system.** See `methodology.md` for the full

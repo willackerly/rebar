@@ -234,3 +234,54 @@ Contract lifecycle is computed by the Steward, never declared manually:
 
 Required sections for spec gate: Interfaces, Behavioral Contracts, Error Contracts,
 Test Requirements, Implementing Files.
+
+## Testing Conventions
+
+### The Scout Rule
+
+Leave the test suite cleaner than you found it. See `methodology.md` §7 and
+`AGENTS.template.md` "The Scout Rule" for the full philosophy.
+
+### Prohibited Patterns
+
+These patterns are **never acceptable** in committed code:
+
+```
+test.skip(...)           # No. Fix or remove.
+xit(...)                 # No. Fix or remove.
+xdescribe(...)           # No. Fix or remove.
+@pytest.mark.skip        # No. Fix or remove.
+t.Skip(...)              # No. Fix or remove.
+#[ignore]                # No. Fix or remove.
+```
+
+### Accepted Conditional Patterns
+
+When a test legitimately only applies in certain conditions:
+
+```go
+// Go: conditional skip with reason
+if runtime.GOOS != "linux" {
+    t.Skip("cgroup tests require Linux")
+}
+```
+
+```typescript
+// TypeScript: conditional describe
+const describeIf = (condition: boolean) =>
+  condition ? describe : describe.skip;
+
+describeIf(process.env.HAS_GPU)('GPU rendering', () => { ... });
+```
+
+```python
+# Python: conditional skip with reason
+@pytest.mark.skipif(
+    sys.platform != "linux",
+    reason="cgroup tests require Linux"
+)
+```
+
+The key difference: **unconditional skip = banned**, **conditional skip with
+a reason that evaluates at runtime = acceptable**. The test runs everywhere
+it can and is skipped only where it provably cannot.

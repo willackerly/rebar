@@ -430,6 +430,31 @@ know about unless you explicitly give them a faster option.
 **Rules:** Iterate at T1. Promote on success. Background T3+. Never run T5
 in the inner loop.
 
+### The Scout Rule
+
+Tests are sacred ground. A test suite tells you whether the system works. If
+tests are skipped or failing, the suite is lying — and every decision based on
+"tests pass" is built on that lie.
+
+**The absolute rules:**
+- No skipped tests. If a test can't run, fix it or remove it.
+- No failing tests. A red test is a P0, not background noise.
+- No flaky tests. Intermittent failure is still failure.
+
+Every agent session that encounters a broken test and walks past it
+contributes to the erosion. Every session that fixes one makes the codebase
+stronger. This is the scout rule: leave the camp cleaner than you found it.
+
+When a test is truly obsolete (the feature was removed, the behavior changed),
+remove the test — but carefully. Verify the behavior it tested is either gone
+or covered by other tests. Deleting a test without checking is as dangerous
+as skipping one.
+
+When a test only applies to certain platforms or conditions, use proper
+conditional logic (`if runtime.GOOS == "linux"`, `test.skipIf(!supportsWebGL)`),
+not a blanket `skip`. The test should run where it applies and be absent
+where it doesn't.
+
 ---
 
 ## 8. Methodology in Practice
