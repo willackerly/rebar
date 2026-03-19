@@ -72,6 +72,28 @@ _None currently._
   Remove when: CDN config updated (see P1 task above)
 -->
 
+## Discoveries
+
+<!-- Findings that don't fit neatly into tasks. The Steward (scripts/steward.sh)
+     parses this section to track contract health. Each discovery is tagged with
+     a type and linked to a contract (or "none" if no contract covers it).
+
+     Four types:
+     - **BUG**: behavior contradicts a contract
+     - **DISCOVERY**: behavior exists but no contract covers it
+     - **DRIFT**: behavior matches contract literally but misses intent
+     - **DISPUTE**: the contract itself is wrong or needs updating
+
+     Format: checkbox, type tag, contract ref, description.
+     Steward greps for **TYPE** patterns to parse this section. -->
+
+<!-- Examples:
+- [ ] **BUG** `CONTRACT:C1-BLOBSTORE` — Delete returns error on missing key, contract says no-op
+- [ ] **DISCOVERY** `none` — Retry logic in relay has no contract coverage
+- [ ] **DRIFT** `CONTRACT:S2-API-GATEWAY` — Auth middleware technically validates tokens but doesn't check expiry
+- [ ] **DISPUTE** `CONTRACT:I2-KEY-EXCHANGE` — Contract requires RSA but team consensus is to use ECDH
+-->
+
 ## Code Debt
 
 <!-- Items tracked via `TRACKED-TASK:` comments in source code.

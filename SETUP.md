@@ -11,6 +11,7 @@ parts to adopt.
 - A git repository
 - Claude Code (or another AI coding agent that reads markdown context files)
 - 30 minutes for initial setup
+- `jq` (for steward quality scanning — `brew install jq` / `apt install jq`)
 
 ## Step 1: Pick Your Profile
 
@@ -50,6 +51,10 @@ cp -r agents/                "$PROJECT/agents/"
 cp -r scripts/               "$PROJECT/scripts/"
 cp conventions.md            "$PROJECT/conventions.md"
 cp METRICS.template           "$PROJECT/METRICS"
+# State directory for steward
+mkdir -p "$PROJECT/architecture/.state"
+touch "$PROJECT/architecture/.state/.gitkeep"
+
 mkdir -p "$PROJECT/.github"
 cp .github/pull_request_template.md "$PROJECT/.github/"
 chmod +x "$PROJECT/scripts/"*.sh
@@ -141,6 +146,12 @@ grep -rn "<PROJECT_NAME>\|<pkg-manager>\|YYYY-MM-DD" \
 
 # Confirm no untracked TODOs
 grep -rn "TODO:" --include="*.ts" --include="*.go" --include="*.py" src/ || echo "Clean"
+
+# Confirm steward script
+[ -x scripts/steward.sh ] && echo "Steward: ready" || echo "Steward: not found or not executable"
+
+# Confirm steward agent
+[ -f agents/steward/AGENT.md ] && echo "Steward agent: ready" || echo "Steward agent: not found"
 
 # Confirm ground truth script has at least one metric defined
 # (remove the no-op line and uncomment at least one metric)

@@ -136,6 +136,42 @@ CONTRACT-{ID}-{NAME}.{MAJOR}.{MINOR}.md
 - `CONTRACT-C1-BLOBSTORE.2.1.md`
 - `CONTRACT-P1-WIRE-FORMAT.1.0.md`
 
+### Contract Lifecycle Status
+
+Lifecycle is **computed, never declared**. The Steward (`scripts/steward.sh`)
+derives status from what exists in the codebase:
+
+| Status | Criteria | What It Means |
+|--------|----------|---------------|
+| **DRAFT** | Missing required sections | Contract is incomplete — needs architect attention |
+| **ACTIVE** | All sections present, no `CONTRACT:{id}` found in source | Spec is ready, awaiting implementation |
+| **TESTING** | Implementing files exist, no test files found | Code exists, needs contract tests |
+| **VERIFIED** | Implementing files AND test files exist | Contract is fully realized in code |
+
+Required sections for spec gate: Interfaces, Behavioral Contracts, Error
+Contracts, Test Requirements, Implementing Files.
+
+The lifecycle is a quality signal, not a workflow gate. A contract in DRAFT
+still has a valid ID and can be referenced in code. The status tells you
+what's missing, not what's allowed.
+
+### Discovery Taxonomy
+
+Discoveries capture the gap between contracts and reality. They live in
+`TODO.md` (Discoveries section) and are parsed by the Steward.
+
+| Type | When | Resolution |
+|------|------|-----------|
+| **BUG** | Behavior contradicts a contract | Fix the code |
+| **DISCOVERY** | Behavior exists but no contract covers it | Write a contract |
+| **DRIFT** | Behavior matches contract literally but misses intent | Refine contract + code |
+| **DISPUTE** | The contract itself is wrong | Update the contract |
+
+Discoveries are the feedback loop that keeps contracts honest. Without them,
+contracts become aspirational documents that describe what was intended, not
+what exists. The Steward surfaces discoveries in per-role action items:
+architects see DISPUTEs, developers see BUGs, product sees DISCOVERYs.
+
 ### Doubly-Linked References
 
 **In code** (every source file header):
@@ -449,6 +485,65 @@ wrong output, compare its intermediate state against the oracle's.
 
 This generalizes to any project where you can measure distance from ground
 truth across multiple code paths.
+
+---
+
+## 9. The Steward: Automated Quality Scanning
+
+The Steward is the project's technical program manager in code form. It scans
+the contract system and produces per-role action items — facts, not opinions.
+
+### What It Does
+
+```bash
+scripts/steward.sh             # full scan → JSON + markdown report
+scripts/steward.sh --json      # aggregate JSON to stdout
+scripts/steward.sh --summary   # one-line summary
+scripts/steward.sh --check C1  # single contract
+```
+
+### What It Checks
+
+Per contract:
+- **Spec gate:** Are all required sections present? (Interfaces, Behavioral, Errors, Tests, Implementing)
+- **Impl gate:** Do any source files reference this contract? Are there test files?
+- **Lifecycle:** Derived from spec + impl gates (DRAFT → ACTIVE → TESTING → VERIFIED)
+- **Discoveries:** Any BUG/DISCOVERY/DRIFT/DISPUTE entries in TODO.md for this contract?
+
+Globally:
+- **Enforcement:** Runs all `check-*.sh` scripts, captures pass/fail
+- **Metrics:** Runs ground truth verification
+
+### Output
+
+All state is JSON in `architecture/.state/`:
+- Per-contract: `<contract-id>.<version>.json`
+- Aggregate: `steward-report.json`
+- Human-readable: `STEWARD_REPORT.md`
+
+The JSON schema is designed for a future single-file HTML dashboard that
+`fetch()`es `steward-report.json` and renders it — no server, no build step.
+
+### Who Uses It
+
+| Role | Reads | Acts On |
+|------|-------|---------|
+| **Eng Lead** | Full report | Coordination, QA flow, fan-out |
+| **Architect** | DRAFT contracts, DISPUTEs | Contract completion, dispute resolution |
+| **Product** | DISCOVERYs, missing BDD refs | Requirements gaps |
+| **Developer** | ACTIVE contracts, BUGs | Implementation, bug fixes |
+| **CI** | Exit code | Blocks merge on enforcement failure |
+
+### The QA Flow
+
+QA is fully automated — no separate QA agent:
+
+1. Eng Lead runs `scripts/steward.sh`
+2. Reviews action items per role
+3. Fans out work to developers (BUGs, implementations)
+4. Escalates to architect (DISPUTEs, missing contracts)
+5. Escalates to product (DISCOVERYs, missing BDD refs)
+6. Re-runs steward to verify resolution
 
 ---
 

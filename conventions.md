@@ -169,3 +169,68 @@ When reviewing a PR that touches contracts:
 - [ ] Error types match contract's error table
 - [ ] Contract tests pass (not just unit tests)
 - [ ] No behavior introduced that isn't covered by the contract
+
+## Companion Files
+
+Contracts may have companion files that hold tribal knowledge — implementation
+notes, debugging tips, performance characteristics, migration guides. Companion
+content supports the contract but doesn't define behavior.
+
+### Naming Convention
+
+```
+CONTRACT-{ID}-{NAME}.impl.md
+```
+
+The companion filename has NO version number. One companion per contract ID,
+regardless of how many versions exist. When a contract is bumped from 1.0 to
+2.0, the same companion file serves both — update it to reflect the new version.
+
+**Examples:**
+- `architecture/CONTRACT-C1-BLOBSTORE.impl.md` — companion for C1-BLOBSTORE
+- `architecture/CONTRACT-S2-API-GATEWAY.impl.md` — companion for S2-API-GATEWAY
+
+### Rules
+
+- Companion edits don't affect contract lifecycle (no version bump needed)
+- Companions are optional — only create when there's tribal knowledge to capture
+- Never put behavioral specifications in companions — those belong in the contract
+- Companions should reference the contract they support: start with
+  `Companion for: CONTRACT-{ID}-{NAME}`
+
+## Discovery Tracking
+
+Discoveries are findings about the gap between contracts and reality. They
+live in the `## Discoveries` section of `TODO.md` and are parsed by the
+Steward (`scripts/steward.sh`).
+
+### Discovery Types
+
+| Type | Meaning | Who Resolves |
+|------|---------|-------------|
+| **BUG** | Behavior contradicts a contract | Developer (fix code) |
+| **DISCOVERY** | Behavior exists but no contract covers it | Architect (write contract) |
+| **DRIFT** | Behavior matches contract literally but misses intent | Architect + Developer |
+| **DISPUTE** | The contract itself is wrong or needs updating | Architect + Product |
+
+### Format in TODO.md
+
+```
+- [ ] **TYPE** `CONTRACT:ID` — Description of the finding
+```
+
+Use `none` instead of a contract reference if no contract covers the behavior.
+
+### Lifecycle Status Definitions
+
+Contract lifecycle is computed by the Steward, never declared manually:
+
+| Status | Criteria |
+|--------|----------|
+| **DRAFT** | Contract file exists but is missing required sections |
+| **ACTIVE** | All required sections present, no implementing files found |
+| **TESTING** | Has implementing files, but no test files found |
+| **VERIFIED** | Has implementing files AND test files |
+
+Required sections for spec gate: Interfaces, Behavioral Contracts, Error Contracts,
+Test Requirements, Implementing Files.

@@ -48,6 +48,26 @@ type BlobStore interface {
 | `List` with no matches | Returns empty slice, not nil |
 | Concurrent safety | All methods safe for concurrent use |
 
+## Scenarios
+
+<!-- OPTIONAL — recommended for UI/API contracts, skip for infrastructure/crypto/protocol.
+     Gherkin-style Given/When/Then for user-facing behavior. These scenarios are
+     the bridge between BDD features (product/) and behavioral contracts (above).
+     If the contract already has a BDD source reference, scenarios here should be
+     a subset — the most architecturally significant ones. -->
+
+<!-- Example:
+```gherkin
+Scenario: Upload encrypted document
+  Given a user has classified a document as SECRET
+  And the user has an active P2P session
+  When the user saves the document
+  Then the document is encrypted client-side with AES-256-GCM
+  And the encrypted blob is stored via the BlobStore interface
+  And the server never receives the plaintext
+```
+-->
+
 ## Error Contracts
 
 <!-- Define the error types/codes this contract uses.
@@ -88,6 +108,23 @@ type BlobStore interface {
 - [ ] Every error contract has a test (trigger the error, verify type/code)
 - [ ] Concurrent safety verified with `-race` flag
 - [ ] Contract tests run against EVERY implementation (file, memory, etc.)
+
+## Companion File
+
+<!-- Every contract MAY have a companion file: `CONTRACT-{ID}-{NAME}.impl.md`
+     (no version number in the companion filename).
+
+     The companion holds tribal knowledge that supports the contract but doesn't
+     define behavior: implementation notes, debugging tips, performance
+     characteristics, historical context, migration guides.
+
+     Companion edits don't affect contract lifecycle — you can freely update
+     the companion without bumping the contract version.
+
+     The companion lives alongside the contract in architecture/:
+       architecture/CONTRACT-C1-BLOBSTORE.2.1.md        ← the contract
+       architecture/CONTRACT-C1-BLOBSTORE.impl.md        ← the companion
+-->
 
 ## Change History
 
