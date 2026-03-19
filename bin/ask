@@ -404,7 +404,7 @@ cmd_init() {
   # --- Create agents ---
   local created=()
 
-  for role in architect product englead; do
+  for role in architect product englead steward; do
     local agent_dir="$AGENTS_DIR/$role"
     if [ -f "$agent_dir/AGENT.md" ]; then
       # Ensure inbox/outbox exist for existing agents
@@ -911,6 +911,17 @@ implementation coordination, code quality, and task management."
 - Manage TODO.md and QUICKCONTEXT.md progress tracking
 - Run and interpret the testing cascade (T0-T5)"
       reading_priority="QUICKCONTEXT.md, TODO.md, AGENTS.md, tests/"
+      ;;
+    steward)
+      role="You are the steward agent for $project_name. You are the project's
+automated quality scanner — you report facts about project health, contract
+lifecycle, and quality gates. You don't prescribe solutions."
+      responsibilities="- Answer questions about project health and contract status
+- Read architecture/.state/steward-report.json as primary context
+- Report open discoveries, enforcement failures, and stale contracts
+- Suggest running scripts/steward.sh if the report is stale (>24h old)
+- Surface per-role action items from the steward report"
+      reading_priority="architecture/.state/ (steward reports), TODO.md (discoveries), scripts/steward.sh"
       ;;
     *)
       role="You are the $name agent for $project_name."

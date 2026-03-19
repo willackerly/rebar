@@ -428,3 +428,52 @@ role, persistent context, and clear communication boundaries:
   orchestrating agent?
 - Can the hierarchy be dynamic — starting flat and adding layers as the
   project grows?
+
+---
+
+## Related Work
+
+### Purlin
+
+[Purlin](https://github.com/purlin) is a spec-driven development framework
+that influenced several concepts in agent-templates. We share key principles
+but differ on implementation approach.
+
+#### Where We Align
+
+| Concept | Purlin | agent-templates |
+|---------|--------|-----------------|
+| Specs before code | Core principle | Core principle (contracts are the operating system) |
+| Contract lifecycle | Explicit status tracking | Computed lifecycle (DRAFT → ACTIVE → TESTING → VERIFIED) |
+| Quality gates | Automated scanning | Steward (`scripts/steward.sh`) |
+| Companion docs | Implementation notes alongside specs | `.impl.md` companion files |
+| Discovery taxonomy | Gap tracking between spec and reality | BUG / DISCOVERY / DRIFT / DISPUTE in TODO.md |
+
+#### Where We Diverge
+
+| Aspect | Purlin | agent-templates | Why We Differ |
+|--------|--------|-----------------|---------------|
+| **Role rigidity** | Fixed role hierarchy, formal handoffs | Fluid roles, any agent can read anything | We optimize for small teams where one person wears multiple hats |
+| **Scenario format** | Gherkin-only, required for all contracts | Gherkin optional, recommended for UI/API | Infrastructure and crypto contracts don't benefit from Given/When/Then |
+| **Code disposability** | "Code is disposable, specs are permanent" | Code and contracts are co-equal | We've seen contracts become as stale as code when not grounded in implementation |
+| **Repository structure** | Git submodules for shared contracts | Flat vendoring (proposed) | Submodules add operational complexity that small teams can't absorb |
+| **Dashboard** | Required web UI for project health | JSON-first, dashboard optional | A `jq` query or `cat` should answer any question the dashboard can |
+| **Tooling weight** | Purpose-built CLI tools | bash + jq + grep | We want zero dependencies beyond a Unix shell |
+
+#### What We Adopted
+
+These concepts from Purlin were adapted into agent-templates:
+
+- **Computed lifecycle status** — contracts have a lifecycle, but it's derived
+  from what exists (implementing files, test files, section completeness), never
+  manually declared. This prevents lifecycle status from drifting.
+- **Discovery taxonomy** — the BUG/DISCOVERY/DRIFT/DISPUTE classification
+  captures the full spectrum of spec-reality gaps, not just "bug or not bug."
+- **Companion files** — tribal knowledge belongs alongside contracts, not in
+  them. The `.impl.md` convention lets you document implementation notes
+  without touching the contract's version.
+- **Role-based action items** — the Steward report routes findings to the
+  right role (architect sees DISPUTEs, dev sees BUGs, product sees DISCOVERYs)
+  instead of dumping everything into a single TODO list.
+- **Quality scanning as infrastructure** — automated quality gates that run as
+  part of CI, not as a manual review step. The Steward is the TPM in code form.
