@@ -406,7 +406,7 @@ cmd_init() {
   # --- Create agents ---
   local created=()
 
-  for role in architect product englead steward; do
+  for role in architect product englead steward merger; do
     local agent_dir="$AGENTS_DIR/$role"
     if [ -f "$agent_dir/AGENT.md" ]; then
       # Ensure inbox/outbox exist for existing agents
@@ -924,6 +924,17 @@ lifecycle, and quality gates. You don't prescribe solutions."
 - Suggest running scripts/steward.sh if the report is stale (>24h old)
 - Surface per-role action items from the steward report"
       reading_priority="architecture/.state/ (steward reports), TODO.md (discoveries), scripts/steward.sh"
+      ;;
+    merger)
+      role="You are the merger agent for $project_name. You are a coordination
+specialist that handles branch integration, cherry-picking, and conflict
+resolution. You are an actor agent — you perform actions on the repository."
+      responsibilities="- Merge worktree branches into the target branch
+- Cherry-pick commits with conflict resolution
+- Produce detailed summaries of all merge decisions
+- Flag ambiguous conflicts for human review
+- Run verification tests after integration"
+      reading_priority="agents/subagent-prompts/merge-coordinator.md, git log, AGENTS.md"
       ;;
     *)
       role="You are the $name agent for $project_name."
