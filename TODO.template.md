@@ -34,20 +34,11 @@ code reference sections of this file.
 
 - [ ] [task description]
 
-## Code Debt
-
-<!-- Items tracked via `TRACKED-TASK:` comments in source code.
-     Each entry should reference the file and line where the comment lives.
-     Periodically verify these still exist in code (comments may be
-     removed when the debt is paid). -->
-
-<!-- Example:
-- [ ] Handle edge case for concurrent session timeout
-  - `internal/relay/relay.go:142` — TRACKED-TASK comment
-  - Context: race condition when two peers timeout simultaneously
--->
-
 ## Known Issues & Blockers
+
+<!-- Known Issues go ABOVE Code Debt intentionally.
+     Gotchas affect every agent's session (e.g., "DATABASE_URL breaks tests").
+     Code debt is background maintenance. Agents need to see gotchas first. -->
 
 <!-- Things that PREVENT work or CAUSE CONFUSION. This replaces a separate
      KNOWN_ISSUES.md — keeping everything in one file reduces drift.
@@ -79,6 +70,19 @@ _None currently._
 - **Blob URL for web workers** — `src/worker-loader.ts:15`
   Why: CDN serves .mjs with wrong MIME type
   Remove when: CDN config updated (see P1 task above)
+-->
+
+## Code Debt
+
+<!-- Items tracked via `TRACKED-TASK:` comments in source code.
+     Each entry should reference the file and line where the comment lives.
+     Periodically verify these still exist in code (comments may be
+     removed when the debt is paid). -->
+
+<!-- Example:
+- [ ] Handle edge case for concurrent session timeout
+  - `internal/relay/relay.go:142` — TRACKED-TASK comment
+  - Context: race condition when two peers timeout simultaneously
 -->
 
 ## Completed

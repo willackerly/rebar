@@ -85,6 +85,16 @@ any project where a security bug is a catastrophic failure.
 - UX review template (no UI)
 - Most of the web-specific gotchas (CORS, MIME types, etc.)
 
+## Retrofitting an Existing Project
+
+1. **Algorithm implementations** — Each algorithm gets a CONTRACT: header. These are the core behavioral contracts.
+2. **Public API surface** — Exported functions/classes that consumers use.
+3. **Test vectors** — Tag test vector files with the contract they validate.
+
+Security-critical code benefits most from contracts because the cost of misunderstanding intent is highest. Start with the crypto primitives, then work outward to the public API.
+
+**Ground truth first step:** Set up `METRICS` with test counts (including fuzz/property tests) and algorithm coverage. In crypto code, "126 tests" vs "586 tests" changes your confidence in shipping.
+
 ## What to Add
 
 - **Threat model document** — reference from QUICKCONTEXT and README

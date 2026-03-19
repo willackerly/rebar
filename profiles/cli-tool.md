@@ -59,6 +59,16 @@ For command-line tools, build tools, code generators, dev utilities.
 - Most of the web-specific guidance
 - Complex fan-out patterns (smaller codebase, less parallelism needed)
 
+## Retrofitting an Existing Project
+
+1. **Command handlers** — Each command/subcommand gets a CONTRACT: header.
+2. **Configuration schema** — Config file format, env var handling, flag definitions.
+3. **Output formatters** — The contract between internal data and user-visible output.
+
+CLI tools often have a small surface area — you may be able to tag every file in a single session. Start with the command entry points.
+
+**Ground truth first step:** Set up `METRICS` with command count and test count. CLI tools are often under-tested; making the number visible motivates coverage.
+
 ## What to Add
 
 - **Release checklist** — version bump, changelog, package publish

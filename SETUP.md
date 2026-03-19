@@ -49,6 +49,7 @@ cp -r agents/                "$PROJECT/agents/"
 # Enforcement scripts and conventions (recommended)
 cp -r scripts/               "$PROJECT/scripts/"
 cp conventions.md            "$PROJECT/conventions.md"
+cp METRICS.template           "$PROJECT/METRICS"
 mkdir -p "$PROJECT/.github"
 cp .github/pull_request_template.md "$PROJECT/.github/"
 chmod +x "$PROJECT/scripts/"*.sh
@@ -141,6 +142,11 @@ grep -rn "<PROJECT_NAME>\|<pkg-manager>\|YYYY-MM-DD" \
 # Confirm no untracked TODOs
 grep -rn "TODO:" --include="*.ts" --include="*.go" --include="*.py" src/ || echo "Clean"
 
+# Confirm ground truth script has at least one metric defined
+# (remove the no-op line and uncomment at least one metric)
+grep -q 'echo "' scripts/check-ground-truth.sh && echo "Ground truth: metrics defined" \
+  || echo "Ground truth: customize compute_metrics() in scripts/check-ground-truth.sh"
+
 # Test the agent experience: start a new Claude Code session
 ```
 
@@ -162,7 +168,7 @@ See: https://github.com/willackerly/agent-templates"
 |---------|--------|
 | **Every session start** | Agent reads Cold Start Quad, verifies freshness |
 | **Every session end** | Update QUICKCONTEXT "In Progress" / "Recently Complete" |
-| **Every commit** | Run TODO two-tag check, update docs if needed |
+| **Every commit** | Run TODO two-tag check, update `METRICS` if counts changed, update docs if needed |
 | **Every new source file** | Add `CONTRACT:` header comment |
 | **Weekly** | Scrub TRACKED-TASK comments, review TODO staleness |
 | **Monthly** | Full doc-drift audit (or use the doc-drift-detector template) |

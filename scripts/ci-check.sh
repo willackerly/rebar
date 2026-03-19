@@ -12,6 +12,7 @@
 #   SKIP_TODOS=1             — skip TODO tracking check
 #   SKIP_FRESHNESS=1         — skip freshness check
 #   SKIP_REGISTRY=1          — skip registry consistency check
+#   SKIP_GROUND_TRUTH=1     — skip ground truth metric verification
 #
 # Exit code: 0 = all pass, 1 = failures in strict mode
 
@@ -63,6 +64,7 @@ run_check "Contract References" SKIP_CONTRACT_REFS    "$SCRIPT_DIR/check-contrac
 run_check "TODO Tracking"       SKIP_TODOS            "$SCRIPT_DIR/check-todos.sh"
 run_check "Doc Freshness"       SKIP_FRESHNESS        "$SCRIPT_DIR/check-freshness.sh"
 run_check "Registry Consistency" SKIP_REGISTRY         "$SCRIPT_DIR/check-registry.sh"
+run_check "Ground Truth"        SKIP_GROUND_TRUTH     "$SCRIPT_DIR/check-ground-truth.sh"
 
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"

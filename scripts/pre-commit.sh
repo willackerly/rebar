@@ -41,6 +41,13 @@ if [ -x "$BASE/check-contract-refs.sh" ]; then
   "$BASE/check-contract-refs.sh" || failed=$((failed + 1))
 fi
 
+# Optional: verify numeric claims haven't drifted (fast — just find/grep/wc)
+if [ -x "$BASE/check-ground-truth.sh" ]; then
+  echo ""
+  echo "Pre-commit: checking ground truth metrics..."
+  "$BASE/check-ground-truth.sh" || failed=$((failed + 1))
+fi
+
 if [ "$failed" -gt 0 ]; then
   echo ""
   echo "Pre-commit checks failed. Fix the issues above before committing."

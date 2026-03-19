@@ -64,3 +64,15 @@ For SPAs, SSR apps, web frontends with API backends.
 - Crypto rules section (unless handling encryption client-side)
 - Wire protocol guidance (unless building WebSocket/WebRTC features)
 - Ghost DB / database shim patterns
+
+## Retrofitting an Existing Project
+
+Don't add CONTRACT: headers to every file at once. Start with the highest-leverage boundaries:
+
+1. **API route modules** — Each gets a CONTRACT: header and a corresponding spec in `docs/specifications/api/`. This is the highest-leverage target because route modules define the external interface. One spec per route file, verified by the ground truth script.
+2. **Shared type definitions** — The types that cross package boundaries (shared/types/, API request/response schemas). These are the IR — the stable interface between packages.
+3. **Core library entry points** — The main exports of each package (index.ts, public API surface).
+
+These 3 areas cover ~80% of the contract system's value. Internal modules, utility functions, and UI components can be tagged incrementally as you touch them.
+
+**Ground truth first step:** Set up `METRICS` with test counts and route counts. These are the numbers that drift fastest in web app monorepos.

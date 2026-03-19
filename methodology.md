@@ -307,6 +307,29 @@ Observed failure pattern from real agent-driven development:
 what exists. Only trustworthy documentation tells you what was intended, what
 was excluded, and what's planned.
 
+### Numeric Claims: The Fastest Drift Vector
+
+Quantitative documentation claims (test counts, endpoint counts, contract
+counts, version numbers) drift faster than any other content. Every commit
+that adds a test file, creates a contract, or bumps a version silently
+invalidates numbers in multiple documents.
+
+**The failure mode is silent success.** Tests pass. The app works. CI is
+green. But "126 tests" became "586 tests" over 3 weeks, and five documents
+still say 126. No mechanism detects this because the metric being wrong
+doesn't break anything — it just makes documentation fictional.
+
+**Defenses:**
+1. **Structured metrics file** — A `METRICS` file with key=value pairs is
+   the single source of truth for all quantitative claims. No prose matching,
+   no fragile grep-against-docs. One file, one format, machine-verifiable.
+2. **Ground truth script** — `scripts/check-ground-truth.sh` computes
+   metrics from code and compares against the `METRICS` file. Fails on drift.
+3. **Known locations** — By convention, all tests live in `tests/` and all
+   contracts live in `architecture/`. Known locations make counting reliable.
+4. **Cold start verification** — New sessions run the ground truth script
+   before trusting QUICKCONTEXT.md claims.
+
 ---
 
 ## 6. Parallel Agent Orchestration
@@ -406,6 +429,26 @@ in the inner loop.
 Use the code-review subagent template. The template checks: does this change
 conform to its declared contract? Does it introduce behavior not covered by
 a contract? Are contract references in file headers correct?
+
+### Debugging with Cross-Representation Oracles
+
+When a system has multiple implementations of the same specification, the
+implementation closest to ground truth becomes an **oracle** for debugging
+the others.
+
+**The pattern:** Measure each implementation's distance from a known-correct
+reference. The closest one is your oracle — use its internal state to debug
+divergences in the others. Instead of guessing why Implementation B produces
+wrong output, compare its intermediate state against the oracle's.
+
+**Examples:**
+- Two parsers for the same format → the more accurate one is oracle
+- A reference implementation and a production implementation → reference is oracle
+- Multiple rendering paths for the same input → the path closest to ground
+  truth reveals what the others should be doing
+
+This generalizes to any project where you can measure distance from ground
+truth across multiple code paths.
 
 ---
 

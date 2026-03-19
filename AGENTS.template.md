@@ -87,6 +87,20 @@ head -10 TODO.md
 git log --oneline -20 | head -10
 ```
 
+### Step 1b: Verify Ground Truth Metrics
+
+If the project has a ground truth script and a `METRICS` file, verify
+numeric claims match reality before trusting them:
+
+```bash
+# Compare documented metrics against codebase reality
+[ -x scripts/check-ground-truth.sh ] && ./scripts/check-ground-truth.sh
+```
+
+If metrics have drifted, update `METRICS` BEFORE proceeding with your task.
+Stale numeric claims cascade — an agent that trusts "126 tests" when there
+are 586 will make wrong assumptions about coverage and maturity.
+
 ### Step 2: Identify Discrepancies
 Look for these common drift patterns:
 - **Branch mismatch**: Docs say one branch, you're on another
@@ -169,6 +183,10 @@ This prevents the 50% waste incident (see learnings-from-opendockit.md §7).
 3. **Read actual source directories.** `ls` and `wc -l` tell you what exists.
 4. **Cross-reference "What's Next"** in QUICKCONTEXT.md against code — verify
    planned items haven't already been implemented.
+5. **Check for overlap between planned agents.** List the files each agent
+   will likely modify. If two agents touch the same file, either combine
+   them into one or explicitly assign non-overlapping sections. Overlap
+   causes merge conflicts that consume significant post-merge context.
 
 This takes 2-3 minutes and prevents hours of wasted agent compute.
 
@@ -340,6 +358,37 @@ philosophy and `architecture/README.md` for the naming/linking system.
 **Why this matters**: Multiple agents work on this codebase asynchronously. Each agent relies on docs to understand context without reading the full history. Stale docs cause wasted effort, duplicate work, and architectural drift.
 
 **Enforcement**: PRs that change code without corresponding doc updates should be flagged. When in doubt, over-document—it's cheaper to trim than to reconstruct context.
+
+#### Metric-Bearing Changes (High Drift Risk)
+
+Quantitative claims (test counts, contract counts, endpoint counts) drift
+faster than prose. These code changes invalidate the `METRICS` file and
+any doc that cross-references those numbers:
+
+| Code Change | What to Update |
+|-------------|----------------|
+| Add/remove test file | `METRICS` file, QUICKCONTEXT.md |
+| Add/remove contract | `METRICS` file, CONTRACT-REGISTRY.md |
+| Add/remove API route | `METRICS` file, corresponding spec |
+| Change dependency version | Architecture docs referencing it |
+
+**Convention:** All tests live in `tests/`. All contracts live in
+`architecture/`. These known locations make metric computation reliable —
+no guesswork about where to count.
+
+#### Single Source of Truth for Metrics
+
+Every quantitative claim must trace to ONE authoritative source.
+The `METRICS` file is the canonical location for project-wide numbers.
+`scripts/check-ground-truth.sh` verifies it against code.
+
+| Metric | Computed From | Verified By | Referenced In |
+|--------|--------------|-------------|---------------|
+| Test count | `tests/` directory | `check-ground-truth.sh` | QUICKCONTEXT.md |
+| Contract count | `architecture/CONTRACT-*.md` | `check-ground-truth.sh` | CONTRACT-REGISTRY.md |
+| Contract coverage | `CONTRACT:` headers in source | `check-ground-truth.sh` | AGENTS.md |
+
+<!-- Customize this table for your project's metrics. -->
 
 #### Doc Ownership by Workstream
 
@@ -523,6 +572,24 @@ These are hard-won lessons. Follow them exactly:
 | Integration | 2-4 | 120s | More complex flows |
 | Full E2E | All | 300s | Complete system tests |
 
+#### Dev Server Memory for Long Test Runs
+
+When running E2E suites with many specs (50+), dev servers can leak
+memory and get OOM-killed mid-run. Common with Vite, Webpack HMR, and
+Next.js dev mode.
+
+**Pattern:** Use production-like servers for E2E, not dev servers.
+
+| Server Type | Memory | Stability |
+|------------|--------|-----------|
+| Dev server (`vite dev`) | Growing (~500MB+) | OOM-killed during long runs |
+| Preview/static (`vite preview`) | Constant (~50MB) | Stable indefinitely |
+
+For Vite: `vite build --mode test && vite preview --port $PORT` gives a
+static server with constant memory. The 10-15s build time pays for itself
+by eliminating OOM kills. Adjust health check timeouts (60s vs 20s) to
+account for the build step.
+
 ### Deployment Traps & Lessons
 
 These patterns cause recurring production incidents in monorepo projects. Document the specifics for your project below.
@@ -598,6 +665,34 @@ Vite, Next.js, and Create React App all **bake environment variables into the bu
 - `JWT_SECRET` is runtime — only needs to be set on the server
 - After deploy, open DevTools Network tab and verify API requests go to the expected URL
 -->
+
+#### Production Deploy Confirmation
+
+Deploy scripts targeting production MUST require interactive confirmation.
+Without this, agents with max autonomy can and will deploy autonomously —
+autonomy grants are for development workflow, not production operations.
+
+**Pattern:**
+```bash
+# In your production deploy script:
+if [ -t 0 ]; then
+  read -p "Deploy to PRODUCTION? Type 'yes' to confirm: " confirm
+  [ "$confirm" = "yes" ] || { echo "Aborted."; exit 1; }
+else
+  echo "ERROR: Production deploy requires interactive terminal (TTY)."
+  echo "This prevents automated/scripted deploys without human confirmation."
+  exit 1
+fi
+```
+
+The `-t 0` check ensures the script runs in an interactive terminal, not
+piped or called from another script. This is a deliberate friction point —
+the one place where we want to slow agents down.
+
+**Document for your project:**
+- Which deploy commands target production vs. staging
+- Which commands have this guard and which don't
+- How to bypass for CI/CD pipelines (e.g., `DEPLOY_CONFIRMED=1`)
 
 ### Agent Collaboration Patterns
 

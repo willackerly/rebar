@@ -61,6 +61,16 @@ For REST/gRPC APIs, microservices, data pipelines, backend systems.
 - Visual/E2E testing tier (T4)
 - Frontend-specific deployment traps (MIME types, build-time env vars, etc.)
 
+## Retrofitting an Existing Project
+
+1. **Route handlers / controllers** — Each gets a CONTRACT: header + spec. These ARE the API contract.
+2. **Database schema / migrations** — The data model contract. Tag schema files and migration directories.
+3. **Middleware chain** — Auth, validation, rate limiting. These define cross-cutting behavioral contracts.
+
+These 3 areas cover the external surface (routes), data surface (schema), and cross-cutting surface (middleware). Internal utilities and helpers can be tagged incrementally.
+
+**Ground truth first step:** Set up `METRICS` with endpoint counts and test counts. Run `check-ground-truth.sh` in CI from day one — it catches drift before it compounds.
+
 ## What to Add
 
 - **Migration checklist** — database migrations, backwards compatibility
