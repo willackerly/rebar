@@ -3,7 +3,7 @@
 Contracts, lifecycle state, and the contract registry.
 
 See the [root README](../README.md) for how contracts fit into the overall system,
-and [methodology.md](../methodology.md) for the full philosophy.
+and [DESIGN.md](../DESIGN.md) for the full philosophy.
 
 ## Quick Reference
 

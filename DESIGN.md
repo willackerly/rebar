@@ -279,7 +279,7 @@ speed of code changes. Therefore:
 
 2. **Pre-Launch Audits** before fan-out campaigns. Grep for existing
    implementations before launching agents to build things that might already
-   exist. (See the 50% waste incident in learnings-from-opendockit.md §7.)
+   exist. (See the 50% waste incident in docs/learnings-from-opendockit.md §7.)
 
 3. **Filesystem as source of truth.** When docs say one thing and `ls` +
    `grep` say another, the filesystem wins. Docs describe intent; the
@@ -584,3 +584,166 @@ QA is fully automated — no separate QA agent:
 | Encode corrections as templates | `agents/subagent-prompts/` for repeatable tasks |
 | Fast inner loops | Testing Cascade T0-T5 |
 | Parallel by default | Worktree isolation, subagent templates, fan-out patterns |
+
+---
+
+## 10. Design Decisions
+
+This repo was built iteratively from real agent-driven development. Each
+decision emerged from a failure that the previous approach didn't prevent.
+
+### Why contracts became the center, not docs or tests
+
+We started with documentation templates (QUICKCONTEXT, AGENTS, TODO) and they
+worked — agents oriented faster, drift decreased. But agents kept changing
+code that *technically worked* but violated architectural intent. They'd
+refactor a function in a way that broke an implicit contract with another
+module, or add a feature that contradicted a design decision from weeks ago.
+
+The problem: no document answered "what is this code *supposed to do*
+according to the architecture?" Tests answer "does it work?" Code answers
+"what does it do right now?" But neither answers "what was intended, and what
+boundaries must be respected?" That's what contracts do.
+
+### Why grep-based linking over tooling
+
+`// CONTRACT:C1-BLOBSTORE.2.1` in code headers + `grep -rn` to find
+implementations. No build plugins, no custom linters, no databases.
+
+- **Zero adoption cost.** Any project can start using it today.
+- **Tool-agnostic.** Works with any editor, any AI agent, any CI.
+- **Transparent.** The linking mechanism is visible in the code.
+- **Resilient.** No tool to break, update, or configure.
+
+The value comes from the *practice* of writing and referencing contracts, not
+from tooling. Start with grep. Add tooling later if scale demands it.
+
+### Why subagent templates matter for single invocations
+
+We built `agents/subagent-prompts/` for parallel fan-out. But the bigger
+insight: **templates are just as valuable for single tasks.** When you ask an
+agent to do a "UX review" without a template, it guesses what you mean. A
+`ux-review.md` template encodes *your* definition — your criteria, heuristics,
+and output format. If you've ever corrected an agent, that correction belongs
+in a template. This is how agents learn across sessions.
+
+### Why TODO absorbed KNOWN_ISSUES
+
+We had QUICKCONTEXT, KNOWN_ISSUES, TODO, AGENTS, CLAUDE — five files. In
+practice, KNOWN_ISSUES and TODO overlapped and agents had to maintain both.
+Every additional file is a drift surface. Merging known issues into TODO as a
+section reduced maintenance without losing information. Fewer files actually
+maintained beats more files that drift.
+
+### Why README is the universal first-read
+
+Previously QUICKCONTEXT was first. But it answers "what's happening now," not
+"what is this project?" An agent that dives into current state without
+understanding the project's identity makes worse decisions. README provides
+stable orientation; QUICKCONTEXT is volatile and tactical. The reading order
+goes from stable/strategic to volatile/tactical.
+
+### Why lifecycle is computed, not declared
+
+We adopted lifecycle tracking from Purlin (see §11 Related Work), but with a
+key difference: status is derived from what exists in the codebase (do
+implementing files exist? do test files exist? are all spec sections present?)
+rather than manually declared. Computed status can't drift — it's always
+accurate because it's always recomputed from reality.
+
+### Why agent commands are unquoted
+
+`ask steward "what needs attention?"` asks a question. `ask steward` runs a
+scan. The convention — quoted = question, unquoted = command — emerged from
+wanting each role to own a slice of project health without requiring the full
+persona invocation. Each agent has a `commands/` directory; drop a `.sh` file
+in it and it's immediately available. Zero changes to `bin/ask` needed.
+
+### How this repo was built
+
+This repo emerged from a single conversation about Claude Code subagent
+concurrency limits, evolved through prompt templates as version-controlled
+infrastructure, and grew into a complete methodology for contract-driven
+agent development. Each idea built on the last:
+
+- Subagent fan-out → reusable prompt templates
+- Templates → single-invocation value (not just fan-out)
+- Templates need shared rules → behavioral contracts for agents
+- Agent contracts → why not contracts for code?
+- Code contracts → BDD first (who/why before what/how)
+- Docs needed → Cold Start Quad
+- Docs drifted → anti-drift mechanisms
+- Different projects → profiles
+- Quality gaps → Steward + enforcement scripts
+- Agent roles → ASK CLI with commands
+
+The [learnings document](docs/learnings-from-opendockit.md) captures the raw
+failure analysis and war stories from 5,800+ tests and 9 simultaneous agents.
+
+---
+
+## 11. Related Work
+
+### Purlin
+
+[Purlin](https://github.com/purlin) is a spec-driven development framework
+that influenced several concepts in rebar.
+
+**Where we align:** specs before code, contract lifecycle, quality gates,
+companion docs, discovery taxonomy.
+
+**Where we diverge:**
+
+| Aspect | Purlin | rebar | Why |
+|--------|--------|-------|-----|
+| Role rigidity | Fixed hierarchy, formal handoffs | Fluid roles | Small teams wear multiple hats |
+| Scenarios | Gherkin-only, required | Gherkin optional | Infrastructure contracts don't benefit from Given/When/Then |
+| Code philosophy | "Code is disposable, specs are permanent" | Code and contracts are co-equal | Contracts become stale when not grounded in implementation |
+| Repo structure | Git submodules | Flat vendoring (proposed) | Submodules add complexity small teams can't absorb |
+| Dashboard | Required web UI | JSON-first, dashboard optional | `jq` should answer what a dashboard can |
+| Tooling | Purpose-built CLI | bash + jq + grep | Zero dependencies beyond a Unix shell |
+
+**What we adopted and adapted:**
+- Computed lifecycle status (derived from code, never declared)
+- Discovery taxonomy (BUG/DISCOVERY/DRIFT/DISPUTE)
+- Companion files (`.impl.md` for tribal knowledge)
+- Role-based action items (Steward routes findings to the right role)
+- Quality scanning as infrastructure (Steward = TPM in code form)
+
+---
+
+## 12. Future Concepts
+
+Ideas we believe are directionally correct but haven't built yet.
+
+### Contract Vendoring
+
+When multiple repos implement the same contracts, each needs a local copy.
+Copies drift. **Concept:** Vendor contracts like Go vendors dependencies —
+`architecture/vendor/` contains read-only copies with a lock file pointing
+to the upstream source. `scripts/vendor-contracts.sh` pulls updates.
+
+### Cryptographic Contract Signing
+
+Vendored contracts could be tampered with. **Concept:** Sign contracts when
+they pass a trust checklist (BDD reviewed, architect approved, security
+reviewed, tests passing, reference implementation exists). Child repos can
+vendor but not modify without invalidating the signature. Matters for
+high-assurance environments (financial, healthcare, defense).
+
+### Expert Agent Hierarchy
+
+At scale, a single orchestrating agent can't deeply understand product intent,
+architecture, and all code simultaneously. **Concept:** A hierarchy of expert
+agents — Product (reads BDD, answers "what and why"), Architect (reads
+contracts, answers "how should it be structured"), Eng Lead (reads code,
+answers "how to implement"), Engineers (subagents, do the work). Each level
+reads summaries from above, detail at its own level. The Eng Lead is the
+default persona you talk to.
+
+This is partially realized through ASK roles and agent commands, but the full
+hierarchy with structured inter-agent communication is future work.
+
+See [docs/AGENT-RUNTIME.md](docs/AGENT-RUNTIME.md),
+[docs/ASK-SHELL.md](docs/ASK-SHELL.md), and
+[docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md) for detailed proposals.

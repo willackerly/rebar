@@ -14,19 +14,19 @@ rebar kit. This table maps each lesson to where it lives now:
 | Cold Start Quad | `README.template.md`, `QUICKCONTEXT.template.md`, `TODO.template.md`, `AGENTS.template.md` |
 | Testing Cascade (T0-T5) | `AGENTS.template.md` §Testing Cascade |
 | Worktree Isolation | `AGENTS.template.md` §Agent Collaboration Patterns |
-| Central Contracts / IR Types | `architecture/`, `methodology.md` §1-3 |
+| Central Contracts / IR Types | `architecture/`, `DESIGN.md` §1-3 |
 | TODO Two-Tag System | `AGENTS.template.md` §TODO Tracking, `TODO.template.md` |
 | Fan-Out Patterns | `AGENTS.template.md` §Subagent Prompt Templates, `agents/` |
 | Doc Drift | `agents/subagent-prompts/doc-drift-detector.md` |
 | W6 / Feature Inventory | `agents/subagent-prompts/feature-inventory.md`, `AGENTS.template.md` §Feature Inventory Protocol |
-| Contract-First Gaps | `architecture/` contract system, `methodology.md` §2-3 |
+| Contract-First Gaps | `architecture/` contract system, `DESIGN.md` §2-3 |
 | Pre-Launch Audit | `AGENTS.template.md` §Pre-Launch Audit |
 | Feature Inventories | `agents/subagent-prompts/feature-inventory.md` |
 | Freshness Timestamps | All template files (freshness markers) |
 | Cherry-Pick Resolution | `AGENTS.template.md` §Cherry-Pick Conflict Resolution |
-| Trust-but-Verify | `AGENTS.template.md` §Post-Merge Integration, `methodology.md` §4 |
-| Subagent Templates | `agents/`, `methodology.md` §6 |
-| Visual Inspection / SBS | Project-specific (rendering), general principle in `methodology.md` |
+| Trust-but-Verify | `AGENTS.template.md` §Post-Merge Integration, `DESIGN.md` §4 |
+| Subagent Templates | `agents/`, `DESIGN.md` §6 |
+| Visual Inspection / SBS | Project-specific (rendering), general principle in `DESIGN.md` |
 | Branded Types | Project-specific (TypeScript), not templated |
 | Metrics Bundle | Project-specific (font data), not templated |
 

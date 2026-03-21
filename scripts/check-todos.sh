@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # check-todos.sh — Enforce the two-tag TODO tracking system
+# rebar-scripts: 2026.03.20
 #
 # Usage: ./scripts/check-todos.sh [directories...]
 # Default: scans src/ internal/ cmd/ client/ packages/ lib/ app/

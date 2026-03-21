@@ -212,7 +212,7 @@ command rather than trust the number.
 
 ---
 
-### Change 3: methodology.md — Numeric drift principle (~15 lines)
+### Change 3: DESIGN.md — Numeric drift principle (~15 lines)
 
 Add to §5 "The Information Environment" under "Anti-Drift Mechanisms":
 
@@ -443,7 +443,7 @@ The original feedback suggested replacing exact numbers with script references. 
 | Ground truth script | `scripts/check-ground-truth.sh` (new) | ~60 | Core enforcement |
 | Single Source of Truth Table | `AGENTS.template.md` | ~25 | Policy |
 | Code→Doc metric matrix | `AGENTS.template.md` | ~25 | Policy |
-| Numeric drift principle | `methodology.md` | ~15 | Philosophy |
+| Numeric drift principle | `DESIGN.md` | ~15 | Philosophy |
 | Known Issues reorder | `TODO.template.md` | ~5 | Structure |
 | E2E memory management | `AGENTS.template.md` | ~10 | Guidance |
 | Deploy confirmation guard | `AGENTS.template.md` | ~15 | Guidance |

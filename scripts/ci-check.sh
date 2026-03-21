@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # ci-check.sh — Atomic CI entrypoint that runs all contract/doc checks
+# rebar-scripts: 2026.03.20
 #
 # Usage: ./scripts/ci-check.sh [--strict]
 #
@@ -13,6 +14,7 @@
 #   SKIP_FRESHNESS=1         — skip freshness check
 #   SKIP_REGISTRY=1          — skip registry consistency check
 #   SKIP_GROUND_TRUTH=1     — skip ground truth metric verification
+#   SKIP_COMPLIANCE=1       — skip rebar compliance check
 #   SKIP_STEWARD=1          — skip steward health scan
 #
 # Exit code: 0 = all pass, 1 = failures in strict mode
@@ -64,8 +66,9 @@ run_check "Contract Headers"    SKIP_CONTRACT_HEADERS "$SCRIPT_DIR/check-contrac
 run_check "Contract References" SKIP_CONTRACT_REFS    "$SCRIPT_DIR/check-contract-refs.sh"
 run_check "TODO Tracking"       SKIP_TODOS            "$SCRIPT_DIR/check-todos.sh"
 run_check "Doc Freshness"       SKIP_FRESHNESS        "$SCRIPT_DIR/check-freshness.sh"
-run_check "Registry Consistency" SKIP_REGISTRY         "$SCRIPT_DIR/check-registry.sh"
+run_check "Registry Consistency" SKIP_REGISTRY         "$SCRIPT_DIR/compute-registry.sh" --check
 run_check "Ground Truth"        SKIP_GROUND_TRUTH     "$SCRIPT_DIR/check-ground-truth.sh"
+run_check "Rebar Compliance"    SKIP_COMPLIANCE       "$SCRIPT_DIR/check-compliance.sh"
 run_check "Steward"             SKIP_STEWARD          "$SCRIPT_DIR/steward.sh"
 
 echo ""

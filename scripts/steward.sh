@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # steward.sh — Automated project health scanner
+# rebar-scripts: 2026.03.20
 #
 # Usage:
 #   steward.sh              Full scan, produces JSON + markdown report
@@ -219,8 +220,9 @@ run_enforcement() {
     "contract_refs:check-contract-refs.sh"
     "todo_tracking:check-todos.sh"
     "doc_freshness:check-freshness.sh"
-    "registry:check-registry.sh"
+    "registry:compute-registry.sh --check"
     "ground_truth:check-ground-truth.sh"
+    "compliance:check-compliance.sh"
   )
 
   local passing=0
@@ -503,6 +505,7 @@ generate_markdown() {
       "doc_freshness:Doc Freshness"
       "registry:Registry Consistency"
       "ground_truth:Ground Truth"
+      "compliance:Rebar Compliance"
     )
 
     for entry in "${check_names[@]}"; do

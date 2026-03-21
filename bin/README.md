@@ -164,7 +164,7 @@ agents/<role>/
 
 ## Known Limitations (v0)
 
-This is a bash proof-of-concept. See [IMPLEMENTATION.md](../IMPLEMENTATION.md)
+This is a bash proof-of-concept. See [IMPLEMENTATION.md](../docs/IMPLEMENTATION.md)
 for the v1/v2 roadmap.
 
 - No concurrent access protection (race conditions with inbox/outbox)

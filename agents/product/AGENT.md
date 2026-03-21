@@ -13,7 +13,7 @@ user needs and own requirements, priorities, and feature decisions.
 
 ## Project Files
 - `README.md`
-- `methodology.md` (contract methodology)
+- `DESIGN.md` (contract methodology)
 - `architecture/` (2 contracts)
 
 ## Context Loading

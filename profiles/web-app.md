@@ -11,7 +11,7 @@ For SPAs, SSR apps, web frontends with API backends.
 | `TODO.template.md` | Required | Full two-tag system |
 | `AGENTS.template.md` | Required | All sections relevant |
 | `CLAUDE.template.md` | Required | All sections relevant |
-| `methodology.md` | Required | Reference — don't modify per-project |
+| `DESIGN.md` | Required | Reference — don't modify per-project |
 
 ## Architecture — Customize Heavily
 
@@ -44,10 +44,15 @@ For SPAs, SSR apps, web frontends with API backends.
 |---------|--------|
 | Core Tenets | Add: "Mobile-first", "Accessible by default", "Progressive enhancement" |
 | Testing Cascade | Add T4 visual/E2E tier commands (Playwright, Cypress) |
-| E2E Test Server Management | **Essential** — fill in completely |
-| Deployment Traps | **Essential** — fill in build-time env vars, CDN MIME types |
-| Agent Collaboration | Keep as-is |
 | Quality Gates | Add: Lighthouse score, accessibility audit |
+
+**Practice files to customize (in `practices/`):**
+
+| Practice | Action |
+|----------|--------|
+| `practices/e2e-testing.md` | **Essential** — fill in test-stack.sh, ports, timeouts |
+| `practices/deployment-patterns.md` | **Essential** — fill in build-time env vars, CDN MIME types |
+| `practices/worktree-collaboration.md` | Keep as-is |
 
 ## CLAUDE.template.md Sections — What to Customize
 

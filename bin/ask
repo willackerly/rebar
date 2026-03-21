@@ -4,6 +4,7 @@
 # Usage:
 #   ask <agent> "<question>"     Send a question, get a concise answer
 #   ask -v <agent> "<question>"  Verbose: answer + rationale + refs
+#   ask -d <agent> "<question>"  Debug: show session ID, context %, timings
 #   ask up <agent>               Bring an agent online
 #   ask who                      List available agents
 #   ask status <agent>           Check agent health
@@ -30,6 +31,7 @@
 #   ASK_SHARED_DIR   Override shared directory (default: ./shared)
 #   ASK_TIMEOUT      Override timeout in seconds (default: 120)
 #   ASK_VERBOSE      Set to 1 for verbose output to stderr
+#   ASK_DEBUG        Set to 1 for debug output (session, tokens, timing)
 
 set -euo pipefail
 
@@ -39,6 +41,7 @@ AGENTS_DIR="${ASK_AGENTS_DIR:-./agents}"
 SHARED_DIR="${ASK_SHARED_DIR:-./shared}"
 TIMEOUT="${ASK_TIMEOUT:-120}"
 VERBOSE="${ASK_VERBOSE:-0}"
+DEBUG="${ASK_DEBUG:-0}"
 MODEL="${ASK_MODEL:-sonnet}"
 CONTEXT_LIMIT="${ASK_CONTEXT_LIMIT:-70}"
 REGISTRY="${ASK_REGISTRY:-$HOME/.config/ask/projects}"
@@ -49,6 +52,12 @@ EVENTS_LOG="$SHARED_DIR/messages/events.jsonl"
 log() {
   if [ "$VERBOSE" = "1" ]; then
     echo "[ask] $*" >&2
+  fi
+}
+
+dbg() {
+  if [ "$DEBUG" = "1" ]; then
+    echo "[ask:debug] $*" >&2
   fi
 }
 
@@ -212,6 +221,7 @@ Usage:
   ask tail <agent>             Follow live event log
   ask where <agent>            Resolve agent directory path
   ask reset <agent>            Clear session (start fresh next question)
+  ask compact <agent>          Compact memory log (summarize old entries)
   ask register [name]          Register current project (default: dir name)
   ask projects                 List registered projects
   ask init                     Initialize directory structure
@@ -381,6 +391,128 @@ cmd_reset() {
   fi
 }
 
+cmd_compact() {
+  require_agent_name "${1:-}"
+  require_agent_exists "$1"
+  local agent="$1"
+  local agent_dir="$AGENTS_DIR/$agent"
+  local log_file="$agent_dir/memory.log.md"
+  local memory_file="$agent_dir/memory.md"
+
+  if [ ! -f "$log_file" ]; then
+    echo "$agent has no memory log to compact."
+    return 0
+  fi
+
+  # Check thresholds: 50KB or 100 entries
+  local file_size
+  file_size=$(wc -c < "$log_file" | tr -d ' ')
+  local entry_count
+  entry_count=$(grep -c '^---$' "$log_file" 2>/dev/null || echo "0")
+
+  local COMPACT_SIZE_THRESHOLD="${ASK_COMPACT_SIZE:-51200}"    # 50KB
+  local COMPACT_ENTRY_THRESHOLD="${ASK_COMPACT_ENTRIES:-100}"
+  local COMPACT_KEEP_RECENT="${ASK_COMPACT_KEEP:-20}"
+
+  if [ "$file_size" -lt "$COMPACT_SIZE_THRESHOLD" ] && [ "$entry_count" -lt "$COMPACT_ENTRY_THRESHOLD" ]; then
+    echo "$agent memory: ${entry_count} entries, $(( file_size / 1024 ))KB — no compaction needed."
+    return 0
+  fi
+
+  echo "Compacting $agent memory: ${entry_count} entries, $(( file_size / 1024 ))KB..."
+
+  # Split: keep last N entries verbatim, summarize older ones
+  local total_separators
+  total_separators=$(grep -c '^---$' "$log_file")
+  local keep_from=$(( total_separators - COMPACT_KEEP_RECENT ))
+  [ "$keep_from" -lt 1 ] && keep_from=1
+
+  # Extract older entries (everything before the last N)
+  local older_entries
+  older_entries=$(awk -v n="$keep_from" '
+    /^---$/ { count++ }
+    count < n { print }
+  ' "$log_file")
+
+  # Extract recent entries (the last N)
+  local recent_entries
+  recent_entries=$(awk -v n="$keep_from" '
+    /^---$/ { count++ }
+    count >= n { print }
+  ' "$log_file")
+
+  if [ -z "$older_entries" ]; then
+    echo "Not enough old entries to compact."
+    return 0
+  fi
+
+  # Summarize older entries using claude
+  local summary_prompt="Summarize these agent interaction logs into a concise memory document.
+Preserve: key decisions, facts learned, important context, open questions, recurring patterns.
+Discard: routine Q&A, greetings, obvious/redundant information.
+Format: bullet points grouped by topic. Be concise but preserve critical details.
+
+LOGS TO SUMMARIZE:
+$older_entries"
+
+  local summary=""
+  if command -v claude >/dev/null 2>&1; then
+    log "Generating summary via claude..."
+    summary=$(echo "$summary_prompt" | claude --print --model "${MODEL:-sonnet}" 2>/dev/null || echo "")
+  fi
+
+  if [ -z "$summary" ]; then
+    # Fallback: keep a truncated version of old entries
+    log "Claude unavailable; keeping truncated log entries."
+    summary="## Compacted Memory ($(timestamp))
+
+$(echo "$older_entries" | head -50)
+
+_[${entry_count} older entries truncated during compaction]_"
+  fi
+
+  # Write compacted memory.md
+  {
+    echo "# Agent Memory: $agent"
+    echo ""
+    echo "<!-- Compacted at $(timestamp). Source: memory.log.md -->"
+    echo "<!-- Older entries summarized, recent entries in memory.log.md -->"
+    echo ""
+    echo "$summary"
+  } > "$memory_file"
+
+  # Rewrite log to keep only recent entries
+  {
+    echo "<!-- Compacted at $(timestamp). Prior history summarized in memory.md -->"
+    echo "$recent_entries"
+  } > "$log_file"
+
+  local new_size
+  new_size=$(wc -c < "$log_file" | tr -d ' ')
+  local new_entries
+  new_entries=$(grep -c '^---$' "$log_file" 2>/dev/null || echo "0")
+  echo "Compacted: ${entry_count} -> ${new_entries} entries, $(( file_size / 1024 ))KB -> $(( new_size / 1024 ))KB"
+  echo "Summary written to: $memory_file"
+}
+
+# Auto-compact check — called after each invocation
+_maybe_compact() {
+  local agent="$1"
+  local agent_dir="$AGENTS_DIR/$agent"
+  local log_file="$agent_dir/memory.log.md"
+
+  [ ! -f "$log_file" ] && return 0
+
+  local file_size
+  file_size=$(wc -c < "$log_file" | tr -d ' ')
+  local threshold="${ASK_COMPACT_SIZE:-51200}"
+
+  if [ "$file_size" -ge "$threshold" ]; then
+    log "Memory log exceeds ${threshold} bytes, auto-compacting in background..."
+    cmd_compact "$agent" >/dev/null 2>&1 &
+  fi
+}
+
 cmd_init() {
   echo "Initializing ASK Scoped Knowledge..."
   echo ""
@@ -487,7 +619,15 @@ _ask_direct() {
     session_id=$(cat "$session_file")
     has_session=true
     log "Resuming session $session_id"
+  else
+    # Pre-generate session ID so the first call's conversation is
+    # pinned and resumable — without this, --print creates an ephemeral
+    # session whose content isn't available on --resume.
+    session_id=$(uuidgen | tr '[:upper:]' '[:lower:]')
+    echo "$session_id" > "$session_file"
+    log "Created new session $session_id"
   fi
+  dbg "session=$session_id has_session=$has_session"
 
   # Build the prompt
   local prompt
@@ -591,7 +731,10 @@ Rules:
   local claude_args=(--print --model "$MODEL" --output-format json)
   if [ "$has_session" = true ]; then
     claude_args+=(--resume "$session_id")
+  else
+    claude_args+=(--session-id "$session_id")
   fi
+  dbg "claude ${claude_args[*]} <prompt>"
 
   # Invoke claude
   local raw_response response
@@ -602,6 +745,17 @@ Rules:
     if [ -n "$new_session_id" ]; then
       echo "$new_session_id" > "$session_file"
       log "Session saved: $new_session_id"
+    fi
+
+    # Debug: show session and token info
+    if [ "$DEBUG" = "1" ]; then
+      local _dbg_usage
+      _dbg_usage=$(echo "$raw_response" | jq -r '
+        [.modelUsage[]] | first |
+        "tokens: in=\(.inputTokens) out=\(.outputTokens) cached=\(.cacheReadInputTokens) window=\(.contextWindow)"
+      ' 2>/dev/null || echo "tokens: unavailable")
+      dbg "$_dbg_usage"
+      dbg "session_id returned: ${new_session_id:-none}"
     fi
 
     # Check context window usage — auto-reset if over limit
@@ -629,6 +783,9 @@ Rules:
       echo "**$ts** Q: $question"
       echo "A: $(echo "$response" | head -1)"
     } >> "$agent_dir/memory.log.md"
+
+    # Auto-compact if memory log is large
+    _maybe_compact "$agent"
 
     # Output the response
     echo "$response"
@@ -833,7 +990,8 @@ _detect_project_context() {
   done
 
   # Methodology
-  [ -f "methodology.md" ] && lines+=("- \`methodology.md\` (contract methodology)")
+  [ -f "DESIGN.md" ] && lines+=("- \`DESIGN.md\` (contract design philosophy)")
+  [ -f "methodology.md" ] && lines+=("- \`methodology.md\` (contract methodology)")  # legacy name
 
   # Architecture
   if [ -d "architecture" ]; then
@@ -892,7 +1050,7 @@ design, contracts, and technical architecture."
 - Reference and maintain contracts in architecture/
 - Advise on interfaces, dependencies, and technical direction
 - Review changes for architectural conformance"
-      reading_priority="architecture/ (contracts), README.md, methodology.md"
+      reading_priority="architecture/ (contracts), README.md, DESIGN.md"
       ;;
     product)
       role="You are the product agent for $project_name. You represent
@@ -1097,6 +1255,7 @@ fi
 while [ $# -gt 0 ]; do
   case "$1" in
     -v|--verbose) VERBOSE=1; shift ;;
+    -d|--debug)   DEBUG=1; VERBOSE=1; shift ;;
     *)            break ;;
   esac
 done
@@ -1136,6 +1295,10 @@ case "$CMD" in
     ;;
   reset)
     cmd_reset "${2:-}"
+    exit 0
+    ;;
+  compact)
+    cmd_compact "${2:-}"
     exit 0
     ;;
   register)

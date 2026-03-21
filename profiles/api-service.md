@@ -11,7 +11,7 @@ For REST/gRPC APIs, microservices, data pipelines, backend systems.
 | `TODO.template.md` | Required | Full two-tag system |
 | `AGENTS.template.md` | Required | All sections relevant |
 | `CLAUDE.template.md` | Required | All sections relevant |
-| `methodology.md` | Required | Reference — contracts are the API contracts |
+| `DESIGN.md` | Required | Reference — contracts are the API contracts |
 
 ## Architecture — High Value
 
@@ -49,17 +49,23 @@ For REST/gRPC APIs, microservices, data pipelines, backend systems.
 | Section | Action |
 |---------|--------|
 | Core Tenets | Add: "API-first", "Backwards compatible", "Observable" |
-| Contract-First Policy | **Essential** — OpenAPI/protobuf before implementation |
+| Contract-Driven Development | **Essential** — OpenAPI/protobuf before implementation |
 | Testing Cascade | Add: integration test tier (real DB), load test tier |
-| Deployment Traps | Fill in: migration order, rollback procedure, health checks |
 | Quality Gates | Add: API contract conformance check, migration reversibility |
+
+**Practice files to customize (in `practices/`):**
+
+| Practice | Action |
+|----------|--------|
+| `practices/deployment-patterns.md` | Fill in: migration order, rollback procedure, health checks |
+| `practices/worktree-collaboration.md` | Keep as-is |
 
 ## What You Can Skip
 
-- E2E Test Server Management (Playwright-specific patterns)
+- `practices/e2e-testing.md` (Playwright-specific patterns)
 - UX review template
 - Visual/E2E testing tier (T4)
-- Frontend-specific deployment traps (MIME types, build-time env vars, etc.)
+- Frontend-specific deployment patterns (MIME types, build-time env vars, etc.)
 
 ## Retrofitting an Existing Project
 

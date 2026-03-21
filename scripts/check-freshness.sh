@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # check-freshness.sh — Flag documentation with stale freshness dates
+# rebar-scripts: 2026.03.20
 #
 # Usage: ./scripts/check-freshness.sh [max-age-days]
 # Default: 14 days
@@ -10,6 +11,10 @@
 # Exit code: 0 = all fresh, 1 = stale docs found
 
 set -euo pipefail
+
+# Tier gate: freshness checks are Tier 2+ (skip for Tier 1 / partial adoption)
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+[ -f "$SCRIPT_DIR/_rebar-config.sh" ] && source "$SCRIPT_DIR/_rebar-config.sh" && _rebar_skip 2 && exit 0
 
 MAX_AGE_DAYS="${1:-14}"
 TODAY=$(date +%s)

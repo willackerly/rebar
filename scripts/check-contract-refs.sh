@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # check-contract-refs.sh — Verify every CONTRACT: reference points to a real file
+# rebar-scripts: 2026.03.20
 #
 # Usage: ./scripts/check-contract-refs.sh [architecture-dir]
 # Default: architecture/

@@ -12,7 +12,7 @@ any project where a security bug is a catastrophic failure.
 | `TODO.template.md` | Required | Full two-tag system |
 | `AGENTS.template.md` | Required | All sections, strengthen security guidance |
 | `CLAUDE.template.md` | Required | Add strict crypto rules |
-| `methodology.md` | Required | Reference — contracts are especially critical here |
+| `DESIGN.md` | Required | Reference — contracts are especially critical here |
 
 ## Architecture — Mission Critical
 
@@ -66,8 +66,13 @@ any project where a security bug is a catastrophic failure.
 | Core Tenets | Add: "No custom crypto", "Formal verification where possible", "Interop testing mandatory" |
 | Requires Discussion | Add: ALL crypto algorithm changes, key format changes, protocol changes |
 | Testing Cascade | Add: fuzz testing tier, interop test tier, benchmark regression tier |
-| Agent Collaboration | Add: **cross-validation pattern** — two agents independently review security-critical code, third diffs findings |
 | Quality Gates | Add: zero `security-surface-scan` high/critical findings before merge |
+
+**Practice files to customize (in `practices/`):**
+
+| Practice | Action |
+|----------|--------|
+| `practices/worktree-collaboration.md` | Add: **cross-validation pattern** — two agents independently review security-critical code, third diffs findings |
 
 ## CLAUDE.template.md Sections — What to Customize
 
@@ -80,8 +85,8 @@ any project where a security bug is a catastrophic failure.
 
 ## What You Can Skip
 
-- E2E Test Server Management (no servers)
-- Deployment Traps (library, not deployed service)
+- `practices/e2e-testing.md` (no servers)
+- `practices/deployment-patterns.md` (library, not deployed service)
 - UX review template (no UI)
 - Most of the web-specific gotchas (CORS, MIME types, etc.)
 

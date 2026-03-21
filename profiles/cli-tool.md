@@ -11,7 +11,7 @@ For command-line tools, build tools, code generators, dev utilities.
 | `TODO.template.md` | Required | Full two-tag system |
 | `AGENTS.template.md` | Required | Slim down — skip deployment/E2E sections |
 | `CLAUDE.template.md` | Required | Slim down — focused on build/test |
-| `methodology.md` | Required | Reference — lighter touch on contracts |
+| `DESIGN.md` | Required | Reference — lighter touch on contracts |
 
 ## Architecture — Light Touch
 
@@ -45,19 +45,24 @@ For command-line tools, build tools, code generators, dev utilities.
 |---------|--------|
 | Core Tenets | Customize: "Zero dependencies where possible", "Fast startup", "Unix philosophy" |
 | Testing Cascade | Simplify: T0-T3 sufficient, skip T4-T5 |
-| Agent Collaboration | Keep but scale down — fewer parallel agents needed |
 | TODO Tracking | Keep — even small projects benefit |
-| E2E Test Server Management | Skip |
-| Deployment Traps | Skip (unless published to package registry) |
+
+**Practice files:**
+
+| Practice | Action |
+|----------|--------|
+| `practices/multi-agent-orchestration.md` | Scale down — fewer parallel agents needed |
+| `practices/e2e-testing.md` | Skip (no servers) |
+| `practices/deployment-patterns.md` | Skip (unless published to package registry) |
+| `practices/worktree-collaboration.md` | Keep but scale down |
 
 ## What You Can Skip
 
-- E2E Test Server Management (no servers)
-- Deployment Traps (no deployed infrastructure)
+- `practices/e2e-testing.md` (no servers)
+- `practices/deployment-patterns.md` (no deployed infrastructure)
 - UX review template
 - Visual/E2E testing tiers
 - Most of the web-specific guidance
-- Complex fan-out patterns (smaller codebase, less parallelism needed)
 
 ## Retrofitting an Existing Project
 

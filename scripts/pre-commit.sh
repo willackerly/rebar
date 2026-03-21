@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # pre-commit.sh — Pre-commit hook that runs fast contract/TODO checks
+# rebar-scripts: 2026.03.20
 #
 # Install:
 #   cp scripts/pre-commit.sh .git/hooks/pre-commit

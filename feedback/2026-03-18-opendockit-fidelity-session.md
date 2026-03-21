@@ -1,7 +1,7 @@
 # Feedback: OpenDocKit Fidelity Blitz — Context Pollution, Skill Gaps, and Architectural Recommendations
 
 **Date:** 2026-03-18
-**Source:** Full rebar methodology, ASK-SHELL.md, AGENT-RUNTIME.md, methodology.md
+**Source:** Full rebar methodology, ASK-SHELL.md, AGENT-RUNTIME.md, DESIGN.md
 **Type:** improvement | missing-feature
 **From:** Claude Code agent session on OpenDocKit (20 commits, 6,042 tests, 15+ hours of continuous work)
 
@@ -107,7 +107,7 @@ The most important discovery of the session: our PDF renderer (NativeRenderer) i
 
 This emerged from running the unified 3-pair SBS viewer for the first time. Without the tooling to compare all three representations simultaneously, this insight would never have surfaced.
 
-**Recommendation for templates:** Add a "cross-representation oracle" pattern to methodology.md. When you have multiple rendering paths for the same input, the path closest to ground truth becomes an oracle for the others. This generalizes beyond document rendering — any system with multiple implementations of the same spec can use this pattern.
+**Recommendation for templates:** Add a "cross-representation oracle" pattern to DESIGN.md. When you have multiple rendering paths for the same input, the path closest to ground truth becomes an oracle for the others. This generalizes beyond document rendering — any system with multiple implementations of the same spec can use this pattern.
 
 ### 2.4 Worktree Isolation
 
@@ -323,7 +323,7 @@ Examples beyond OpenDocKit:
 - A reference implementation and a production implementation → reference is oracle
 - Test doubles and real implementations → real implementation is oracle for test double accuracy
 
-**Recommendation:** Add the "Oracle Pattern" to `methodology.md` as a debugging primitive alongside the existing patterns (contracts, BDD, testing cascade). It's applicable to any project where you can measure distance from ground truth across multiple paths.
+**Recommendation:** Add the "Oracle Pattern" to `DESIGN.md` as a debugging primitive alongside the existing patterns (contracts, BDD, testing cascade). It's applicable to any project where you can measure distance from ground truth across multiple paths.
 
 ---
 
@@ -352,6 +352,6 @@ The `TODO:` / `TRACKED-TASK:` system prevented tech debt accumulation. Every age
 |------|---------------|--------|--------|
 | 1 | `/cherry-pick-resolve` skill | Saves ~20% of context in merge-heavy sessions | Medium |
 | 2 | `/fanout-audit` skill with overlap detection | Prevents redundant agents + merge conflicts | Low-Medium |
-| 3 | Oracle Pattern in methodology.md | Generalizable debugging primitive | Low |
+| 3 | Oracle Pattern in DESIGN.md | Generalizable debugging primitive | Low |
 | 4 | `/sbs` + `/sbs-assess` skills | Streamlines visual fidelity workflow | Medium |
 | 5 | Semantic worktree branch naming | Reduces post-merge bookkeeping confusion | Low |

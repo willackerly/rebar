@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # check-ground-truth.sh — Verify METRICS file matches codebase reality.
+# rebar-scripts: 2026.03.20
 #
 # Computes project metrics from code and compares against claims in the
 # METRICS file. Catches "silent success" drift where everything works but
@@ -11,6 +12,10 @@
 # Exit: 0 = all claims match, 1 = drift detected
 
 set -euo pipefail
+
+# Tier gate: ground truth is Tier 3 only (skip for Tier 1-2)
+SCRIPT_DIR_GT="$(cd "$(dirname "$0")" && pwd)"
+[ -f "$SCRIPT_DIR_GT/_rebar-config.sh" ] && source "$SCRIPT_DIR_GT/_rebar-config.sh" && _rebar_skip 3 && exit 0
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 METRICS_FILE="$REPO_ROOT/METRICS"

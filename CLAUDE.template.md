@@ -30,7 +30,7 @@ Project instructions for Claude Code. These override defaults—follow them exac
 4. `AGENTS.md` → norms, testing cascade, contracts, collaboration
 
 **Reference:**
-- `methodology.md` → the philosophy (contracts, BDD, autonomy model)
+- `DESIGN.md` → the philosophy (contracts, BDD, autonomy model)
 - `architecture/` → contract documents
 - `agents/` → subagent templates
 
@@ -82,7 +82,7 @@ implements or belongs to. See `architecture/README.md` for the full system.
 
 When editing a file: **read its contract first.** When updating a contract:
 **search for all implementing code** (`grep -rn "CONTRACT:{id}"`).
-See `methodology.md` for the full philosophy.
+See `DESIGN.md` for the full philosophy.
 
 ## Testing
 

@@ -2,7 +2,7 @@
 
 How to adopt the rebar kit in your project.
 
-**Start by reading [methodology.md](methodology.md)** to understand the
+**Start by reading [DESIGN.md](DESIGN.md)** to understand the
 philosophy. Then pick your [project profile](profiles/) to know which
 parts to adopt.
 
@@ -13,15 +13,23 @@ parts to adopt.
 - 30 minutes for initial setup
 - `jq` (for steward quality scanning — `brew install jq` / `apt install jq`)
 
-## Step 1: Pick Your Profile
+## Step 1: Pick Your Profiles
 
-Check [profiles/](profiles/) for your project type:
+Profiles have two dimensions — pick one from each:
+
+**By project type** ([profiles/](profiles/)):
 - [web-app.md](profiles/web-app.md) — SPA, SSR, frontend + API
 - [api-service.md](profiles/api-service.md) — Backend API, microservice
 - [crypto-library.md](profiles/crypto-library.md) — Security-critical library
 - [cli-tool.md](profiles/cli-tool.md) — Command-line tool
 
-Your profile tells you which files to copy and which sections to customize.
+**By team size** ([profiles/](profiles/)):
+- [solo-dev.md](profiles/solo-dev.md) — 1 dev, Tier 1 (15 min setup)
+- [small-team.md](profiles/small-team.md) — 2-10 devs, Tier 2 (45 min setup)
+- [department.md](profiles/department.md) — 10+ devs, Tier 3 (2 hour setup)
+
+Your profiles tell you which files to copy, which sections to customize,
+and which enforcement tier to configure.
 
 ## Step 2: Copy the Core Files
 
@@ -39,13 +47,16 @@ cp AGENTS.template.md        "$PROJECT/AGENTS.md"
 cp CLAUDE.template.md        "$PROJECT/CLAUDE.md"
 
 # Methodology (required — the philosophy)
-cp methodology.md            "$PROJECT/methodology.md"
+cp DESIGN.md            "$PROJECT/DESIGN.md"
 
 # Contract system (required)
 cp -r architecture/          "$PROJECT/architecture/"
 
 # Agent orchestration (recommended)
 cp -r agents/                "$PROJECT/agents/"
+
+# Practice reference guides (recommended)
+cp -r practices/             "$PROJECT/practices/"
 
 # Enforcement scripts and conventions (recommended)
 cp -r scripts/               "$PROJECT/scripts/"
@@ -54,6 +65,12 @@ cp METRICS.template           "$PROJECT/METRICS"
 # State directory for steward
 mkdir -p "$PROJECT/architecture/.state"
 touch "$PROJECT/architecture/.state/.gitkeep"
+
+# Tier configuration (set your enforcement level)
+cp .rebarrc.template         "$PROJECT/.rebarrc"
+
+# Version tracking (so you know which rebar you adopted)
+echo "v1.2.0" > "$PROJECT/.rebar-version"
 
 mkdir -p "$PROJECT/.github"
 cp .github/pull_request_template.md "$PROJECT/.github/"
@@ -75,11 +92,17 @@ blocks explaining what to customize. Remove comments when done.
 
 The universal first-read. Every agent, every session, no exceptions.
 
-1. **Project name & description** — Replace `<PROJECT_NAME>`
-2. **Architecture overview** — Briefly describe the contract structure
-3. **Quick Start** — How to get the project running
-4. **Project Structure** — Directory layout
-5. **Core Tenets** — 3-5 non-negotiable principles
+1. **Rebar badge** — First line after `# Title` MUST be the rebar badge:
+   ```markdown
+   > **rebar v1.2.0** | **Tier 2: ADOPTED**
+   ```
+   This is validated by `scripts/check-compliance.sh`. Update version when you
+   upgrade rebar. Update tier when you change `.rebarrc`.
+2. **Project name & description** — Replace `<PROJECT_NAME>`
+3. **Architecture overview** — Briefly describe the contract structure
+4. **Quick Start** — How to get the project running
+5. **Project Structure** — Directory layout
+6. **Core Tenets** — 3-5 non-negotiable principles
 
 ### QUICKCONTEXT.md (5 min)
 
@@ -100,15 +123,15 @@ Tasks + known issues + blockers, all in one place.
 3. **Audit existing TODOs** — `grep -rn "TODO:" src/` — fix them or track them
 4. **Update freshness and last-synced dates**
 
-### AGENTS.md (15 min)
+### AGENTS.md (10 min)
 
-How agents work in this project.
+How agents work in this project. This file is now slim — mandatory
+foundations only. Advanced practices live in `practices/`.
 
 1. **Core Tenets** — Mirror from README.md
 2. **Agent Autonomy** — Adjust "Requires Discussion" for your architecture
 3. **Contract-Driven Development** — Customize for your contract categories
 4. **Testing Cascade** — Fill in commands for your test runner
-5. **Active Workstreams** — Current priorities
 
 ### CLAUDE.md (15 min)
 
@@ -122,7 +145,7 @@ Claude Code-specific configuration.
 ### architecture/ (10 min)
 
 1. **Define your first contracts** — Start with the most important interfaces
-2. **Fill in CONTRACT-REGISTRY.md** — Index your contracts
+2. **Generate CONTRACT-REGISTRY.md** — Run `scripts/compute-registry.sh`
 3. **Convention** — Decide on your ID prefixes (S, C, I, P or your own)
 
 ### agents/ (10 min, optional)
@@ -135,7 +158,7 @@ Claude Code-specific configuration.
 
 ```bash
 # Confirm Cold Start Quad exists
-ls README.md QUICKCONTEXT.md TODO.md AGENTS.md CLAUDE.md methodology.md
+ls README.md QUICKCONTEXT.md TODO.md AGENTS.md CLAUDE.md DESIGN.md
 
 # Confirm architecture directory
 ls architecture/CONTRACT-REGISTRY.md
@@ -164,7 +187,7 @@ grep -q 'echo "' scripts/check-ground-truth.sh && echo "Ground truth: metrics de
 ## Step 5: Commit
 
 ```bash
-git add README.md QUICKCONTEXT.md TODO.md AGENTS.md CLAUDE.md methodology.md
+git add README.md QUICKCONTEXT.md TODO.md AGENTS.md CLAUDE.md DESIGN.md
 git add architecture/ agents/
 git commit -m "docs: adopt contract-driven rebar methodology
 

@@ -86,7 +86,7 @@ This prevents the common failure mode where a single agent session tries to be e
 4. Set up 5 role-based agents with AGENT.md + commands/
 5. Copied and adapted 8 subagent templates
 6. Merged subagent-guidelines.md (rebar base + blindpipe crypto/ABAC additions)
-7. Copied reference docs (methodology.md, conventions.md, crypto-library profile)
+7. Copied reference docs (DESIGN.md, conventions.md, crypto-library profile)
 8. Installed ASK CLI (`bin/ask`, `bin/ask-agent-loop`)
 9. Updated existing docs (CLAUDE.md, AGENTS.md, TODO.md, .gitignore)
 10. Embedded role discipline pattern in AGENTS.md

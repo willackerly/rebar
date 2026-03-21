@@ -48,7 +48,7 @@ This document maps the adoption curve from solo → small team → department �
 **What changes:**
 - Multiple people edit QUICKCONTEXT.md and TODO.md → merge conflicts
 - Someone needs to own contract reviews (not just "whoever gets to it")
-- New team members need onboarding (can't just say "read methodology.md")
+- New team members need onboarding (can't just say "read DESIGN.md")
 - CI becomes important (not just local pre-commit hooks)
 - Cross-repo changes need coordination (PR in repo A depends on PR in repo B)
 
@@ -339,7 +339,7 @@ A Tier 4 organization still uses `grep -rn "CONTRACT:"` to find implementations.
 
 3. **PR template** — `.github/pull_request_template.md` with "Contracts affected:" and "Breaking changes:" sections. Unlocks Tier 2.
 
-4. **Progressive onboarding doc** — A 2-minute quickstart that links to the 10-minute orientation that links to methodology.md. Unlocks Tier 2-3.
+4. **Progressive onboarding doc** — A 2-minute quickstart that links to the 10-minute orientation that links to DESIGN.md. Unlocks Tier 2-3.
 
 5. **Maturity model doc** — `profiles/maturity-model.md` with L1-L5 self-assessment. Unlocks Tier 4.
 

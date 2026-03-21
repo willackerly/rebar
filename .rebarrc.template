@@ -1,0 +1,10 @@
+# Rebar enforcement configuration
+#
+# Tier controls which checks are enforced:
+#   1 = Partial  — contract-refs + TODOs only (solo dev / early adoption)
+#   2 = Adopted  — + contract-headers, freshness, registry (small team)
+#   3 = Enforced — + ground-truth, strict steward (full enforcement)
+#
+# Override per-run with: REBAR_TIER=1 ./scripts/ci-check.sh
+
+tier = 2

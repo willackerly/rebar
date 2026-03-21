@@ -1,5 +1,13 @@
 # <PROJECT_NAME>
 
+> **rebar v1.2.0** | **Tier 2: ADOPTED**
+
+<!-- REQUIRED: The rebar badge above MUST be the first line after the title.
+     Format: > **rebar vX.Y.Z** | **Tier N: LEVEL**
+     Where LEVEL is one of: PARTIAL (tier 1), ADOPTED (tier 2), ENFORCED (tier 3)
+     This is validated by scripts/check-compliance.sh and the steward.
+     Update the version when you upgrade rebar. Update the tier when you change .rebarrc. -->
+
 <!-- One paragraph: what this project is, what problem it solves, and the
      core tech stack. This is the first thing any agent or human reads. -->
 
@@ -20,7 +28,7 @@ and compare. If docs and reality disagree, reality wins.
 ## Architecture
 
 This project uses contract-driven development. All contracts live in
-`architecture/`. See [methodology.md](methodology.md) for the full philosophy.
+`architecture/`. See [DESIGN.md](DESIGN.md) for the full philosophy.
 
 ```bash
 # Find all contracts

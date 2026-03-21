@@ -13,7 +13,7 @@ implementation coordination, code quality, and task management.
 
 ## Project Files
 - `README.md`
-- `methodology.md` (contract methodology)
+- `DESIGN.md` (contract methodology)
 - `architecture/` (2 contracts)
 
 ## Context Loading

@@ -5,6 +5,18 @@ project for consistency across agents and humans.
 
 ---
 
+## Minimum Viable (Tier 1 — Solo / Small Project)
+
+Not every project needs the full convention set. At Tier 1, adopt only these:
+
+1. **Contract headers** — Every source file gets a `CONTRACT:` or `Architecture:` header
+2. **Two-tag TODOs** — `TODO:` in code = untracked (blocks commit), `TRACKED-TASK:` = tracked in TODO.md
+3. **Commit references** — Reference contracts in commits when relevant (no strict format required)
+
+Everything below is recommended for Tier 2+ (teams, shared repos, CI enforcement).
+
+---
+
 ## Branch Naming
 
 Branches reference the contract they're working on:
@@ -239,7 +251,7 @@ Test Requirements, Implementing Files.
 
 ### The Scout Rule
 
-Leave the test suite cleaner than you found it. See `methodology.md` §7 and
+Leave the test suite cleaner than you found it. See `DESIGN.md` §7 and
 `AGENTS.template.md` "The Scout Rule" for the full philosophy.
 
 ### Prohibited Patterns

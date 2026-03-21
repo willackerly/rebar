@@ -27,7 +27,7 @@ Our project independently developed most of what the templates prescribe. This i
 | Template Concept | Our Equivalent | Quality |
 |---|---|---|
 | Cold Start Quad (4 files) | 6 files: CLAUDE.md, QUICKCONTEXT.md, TODO.md, AGENTS.md, KNOWN_ISSUES.md, docs/README.md | Good — same function, different structure |
-| `methodology.md` | `docs/plans/CONTRACT_FIRST_STRATEGY.md` | Partial — covers API contracts but not the full philosophy |
+| `DESIGN.md` | `docs/plans/CONTRACT_FIRST_STRATEGY.md` | Partial — covers API contracts but not the full philosophy |
 | `architecture/CONTRACT-*.md` | `docs/architecture/` (14 files, prose-based) | Strong content, but no CONTRACT: IDs, no versioning |
 | API specs | `docs/specifications/api/` (13 files covering all 14 route modules) | Comprehensive — but no machine-readable format (OpenAPI is partial) |
 | `agents/` subagent templates | None | Gap — we use subagents heavily but with inline prompts |
@@ -48,7 +48,7 @@ Our project independently developed most of what the templates prescribe. This i
 
 We're ~70% aligned with the templates, but the 30% that's missing is **the contract linking system** — the core differentiator. Our architecture docs have excellent content. Our API specs are comprehensive. But there's no bidirectional link between source code and these documents. An agent editing `packages/api/src/routes/modules/auth.ts` doesn't know `docs/specifications/api/auth-api.md` exists unless it happens to explore that directory.
 
-This is the exact failure mode the contract system prevents: "agents making locally-correct but globally-wrong decisions because they didn't understand the architectural context" (methodology.md §1).
+This is the exact failure mode the contract system prevents: "agents making locally-correct but globally-wrong decisions because they didn't understand the architectural context" (DESIGN.md §1).
 
 ---
 
@@ -73,7 +73,7 @@ In practice, this underestimates the problem:
 For projects like ours, the migration has four distinct phases with very different effort profiles:
 
 **Phase A: Additive (hours, no risk)**
-- Copy `methodology.md` as reference material
+- Copy `DESIGN.md` as reference material
 - Create `agents/` directory with subagent templates
 - Consolidate coding conventions into `conventions.md`
 - Create `METRICS` file from ground truth script output
@@ -198,7 +198,7 @@ Map your existing documentation to the template system:
 | TODO.md | ? | Merge Known Issues if they're in a separate file |
 | AGENTS.md | ? | Add missing sections (testing cascade, contracts, subagents) |
 | CLAUDE.md | ? | Add contract linking section, verify commands |
-| methodology.md | ? | Copy as-is — it's reference material |
+| DESIGN.md | ? | Copy as-is — it's reference material |
 | architecture/ | ? | Map existing architecture docs to contract format |
 | agents/ | ? | Likely new — create from templates |
 
@@ -213,7 +213,7 @@ Walk your source tree and assign each directory to a contract tier:
 ### Step 3: Additive Adoption (hours, zero risk)
 
 Copy what doesn't conflict with existing docs:
-- methodology.md (reference material, no conflict possible)
+- DESIGN.md (reference material, no conflict possible)
 - agents/ directory (new capability, no existing equivalent)
 - conventions.md (consolidate scattered style guidance)
 - METRICS file (captures ground truth output)
@@ -472,7 +472,7 @@ The templates are designed for greenfield adoption: write contracts → implemen
 
 For reference, here's the order we intend to adopt the remaining template components in SafeSign:
 
-1. **Copy methodology.md** — reference material, zero risk
+1. **Copy DESIGN.md** — reference material, zero risk
 2. **Create agents/ directory** — formalize our subagent prompts
 3. **Create conventions.md** — consolidate scattered style guidance
 4. **Create METRICS file** — formalize ground truth output

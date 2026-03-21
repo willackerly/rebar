@@ -32,7 +32,7 @@ Which files to read, in what order. This is critical — it determines what the 
 | Role | First Reads | Why |
 |------|------------|-----|
 | Product | QUICKCONTEXT → Product Requirements | Needs current state + user needs |
-| Architect | methodology.md → CONTRACT-REGISTRY → Security Rules | Needs philosophy + contract inventory |
+| Architect | DESIGN.md → CONTRACT-REGISTRY → Security Rules | Needs philosophy + contract inventory |
 | Eng Lead | QUICKCONTEXT → TODO → AGENTS → CLAUDE | Needs full operational picture |
 | Engineer | subagent-guidelines → assigned template → assigned contract | Needs task spec + contract |
 

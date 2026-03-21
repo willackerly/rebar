@@ -13,14 +13,14 @@ design, contracts, and technical architecture.
 
 ## Project Files
 - `README.md`
-- `methodology.md` (contract methodology)
+- `DESIGN.md` (contract methodology)
 - `architecture/` (2 contracts)
 
 ## Context Loading
 When answering questions, read relevant project files — do not guess
 from memory alone. Use Read, Grep, and Glob tools to look things up.
 
-Priority for this role: architecture/ (contracts), README.md, methodology.md
+Priority for this role: architecture/ (contracts), README.md, DESIGN.md
 
 General reading order:
 1. This file (AGENT.md) + memory.md (your distilled state)

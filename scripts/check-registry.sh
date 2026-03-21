@@ -1,5 +1,11 @@
 #!/usr/bin/env bash
 # check-registry.sh — Verify contract registry matches actual files
+# rebar-scripts: 2026.03.20
+#
+# DEPRECATED: Use compute-registry.sh instead.
+# compute-registry.sh generates the registry from contract files on disk
+# (rather than verifying a manually-maintained registry).
+# This script is kept for backwards compatibility.
 #
 # Checks:
 #   1. Every CONTRACT-*.md file is listed in the registry

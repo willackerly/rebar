@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # check-contract-headers.sh — Verify every source file has a CONTRACT: or Architecture: header
+# rebar-scripts: 2026.03.20
 #
 # Usage: ./scripts/check-contract-headers.sh [directories...]
 # Default: scans src/ internal/ cmd/ client/ packages/ lib/ app/
@@ -7,6 +8,10 @@
 # Exit code: 0 = all files have headers, 1 = missing headers found
 
 set -euo pipefail
+
+# Tier gate: contract headers are Tier 2+ (skip for Tier 1 / partial adoption)
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+[ -f "$SCRIPT_DIR/_rebar-config.sh" ] && source "$SCRIPT_DIR/_rebar-config.sh" && _rebar_skip 2 && exit 0
 
 # Configurable: file extensions to check
 EXTENSIONS="${CONTRACT_EXTENSIONS:-.go .ts .tsx .js .jsx .py .rs}"
