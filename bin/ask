@@ -19,6 +19,8 @@
 #   ask register [name]           Register current project globally
 #   ask projects                  List registered projects
 #   ask init                      Initialize directory structure
+#   ask serve [--port N] [--repos-dir DIR]  Start enterprise server
+#   ask agents                    List agents on remote server
 #   ask help                      Show this help text
 #
 # Exit codes:
@@ -35,6 +37,8 @@
 #   ASK_VERBOSE      Set to 1 for verbose output to stderr
 #   ASK_DEBUG        Set to 1 for debug output (session, tokens, timing)
 #   ASK_WRITE        Set to 1 to enable write mode by default
+#   ASK_SERVER       Remote server host:port (enables remote mode for repo:agent queries)
+#   ASK_API_KEY      API key for remote server authentication
 
 set -euo pipefail
 
@@ -49,7 +53,228 @@ MODEL="${ASK_MODEL:-sonnet}"
 CONTEXT_LIMIT="${ASK_CONTEXT_LIMIT:-70}"
 WRITE_MODE="${ASK_WRITE:-0}"
 REGISTRY="${ASK_REGISTRY:-$HOME/.config/ask/projects}"
+SERVER="${ASK_SERVER:-}"
+SERVER_API_KEY="${ASK_API_KEY:-}"
 EVENTS_LOG="$SHARED_DIR/messages/events.jsonl"
+
+# --- Remote (ASK_SERVER) Functions --------------------------------------------
+#
+# ASK_SERVER supports comma-separated servers for multi-node setups:
+#   ASK_SERVER=192.168.0.181:7232,192.168.0.50:7232
+#
+# Requests round-robin across servers so no single node gets spammed.
+# For queries (ask, status, log, reset), servers are tried in round-robin
+# order until one has the repo. For listing (agents), all servers are queried.
+
+_RR_FILE="${HOME}/.config/ask/.rr-index"
+
+_parse_servers() {
+  # Split ASK_SERVER on commas into _SERVERS array
+  IFS=',' read -ra _SERVERS <<< "$SERVER"
+}
+
+_next_rr_index() {
+  # Get and increment the round-robin index
+  local count="$1"
+  local idx=0
+  if [ -f "$_RR_FILE" ]; then
+    idx=$(cat "$_RR_FILE" 2>/dev/null || echo 0)
+  fi
+  mkdir -p "$(dirname "$_RR_FILE")"
+  echo $(( (idx + 1) % count )) > "$_RR_FILE"
+  echo "$idx"
+}
+
+_normalize_server_url() {
+  local server="$1"
+  case "$server" in
+    http://*|https://*) echo "$server" ;;
+    *) echo "http://$server" ;;
+  esac
+}
+
+_curl_one() {
+  # Curl a single server. Returns 0 on success, 1 on failure.
+  local server="$1"
+  local method="$2"
+  local endpoint="$3"
+  shift 3
+
+  local url
+  url="$(_normalize_server_url "$server")$endpoint"
+  local curl_args=(-s -S --fail-with-body --max-time 300 -X "$method")
+
+  if [ -n "$SERVER_API_KEY" ]; then
+    curl_args+=(-H "Authorization: Bearer $SERVER_API_KEY")
+  fi
+
+  curl_args+=(-H "Content-Type: application/json")
+  curl_args+=("$@")
+  curl_args+=("$url")
+
+  curl "${curl_args[@]}" 2>/dev/null
+}
+
+_server_curl() {
+  # Try servers in round-robin order until one succeeds.
+  # For non-404 errors (connection refused, timeout), try next server.
+  # For 404 (repo/agent not found on that server), try next server.
+  # Only fail if ALL servers fail.
+  local method="$1"
+  local endpoint="$2"
+  shift 2
+
+  _parse_servers
+  local count=${#_SERVERS[@]}
+  local start_idx
+  start_idx=$(_next_rr_index "$count")
+
+  local i response
+  for (( i=0; i<count; i++ )); do
+    local idx=$(( (start_idx + i) % count ))
+    local server="${_SERVERS[$idx]}"
+
+    if response=$(_curl_one "$server" "$method" "$endpoint" "$@"); then
+      # Success — but check if it's a 404 (repo not on this server)
+      if echo "$response" | jq -e '.error' &>/dev/null; then
+        local err_msg
+        err_msg=$(echo "$response" | jq -r '.error' 2>/dev/null)
+        if echo "$err_msg" | grep -qi "not found"; then
+          log "Server $server: $err_msg — trying next"
+          continue
+        fi
+      fi
+      echo "$response"
+      return 0
+    else
+      log "Server $server: unreachable — trying next"
+      continue
+    fi
+  done
+
+  echo "ask: error: all servers failed for $method $endpoint" >&2
+  local tried
+  tried=$(printf '%s, ' "${_SERVERS[@]}")
+  echo "  tried: ${tried%, }" >&2
+  return 1
+}
+
+_is_remote_query() {
+  # Returns 0 (true) if this should be routed to the server
+  # Conditions: ASK_SERVER is set AND the agent spec contains ':'
+  [ -n "$SERVER" ] && [[ "$1" == *:* ]]
+}
+
+cmd_serve() {
+  # Start the enterprise ASK server
+  local script_dir
+  script_dir="$(cd "$(dirname "$0")" && pwd)"
+  local server_bin="$script_dir/ask-server"
+
+  if [ ! -f "$server_bin" ]; then
+    die "ask-server not found at $server_bin"
+  fi
+
+  if ! command -v python3 &>/dev/null; then
+    die "python3 is required for 'ask serve'. Install Python 3.7+."
+  fi
+
+  # Pass through all remaining args to ask-server
+  exec python3 "$server_bin" "$@"
+}
+
+cmd_agents() {
+  # List agents from ALL remote servers (merged, deduplicated)
+  if [ -z "$SERVER" ]; then
+    echo "ask: ASK_SERVER not set. Use 'ask who' for local agents." >&2
+    exit 4
+  fi
+
+  _parse_servers
+  local all_agents="[]"
+
+  for server in "${_SERVERS[@]}"; do
+    local response
+    if response=$(_curl_one "$server" GET /v1/agents); then
+      # Merge — add server info to each entry
+      all_agents=$(echo "$all_agents" "$response" | jq -s '
+        .[0] + [.[1][] | . + {server: "'"$server"'"}]
+      ' 2>/dev/null || echo "$all_agents")
+    else
+      echo "  (server $server: unreachable)" >&2
+    fi
+  done
+
+  # Deduplicate by id, show with server if multiple servers
+  local server_count=${#_SERVERS[@]}
+  if [ "$server_count" -gt 1 ]; then
+    echo "$all_agents" | jq -r 'group_by(.id) | .[] | .[0] | "\(.id)  ← \(.server)"' 2>/dev/null || echo "$all_agents"
+  else
+    echo "$all_agents" | jq -r '.[].id' 2>/dev/null || echo "$all_agents"
+  fi
+}
+
+_remote_ask() {
+  # Route a question to the remote server (round-robin)
+  local repo="$1"
+  local role="$2"
+  local question="$3"
+
+  local json_body
+  json_body=$(jq -n \
+    --arg repo "$repo" \
+    --arg role "$role" \
+    --arg question "$question" \
+    --argjson verbose "$([ "$VERBOSE" = "1" ] && echo true || echo false)" \
+    '{repo: $repo, role: $role, question: $question, verbose: $verbose}')
+
+  local response
+  if ! response=$(_server_curl POST /v1/ask -d "$json_body"); then
+    exit 1
+  fi
+
+  # Extract the answer from JSON response
+  local answer exit_code error
+  answer=$(echo "$response" | jq -r '.answer // empty' 2>/dev/null)
+  exit_code=$(echo "$response" | jq -r '.exit_code // 0' 2>/dev/null)
+  error=$(echo "$response" | jq -r '.error // empty' 2>/dev/null)
+
+  if [ -n "$answer" ]; then
+    echo "$answer"
+  fi
+  if [ -n "$error" ]; then
+    echo "$error" >&2
+  fi
+
+  exit "${exit_code:-0}"
+}
+
+_remote_status() {
+  local repo="$1" role="$2"
+  local response
+  if ! response=$(_server_curl GET "/v1/status/$repo/$role"); then
+    exit 1
+  fi
+  echo "$response" | jq -r 'to_entries | map("\(.key | ascii_upcase): \(.value)") | .[]' 2>/dev/null || echo "$response"
+}
+
+_remote_log() {
+  local repo="$1" role="$2"
+  local response
+  if ! response=$(_server_curl GET "/v1/log/$repo/$role"); then
+    exit 1
+  fi
+  echo "$response" | jq -r '.log // empty' 2>/dev/null || echo "$response"
+}
+
+_remote_reset() {
+  local repo="$1" role="$2"
+  local response
+  if ! response=$(_server_curl POST "/v1/reset/$repo/$role"); then
+    exit 1
+  fi
+  echo "$response" | jq -r '.message // empty' 2>/dev/null || echo "$response"
+}
 
 # --- Helpers ------------------------------------------------------------------
 
@@ -233,6 +458,10 @@ Usage:
   ask init                     Initialize directory structure
   ask help                     Show this help
 
+Enterprise (server mode):
+  ask serve [flags]            Start enterprise server (see ask serve --help)
+  ask agents                   List agents on remote server
+
 Exit codes:
   0  Answer returned
   1  Agent could not answer
@@ -247,6 +476,8 @@ Environment variables:
   ASK_CONTEXT_LIMIT  Auto-reset threshold, percent (default: 70)
   ASK_VERBOSE      Set to 1 for debug output
   ASK_WRITE        Set to 1 to enable write mode by default
+  ASK_SERVER       Remote server host:port (routes repo:agent queries over HTTP)
+  ASK_API_KEY      API key for remote server auth
 USAGE
 }
 
@@ -1424,11 +1655,19 @@ case "$CMD" in
     exit 0
     ;;
   status)
-    cmd_status "${2:-}"
+    if _is_remote_query "${2:-}"; then
+      _remote_status "${2%%:*}" "${2#*:}"
+    else
+      cmd_status "${2:-}"
+    fi
     exit 0
     ;;
   log)
-    cmd_log "${2:-}"
+    if _is_remote_query "${2:-}"; then
+      _remote_log "${2%%:*}" "${2#*:}"
+    else
+      cmd_log "${2:-}"
+    fi
     exit 0
     ;;
   peek)
@@ -1460,7 +1699,11 @@ case "$CMD" in
     exit 0
     ;;
   reset)
-    cmd_reset "${2:-}"
+    if _is_remote_query "${2:-}"; then
+      _remote_reset "${2%%:*}" "${2#*:}"
+    else
+      cmd_reset "${2:-}"
+    fi
     exit 0
     ;;
   compact)
@@ -1479,11 +1722,43 @@ case "$CMD" in
     cmd_init
     exit 0
     ;;
+  serve)
+    shift  # remove 'serve'
+    cmd_serve "$@"
+    ;;
+  agents)
+    cmd_agents
+    exit 0
+    ;;
   *)
     # Default: ask a question or run an agent command
     #   ask <agent> "question"        — quoted/multi-word → question
     #   ask <agent> <command> [args]  — unquoted word matching commands/ → command
     #   ask <agent>                   — no args → default command (if exists)
+
+    # --- Remote mode: route repo:agent queries to ASK_SERVER ---
+    if _is_remote_query "$CMD"; then
+      _REMOTE_REPO="${CMD%%:*}"
+      _REMOTE_ROLE="${CMD#*:}"
+      _REMOTE_CMD="${2:-}"
+
+      case "$_REMOTE_CMD" in
+        "")
+          echo "ask: error: question required for remote agent" >&2
+          echo "Usage: ask $_REMOTE_REPO:$_REMOTE_ROLE \"<question>\"" >&2
+          exit 4
+          ;;
+        *)
+          _remote_ask "$_REMOTE_REPO" "$_REMOTE_ROLE" "$_REMOTE_CMD"
+          ;;
+      esac
+      exit 0
+    fi
+
+    # --- Also intercept management commands with repo:agent when remote ---
+    # (handled above for questions, here for status/log/reset via explicit commands)
+
+    # --- Local mode ---
     resolve_project_agent "$CMD"
     AGENT="$_RESOLVED_AGENT"
     AGENT_DIR="$AGENTS_DIR/$AGENT"

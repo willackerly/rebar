@@ -211,6 +211,84 @@ agents/<role>/
   .progress             # Incremental progress (write mode, auto-managed)
 ```
 
+## Enterprise Server
+
+Host agents from multiple repos on a single endpoint. Any machine can query
+any repo's agents over HTTP.
+
+### Start the server
+
+```bash
+# Serve all repos in a directory
+ask serve --port 7232 --repos-dir /srv/repos
+
+# Serve specific repos
+ask serve --port 7232 --repos /srv/repos/billing,/srv/repos/auth
+
+# With API key auth
+ask serve --port 7232 --repos-dir /srv/repos --api-key SECRET
+```
+
+### Query from any machine
+
+```bash
+# Set the server address
+export ASK_SERVER=server-host:7232
+export ASK_API_KEY=SECRET  # if server uses auth
+
+# List all available agents
+ask agents
+
+# Query a remote agent
+ask billing:architect "What contracts does the payment flow touch?"
+ask -v auth:steward "What's the contract health?"
+
+# Management
+ask status billing:architect
+ask log billing:architect
+ask reset billing:architect
+```
+
+### API Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/v1/health` | Server health check |
+| GET | `/v1/agents` | List all repo:role pairs |
+| GET | `/v1/repos` | List repos with agent counts |
+| POST | `/v1/ask` | Ask a question (`{repo, role, question, verbose?}`) |
+| GET | `/v1/status/<repo>/<role>` | Agent status |
+| GET | `/v1/log/<repo>/<role>` | Agent memory log |
+| POST | `/v1/reset/<repo>/<role>` | Reset agent session |
+
+### How it works
+
+The server is a thin HTTP wrapper around the `ask` CLI. Each request
+invokes `ask` with `cwd` set to the target repo — all existing logic
+(sessions, memory, context loading) works unchanged. Agents spin up
+on demand, not ahead of time.
+
+Local agents (no `:` prefix) always run locally. The `ASK_SERVER`
+variable only affects `repo:agent` cross-project queries.
+
+**Dependencies:** Python 3.7+ (zero external packages), plus the
+standard `ask` dependencies (bash 4.0+, jq, claude CLI).
+
+### Future
+
+- MCP protocol layer (SSE transport, tool/resource discovery)
+- TLS / HTTPS (use a reverse proxy for now)
+- Write mode over network (`-w` flag)
+- PROGRAM concept (bundled multi-repo scopes)
+- Company-level shared agents
+- Horizontal scaling / load balancing
+- Agent session pooling / warm instances
+- WebSocket streaming for long-running queries
+- Rate limiting per client/repo
+- Audit logging / admin dashboard
+- Agent-to-agent cross-repo queries via server
+- Team/user access scoping
+
 ## Known Limitations (v0)
 
 This is a bash proof-of-concept. See [IMPLEMENTATION.md](../docs/IMPLEMENTATION.md)

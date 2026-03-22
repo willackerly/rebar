@@ -1,0 +1,460 @@
+#!/usr/bin/env python3
+"""ask-server — Enterprise ASK HTTP server.
+
+Hosts agents from multiple repos on a single endpoint.
+Each repo's agents are accessible as repo:role via HTTP.
+
+Usage:
+  ask-server --port 7232 --repos-dir /srv/repos
+  ask-server --port 7232 --repos /srv/repos/billing,/srv/repos/auth
+  ask-server --port 7232 --repos-dir /srv/repos --api-key SECRET
+
+Environment:
+  ASK_API_KEY    Require this bearer token in Authorization header (optional)
+  ASK_MODEL      Claude model passed through to ask CLI (default: sonnet)
+  ASK_BIN        Path to ask CLI (default: ask, found via PATH)
+
+API:
+  GET  /v1/health                     → {"status": "ok"}
+  GET  /v1/agents                     → list all repo:role pairs
+  GET  /v1/repos                      → list repos with agent counts
+  POST /v1/ask                        → {repo, role, question, verbose?} → {answer}
+  GET  /v1/status/<repo>/<role>       → agent status
+  GET  /v1/log/<repo>/<role>          → memory log
+  POST /v1/reset/<repo>/<role>        → reset agent session
+
+FUTURE (not in v1):
+  - MCP protocol layer (SSE transport, tool/resource discovery)
+  - TLS / HTTPS (use a reverse proxy for now)
+  - Write mode over network (-w flag) — security implications need design
+  - PROGRAM concept (bundled multi-repo scopes)
+  - Company-level shared agents (e.g. company:architect)
+  - Horizontal scaling / load balancing
+  - Agent session pooling / warm instances
+  - WebSocket streaming for long-running queries
+  - Rate limiting per client/repo
+  - Audit logging / admin dashboard
+  - Agent-to-agent cross-repo queries via server
+  - Auto-restart / health monitoring with heartbeats
+  - Team/user access scoping (who can query which repos)
+  - Webhook notifications on agent activity
+  - Repo sync / auto-pull from git remotes
+"""
+
+import argparse
+import json
+import os
+import subprocess
+import sys
+import threading
+import time
+from http.server import HTTPServer, BaseHTTPRequestHandler
+from pathlib import Path
+from socketserver import ThreadingMixIn
+from urllib.parse import urlparse
+
+
+# ---------------------------------------------------------------------------
+# Registry: discovers repos and their agents
+# ---------------------------------------------------------------------------
+
+class RepoRegistry:
+    """Scans directories for repos containing agents/ with AGENT.md files."""
+
+    def __init__(self):
+        self.repos = {}  # name → absolute path
+        self._lock = threading.Lock()
+
+    def scan_dir(self, repos_dir):
+        """Scan a directory for repos (subdirs containing agents/)."""
+        repos_dir = Path(repos_dir).resolve()
+        if not repos_dir.is_dir():
+            print(f"ask-server: warning: repos-dir not found: {repos_dir}", file=sys.stderr)
+            return
+        for entry in sorted(repos_dir.iterdir()):
+            if entry.is_dir() and (entry / "agents").is_dir():
+                self.add_repo(entry.name, str(entry))
+
+    def add_repos(self, paths):
+        """Add explicit repo paths (comma-separated or list)."""
+        for p in paths:
+            p = Path(p).resolve()
+            if p.is_dir() and (p / "agents").is_dir():
+                self.add_repo(p.name, str(p))
+            else:
+                print(f"ask-server: warning: skipping {p} (no agents/ dir)", file=sys.stderr)
+
+    def add_repo(self, name, path):
+        with self._lock:
+            self.repos[name] = path
+            agents = self._list_agents_for(path)
+            print(f"  registered: {name} → {path} ({len(agents)} agents: {', '.join(agents)})")
+
+    def list_repos(self):
+        with self._lock:
+            result = []
+            for name, path in sorted(self.repos.items()):
+                agents = self._list_agents_for(path)
+                result.append({"repo": name, "path": path, "agents": agents})
+            return result
+
+    def list_all_agents(self):
+        with self._lock:
+            result = []
+            for name, path in sorted(self.repos.items()):
+                for agent in self._list_agents_for(path):
+                    result.append({"repo": name, "role": agent, "id": f"{name}:{agent}"})
+            return result
+
+    def get_repo_path(self, repo_name):
+        with self._lock:
+            return self.repos.get(repo_name)
+
+    def has_agent(self, repo_name, role):
+        path = self.get_repo_path(repo_name)
+        if not path:
+            return False
+        return (Path(path) / "agents" / role / "AGENT.md").is_file()
+
+    def rescan(self):
+        """Re-scan all known repo paths to pick up new agents."""
+        with self._lock:
+            for name, path in list(self.repos.items()):
+                if not Path(path).is_dir():
+                    print(f"ask-server: warning: repo path gone: {name} → {path}", file=sys.stderr)
+                    del self.repos[name]
+
+    def _list_agents_for(self, path):
+        agents_dir = Path(path) / "agents"
+        if not agents_dir.is_dir():
+            return []
+        agents = []
+        for entry in sorted(agents_dir.iterdir()):
+            if entry.is_dir() and (entry / "AGENT.md").is_file():
+                agents.append(entry.name)
+        return agents
+
+
+# ---------------------------------------------------------------------------
+# HTTP Handler
+# ---------------------------------------------------------------------------
+
+class AskHandler(BaseHTTPRequestHandler):
+    """Handles HTTP requests for the enterprise ASK server."""
+
+    # Set by the server on startup
+    registry = None
+    api_key = None
+    ask_bin = None
+
+    def do_GET(self):
+        if not self._check_auth():
+            return
+
+        path = urlparse(self.path).path.rstrip("/")
+
+        if path == "/v1/health":
+            self._json_ok({"status": "ok", "repos": len(self.registry.repos)})
+
+        elif path == "/v1/agents":
+            self._json_ok(self.registry.list_all_agents())
+
+        elif path == "/v1/repos":
+            self._json_ok(self.registry.list_repos())
+
+        elif path.startswith("/v1/status/"):
+            parts = path.split("/")
+            if len(parts) == 5:
+                self._handle_status(parts[3], parts[4])
+            else:
+                self._json_error(404, "Expected /v1/status/<repo>/<role>")
+
+        elif path.startswith("/v1/log/"):
+            parts = path.split("/")
+            if len(parts) == 5:
+                self._handle_log(parts[3], parts[4])
+            else:
+                self._json_error(404, "Expected /v1/log/<repo>/<role>")
+
+        else:
+            self._json_error(404, "Not found")
+
+    def do_POST(self):
+        if not self._check_auth():
+            return
+
+        path = urlparse(self.path).path.rstrip("/")
+
+        if path == "/v1/ask":
+            self._handle_ask()
+
+        elif path.startswith("/v1/reset/"):
+            parts = path.split("/")
+            if len(parts) == 5:
+                self._handle_reset(parts[3], parts[4])
+            else:
+                self._json_error(404, "Expected /v1/reset/<repo>/<role>")
+
+        else:
+            self._json_error(404, "Not found")
+
+    # --- Handlers -----------------------------------------------------------
+
+    def _handle_ask(self):
+        body = self._read_json()
+        if body is None:
+            return
+
+        repo = body.get("repo", "").strip()
+        role = body.get("role", "").strip()
+        question = body.get("question", "").strip()
+        verbose = body.get("verbose", False)
+
+        if not repo or not role or not question:
+            self._json_error(400, "Required fields: repo, role, question")
+            return
+
+        repo_path = self.registry.get_repo_path(repo)
+        if not repo_path:
+            self._json_error(404, f"Repo '{repo}' not found. Use GET /v1/repos to list available repos.")
+            return
+
+        if not self.registry.has_agent(repo, role):
+            self._json_error(404, f"Agent '{role}' not found in repo '{repo}'. Use GET /v1/agents to list available agents.")
+            return
+
+        # Build ask command
+        cmd = [self.ask_bin]
+        if verbose:
+            cmd.append("-v")
+        cmd.extend([role, question])
+
+        try:
+            result = subprocess.run(
+                cmd,
+                cwd=repo_path,
+                capture_output=True,
+                text=True,
+                timeout=300,  # 5 minute timeout
+                env={**os.environ, "ASK_SERVER": ""},  # clear ASK_SERVER to prevent recursion
+            )
+
+            self._json_ok({
+                "repo": repo,
+                "role": role,
+                "answer": result.stdout.strip(),
+                "exit_code": result.returncode,
+                "error": result.stderr.strip() if result.returncode != 0 else None,
+            })
+
+        except subprocess.TimeoutExpired:
+            self._json_error(504, f"Agent '{repo}:{role}' timed out (300s)")
+        except FileNotFoundError:
+            self._json_error(500, f"ask CLI not found at '{self.ask_bin}'. Set ASK_BIN or ensure ask is in PATH.")
+        except Exception as e:
+            self._json_error(500, f"Internal error: {e}")
+
+    def _handle_status(self, repo, role):
+        repo_path = self.registry.get_repo_path(repo)
+        if not repo_path:
+            self._json_error(404, f"Repo '{repo}' not found")
+            return
+        if not self.registry.has_agent(repo, role):
+            self._json_error(404, f"Agent '{role}' not found in repo '{repo}'")
+            return
+
+        try:
+            result = subprocess.run(
+                [self.ask_bin, "status", role],
+                cwd=repo_path,
+                capture_output=True,
+                text=True,
+                timeout=10,
+                env={**os.environ, "ASK_SERVER": ""},
+            )
+            # Parse status output into structured response
+            lines = result.stdout.strip().split("\n")
+            status = {}
+            for line in lines:
+                if ":" in line:
+                    key, val = line.split(":", 1)
+                    status[key.strip().lower()] = val.strip()
+            self._json_ok({"repo": repo, "role": role, **status})
+        except Exception as e:
+            self._json_error(500, f"Error checking status: {e}")
+
+    def _handle_log(self, repo, role):
+        repo_path = self.registry.get_repo_path(repo)
+        if not repo_path:
+            self._json_error(404, f"Repo '{repo}' not found")
+            return
+        if not self.registry.has_agent(repo, role):
+            self._json_error(404, f"Agent '{role}' not found in repo '{repo}'")
+            return
+
+        log_file = Path(repo_path) / "agents" / role / "memory.log.md"
+        if log_file.is_file():
+            content = log_file.read_text()
+        else:
+            content = "(no log entries yet)"
+
+        self._json_ok({"repo": repo, "role": role, "log": content})
+
+    def _handle_reset(self, repo, role):
+        repo_path = self.registry.get_repo_path(repo)
+        if not repo_path:
+            self._json_error(404, f"Repo '{repo}' not found")
+            return
+        if not self.registry.has_agent(repo, role):
+            self._json_error(404, f"Agent '{role}' not found in repo '{repo}'")
+            return
+
+        try:
+            result = subprocess.run(
+                [self.ask_bin, "reset", role],
+                cwd=repo_path,
+                capture_output=True,
+                text=True,
+                timeout=10,
+                env={**os.environ, "ASK_SERVER": ""},
+            )
+            self._json_ok({"repo": repo, "role": role, "message": result.stdout.strip()})
+        except Exception as e:
+            self._json_error(500, f"Error resetting agent: {e}")
+
+    # --- Auth ---------------------------------------------------------------
+
+    def _check_auth(self):
+        if not self.api_key:
+            return True
+        auth = self.headers.get("Authorization", "")
+        if auth == f"Bearer {self.api_key}":
+            return True
+        self._json_error(401, "Unauthorized. Provide Authorization: Bearer <key>")
+        return False
+
+    # --- JSON helpers -------------------------------------------------------
+
+    def _read_json(self):
+        try:
+            length = int(self.headers.get("Content-Length", 0))
+            raw = self.rfile.read(length)
+            return json.loads(raw)
+        except (json.JSONDecodeError, ValueError) as e:
+            self._json_error(400, f"Invalid JSON: {e}")
+            return None
+
+    def _json_ok(self, data):
+        body = json.dumps(data, indent=2).encode()
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def _json_error(self, code, message):
+        body = json.dumps({"error": message}).encode()
+        self.send_response(code)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    # Quiet the default request logging — show one-liners instead
+    def log_message(self, fmt, *args):
+        method = args[0].split()[0] if args else "?"
+        path = args[0].split()[1] if args and len(args[0].split()) > 1 else "?"
+        code = args[1] if len(args) > 1 else "?"
+        print(f"  {method} {path} → {code}")
+
+
+# ---------------------------------------------------------------------------
+# Threaded server (handles concurrent requests)
+# ---------------------------------------------------------------------------
+
+class ThreadedAskServer(ThreadingMixIn, HTTPServer):
+    daemon_threads = True
+    # Prevent slow FQDN lookup on macOS (socket.getfqdn() can hang)
+    allow_reuse_address = True
+
+    def server_bind(self):
+        self.socket.setsockopt(__import__('socket').SOL_SOCKET, __import__('socket').SO_REUSEADDR, 1)
+        self.socket.bind(self.server_address)
+        host, port = self.server_address[:2]
+        self.server_name = host or "localhost"
+        self.server_port = port
+
+
+# ---------------------------------------------------------------------------
+# Main
+# ---------------------------------------------------------------------------
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Enterprise ASK server — host agents from multiple repos on one endpoint",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  %(prog)s --port 7232 --repos-dir /srv/repos
+  %(prog)s --port 7232 --repos /srv/repos/billing,/srv/repos/auth
+  %(prog)s --port 7232 --repos-dir /srv/repos --api-key SECRET
+
+Then from any machine:
+  ASK_SERVER=host:7232 ask billing:architect "What contracts exist?"
+        """,
+    )
+    parser.add_argument("--port", type=int, default=7232, help="Port to listen on (default: 7232)")
+    parser.add_argument("--host", default="0.0.0.0", help="Host to bind (default: 0.0.0.0)")
+    parser.add_argument("--repos-dir", help="Directory containing repos (each subdir with agents/)")
+    parser.add_argument("--repos", help="Comma-separated paths to specific repos")
+    parser.add_argument("--api-key", default=os.environ.get("ASK_API_KEY", ""), help="API key for auth (or set ASK_API_KEY)")
+    # Default ask-bin: look next to this script first, then PATH
+    default_ask = os.environ.get("ASK_BIN", "")
+    if not default_ask:
+        sibling = Path(__file__).resolve().parent / "ask"
+        default_ask = str(sibling) if sibling.is_file() else "ask"
+    parser.add_argument("--ask-bin", default=default_ask, help="Path to ask CLI (default: sibling ./ask or PATH)")
+
+    args = parser.parse_args()
+
+    if not args.repos_dir and not args.repos:
+        parser.error("Provide --repos-dir or --repos")
+
+    # Build registry
+    registry = RepoRegistry()
+    print("ask-server: scanning repos...")
+
+    if args.repos_dir:
+        registry.scan_dir(args.repos_dir)
+    if args.repos:
+        registry.add_repos(args.repos.split(","))
+
+    if not registry.repos:
+        print("ask-server: error: no repos found with agents/ directories", file=sys.stderr)
+        sys.exit(1)
+
+    total_agents = len(registry.list_all_agents())
+    print(f"\nask-server: {len(registry.repos)} repos, {total_agents} agents")
+
+    # Configure handler
+    AskHandler.registry = registry
+    AskHandler.api_key = args.api_key or None
+    AskHandler.ask_bin = args.ask_bin
+
+    # Start server
+    server = ThreadedAskServer((args.host, args.port), AskHandler)
+
+    auth_status = "with API key" if args.api_key else "no auth (use --api-key for production)"
+    print(f"ask-server: listening on {args.host}:{args.port} ({auth_status})")
+    print(f"ask-server: try: curl http://localhost:{args.port}/v1/agents")
+    print()
+
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        print("\nask-server: shutting down")
+        server.shutdown()
+
+
+if __name__ == "__main__":
+    main()
