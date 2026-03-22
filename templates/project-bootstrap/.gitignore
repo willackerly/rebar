@@ -1,0 +1,62 @@
+# Dependencies
+node_modules/
+vendor/
+target/
+build/
+dist/
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+
+# Runtime data
+pids/
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage directory used by tools like istanbul
+coverage/
+*.lcov
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Rebar-specific
+# Keep steward state but ignore computed files
+architecture/.state/*.json
+architecture/.state/steward-report.md
+!architecture/.state/.gitkeep
+
+# Agent session files (from ASK CLI)
+agents/*/memory.log.md
+agents/*/.session-id
+shared/
+
+# Temporary files
+*.tmp
+*.temp
+scratchpad.txt
+
+# Project-specific (customize for your tech stack)
+# Add patterns specific to your language/framework here

@@ -10,25 +10,17 @@ Experience rebar's value immediately: write one contract, link it to code, see a
 
 ## Solo Developer Setup
 
-### Step 1: Copy the essentials (2 minutes)
+### Step 1: Copy the bootstrap template (30 seconds)
 ```bash
 # Clone or download rebar
 git clone <rebar-repo> /path/to/rebar
-cd /path/to/your-project
 
-# Copy core files
-cp /path/to/rebar/QUICKCONTEXT.template.md QUICKCONTEXT.md
-cp /path/to/rebar/TODO.template.md TODO.md
-cp /path/to/rebar/AGENTS.template.md AGENTS.md
-cp /path/to/rebar/CLAUDE.template.md CLAUDE.md
-cp -r /path/to/rebar/architecture/ architecture/
-cp -r /path/to/rebar/scripts/ scripts/
+# Copy complete working project template
+cp -r /path/to/rebar/templates/project-bootstrap/* my-new-project/
+cd my-new-project
 
-# Set tier (1=minimal enforcement)
-echo "REBAR_TIER=1" > .rebarrc
-echo "v1.2.0" > .rebar-version
-
-chmod +x scripts/*.sh
+# Install rebar CLI tools + agent access
+/path/to/rebar/bin/install --server 192.168.0.181:7232
 ```
 
 ### Step 2: Write your first contract (3 minutes)

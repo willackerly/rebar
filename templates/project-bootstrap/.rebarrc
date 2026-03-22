@@ -1,0 +1,16 @@
+# Rebar configuration for this project
+#
+# Tier controls which checks are enforced:
+#   1 = Partial  — contract refs + TODOs only (solo dev / early adoption)
+#   2 = Adopted  — + headers, freshness, registry, compliance (small team)
+#   3 = Enforced — + ground truth, strict steward (department / production)
+
+REBAR_TIER=1
+
+# Version compatibility
+REBAR_VERSION=1.2.0
+
+# Optional: Override specific check behaviors
+# REBAR_SKIP_CHECKS="check-freshness"
+# REBAR_TODO_STRICT=true
+# REBAR_CONTRACT_STRICT=false
