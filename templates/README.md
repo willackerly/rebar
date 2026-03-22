@@ -8,12 +8,12 @@
 
 ### Complete Project Template
 ```bash
-# Copy entire working project structure
-cp -r templates/project-bootstrap/* my-new-project/
-cd my-new-project
+# From within the rebar checkout
+cp -r templates/project-bootstrap/* ../my-new-project/
+cd ../my-new-project
 
 # Install CLI tools and configure agents
-../bin/install --server your-ask-server:port
+../rebar/bin/install --server your-ask-server:port
 ```
 
 **What you get:** Working rebar project with filled examples, ready to run immediately.
@@ -71,8 +71,9 @@ cp templates/component-templates/agent-role.md agents/specialist/AGENT.md
 
 ### 🚀 **New Project (Recommended)**
 ```bash
-cp -r templates/project-bootstrap/* my-project/
-cd my-project
+# From within rebar checkout
+cp -r templates/project-bootstrap/* ../my-project/
+cd ../my-project
 # Customize README.md, QUICKCONTEXT.md for your project
 # Start developing with contracts + agents
 ```

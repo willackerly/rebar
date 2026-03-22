@@ -12,15 +12,16 @@ Experience rebar's value immediately: write one contract, link it to code, see a
 
 ### Step 1: Copy the bootstrap template (30 seconds)
 ```bash
-# Clone or download rebar
-git clone <rebar-repo> /path/to/rebar
+# Clone rebar
+git clone https://github.com/willackerly/rebar.git
+cd rebar
 
 # Copy complete working project template
-cp -r /path/to/rebar/templates/project-bootstrap/* my-new-project/
-cd my-new-project
+cp -r templates/project-bootstrap/* ../my-new-project/
+cd ../my-new-project
 
 # Install rebar CLI tools + agent access
-/path/to/rebar/bin/install --server 192.168.0.181:7232
+../rebar/bin/install --server 192.168.0.181:7232
 ```
 
 ### Step 2: Write your first contract (3 minutes)
