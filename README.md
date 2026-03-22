@@ -48,8 +48,9 @@ ask steward "What contracts need attention?"
 
 **Solo developer quickstart:**
 ```bash
-# Copy the essentials
-curl -L rebar.dev/quickstart | bash
+# Clone and bootstrap
+git clone https://github.com/willackerly/rebar.git && cd rebar
+cp -r templates/project-bootstrap/* ../my-project/ && cd ../my-project
 # Edit your first contract → link it to code → see the magic
 ```
 
