@@ -18,6 +18,8 @@ How 10+ agents work together without destroying each other's work:
 ### The ASK Tool — Persistent Multi-Role Agent System
 **What it is:** Enterprise-grade CLI that maintains persistent agent sessions across projects and time. Instead of ephemeral subagents that cost 10x context on each question, ASK agents accumulate knowledge and coordinate through specialized roles.
 
+**MCP-Enabled for Swarms:** Now supports Model Context Protocol (MCP), allowing a single ASK agent instance to answer questions from multiple users and agents simultaneously. This enables true swarm intelligence where one expert agent can serve an entire development team or agent collective.
+
 **How it's used:**
 ```bash
 ask architect "Should we add caching to the user service?"
