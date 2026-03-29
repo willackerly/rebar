@@ -23,10 +23,15 @@ Do not skip steps. Do not start working before reading your template.
 
 - **If you are writing ANY code, you MUST use worktree isolation.** This is
   non-negotiable. No exceptions.
+- **Use `rebar agent start` to create your worktree.** This is the canonical
+  way to begin a coding task — it creates the worktree, snapshots integrity
+  state, and enforces role-based file permissions automatically.
+  ```bash
+  rebar agent start --role developer "implement feature X"
+  ```
 - Read-only research tasks (exploration, analysis, audits) may run in the
   main working tree.
 - Work in your worktree branch. Do not modify the main working tree.
-- Name your branch descriptively: `agent/<template-name>-<shard-or-scope>`
 
 ## Results & Checkpointing
 
@@ -35,8 +40,14 @@ Do not skip steps. Do not start working before reading your template.
   `agents/results/<template-name>-<scope>.md`
 - **You MUST commit before completing.** Your worktree is ephemeral —
   uncommitted work is lost. No commit = no work happened.
-- Use a descriptive commit message:
-  `agents/<template-name>: <brief description of what was done>`
+- **Use `rebar commit` instead of `git commit`.** This ensures pre-commit
+  checks run (no bypass possible), the integrity manifest is updated, and
+  ratchets are enforced. There is no `--no-verify` flag.
+  ```bash
+  rebar commit -m "agents/<template-name>: <brief description>"
+  ```
+- When done, run `rebar agent finish <id>` to audit your work against the
+  sealed envelope (role permissions, ratchets, integrity).
 
 ## Architectural Change Detection
 
@@ -90,6 +101,23 @@ proceed**. Document the finding in `agents/findings/<date>-<short-title>.md`:
   finding.
 - Do not add unnecessary comments, docstrings, or type annotations to code
   you didn't change.
+
+## Enforcement
+
+The `rebar` CLI enforces structural integrity. Key rules:
+
+- **`rebar commit` is the only commit path.** It runs pre-commit checks, updates
+  integrity hashes, and checks ratchets. There is no `--no-verify` flag.
+  If checks fail, fix the issue — do not attempt to use raw `git commit`.
+- **Role-based file permissions are enforced.** If you're a `developer` role,
+  you can write to `src/` but not to `tests/`, `scripts/`, or `architecture/`.
+  If you need to modify files outside your role, document it as a finding.
+- **Assertion counts cannot decrease.** The ratchet system ensures test
+  assertions only increase. If you need to remove assertions, explain why
+  in your commit message.
+- **`rebar verify` detects tampering.** Any modification to protected files
+  outside the CLI is detectable. Do not edit enforcement scripts, contracts,
+  or test files outside the `rebar` workflow.
 
 ## Error Handling
 

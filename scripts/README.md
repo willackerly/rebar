@@ -4,6 +4,14 @@ Enforcement scripts and quality scanning for the contract-driven methodology.
 
 See the [root README](../README.md) for how scripts fit into the overall system.
 
+> **Note:** These scripts are now called via the `rebar` CLI for integrity tracking:
+> - `rebar check` — runs `ci-check.sh` with integrity updates
+> - `rebar commit` — runs `pre-commit.sh` + updates integrity manifest (no `--no-verify`)
+> - `rebar verify` — checks hash integrity of all protected files (including these scripts)
+>
+> Direct invocation still works but bypasses integrity tracking.
+> See `docs/REBAR-CLI-INTEGRITY.md` for the full design.
+
 ## Quality Scanner
 
 | Script | What It Does | Invocation |

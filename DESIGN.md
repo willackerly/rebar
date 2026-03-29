@@ -275,6 +275,23 @@ can silently make architectural decisions that are hard to reverse. With
 contracts, agents have clear boundaries — they can move fast within them, and
 the system forces a pause when boundaries need to change.
 
+### Structural Enforcement via the REBAR CLI
+
+Agent autonomy is backed by structural enforcement, not just behavioral rules.
+The `rebar` CLI ensures agents cannot accidentally bypass methodology:
+
+- **`rebar commit`** replaces `git commit`. It runs pre-commit checks, updates
+  integrity hashes, and enforces ratchets. There is no `--no-verify` flag.
+- **`rebar agent start/finish`** wraps agent execution in a sealed envelope:
+  worktree isolation, role-based file permissions, integrity snapshots.
+- **`rebar verify`** detects any modification to protected files (enforcement
+  scripts, contracts, tests) outside the CLI workflow — via SHA-256 hashes
+  and role-keyed HMACs.
+- **`rebar sign` / `rebar verify --signatures`** provide optional Ed25519
+  digital signatures for authenticity — proving *who* attested to each state.
+
+See `docs/REBAR-CLI-INTEGRITY.md` for the full integrity system design.
+
 ### Trust But Verify
 
 Agents trust the context they're given. Context drifts from reality at the

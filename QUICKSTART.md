@@ -91,8 +91,15 @@ scripts/check-contract-refs.sh  # Should pass
 
 **Test agent coordination:**
 ```bash
-ask architect "Review CONTRACT:C1-FILESTORE.1.0 - any integration concerns?"
-ask product "Does this file storage meet basic user needs?"
+rebar ask architect "Review CONTRACT:C1-FILESTORE.1.0 - any integration concerns?"
+rebar ask product "Does this file storage meet basic user needs?"
+```
+
+**Check integrity:**
+```bash
+rebar init       # Initialize integrity tracking
+rebar verify     # Verify all protected files are clean
+rebar status     # Quick health dashboard
 ```
 
 ---

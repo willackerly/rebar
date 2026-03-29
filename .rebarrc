@@ -1,0 +1,5 @@
+# REBAR Configuration
+# See: https://github.com/willackerly/rebar
+
+# Enforcement tier (1=Partial, 2=Adopted, 3=Enforced)
+tier = 1

@@ -184,12 +184,30 @@ grep -q 'echo "' scripts/check-ground-truth.sh && echo "Ground truth: metrics de
 # Test the agent experience: start a new Claude Code session
 ```
 
+## Step 4b: Initialize Integrity Tracking
+
+```bash
+# Build and install the rebar CLI (requires Go 1.22+)
+cd cli && go build -o ../bin/rebar . && cd ..
+
+# Initialize integrity system
+rebar init
+
+# Verify everything is clean
+rebar verify
+rebar status
+```
+
+This creates `.rebar/integrity.json` (hash manifest), `.rebar/salt` (gitignored),
+and tracks all enforcement scripts, contracts, and test files. From this point
+forward, use `rebar commit` instead of `git commit` to ensure integrity tracking.
+
 ## Step 5: Commit
 
 ```bash
 git add README.md QUICKCONTEXT.md TODO.md AGENTS.md CLAUDE.md DESIGN.md
-git add architecture/ agents/
-git commit -m "docs: adopt contract-driven rebar methodology
+git add architecture/ agents/ .rebar/integrity.json .rebarrc
+rebar commit -m "docs: adopt contract-driven rebar methodology
 
 Add Cold Start Quad (README, QUICKCONTEXT, TODO, AGENTS), Claude Code
 config, methodology, contract system, and agent orchestration templates.
