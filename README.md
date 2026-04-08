@@ -56,6 +56,11 @@ cp -r templates/project-bootstrap/* ../my-project/ && cd ../my-project
 # Edit your first contract → link it to code → see the magic
 ```
 
+OR from via installer setup script:
+```bash
+curl -fsSL https://raw.githubusercontent.com/willackerly/rebar/main/setup-rebar.sh | bash
+```
+
 **What you get:** Contracts linked to code + agent coordination + immediate productivity boost
 **Perfect for:** Solo devs, 1-3 repos, testing the waters
 **[→ QUICKSTART GUIDE](QUICKSTART.md)**
