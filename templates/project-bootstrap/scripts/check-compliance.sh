@@ -46,7 +46,7 @@ echo ""
 
 if [ ! -f "$VERSION_FILE" ]; then
   echo "FAIL: .rebar-version file not found"
-  echo "  Create it with: echo 'v1.2.0' > .rebar-version"
+  echo "  Create it with: echo 'v2.0.0' > .rebar-version"
   errors=$((errors + 1))
   declared_version=""
 else
@@ -88,7 +88,7 @@ else
   if [ -z "$badge_line" ]; then
     echo "FAIL: README.md has no rebar badge"
     echo "  Add this as the first line after your # Title:"
-    echo '  > **rebar v1.2.0** | **Tier 2: ADOPTED**'
+    echo '  > **rebar v2.0.0** | **Tier 2: ADOPTED**'
     errors=$((errors + 1))
   else
     line_num=$(echo "$badge_line" | cut -d: -f1)

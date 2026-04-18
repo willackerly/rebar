@@ -32,7 +32,7 @@
 
 Every component gets a behavioral specification in `architecture/CONTRACT-*.md` before implementation begins.
 
-### The Four Contract Rules
+### The Four Contract Principles
 1. **Don't implement without a contract** — write the spec first
 2. **Don't modify code without checking its contract** — understand what you're changing
 3. **Don't update a contract without searching all implementations** — `grep -rn "CONTRACT:C1-NAME"`

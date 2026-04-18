@@ -229,7 +229,7 @@ draft → active → testing → verified → deprecated → superseded
 
 ### Ready to scale?
 - **[Contract versioning](architecture/README.md#versioning)** — Breaking changes and upgrade paths
-- **[Cross-repo contracts](CASE-STUDIES.md#multi-repo)** — Namespacing for shared dependencies
+- **[Cross-repo contracts](CASE-STUDIES.md)** — Namespacing for shared dependencies
 - **[Contract enforcement](practices/multi-agent-orchestration.md)** — Automated quality gates
 
 **Remember:** Every contract follows the same pattern — Purpose, Interface, Behaviors, Dependencies, Testing. Start simple, add complexity as you need it. The five-minute contract you write today can grow into the foundation for coordinated multi-agent development.

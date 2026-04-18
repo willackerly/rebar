@@ -207,7 +207,7 @@ The swarm gets smarter over time. What one agent discovers, all agents benefit f
 - **Role-based expertise** — architect, product, tester each accumulate domain knowledge
 - **Failure pattern library** — every crash, conflict, and regression becomes a mitigation for the next run
 
-**The four contract rules** (the foundation everything else builds on):
+**The four contract principles** (the foundation everything else builds on):
 
 1. Don't implement without a contract
 2. Don't modify code without checking its contract
@@ -285,7 +285,7 @@ rebar/
 **Ready to adopt?** → [❤️ Love It (1 hour)](FEATURE-DEVELOPMENT.md)
 **Need advanced patterns?** → [🎯 Master It](CASE-STUDIES.md)
 
-**Questions?** → [Ask the architect agent](bin/README.md#ask-cli-reference)
+**Questions?** → [Ask the architect agent](bin/README.md)
 
 ### Pick Your Profile
 

@@ -434,10 +434,10 @@ Closes: #auth-service-implementation"
 
 ### Need specialized patterns?
 - **[Contract versioning](architecture/README.md#versioning)** - Breaking changes and upgrade paths
-- **[Cross-repo coordination](CASE-STUDIES.md#multi-repo)** - Contract namespacing and shared dependencies
+- **[Cross-repo coordination](CASE-STUDIES.md)** - Contract namespacing and shared dependencies
 
 ### Want to see war stories?
-- **[OpenDocKit case study](feedback/opendockit-fidelity-session.md)** - 9 simultaneous agents, 5,824 tests
+- **[OpenDocKit case study](feedback/2026-03-18-opendockit-fidelity-session.md)** - 9 simultaneous agents, 5,824 tests
 - **[Human-based Digital Signer case study](feedback/digital-signer-feedback.md)** - 18 agents, 0 merge conflicts, 3 hours wall clock
 
 **You've just experienced the full rebar methodology. Every feature you build from now on follows this same pattern: BDD → Contract → Multi-agent coordination → Implementation → Quality cascade → Integration.**
