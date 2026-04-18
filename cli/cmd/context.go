@@ -238,6 +238,4 @@ func runSessionStart() error {
 	return runContext(&cobra.Command{}, []string{})
 }
 
-func init() {
-	rootCmd.AddCommand(contextCmd)
-}
+// contextCmd is registered in root.go with GroupID

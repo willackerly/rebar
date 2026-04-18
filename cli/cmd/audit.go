@@ -34,7 +34,7 @@ Without arguments, audits the current directory.
 func init() {
 	auditCmd.Flags().StringVar(&auditAll, "all", "", "scan all repos in this directory")
 	auditCmd.Flags().BoolVar(&auditFix, "fix", false, "auto-fix quick wins (create .rebarrc, install hook, etc.)")
-	rootCmd.AddCommand(auditCmd)
+	// auditCmd is registered in root.go with GroupID
 }
 
 type auditResult struct {

@@ -39,7 +39,7 @@ func init() {
 	adoptCmd.Flags().BoolVar(&adoptLocal, "local", false, "use local LLM (LM Studio/ollama) instead of Claude API")
 	adoptCmd.Flags().StringVar(&adoptEndpoint, "endpoint", "", "local LLM endpoint (default: http://localhost:1234/v1)")
 	adoptCmd.Flags().StringVar(&adoptModel, "model", "", "LLM model override")
-	rootCmd.AddCommand(adoptCmd)
+	// adoptCmd is registered in root.go with GroupID
 }
 
 func runAdopt(cmd *cobra.Command, args []string) error {

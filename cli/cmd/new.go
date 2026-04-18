@@ -36,7 +36,7 @@ func init() {
 	newCmd.Flags().BoolVar(&newLocal, "local", false, "use local LLM instead of Claude API")
 	newCmd.Flags().StringVar(&newEndpoint, "endpoint", "", "local LLM endpoint")
 	newCmd.Flags().StringVar(&newModel, "model", "", "LLM model override")
-	rootCmd.AddCommand(newCmd)
+	// newCmd is registered in root.go with GroupID
 }
 
 func runNew(cmd *cobra.Command, args []string) error {
