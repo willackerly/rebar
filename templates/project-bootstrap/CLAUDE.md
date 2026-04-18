@@ -28,15 +28,27 @@
 1. **Read the Cold Start Quad:**
    - `README.md` — project overview
    - `QUICKCONTEXT.md` — current state
-   - `TODO.md` — active work
+   - **VERIFY:** `git log --since='7 days' --oneline | head -20` — cross-reference
+     against QUICKCONTEXT claims. If the `last-synced` date is >1 week old,
+     treat ALL claims as suspect.
+   - `TODO.md` — active work (open items only)
    - `AGENTS.md` — coordination guidelines
 
 2. **Check project health:**
    ```bash
    git status
+   git worktree list              # Check for abandoned worktrees
+   scripts/refresh-context.sh     # Automated freshness check (if available)
    scripts/check-contract-refs.sh
    ask steward summary
    ```
+
+### Ending a Session
+1. **Update QUICKCONTEXT.md** with current project state
+2. **Update TODO.md** — mark completed items, add newly discovered items
+3. **Clean up:** `git worktree prune`, commit any uncommitted work
+4. **Write a wrapup** — see `practices/session-lifecycle.md` for the template
+5. **Verify:** does QUICKCONTEXT match `git log --oneline -10`?
 
 ### Adding a Feature
 1. **Define success** — BDD scenario or user story

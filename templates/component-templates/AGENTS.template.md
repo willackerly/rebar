@@ -11,8 +11,9 @@
 **Reference (read as needed):**
 - `DESIGN.md` — the philosophy (contracts are the operating system)
 - `architecture/CONTRACT-REGISTRY.md` — contract index
-- `practices/` — specialized guidance (orchestration, E2E, deployment, worktrees)
+- `practices/` — specialized guidance (orchestration, E2E, deployment, worktrees, session lifecycle, red team)
 - **ASK CLI** — query role-based agents: `ask architect "question"`, `ask product "question"`, `ask steward summary`. Persistent sessions save context across questions. See `bin/ask help`.
+- **`rebar context [role]`** — cats role-relevant files in reading order (e.g., `rebar context architect` for contracts + DESIGN.md)
 
 <!-- Add project-specific context files here, e.g.:
 5. `docs/README.md` -> full documentation tree
@@ -127,6 +128,22 @@ Multiple agents work async on this codebase. Docs drift when agents complete wor
 
 ---
 
+## Session Lifecycle
+
+Sessions have three stages. See `practices/session-lifecycle.md` for the full protocol.
+
+| Stage | Trigger | Key Actions |
+|-------|---------|-------------|
+| **Start** | New session | Cold Start Quad + staleness verification |
+| **Checkpoint** | Every 10 commits or 2 hours | Update QUICKCONTEXT, commit WIP, check context quality |
+| **End** | Session closing | Update QUICKCONTEXT, update TODO, clean worktrees, write wrapup |
+
+**Priority tracking rule:** QUICKCONTEXT.md "What's Next" is the single source of truth for priorities. TODO.md has task details but should NOT duplicate the priority ordering.
+
+**Issue tracking rule:** One canonical entry per issue. Cross-reference, don't duplicate.
+
+---
+
 ## Multi-Agent Orchestration
 
 > For subagent templates, fan-out patterns, pre-launch audit, and feature
@@ -136,37 +153,28 @@ Multiple agents work async on this codebase. Docs drift when agents complete wor
 > isolation. Subagents MUST commit before completing. Run a pre-launch audit
 > before any parallel agent campaign.
 
-### Mandatory Agent Protocol (6 Rules)
+### The 10 Rules (Mandatory for All Subagents)
 
-Every agent in a parallel fan-out MUST follow these rules. They are the
-difference between 100% work survival and total loss.
+Every subagent reads `agents/subagent-guidelines.md` which defines **The 10
+Rules** — the non-negotiable protocol for parallel agent work. Summary:
 
-1. **Commit after each logical chunk.** Don't accumulate. If you get logged
-   out, only uncommitted work is lost. One fix = one commit.
+| # | Rule | Why |
+|---|------|-----|
+| 1 | **Worktree isolation** for code changes | Prevents conflicts with parallel agents |
+| 2 | **Commit after every logical chunk** | Uncommitted work = lost work on crash/logout |
+| 3 | **Strict file ownership** — only modify your allowlist | Prevents merge conflicts |
+| 4 | **No removals** without explicit authorization | Your worktree is stale; references exist you can't see |
+| 5 | **Measure before AND after** | Catches regressions before they compound |
+| 6 | **Run package tests** after each change | Fast (<10s), catches compile errors immediately |
+| 7 | **Write progress** to shared file | Orchestrator sees what happened without reading transcripts |
+| 8 | **Don't touch shared files** (types, router, App.tsx) | #1 source of merge conflicts |
+| 9 | **Respect context briefing** — don't modify files in "Recent Changes" | Your snapshot doesn't have those changes |
+| 10 | **Commit before completing** | Worktree is ephemeral; no commit = no work |
 
-2. **Measure before AND after.** Run the relevant test/gate before your first
-   change and after each fix. Record the metric. If it regressed, revert.
+**Canonical source:** `agents/subagent-guidelines.md` — cite rules by number.
 
-3. **Write progress.** After each commit, append to the shared progress file
-   so the parent knows what you accomplished without reading your transcript.
-
-4. **Run package tests** after each change — not the full suite, just the
-   affected package. Fast (<10s) and catches compile errors immediately.
-
-5. **Don't touch shared files** without coordination. High-conflict files
-   (shared types, auto-generated bundles, theme/config) must be explicitly
-   assigned to at most one agent. List danger files in the fan-out prompt.
-
-6. **Use the oracle.** If a reference implementation, spec, or ground truth
-   exists, check it before guessing. Agents using an oracle are dramatically
-   more effective per change than agents hypothesizing.
-
-**Why each rule is non-negotiable:**
-- Rule 1 saved work in 3 login expiration incidents. Agents that committed per-chunk lost 0 work.
-- Rule 2 catches regressions before they compound across multiple changes.
-- Rule 3 is the only way the parent knows what happened without reading 700-line transcripts.
-- Rule 5 eliminated the #1 source of merge conflicts (multiple agents touching the same file).
-- Rule 6 made agents 26x more effective per change (measured: oracle vs. guessing).
+**Orchestrator protocol:** `practices/multi-agent-orchestration.md` — pre-launch
+audit (9 steps), merge ordering, conflict zones, recovery.
 
 ---
 

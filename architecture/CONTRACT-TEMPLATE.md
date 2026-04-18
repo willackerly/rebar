@@ -99,6 +99,19 @@ Scenario: Upload encrypted document
 - `internal/blobstore/memory.go` — in-memory implementation (tests)
 - `internal/blobstore/blobstore_test.go` — contract tests
 
+## Enforcement Matrix (optional — for security/access contracts)
+
+<!-- When this contract defines a security control (auth, ABAC, rate limiting,
+     encryption), list every endpoint/component and whether the control applies.
+     This makes gaps discoverable by inspection rather than audit.
+
+| Endpoint / Component | Enforced | Status | Notes |
+|----------------------|----------|--------|-------|
+| GET /api/v1/users    | Yes      | Active | Role-based access |
+| GET /api/v1/stats    | No       | N/A    | Aggregate data only |
+| POST /api/v1/upload  | Yes      | Active | Auth + size limit |
+-->
+
 ## Test Requirements
 
 <!-- What must be tested? Contract tests are king. -->

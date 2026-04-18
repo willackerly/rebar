@@ -44,11 +44,18 @@
 │ ├─ practices/           Specialized workflows           │
 │ └─ feedback/            Battle-tested patterns          │
 │                                                         │
-│ Advanced Coordination                                   │
+│ Session & Coordination                                  │
+│ ├─ Session lifecycle (start/checkpoint/end)             │
 │ ├─ Multi-agent orchestration                           │
-│ ├─ Worktree collaboration                               │
+│ ├─ Worktree collaboration + merge strategy              │
+│ ├─ Red team protocol                                    │
 │ ├─ Cross-repo patterns                                  │
 │ └─ Enterprise scaling                                   │
+│                                                         │
+│ Specialized Practices                                   │
+│ ├─ Visual fidelity methodology                          │
+│ ├─ Seam contracts (integration points)                  │
+│ └─ rebar context CLI (context shepherd)                 │
 │                                                         │
 │ Deep Philosophy                                         │
 │ ├─ DESIGN.md            Complete methodology            │

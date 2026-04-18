@@ -56,6 +56,124 @@ REGISTRY="${ASK_REGISTRY:-$HOME/.config/ask/projects}"
 SERVER="${ASK_SERVER:-}"
 SERVER_API_KEY="${ASK_API_KEY:-}"
 EVENTS_LOG="$SHARED_DIR/messages/events.jsonl"
+NO_COLOR="${NO_COLOR:-}"
+
+# --- Pretty Output -----------------------------------------------------------
+
+# Colors (suppressed if NO_COLOR is set or stdout is not a terminal)
+if [ -z "$NO_COLOR" ] && [ -t 1 ]; then
+  _C_RESET='\033[0m'
+  _C_BOLD='\033[1m'
+  _C_DIM='\033[2m'
+  _C_CYAN='\033[36m'
+  _C_GREEN='\033[32m'
+  _C_YELLOW='\033[33m'
+  _C_BLUE='\033[34m'
+  _C_MAGENTA='\033[35m'
+  _C_WHITE='\033[37m'
+  _C_BAR='\033[38;5;240m'  # dark gray for the separator bar
+else
+  _C_RESET='' _C_BOLD='' _C_DIM='' _C_CYAN='' _C_GREEN=''
+  _C_YELLOW='' _C_BLUE='' _C_MAGENTA='' _C_WHITE='' _C_BAR=''
+fi
+
+# Map agent roles to colors for visual distinction
+_role_color() {
+  case "$1" in
+    architect) echo "$_C_CYAN" ;;
+    product)   echo "$_C_GREEN" ;;
+    englead)   echo "$_C_YELLOW" ;;
+    steward)   echo "$_C_MAGENTA" ;;
+    tester)    echo "$_C_BLUE" ;;
+    merger)    echo "$_C_BLUE" ;;
+    engineer)  echo "$_C_GREEN" ;;
+    *)         echo "$_C_WHITE" ;;
+  esac
+}
+
+# Format and display an agent response with header, word-wrap, and separator.
+# When stdout is not a TTY (piped, captured by server), output raw text only —
+# the receiving end will format if needed.
+_format_response() {
+  local agent="$1"
+  local response="$2"
+  local project="${3:-}"  # optional project name for cross-project queries
+
+  # If not a terminal, output raw text (server subprocess, pipe, redirect)
+  if [ ! -t 1 ]; then
+    echo "$response"
+    return
+  fi
+
+  local color
+  color=$(_role_color "$agent")
+
+  # Build the header
+  local header
+  if [ -n "$project" ]; then
+    header="${project}:${agent}"
+  else
+    # Try to derive project name from current directory
+    local proj_name
+    proj_name=$(basename "$(pwd)")
+    header="${proj_name}:${agent}"
+  fi
+
+  # Capitalize first letter of each component for display
+  local display_header
+  display_header=$(echo "$header" | sed 's/\(^\|:\)\([a-z]\)/\1\u\2/g' 2>/dev/null || echo "$header")
+
+  local term_width
+  term_width=$(tput cols 2>/dev/null || echo 80)
+  local bar_width=$((term_width < 80 ? term_width : 80))
+  local bar
+  bar=$(printf '%.0s─' $(seq 1 "$bar_width"))
+
+  # Print header
+  echo ""
+  printf "${_C_BAR}%s${_C_RESET}\n" "$bar"
+  printf "${color}${_C_BOLD}  %s${_C_RESET}\n" "$display_header"
+  printf "${_C_BAR}%s${_C_RESET}\n" "$bar"
+  echo ""
+
+  # Print response with left margin, word-wrapped to terminal width
+  local wrap_width=$((term_width - 4))
+  [ "$wrap_width" -lt 40 ] && wrap_width=40
+  echo "$response" | fmt -w "$wrap_width" 2>/dev/null | sed 's/^/  /' || echo "$response" | sed 's/^/  /'
+
+  echo ""
+}
+
+# Format project list with colors
+_format_projects() {
+  if [ ! -f "$REGISTRY" ]; then
+    echo "  (no projects registered — run 'ask register <name>' in a project)"
+    return 0
+  fi
+  echo ""
+  printf "${_C_BOLD}  Registered Projects${_C_RESET}\n"
+  echo ""
+  while IFS='=' read -r name path; do
+    name=$(echo "$name" | xargs)
+    path=$(echo "$path" | xargs)
+    [ -z "$name" ] && continue
+    echo "$name" | grep -q '^#' && continue
+    local count=0
+    if [ -d "$path/agents" ]; then
+      count=$(find "$path/agents" -maxdepth 2 -name 'AGENT.md' 2>/dev/null | wc -l | tr -d ' ')
+    fi
+    local agents_list=""
+    if [ -d "$path/agents" ]; then
+      agents_list=$(find "$path/agents" -maxdepth 2 -name 'AGENT.md' -exec dirname {} \; 2>/dev/null \
+        | xargs -I{} basename {} | sort | tr '\n' ',' | sed 's/,$//' | sed 's/,/, /g')
+    fi
+    printf "  ${_C_BOLD}%-14s${_C_RESET} ${_C_DIM}%s${_C_RESET}\n" "$name" "$path"
+    if [ -n "$agents_list" ]; then
+      printf "  ${_C_DIM}%-14s${_C_RESET} %s\n" "" "$count agents: $agents_list"
+    fi
+  done < "$REGISTRY"
+  echo ""
+}
 
 # --- Remote (ASK_SERVER) Functions --------------------------------------------
 #
@@ -240,7 +358,7 @@ _remote_ask() {
   error=$(echo "$response" | jq -r '.error // empty' 2>/dev/null)
 
   if [ -n "$answer" ]; then
-    echo "$answer"
+    _format_response "$role" "$answer" "$repo"
   fi
   if [ -n "$error" ]; then
     echo "$error" >&2
@@ -398,22 +516,7 @@ cmd_register() {
 }
 
 cmd_projects() {
-  if [ ! -f "$REGISTRY" ]; then
-    echo "(no projects registered — run 'ask register <name>' in a project)"
-    return 0
-  fi
-  # Show registered projects with agent counts
-  while IFS='=' read -r name path; do
-    name=$(echo "$name" | xargs)
-    path=$(echo "$path" | xargs)
-    [ -z "$name" ] && continue
-    echo "$name" | grep -q '^#' && continue
-    local count=0
-    if [ -d "$path/agents" ]; then
-      count=$(find "$path/agents" -maxdepth 2 -name 'AGENT.md' 2>/dev/null | wc -l | tr -d ' ')
-    fi
-    echo "  $name → $path ($count agents)"
-  done < "$REGISTRY"
+  _format_projects
 }
 
 generate_msg_id() {
@@ -486,12 +589,35 @@ cmd_who() {
     echo "ask: no agents directory at $AGENTS_DIR" >&2
     exit 2
   fi
+
+  local proj_name
+  proj_name=$(basename "$(pwd)")
+  echo ""
+  printf "${_C_BOLD}  %s — Available Agents${_C_RESET}\n" "$proj_name"
+  echo ""
+
   for d in "$AGENTS_DIR"/*/; do
     [ -d "$d" ] || continue
     if [ -f "$d/AGENT.md" ]; then
-      basename "$d"
+      local name
+      name=$(basename "$d")
+      local color
+      color=$(_role_color "$name")
+      local desc=""
+      # Try to extract role description from first line after "## Role"
+      # Try: first Responsibilities bullet, then first Role line, then first line
+      desc=$(sed -n '/^## Responsibilities/,/^##/{s/^- *//p;}' "$d/AGENT.md" 2>/dev/null | head -1 | cut -c1-55)
+      if [ -z "$desc" ]; then
+        desc=$(sed -n '/^## Role/,/^##/{/^## Role/d;/^##/d;/^$/d;p;}' "$d/AGENT.md" 2>/dev/null | head -1 | sed 's/^[[:space:]]*//' | cut -c1-55)
+      fi
+      if [ -n "$desc" ]; then
+        printf "  ${color}${_C_BOLD}%-12s${_C_RESET} ${_C_DIM}%s${_C_RESET}\n" "$name" "$desc"
+      else
+        printf "  ${color}${_C_BOLD}%s${_C_RESET}\n" "$name"
+      fi
     fi
   done
+  echo ""
 }
 
 cmd_where() {
@@ -1078,7 +1204,7 @@ Rules:
   _maybe_compact "$agent"
 
   # Output the response
-  echo "$response"
+  _format_response "$agent" "$response" "${_RESOLVED_PROJECT:-}"
   exit 0
 }
 
@@ -1137,13 +1263,13 @@ EOJSON
   local answer
   answer=$(cat "$outbox_file")
 
-  # Try to parse as JSON and format nicely; fall back to raw output
+  # Format the response
   if echo "$answer" | jq -e '.answer' &>/dev/null; then
-    echo "$answer" | jq -r '
-      "ANSWER: \(.answer)\n\nRATIONALE:\n\(.rationale // "(none)")\n\nREFS:\n\(.refs // [] | map("- " + .) | join("\n"))"
-    '
+    local parsed
+    parsed=$(echo "$answer" | jq -r '.answer' 2>/dev/null)
+    _format_response "$agent" "$parsed"
   else
-    echo "$answer"
+    _format_response "$agent" "$answer"
   fi
 
   # Clean up outbox

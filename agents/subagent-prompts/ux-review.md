@@ -84,6 +84,27 @@ why it matters to users, and suggest a concrete fix.
 - Do interactions feel immediate (<100ms response)?
 - Is above-the-fold content prioritized?
 
+### 8. Interaction Stability (Human Emulator)
+
+When reviewing interactive features, evaluate visual stability through
+the lens of exact human interaction sequences:
+
+- **Before/after stability:** Would a screenshot before a click be
+  identical to a screenshot after clicking (when the visual state shouldn't
+  change)? Look for ghost text, double rendering, layout shift.
+- **Hover/focus/selection composition:** Do hover states, focus rings, and
+  selection highlights compose correctly without visual glitches?
+- **Real interaction sequences:** Consider the exact sequence a human would
+  perform (mousedown → mousemove → mouseup, not just synthetic click events).
+  Are there intermediate states that look wrong?
+- **Edit-mode transitions:** When entering edit mode (clicking to type,
+  opening a modal, expanding an accordion), does the transition preserve
+  visual stability? No jumps, no flashes, no content reflow?
+
+This dimension catches the class of bugs that are invisible to unit tests
+and hard to spot in static code review — they only appear when a real user
+interacts with the UI in real time.
+
 ## Context Files
 
 Read these before starting:
@@ -100,7 +121,7 @@ Read these before starting:
   "scope": "<SCOPE or 'full'>",
   "status": "complete | partial",
   "summary": "One-line overall assessment",
-  "dimensions_reviewed": ["information-architecture", "interaction", "visual", "accessibility", "responsive", "errors", "performance"],
+  "dimensions_reviewed": ["information-architecture", "interaction", "visual", "accessibility", "responsive", "errors", "performance", "interaction-stability"],
   "findings": [
     {
       "location": "ComponentName.tsx:42",
@@ -121,7 +142,8 @@ Read these before starting:
     "accessibility": "strong | adequate | needs-work",
     "responsive": "strong | adequate | needs-work",
     "error_states": "strong | adequate | needs-work",
-    "performance_perception": "strong | adequate | needs-work"
+    "performance_perception": "strong | adequate | needs-work",
+    "interaction_stability": "strong | adequate | needs-work"
   }
 }
 ```

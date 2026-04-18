@@ -23,6 +23,10 @@ rebar commit -m "message"     # Enforced commit (no --no-verify)
 rebar check                   # Run all enforcement checks
 rebar push                    # Verify + check + push
 
+rebar context                     # Cold Start Quad in reading order
+rebar context architect           # + DESIGN.md, contracts
+rebar context session-start       # Cold Start Quad + staleness check
+
 rebar ask architect "question"  # Query agents (delegates to bin/ask)
 
 rebar agent start --role developer "task"  # Sealed envelope execution

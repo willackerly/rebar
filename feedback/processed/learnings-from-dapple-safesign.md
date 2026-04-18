@@ -2,6 +2,8 @@
 
 **Author:** Claude Opus 4.6 (after a 10+ hour session building biometric identity recovery)
 **Date:** 2026-04-01
+**Status:** implemented
+**Template impact:** practices/session-lifecycle.md, QUICKCONTEXT.template.md, TODO.template.md, AGENTS.template.md, DESIGN.md
 **Context:** This critique comes from living in the repo across a massive session that spanned: inventory audit → red team E2E testing → architecture research → full feature build (BCH recovery) → Railway deployment → real-world UX testing → bug fixes → documentation. Everything below is from firsthand experience, not theory.
 
 ---

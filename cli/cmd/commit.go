@@ -13,6 +13,9 @@ import (
 	"github.com/willackerly/rebar/cli/internal/scripts"
 )
 
+// Ensure scripts is used (pre-commit check)
+var _ = scripts.Run
+
 var commitMessage string
 var commitRole string
 
@@ -179,5 +182,63 @@ func runCommit(cmd *cobra.Command, args []string) error {
 		fmt.Printf("Integrity: %d protected file(s) updated in manifest\n", updated)
 	}
 
+	// 8. Session checkpoint reminder
+	checkSessionCheckpoint(cfg.RepoRoot)
+
 	return nil
+}
+
+// checkSessionCheckpoint emits a warning if it's been many commits since
+// QUICKCONTEXT was last synced. This is a behavioral nudge, not enforcement.
+func checkSessionCheckpoint(repoRoot string) {
+	qcPath := filepath.Join(repoRoot, "QUICKCONTEXT.md")
+	content, err := os.ReadFile(qcPath)
+	if err != nil {
+		return
+	}
+
+	lastSynced := extractQCDate(string(content))
+	if lastSynced == "" {
+		return
+	}
+
+	// Count commits since last sync
+	countStr := strings.TrimSpace(string(mustGitOutput(repoRoot, "rev-list", "--count", "--since="+lastSynced, "HEAD")))
+	if countStr == "" {
+		return
+	}
+
+	var count int
+	fmt.Sscanf(countStr, "%d", &count)
+
+	if count >= 10 {
+		fmt.Printf("\n⚠  Checkpoint trigger: %d commits since QUICKCONTEXT was last synced (%s)\n", count, lastSynced)
+		fmt.Println("   Consider: update QUICKCONTEXT.md, run 'rebar context session-start'")
+		fmt.Println("   See: practices/session-lifecycle.md")
+	}
+}
+
+// extractQCDate finds the last-synced or freshness date in QUICKCONTEXT content.
+func extractQCDate(content string) string {
+	for _, line := range strings.Split(content, "\n") {
+		for _, key := range []string{"last-synced:", "freshness:"} {
+			if idx := strings.Index(line, key); idx >= 0 {
+				rest := strings.TrimSpace(line[idx+len(key):])
+				for i := 0; i <= len(rest)-10; i++ {
+					candidate := rest[i : i+10]
+					if len(candidate) == 10 && candidate[4] == '-' && candidate[7] == '-' {
+						return candidate
+					}
+				}
+			}
+		}
+	}
+	return ""
+}
+
+func mustGitOutput(repoRoot string, args ...string) []byte {
+	cmd := exec.Command("git", args...)
+	cmd.Dir = repoRoot
+	out, _ := cmd.Output()
+	return out
 }

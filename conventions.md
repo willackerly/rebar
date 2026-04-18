@@ -157,6 +157,20 @@ locations may not be found by orphan detection. If you have contract
 implementations in unusual directories, add those paths to the search
 scope in `scripts/check-registry.sh`.
 
+**Script exclusion patterns:** All enforcement scripts (contract refs,
+headers, TODOs, ground truth) must exclude directories that contain
+stale or third-party code:
+
+- `.claude/worktrees/` — agent isolation directories with stale snapshots
+- `node_modules/` — vendored third-party code (may contain CONTRACT-like strings)
+- `vendor/` — Go vendored dependencies
+- `.git/` — Git internals
+
+Without these exclusions, worktree artifacts produce false-positive errors
+(e.g., a stale agent worktree with older CONTRACT headers fails the header
+check on clean main). Add `-not -path "./.claude/*"` to `find` commands
+and `grep -v ".claude/worktrees"` to grep pipelines.
+
 ### Multiple Contracts
 
 Rare, but some files bridge two contracts:

@@ -18,6 +18,8 @@ rebar without needing to create a PR.
 **Date:** YYYY-MM-DD
 **Source:** [which template or file this is about]
 **Type:** improvement | bug | confusion | missing-feature | anti-pattern
+**Status:** proposed | in-progress | implemented | wontfix
+**Template impact:** [which templates/practices need updating, if any]
 **From:** [agent session / human / project name]
 
 ## What Happened
@@ -29,6 +31,17 @@ rebar without needing to create a PR.
 ## Suggestion
 [Concrete improvement — not just "make it better"]
 ```
+
+## Processing Feedback
+
+When feedback items are implemented:
+1. Update the `**Status:**` field to `implemented`
+2. Move the file to `feedback/processed/`
+3. Note which templates/practices were updated in the `**Template impact:**` field
+
+Periodic review: scan `feedback/*.md` for `Status: proposed` to find
+unactioned items. Use `ask steward "which feedback items are still open?"`
+if automated scanning is configured.
 
 ## Why This Exists
 

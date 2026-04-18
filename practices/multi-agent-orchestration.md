@@ -69,8 +69,75 @@ This prevents the 50% waste incident (see docs/learnings-from-opendockit.md §7)
    will likely modify. If two agents touch the same file, either combine
    them into one or explicitly assign non-overlapping sections. Overlap
    causes merge conflicts that consume significant post-merge context.
+6. **Build a file-level conflict matrix.** For N planned agents, explicitly
+   list which files each will touch and verify no overlaps:
+   ```
+   Agent A: editing-session.ts, shape-dom.ts
+   Agent B: hit-testing.ts, cursor-positioning.ts
+   Agent C: pptx-svg-adapter.ts, pptx-editor.ts
+   → No overlaps. Safe to parallelize.
+   
+   Agent D: editing-session.ts, hit-testing.ts
+   Agent A: editing-session.ts, shape-dom.ts
+   → OVERLAP on editing-session.ts! Sequence D after A, or combine.
+   ```
+7. **Interface additions: assign to ONE agent.** If an agent needs to add
+   a method to a shared interface (Store, Scanner, etc.), that agent goes
+   first. All other agents add their mock stubs after that merge lands.
+   See `practices/worktree-collaboration.md` for merge ordering strategy.
 
-This takes 2-3 minutes and prevents hours of wasted agent compute.
+8. **Verify shared mock is current.** If the project has a shared mock
+   store, ensure it implements ALL current interface methods before
+   launching agents. Otherwise every merge requires adding stubs to N
+   test files. (See "Shared Mock Consolidation" in worktree-collaboration.md.)
+9. **Assign migration versions at merge time.** Agents use `version: 0`
+   as a placeholder. The orchestrator assigns the correct sequential
+   version during merge. Alternatively, use timestamp-based naming to
+   eliminate version conflicts entirely.
+
+This takes 5 minutes and prevents hours of wasted integration work.
+
+---
+
+## Agent Rules Reference
+
+Agents follow **The 10 Rules** defined in `agents/subagent-guidelines.md`.
+That file is the single source of truth — every subagent reads it before
+starting work. Do not duplicate the rules here; reference them.
+
+When writing agent prompts, include:
+```
+Read agents/subagent-guidelines.md for The 10 Rules.
+```
+
+The orchestrator's responsibilities (pre-launch audit, merge strategy,
+conflict zones) are below. The agent's responsibilities (isolation, commit
+discipline, file ownership, no removals) are in subagent-guidelines.md.
+
+### Orchestrator's Integration Checklist
+
+After merging each agent, verify:
+
+- [ ] Build passes (`go build ./...` / `pnpm build`)
+- [ ] Tests pass (`go test ./...` / `pnpm test`)
+- [ ] No duplicate declarations (two files defining same function)
+- [ ] No removed types/functions (compare against pre-merge)
+- [ ] Migration version correct (if applicable)
+- [ ] Mock stubs complete for all interface methods
+- [ ] Router/App wired for new endpoints/components
+- [ ] Contract headers present on new files
+
+**Target:** 5 minutes per merge. If it's taking 15+, a pre-launch step
+was skipped.
+
+### Crafting Agent Prompts
+
+Every parallel agent prompt should include:
+
+1. **File allowlist** — what they may create/modify (Rule 3)
+2. **Recent changes** — `git log --oneline -10` since worktree branched (Rule 9)
+3. **Template reference** — which subagent-prompt to follow
+4. **Scope boundary** — explicit "do NOT modify" list for shared files (Rule 8)
 
 ---
 

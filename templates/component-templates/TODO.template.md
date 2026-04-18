@@ -4,12 +4,11 @@
 <!-- freshness: YYYY-MM-DD -->
 <!-- last-synced: YYYY-MM-DD — date this file was verified against code -->
 
-Consolidated task tracking for the project. All `TRACKED-TASK:` comments in
-code reference sections of this file.
+Active tasks only. Scan in 10 seconds, not 5 minutes.
+Priorities live in QUICKCONTEXT.md "What's Next" — that is the single source of truth.
 
-**Two-Tag System:** See AGENTS.md "TODO Tracking" for full rules. Short version:
-- `TODO:` in code = untracked = **blocks commit**
-- `TRACKED-TASK:` in code = tracked here = commit allowed
+**Two-Tag System:** `TODO:` in code = untracked = blocks commit.
+`TRACKED-TASK:` in code = tracked here = commit allowed.
 
 ---
 
@@ -107,15 +106,17 @@ _None currently._
   - Context: race condition when two peers timeout simultaneously
 -->
 
-## Completed
+<details>
+<summary><strong>Completed</strong> (click to expand)</summary>
 
-<!-- Recently completed items. Keep for 1-2 weeks so agents can see what's
-     been done, then archive.
-     Format: [x] task — completed YYYY-MM-DD, commit/PR reference -->
+<!-- Recently completed items. Keep for 1-2 weeks, then archive or remove.
+     For full history, see git log. -->
 
 <!-- Example:
 - [x] Add AES-256-GCM encryption to blob store — completed 2026-03-10, commit abc1234
 -->
+
+</details>
 
 ---
 

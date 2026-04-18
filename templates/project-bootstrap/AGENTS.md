@@ -12,8 +12,10 @@
 ### Essential Reading Order (5 minutes)
 1. **README.md** — what is this project?
 2. **QUICKCONTEXT.md** — what's true right now? (branch, tests, active work)
-3. **TODO.md** — what needs doing? (P0 tasks, blockers, discoveries)
-4. **This file** — how do we work together?
+3. **VERIFY:** Run `git log --since='7 days' --oneline | head -20` and
+   cross-reference against QUICKCONTEXT claims. Flag any discrepancies.
+4. **TODO.md** — what needs doing? (open items only, scannable in 10 seconds)
+5. **This file** — how do we work together?
 
 ### Project Context
 - **Project type:** [Web app/API service/Library/CLI tool]
@@ -82,20 +84,43 @@ ask steward summary  # Automated quality health check
 - **Link to contracts** — maintain `CONTRACT:` headers in all source files
 - **Run quality checks** — `scripts/check-contract-refs.sh` before commits
 
+### Parallel Agent Protocol
+
+When launching subagents for parallel work, every agent follows **The 10 Rules**
+in `agents/subagent-guidelines.md`. The orchestrator follows the pre-launch audit
+and merge strategy in `practices/multi-agent-orchestration.md`.
+
+**The 3 absolute invariants (never violated):**
+1. **Worktree isolation** for any agent writing code
+2. **Commit before completing** — no commit = no work
+3. **Strict file ownership** — each agent gets an explicit allowlist; shared
+   files (interfaces, types, router, App entry point) are orchestrator-only
+
 ---
 
 ## Testing Cascade
 
-### Progressive Quality Gates
-- **T0: Unit tests** — test contract behavior directly
-- **T1: Integration tests** — test component interactions
-- **T2: Security tests** — test edge cases, input validation, error handling
-- **T3: System tests** — full workflow validation
-- **T4: Load tests** — performance and scalability
-- **T5: Chaos tests** — failure mode validation
+**Fast inner loops, rigorous outer gates.** Never run the full suite when a
+targeted test will do. Iterate at the speed of a single test file.
+
+### The Tiers
+
+<!-- Customize commands for your project's test runner -->
+
+| Tier | Name | Speed | When to Run |
+|------|------|-------|-------------|
+| **T0** | Typecheck | <5s | Every meaningful edit |
+| **T1** | Targeted | <10s | Every change cycle (single test file) |
+| **T2** | Package | <30s | Before committing |
+| **T3** | Cross-package | <60s | Before pushing |
+| **T4** | Visual/E2E | <2min | UI/render changes |
+| **T5** | Full suite | <10min | Release prep |
+
+**Rules:** Iterate at T1. Promote on success. Background T3+. Never run T5
+in your inner loop.
 
 ### For This Project
-**Start with T0-T1**, add T2+ as system grows in complexity and criticality.
+**Start with T0-T2**, add T3+ as the project grows.
 
 **Quality enforcement:**
 ```bash
@@ -119,6 +144,41 @@ scripts/ci-check.sh           # Full quality scan
 // GOOD: This is tracked and commit-safe
 // TRACKED-TASK:TODO.md#handle-concurrency Handle edge case for concurrent access
 ```
+
+---
+
+## Session Lifecycle
+
+Sessions have three stages. The Cold Start Quad covers START. Checkpoints
+and wrapup are equally important.
+
+**See `practices/session-lifecycle.md` for the full protocol.**
+
+### Checkpoint (every 10 commits or 2 hours)
+- Update QUICKCONTEXT.md (at minimum: timestamp + what shipped)
+- Commit work-in-progress
+- Check context quality — if re-reading files or repeating searches, break and restart
+
+### Session End
+- Update QUICKCONTEXT.md with current state (not aspirational)
+- Update TODO.md (check completed items, add discovered items)
+- Clean up worktrees: `git worktree list` → `git worktree prune`
+- Write a session wrapup (see template in `practices/session-lifecycle.md`)
+
+---
+
+## Priority and Issue Tracking Rules
+
+### Priority Tracking
+- **QUICKCONTEXT.md "What's Next"** = the single source of truth for priorities
+- **TODO.md** = detailed task list with context, NOT a separate priority list
+- If both files have a priority ordering, QUICKCONTEXT wins
+
+### Issue Tracking
+- **TODO.md "Known Issues"** = what's broken + workaround + fix tracking
+- **Cross-reference, don't duplicate.** One canonical entry per issue.
+- If an issue appears in multiple files, pick ONE as canonical and add
+  "See TODO.md §Known Issues" to the others
 
 ---
 

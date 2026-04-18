@@ -152,13 +152,14 @@ $ ask product "does offline sync need a new contract?"
 
 # Battle-Tested Results
 
-Rebar has been proven across 100+ worktree agent launches in four production projects:
+Rebar has been proven across 200+ worktree agent launches in five production projects:
 
 | Project | Swarm Scale | What Happened |
 |---------|------------|--------------|
 | **Dapple SafeSign** | 18 agents, 3 phases | 17 contracts, 169 headers, **0 merge conflicts**, 3 hours wall clock |
 | **blindpipe** | Selective adoption | Crypto-critical ZK suite. ASK sessions save **10x context** vs ephemeral subagents |
-| **OpenDocKit** | 9 simultaneous agents | 5,824 tests, progressive-fidelity OOXML renderer. Proved the 6-rule agent protocol |
+| **OpenDocKit** | 15+ parallel agents | 8,000+ tests, 20hr marathon. Red team protocol: 18 issues found, 18 fixed. Visual fidelity RMSE 0.159→0.102 |
+| **filedag** | 40+ parallel agents | 62 commits in 48hrs, 28K lines Go + 10K TypeScript, 87 Playwright tests. Proved session lifecycle need |
 | **Office 180** | Multi-repo swarm | Cross-repo namespacing, AI-native contract frontmatter |
 
 **Key insight from OpenDocKit:** 100% of committed agent work was recoverable after login expiration incidents. Uncommitted work was the only true loss — which the commit-per-chunk protocol minimizes.
@@ -236,8 +237,8 @@ Routes action items by role: draft contracts → architect, testing gaps → eng
 | Tier | What's Enforced | Scripts |
 |------|----------------|---------|
 | **1 - Partial** | Contract refs + TODOs | `check-contract-refs.sh`, `check-todos.sh` |
-| **2 - Adopted** | + headers, freshness, registry | + `check-contract-headers.sh`, `check-freshness.sh` |
-| **3 - Enforced** | + ground truth, strict steward | + `check-ground-truth.sh`, full Steward |
+| **2 - Adopted** | + headers, freshness, ground truth, compliance | + `check-contract-headers.sh`, `check-freshness.sh`, `check-ground-truth.sh`, `check-compliance.sh` |
+| **3 - Enforced** | + strict steward, full lifecycle | + full Steward with computed lifecycles |
 
 *Run all: `scripts/ci-check.sh` | Pre-commit: `scripts/pre-commit.sh`*
 
@@ -297,7 +298,7 @@ rebar/
 Every rebar repo declares its version and tier at the top of README.md:
 
 ```markdown
-> **rebar v1.2.0** | **Tier 2: ADOPTED**
+> **rebar v2.0.0** | **Tier 2: ADOPTED**
 ```
 
 This is validated by `scripts/check-compliance.sh` and the Steward. It tells
@@ -309,25 +310,24 @@ anyone looking at your repo: "this project speaks rebar, here's what's enforced.
 
 ```
 rebar/
-├── DESIGN.md               # The philosophy (read first for depth)
+├── DESIGN.md                    # The philosophy (read first for depth)
 ├── conventions.md               # Branch naming, commits, headers, reviews
 ├── SETUP.md                     # Step-by-step adoption guide
 ├── CHANGELOG.md                 # Version history + migration guides
 │
-├── # Templates (copy into your project)
-├── README.template.md           # Cold Start Quad #1
-├── QUICKCONTEXT.template.md     # Cold Start Quad #2
-├── TODO.template.md             # Cold Start Quad #3
-├── AGENTS.template.md           # Cold Start Quad #4
-├── CLAUDE.template.md           # Claude Code config
-├── METRICS.template             # Ground truth metrics
-├── .rebarrc.template            # Tier configuration
+├── templates/
+│   ├── project-bootstrap/       # Copy this into your project to get started
+│   │   ├── README.md, QUICKCONTEXT.md, TODO.md, AGENTS.md, CLAUDE.md
+│   │   ├── architecture/, scripts/
+│   │   └── .rebarrc, METRICS.md
+│   └── component-templates/     # Individual file templates for advanced use
 │
 ├── architecture/                # Contract system + templates
 ├── agents/                      # Role definitions + subagent templates
 ├── bin/                         # ASK CLI (persistent agent sessions)
+├── cli/                         # Rebar CLI (Go binary — commit, verify, context)
 ├── scripts/                     # Enforcement + quality scanning
-├── practices/                   # Reference guides (E2E, deployment, orchestration, worktrees)
+├── practices/                   # Session lifecycle, orchestration, red team, fidelity, etc.
 ├── profiles/                    # Adoption guides (by project type + team size)
 ├── feedback/                    # Real-world adoption reports
 └── docs/                        # Proposals + design documents
