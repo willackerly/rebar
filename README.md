@@ -35,9 +35,7 @@ ask steward "What contracts need attention?"
 - **Cross-session** — today's agent learns what yesterday's agent discovered
 - **Cross-failure** — when agents fail, failure modes become swarm knowledge
 
-**The result:** 10x context efficiency + coordinated decision-making across your entire development workflow.
-
-**The result:** Your codebase becomes a *living system* where information stays organized, agents coordinate seamlessly, and collective intelligence compounds across every session.
+**The result:** Your codebase becomes a *living system* where information stays organized, agents coordinate seamlessly, and collective intelligence compounds across every session. 10x context efficiency. Coordinated decision-making across your entire workflow.
 
 30 minutes to set up. Zero infrastructure. Everything is plain text — bash, markdown, grep, jq. No framework to install. Copy files into your project, and both your organization model AND agent coordination work immediately.
 
@@ -50,10 +48,12 @@ ask steward "What contracts need attention?"
 
 **Solo developer quickstart:**
 ```bash
-# Clone and bootstrap
+# Option A: Copy templates
 git clone https://github.com/willackerly/rebar.git && cd rebar
 cp -r templates/project-bootstrap/* ../my-project/ && cd ../my-project
-# Edit your first contract → link it to code → see the magic
+
+# Option B: Use the CLI (builds v2 scaffolding automatically)
+cd my-project && ../rebar/bin/rebar init
 ```
 
 **What you get:** Contracts linked to code + agent coordination + immediate productivity boost

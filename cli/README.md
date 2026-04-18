@@ -15,7 +15,7 @@ Requires Go 1.22+.
 ## Quick Start
 
 ```bash
-rebar init                    # Bootstrap .rebar/ with salt, manifest
+rebar init                    # Bootstrap .rebar/ + v2 files (QUICKCONTEXT, TODO, scripts, architecture/)
 rebar verify                  # Check integrity of protected files
 rebar status                  # Health dashboard
 

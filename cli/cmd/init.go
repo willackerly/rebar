@@ -152,6 +152,9 @@ func runInit(cmd *cobra.Command, args []string) error {
 	// Create .rebarrc if missing
 	ensureRebarRC(root)
 
+	// Bootstrap v2 files if missing
+	bootstrapped := bootstrapV2Files(root)
+
 	// Summary
 	fmt.Printf("\nREBAR initialized\n")
 	fmt.Printf("  Repo ID:    %s\n", repoID)
@@ -165,9 +168,149 @@ func runInit(cmd *cobra.Command, args []string) error {
 	if cfg != nil {
 		fmt.Printf("  Tier:       %d\n", cfg.Tier)
 	}
+	if bootstrapped > 0 {
+		fmt.Printf("  Bootstrap:  %d v2 file(s) created\n", bootstrapped)
+	}
 	fmt.Printf("\nRun 'rebar verify' to check integrity.\n")
+	fmt.Println("Run 'rebar context' to view the Cold Start Quad.")
 
 	return nil
+}
+
+// bootstrapV2Files creates essential v2 files if they don't exist.
+// Returns the number of files created.
+func bootstrapV2Files(root string) int {
+	created := 0
+
+	// .rebar-version
+	versionPath := filepath.Join(root, ".rebar-version")
+	if _, err := os.Stat(versionPath); os.IsNotExist(err) {
+		os.WriteFile(versionPath, []byte("v2.0.0\n"), 0644)
+		fmt.Println("  Created .rebar-version")
+		created++
+	}
+
+	// Cold Start Quad — only create if missing (don't overwrite existing)
+	quadFiles := map[string]string{
+		"QUICKCONTEXT.md": `# Quick Context
+
+<!-- freshness: ` + time.Now().Format("2006-01-02") + ` -->
+<!-- last-synced: ` + time.Now().Format("2006-01-02") + ` -->
+
+**Current state of the project.**
+
+## What's Next (in priority order)
+
+1. Define first contract
+2. Set up testing cascade
+3. Configure CI enforcement
+
+## Active Work
+
+**In progress:** Initial REBAR setup
+
+## Branch & State
+
+- **Active branch:** main
+`,
+		"TODO.md": `# TODO
+
+<!-- last-synced: ` + time.Now().Format("2006-01-02") + ` -->
+
+Active tasks only. Priorities live in QUICKCONTEXT.md "What's Next."
+
+## Open Items
+
+- [ ] Define first contract for core component
+- [ ] Set up testing cascade (T0-T5)
+- [ ] Configure pre-commit hook enforcement
+
+## Known Issues & Blockers
+
+_None currently._
+
+<details>
+<summary><strong>Completed</strong></summary>
+
+- [x] REBAR bootstrap — ` + time.Now().Format("2006-01-02") + `
+
+</details>
+`,
+	}
+
+	for name, content := range quadFiles {
+		path := filepath.Join(root, name)
+		if _, err := os.Stat(path); os.IsNotExist(err) {
+			os.WriteFile(path, []byte(content), 0644)
+			fmt.Printf("  Created %s\n", name)
+			created++
+		}
+	}
+
+	// scripts/refresh-context.sh
+	scriptsDir := filepath.Join(root, "scripts")
+	refreshPath := filepath.Join(scriptsDir, "refresh-context.sh")
+	if _, err := os.Stat(refreshPath); os.IsNotExist(err) {
+		os.MkdirAll(scriptsDir, 0755)
+		// Find rebar's copy to use as source
+		rebarRoot := findRebarRoot()
+		if rebarRoot != "" {
+			src := filepath.Join(rebarRoot, "scripts", "refresh-context.sh")
+			if data, err := os.ReadFile(src); err == nil {
+				os.WriteFile(refreshPath, data, 0755)
+				fmt.Println("  Created scripts/refresh-context.sh")
+				created++
+			}
+		}
+	}
+
+	// architecture/ directory
+	archDir := filepath.Join(root, "architecture")
+	if _, err := os.Stat(archDir); os.IsNotExist(err) {
+		os.MkdirAll(archDir, 0755)
+		// Copy contract template
+		rebarRoot := findRebarRoot()
+		if rebarRoot != "" {
+			src := filepath.Join(rebarRoot, "architecture", "CONTRACT-TEMPLATE.md")
+			dst := filepath.Join(archDir, "CONTRACT-TEMPLATE.md")
+			if data, err := os.ReadFile(src); err == nil {
+				os.WriteFile(dst, data, 0644)
+				fmt.Println("  Created architecture/ with contract template")
+				created++
+			}
+		} else {
+			os.WriteFile(filepath.Join(archDir, ".gitkeep"), []byte(""), 0644)
+			fmt.Println("  Created architecture/")
+			created++
+		}
+	}
+
+	return created
+}
+
+// findRebarRoot locates the rebar framework repo by checking common locations.
+func findRebarRoot() string {
+	// Check if we're inside the rebar repo
+	if _, err := os.Stat("DESIGN.md"); err == nil {
+		if _, err := os.Stat("architecture/CONTRACT-TEMPLATE.md"); err == nil {
+			cwd, _ := os.Getwd()
+			return cwd
+		}
+	}
+
+	// Check common locations
+	home, _ := os.UserHomeDir()
+	candidates := []string{
+		filepath.Join(home, "dev", "rebar"),
+		filepath.Join(home, "src", "rebar"),
+		filepath.Join(home, "code", "rebar"),
+	}
+	for _, c := range candidates {
+		if _, err := os.Stat(filepath.Join(c, "DESIGN.md")); err == nil {
+			return c
+		}
+	}
+	return ""
 }
 
 func ensureGitignore(root string) {
