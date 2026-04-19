@@ -34,14 +34,32 @@ rebar without needing to create a PR.
 
 ## Processing Feedback
 
-When feedback items are implemented:
-1. Update the `**Status:**` field to `implemented`
-2. Move the file to `feedback/processed/`
-3. Note which templates/practices were updated in the `**Template impact:**` field
+When feedback items are triaged:
+1. Update the `**Status:**` field to reflect the decision
+2. Record the disposition in [INVENTORY.md](INVENTORY.md)
+3. Move the source file to `feedback/processed/` unless pending
+   implementation (in which case leave it in `feedback/` root until the
+   work lands, then move)
 
-Periodic review: scan `feedback/*.md` for `Status: proposed` to find
-unactioned items. Use `ask steward "which feedback items are still open?"`
-if automated scanning is configured.
+**Dispositions:**
+- `implemented` — action complete; move to `processed/`
+- `in-progress` — accepted, implementation pending (Wave 1/2); stays in `feedback/`
+- `deferred` — watchlisted in INVENTORY.md; move to `processed/`
+- `wontfix` / `redirected` — move to `processed/` with reason in INVENTORY.md
+
+Periodic review: check [INVENTORY.md](INVENTORY.md) for Watchlist items
+with multiple votes — those are candidates to promote to Queued. Scan
+`feedback/*.md` (root) for active proposals. Use `ask steward "which
+feedback items are still open?"` if automated scanning is configured.
+
+## Inventory and vote accumulation
+
+[INVENTORY.md](INVENTORY.md) is the single index of all feedback
+dispositions. Its purpose: when a new project raises a proposal that's
+already been deferred, increment the vote count rather than filing a
+duplicate discussion. When an item reaches **2+ independent project votes**
+OR **1 measured pain point** it's a candidate to promote from Watchlist
+to Queued.
 
 ## Why This Exists
 
