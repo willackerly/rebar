@@ -95,9 +95,16 @@ rebar ask architect "Review CONTRACT:C1-FILESTORE.1.0 - any integration concerns
 rebar ask product "Does this file storage meet basic user needs?"
 ```
 
+**Wire ASK into Claude Code (MCP):**
+`rebar init` already wrote `.mcp.json` to your project root. Reload
+Claude Code in this directory and the `ask_<repo>_<role>` tools appear
+in the tool list automatically — no more shelling out.
+**[→ MCP Setup Guide](docs/MCP-SETUP.md)** if you want user-level or
+multi-repo setups.
+
 **Check integrity:**
 ```bash
-rebar init       # Initialize integrity tracking
+rebar init       # Initialize integrity tracking + MCP wiring
 rebar verify     # Verify all protected files are clean
 rebar status     # Quick health dashboard
 ```

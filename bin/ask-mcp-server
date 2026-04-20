@@ -430,7 +430,7 @@ class RepoRegistry:
         with self._lock:
             self.repos[name] = path
             agents = self._list_agents_for(path)
-            print(f"  registered: {name} → {path} ({len(agents)} agents: {', '.join(agents)})")
+            print(f"  registered: {name} → {path} ({len(agents)} agents: {', '.join(agents)})", file=sys.stderr)
 
     def list_repos(self):
         with self._lock:
@@ -671,7 +671,7 @@ Examples:
 
     # Build registry
     registry = RepoRegistry()
-    print("ask-mcp-server: scanning repos...")
+    print("ask-mcp-server: scanning repos...", file=sys.stderr)
 
     if args.repos_dir:
         registry.scan_dir(args.repos_dir)
@@ -683,7 +683,7 @@ Examples:
         sys.exit(1)
 
     total_agents = len(registry.list_all_agents())
-    print(f"\nask-mcp-server: {len(registry.repos)} repos, {total_agents} agents")
+    print(f"\nask-mcp-server: {len(registry.repos)} repos, {total_agents} agents", file=sys.stderr)
 
     if args.stdio:
         # MCP over stdio

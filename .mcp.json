@@ -1,6 +1,6 @@
 {
   "mcpServers": {
-    "rebar-agents": {
+    "rebar-ask": {
       "command": "/Users/will/dev/rebar/bin/ask-mcp-server",
       "args": ["--stdio", "--repos-dir", "/Users/will/dev"]
     }

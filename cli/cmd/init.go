@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -285,7 +286,69 @@ _None currently._
 		}
 	}
 
+	// .mcp.json — Claude Code MCP config for ASK
+	if ensureMCPConfig(root) {
+		created++
+	}
+
 	return created
+}
+
+// ensureMCPConfig writes a project-local .mcp.json that registers the rebar
+// ASK MCP server with Claude Code. Skipped silently if the file already exists.
+// Skipped with a message if ask-mcp-server can't be located.
+func ensureMCPConfig(root string) bool {
+	mcpPath := filepath.Join(root, ".mcp.json")
+	if _, err := os.Stat(mcpPath); err == nil {
+		return false
+	}
+
+	serverPath := findMCPServerPath()
+	if serverPath == "" {
+		fmt.Println("  Skipped .mcp.json — ask-mcp-server not found; see SETUP.md §MCP to configure manually")
+		return false
+	}
+
+	// --repos-dir = parent of this project so sibling rebar-adopted repos also register
+	reposDir := filepath.Dir(root)
+
+	content := fmt.Sprintf(`{
+  "mcpServers": {
+    "rebar-ask": {
+      "command": %q,
+      "args": ["--stdio", "--repos-dir", %q]
+    }
+  }
+}
+`, serverPath, reposDir)
+
+	if err := os.WriteFile(mcpPath, []byte(content), 0644); err != nil {
+		fmt.Printf("  Warning: could not write .mcp.json: %v\n", err)
+		return false
+	}
+	fmt.Println("  Created .mcp.json (Claude Code MCP wiring for ASK)")
+	return true
+}
+
+// findMCPServerPath locates the ask-mcp-server executable.
+// Tries: same bin/ as this rebar CLI, then findRebarRoot()/bin/, then PATH.
+func findMCPServerPath() string {
+	if exe, err := os.Executable(); err == nil {
+		candidate := filepath.Join(filepath.Dir(exe), "ask-mcp-server")
+		if _, err := os.Stat(candidate); err == nil {
+			return candidate
+		}
+	}
+	if rebarRoot := findRebarRoot(); rebarRoot != "" {
+		candidate := filepath.Join(rebarRoot, "bin", "ask-mcp-server")
+		if _, err := os.Stat(candidate); err == nil {
+			return candidate
+		}
+	}
+	if p, err := exec.LookPath("ask-mcp-server"); err == nil {
+		return p
+	}
+	return ""
 }
 
 // findRebarRoot locates the rebar framework repo by checking common locations.

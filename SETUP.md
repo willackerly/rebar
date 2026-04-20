@@ -210,6 +210,18 @@ This creates `.rebar/integrity.json` (hash manifest), `.rebar/salt` (gitignored)
 and tracks all enforcement scripts, contracts, and test files. From this point
 forward, use `rebar commit` instead of `git commit` to ensure integrity tracking.
 
+**`rebar init` also writes `.mcp.json`** — a Claude Code MCP config
+that exposes ASK agents as first-class tools (`ask_<repo>_<role>`).
+Reload Claude Code in this directory and the tools appear automatically.
+If you prefer user-level config (available in all projects, not just
+adopted ones), or if your layout needs a non-default `--repos-dir`,
+see **[docs/MCP-SETUP.md](docs/MCP-SETUP.md)**.
+
+**Commit `.mcp.json`?** It contains absolute paths specific to the
+machine that ran `rebar init`. Solo devs: commit. Team projects with
+heterogeneous dev environments: add to `.gitignore` and let each dev
+regenerate via `rebar init`. Rebar does not auto-gitignore it.
+
 ## Step 5: Commit
 
 ```bash

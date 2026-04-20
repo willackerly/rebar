@@ -18,14 +18,21 @@ How 10+ agents work together without destroying each other's work:
 ### The ASK Tool — Persistent Multi-Role Agent System
 **What it is:** Enterprise-grade CLI that maintains persistent agent sessions across projects and time. Instead of ephemeral subagents that cost 10x context on each question, ASK agents accumulate knowledge and coordinate through specialized roles.
 
-**MCP-Enabled for Swarms:** Now supports Model Context Protocol (MCP), allowing a single ASK agent instance to answer questions from multiple users and agents simultaneously. This enables true swarm intelligence where one expert agent can serve an entire development team or agent collective.
+**MCP-Enabled for Claude Code:** ASK exposes every agent as an MCP tool
+(`ask_<repo>_<role>`), so Claude Code instances working in your project
+can call the architect, product, or englead agent as a first-class tool —
+no shell-out, no context cost. `rebar init` and `rebar adopt` write a
+project-local `.mcp.json` automatically.
+**[→ MCP Setup Guide](docs/MCP-SETUP.md)**
 
 **How it's used:**
 ```bash
+# From your shell
 ask architect "Should we add caching to the user service?"
 ask product "Does this contract match our user stories?"
-ask englead "Are we ready to merge this feature?"
-ask steward "What contracts need attention?"
+
+# From Claude Code (after MCP wiring, tools appear automatically)
+# → agent reaches for ask_rebar_architect the same way it reaches for Grep
 ```
 
 **What it accomplishes:**

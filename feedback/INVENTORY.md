@@ -43,6 +43,11 @@ remain in `feedback/` root until implementation lands, then move to processed/.
 | W2-1 | `O-` operational-contract prefix in CONTRACT-TEMPLATE.md + filedag O1/O2 as reference examples | [2026-04-18-filedag-deep-audit-insights.md](2026-04-18-filedag-deep-audit-insights.md) #1 | M |
 | W2-2 | Extend `compute-registry.sh` to detect drift / shadow / ghost / zombie / unlisted contracts | [2026-04-18-filedag-deep-audit-insights.md](2026-04-18-filedag-deep-audit-insights.md) #5 | M |
 
+### Wave 2.5 — MCP activation (COMPLETED 2026-04-20)
+
+Turning a latent MCP server into a discoverable first-class tool for
+Claude Code instances. Moved to Implemented section below.
+
 ---
 
 ## 👀 Watchlist — Deferred, Awaiting Accumulation
@@ -142,6 +147,22 @@ source project(s) so accumulation is visible.
 These items were substantially addressed by commits in the last cycle.
 Listed so future feedback on the same topic can see prior work and not
 re-request.
+
+### Wave 2.5 — MCP activation (2026-04-20)
+
+Turning a latent MCP server into a discoverable, first-class tool for
+Claude Code instances. Pre-this-cycle: server existed but stdio was
+broken (stdout pollution) and nothing in the adoption flow wired it up.
+
+| Item | Details |
+|------|---------|
+| Stdout pollution bug fix in `ask-mcp-server` | Status banner now on stderr. Was breaking stdio JSON-RPC handshake — Claude Code would fail to connect. This means the prior "MCP wiring" was never actually working end-to-end. |
+| `rebar init` / `rebar adopt` emit project-local `.mcp.json` | `ensureMCPConfig` + `findMCPServerPath` in `cli/cmd/init.go`; auto-called from `bootstrapV2Files`. Tries same-bin, `findRebarRoot`, then PATH for `ask-mcp-server` |
+| `docs/MCP-SETUP.md` — new user-facing setup guide | Covers project-level vs user-level paths, verify procedures, pitfalls, commit-or-gitignore guidance |
+| README, QUICKSTART, SETUP, bin/README all link MCP-SETUP | MCP is a first-class setup step, not a footnote |
+| Will's `~/.claude.json` configured | `rebar-ask` user-level entry; 32 tools across 7 rebar-adopted repos verified end-to-end (TALOS, blindpipe, filedag, fontkit, office180, pdf-signer-web, rebar). Makes ASK available in opendockit + OpenTDF/{TDFLite,otdfctl-main,platform-main} as consumers. |
+
+### Prior cycle
 
 | Item | Implemented By | Source Feedback |
 |------|---------------|-----------------|
