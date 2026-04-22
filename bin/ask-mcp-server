@@ -58,9 +58,8 @@ class MCPServer:
         self.initialized = False
 
     def handle_request(self, request):
-        """Handle a JSON-RPC 2.0 MCP request."""
+        """Handle a JSON-RPC 2.0 MCP request. Returns None for notifications."""
         try:
-            # Validate JSON-RPC structure
             if not isinstance(request, dict):
                 return self._error(-32600, "Invalid Request", "Request must be JSON object")
 
@@ -69,9 +68,17 @@ class MCPServer:
 
             method = request.get("method")
             params = request.get("params", {})
+
+            # JSON-RPC 2.0: a request without an "id" member is a NOTIFICATION.
+            # The server MUST NOT reply. MCP uses notifications like
+            # "notifications/initialized" and "notifications/cancelled".
+            is_notification = "id" not in request
             req_id = request.get("id")
 
-            # Route to handler
+            if is_notification:
+                # No response for notifications — just absorb and continue.
+                return None
+
             if method == "initialize":
                 return self._handle_initialize(params, req_id)
             elif method == "tools/list":
@@ -86,7 +93,10 @@ class MCPServer:
                 return self._error(-32601, "Method not found", f"Unknown method: {method}", req_id)
 
         except Exception as e:
-            return self._error(-32603, "Internal error", str(e))
+            # Only surface errors for requests with ids; swallow for notifications
+            if isinstance(request, dict) and "id" in request:
+                return self._error(-32603, "Internal error", str(e), request.get("id"))
+            return None
 
     def _handle_initialize(self, params, req_id):
         """Initialize MCP session."""
@@ -692,19 +702,24 @@ Examples:
         mcp_server.ask_bin = args.ask_bin
 
         for line in sys.stdin:
+            line = line.strip()
+            if not line:
+                continue
             try:
-                request = json.loads(line.strip())
-                response = mcp_server.handle_request(request)
-                print(json.dumps(response))
-                sys.stdout.flush()
+                request = json.loads(line)
             except Exception as e:
-                error_response = {
-                    "jsonrpc": "2.0",
-                    "id": None,
-                    "error": {"code": -32603, "message": f"Parse error: {e}"}
-                }
-                print(json.dumps(error_response))
-                sys.stdout.flush()
+                # JSON-RPC 2.0 says a parse error MAY be replied to with
+                # id=null. Claude Code's Zod validator rejects id=null
+                # responses, and we can't tell if the sender was a
+                # notification. Log to stderr and move on.
+                print(f"ask-mcp-server: parse error: {e}", file=sys.stderr)
+                continue
+            response = mcp_server.handle_request(request)
+            if response is None:
+                # Notification — no reply allowed per JSON-RPC 2.0.
+                continue
+            print(json.dumps(response))
+            sys.stdout.flush()
 
     else:
         # HTTP transport
