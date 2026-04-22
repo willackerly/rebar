@@ -301,25 +301,52 @@ class MCPServer:
             return self._error(-32603, "Resource read failed", str(e), req_id)
 
     def _get_agent_description(self, repo, role):
-        """Get agent description from AGENT.md file."""
+        """Get agent description from AGENT.md file.
+
+        Extracts the first full paragraph (consecutive non-empty,
+        non-heading lines) after any leading headings. Previous version
+        returned only the first line, which truncated mid-sentence on
+        any AGENT.md that hard-wrapped its Role paragraph.
+        """
         repo_path = self.registry.get_repo_path(repo)
+        fallback = f"Query the {role} agent for {repo}."
+
         if not repo_path:
-            return f"Agent {role} in repository {repo}"
+            return fallback
 
         agent_file = Path(repo_path) / "agents" / role / "AGENT.md"
-        if agent_file.is_file():
-            try:
-                content = agent_file.read_text()
-                # Extract first paragraph as description
-                lines = content.split('\n')
-                for line in lines:
-                    line = line.strip()
-                    if line and not line.startswith('#'):
-                        return line
-            except Exception:
-                pass
+        if not agent_file.is_file():
+            return fallback
 
-        return f"Agent {role} in repository {repo}"
+        try:
+            content = agent_file.read_text()
+        except Exception:
+            return fallback
+
+        # Walk lines, skip headings and blanks, then collect the first
+        # paragraph (until blank line or next heading).
+        paragraph = []
+        in_paragraph = False
+        for raw in content.split('\n'):
+            line = raw.strip()
+            if not in_paragraph:
+                if not line or line.startswith('#'):
+                    continue
+                in_paragraph = True
+                paragraph.append(line)
+            else:
+                if not line or line.startswith('#'):
+                    break
+                paragraph.append(line)
+
+        if not paragraph:
+            return fallback
+
+        # Join wrapped lines with single spaces; prepend a caller-facing
+        # preamble so Claude sees "Query X agent about: <prose>" rather
+        # than raw second-person instruction to the agent itself.
+        prose = ' '.join(paragraph)
+        return f"Query the {role} agent for {repo}. {prose}"
 
     def _get_resource_content(self, resource_type, repo, role):
         """Get content for a specific resource type."""
