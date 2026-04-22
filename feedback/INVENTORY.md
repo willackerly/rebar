@@ -140,6 +140,17 @@ source project(s) so accumulation is visible.
 |------|------:|---------|--------|-----------|
 | **Pre-flight repo-state check** (read `.rebar-version`, compare to latest tag, warn if behind, link CHANGELOG migration) | 1 | FontKit (via conversation 2026-04-19) | S | Real pain reported; if 1 more adopter hits this, promote. Candidate: `rebar doctor` or extend `rebar status`. |
 
+### Testing rigor (from 2026-04-22-testing-rigor-six-moments.md)
+
+| Item | Votes | Sources | Effort | Rationale |
+|------|------:|---------|--------|-----------|
+| **Tag-to-CI coverage check** — every `@<tag>` in spec files must have a path to CI or be allowlisted with a reason | 1 (measured pain) | Dapple SafeSign 2026-04-22 | S | **Prototype attached** in source project: `scripts/check-tag-ci-coverage.mjs` + allowlist JSON, battle-tested (surfaced 35 pre-existing orphan tags on first run). Caught the specific failure where `@security-audit` ran nowhere in CI. Lift directly into `templates/scripts/` if useful. |
+| File-to-tier matrix (path → required tier must pass before commit) | 1 (measured pain) | Dapple SafeSign 2026-04-22 | S | Prevents the "web vitest green = committable" failure mode when editing files that only a slow tier exercises. Related to existing Wave 1 zero-tolerance testing doctrine but adds a *which tier must run* dimension. |
+| Negative-control mandate for detection tests (stage the violation, prove the detector fires) | 1 (measured pain) | Dapple SafeSign 2026-04-22 | XS | Script-enforceable: spec-file linter greps for `.not.toContain / toBeNull / toEqual([])` patterns and requires a sibling `negative control` describe. Catches tautological tests that pass on a clean environment. |
+| Test Fidelity Ladder — formalize `fidelity: tautology / surrogate / real-flow / mutation-proof` declaration in spec headers | 1 (measured pain) | Dapple SafeSign 2026-04-22 | S | References existing Fidelity Ladder concept; adds machine-checkable comment requirement. For `surrogate` decls, verify a matching `real-flow` test covering the same claim exists. |
+| Drift-mode taxonomy for differential tests (enumerate `DriftModes: covered` / `NOT covered`) | 1 | Dapple SafeSign 2026-04-22 | XS | Convention + optional linter. Forces comparison-test authors to think through what their regex/fingerprint actually proves vs. misses. |
+| Security-test commit-message template (required fields: Claim / Fidelity / Drift modes NOT covered / Negative control / CI job) | 1 | Dapple SafeSign 2026-04-22 | XS | `commit-msg` hook. Forces honesty at commit time when the claim is security-critical. Lowest priority of the six. |
+
 ---
 
 ## ✅ Implemented (recent commits)
