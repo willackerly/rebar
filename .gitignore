@@ -3,9 +3,22 @@ agents/*/inbox/
 agents/*/outbox/
 agents/*/.pid
 agents/*/.last-stderr
+agents/*/.session-id
 agents/*/memory.log.md
 shared/messages/events.jsonl
 
 # REBAR integrity secrets
 .rebar/salt
 .rebar/keys/
+
+# Generated outputs (Steward writes these on every scan)
+STEWARD_REPORT.md
+architecture/.state/*.json
+
+# Python bytecode (ASK CLI)
+bin/__pycache__/
+**/__pycache__/
+
+# macOS
+.DS_Store
+**/.DS_Store
