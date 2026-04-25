@@ -1,6 +1,6 @@
 📍 **You are here:** [Try It](QUICKSTART.md) → **Love It (1 hour)** → [Master It](CASE-STUDIES.md)
 **Prerequisites:** [QUICKSTART.md](QUICKSTART.md) complete
-**Next step:** [Agent coordination](AGENTS-QUICKSTART.md) or [real-world patterns](CASE-STUDIES.md)
+**Next step:** [Agent coordination](agents/README.md) or [real-world patterns](CASE-STUDIES.md)
 
 # Feature Development Guide
 
@@ -437,7 +437,7 @@ Closes: #auth-service-implementation"
 - **[Cross-repo coordination](CASE-STUDIES.md)** - Contract namespacing and shared dependencies
 
 ### Want to see war stories?
-- **[OpenDocKit case study](feedback/2026-03-18-opendockit-fidelity-session.md)** - 9 simultaneous agents, 5,824 tests
+- **[OpenDocKit case study](feedback/processed/2026-03-18-opendockit-fidelity-session.md)** - 9 simultaneous agents, 5,824 tests
 - **[Human-based Digital Signer case study](feedback/digital-signer-feedback.md)** - 18 agents, 0 merge conflicts, 3 hours wall clock
 
 **You've just experienced the full rebar methodology. Every feature you build from now on follows this same pattern: BDD → Contract → Multi-agent coordination → Implementation → Quality cascade → Integration.**

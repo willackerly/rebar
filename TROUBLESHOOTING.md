@@ -26,7 +26,7 @@ This guide covers the most frequent problems teams encounter when adopting rebar
 **Solution:**
 - **Don't replace existing docs** — merge rebar's gaps in
 - Focus on highest-value additions: contract headers, enforcement scripts, agent roles
-- See [blindpipe case study](feedback/blindpipe-adoption-2026-03-19.md) for selective adoption patterns
+- See [blindpipe case study](feedback/processed/blindpipe-adoption-2026-03-19.md) for selective adoption patterns
 - Consider tier 1 (partial) adoption first
 
 ### "Scripts fail with permission errors"
@@ -86,7 +86,7 @@ ls architecture/CONTRACT-*.md
 **Solution:**
 - **Questions & guidance** → Role agents (`ask architect "should I..."`)
 - **Focused work tasks** → Subagent templates (`claude --prompt ...`)
-- See [AGENTS-QUICKSTART.md](AGENTS-QUICKSTART.md) decision tree
+- See [agents/README.md](agents/README.md) for the decision tree and the 6 core roles
 
 ### "Multi-agent coordination creates conflicts"
 **Symptoms:** Merge conflicts, agents stepping on each other's work, lost changes
@@ -94,7 +94,7 @@ ls architecture/CONTRACT-*.md
 **Solutions:**
 1. **Use worktree isolation** — each agent gets its own working copy
 2. **Follow practices/worktree-collaboration.md** for coordination patterns
-3. **See [OpenDocKit case study](feedback/2026-03-18-opendockit-fidelity-session.md)** for 9-agent coordination patterns
+3. **See [OpenDocKit case study](feedback/processed/2026-03-18-opendockit-fidelity-session.md)** for 9-agent coordination patterns
 4. **Consider [Human-based Digital Signer approach](feedback/digital-signer-feedback.md)** — 18 agents, 0 conflicts
 
 ---
@@ -105,7 +105,7 @@ ls architecture/CONTRACT-*.md
 **Symptoms:** Don't understand behavioral contracts vs interfaces, versioning seems heavyweight
 
 **Start simple approach:**
-1. **Use [CONTRACT-QUICKSTART.md](CONTRACT-QUICKSTART.md)** — focus on 5-minute template
+1. **Use [architecture/CONTRACT-TEMPLATE.md](architecture/CONTRACT-TEMPLATE.md)** — annotated template, all sections explained inline
 2. **Start with obvious behaviors:** What happens on missing key? Empty input? Error cases?
 3. **Don't worry about versioning initially** — use 1.0 for everything
 4. **See [FEATURE-DEVELOPMENT.md](FEATURE-DEVELOPMENT.md)** auth example for concrete pattern
@@ -155,7 +155,7 @@ REBAR_TIER=3  # Enforced: + ground truth, strict steward
 - **Solo dev, new to rebar:** Start with tier 1
 - **Small team, established workflow:** Use tier 2
 - **Department, mission-critical:** Use tier 3
-- See [scalability assessment](feedback/scalability-assessment-2026-03-20.md) for progression
+- See [scalability assessment](feedback/processed/scalability-assessment-2026-03-20.md) for progression
 
 ### "Testing cascade seems overwhelming"
 **Symptoms:** T0-T5 feels like too many testing levels, unclear which tests to write
@@ -252,8 +252,8 @@ REBAR_TIER=3  # Enforced: + ground truth, strict steward
 
 3. **Show real results:**
    - [Human-based Digital Signer](feedback/digital-signer-feedback.md): 0 merge conflicts
-   - [blindpipe](feedback/blindpipe-adoption-2026-03-19.md): 10x context efficiency
-   - [OpenDocKit](feedback/2026-03-18-opendockit-fidelity-session.md): 100% work recovery
+   - [blindpipe](feedback/processed/blindpipe-adoption-2026-03-19.md): 10x context efficiency
+   - [OpenDocKit](feedback/processed/2026-03-18-opendockit-fidelity-session.md): 100% work recovery
 
 ### "Scaling beyond small team"
 **Symptoms:** Single-repo patterns don't work for multiple teams, cross-repo dependencies unclear
@@ -268,14 +268,14 @@ REBAR_TIER=3  # Enforced: + ground truth, strict steward
    - Breaking change detection across repos
 
 3. **Study enterprise patterns:**
-   - [Scalability Assessment](feedback/scalability-assessment-2026-03-20.md) for 1000-dev organization
+   - [Scalability Assessment](feedback/processed/scalability-assessment-2026-03-20.md) for 1000-dev organization
 
 ---
 
 ## 📞 Getting Help
 
 ### Quick Self-Help
-1. **Check [SITE-MAP.md](SITE-MAP.md)** for navigation
+1. **Check [README.md](README.md)** for the navigation gateway
 2. **Search [CASE-STUDIES.md](CASE-STUDIES.md)** for similar problems
 3. **Ask your agents:** `ask steward "what issues exist?"` or `ask architect "review my setup"`
 

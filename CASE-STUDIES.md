@@ -19,32 +19,32 @@ This directory contains 12 detailed adoption reports from production systems tha
 | Problem | See This Case Study | Key Solution |
 |---------|---------------------|--------------|
 | **Numbers in docs drift from reality** | [Human-based Digital Signer](feedback/digital-signer-feedback.md) | Ground truth enforcement layer |
-| **Want to adopt rebar in mature codebase** | [blindpipe Adoption](feedback/blindpipe-adoption-2026-03-19.md) | Selective adoption strategy |
-| **Scaling beyond solo development** | [Scalability Assessment](feedback/scalability-assessment-2026-03-20.md) | Tier progression patterns |
+| **Want to adopt rebar in mature codebase** | [blindpipe Adoption](feedback/processed/blindpipe-adoption-2026-03-19.md) | Selective adoption strategy |
+| **Scaling beyond solo development** | [Scalability Assessment](feedback/processed/scalability-assessment-2026-03-20.md) | Tier progression patterns |
 | **Version migration and compatibility** | [Versioning & Upgrade Path](feedback/versioning-and-upgrade-path-2026-03-20.md) | Backwards compatibility strategies |
-| **Multi-agent coordination failures** | [OpenDocKit Fidelity Session](feedback/2026-03-18-opendockit-fidelity-session.md) | Swarm orchestration protocols |
-| **Role boundaries unclear** | [Role Definitions Feedback](feedback/role-definitions-feedback.md) | Agent responsibility clarification |
+| **Multi-agent coordination failures** | [OpenDocKit Fidelity Session](feedback/processed/2026-03-18-opendockit-fidelity-session.md) | Swarm orchestration protocols |
+| **Role boundaries unclear** | [Role Definitions Feedback](feedback/processed/role-definitions-feedback.md) | Agent responsibility clarification |
 | **Testing everything vs. testing enough** | [Zero-Tolerance Testing](feedback/zero-tolerance-testing-feedback.md) | Pragmatic quality gates |
-| **Contract design for AI agents** | [AI-Native Contracts](feedback/ai-native-contracts-2026-03-20.md) | Machine-readable specifications |
-| **Legacy system migration** | [PDF Signer Migration](feedback/pdf-signer-migration-feedback.md) | Incremental adoption patterns |
+| **Contract design for AI agents** | [AI-Native Contracts](feedback/processed/ai-native-contracts-2026-03-20.md) | Machine-readable specifications |
+| **Legacy system migration** | [PDF Signer Migration](feedback/processed/pdf-signer-migration-feedback.md) | Incremental adoption patterns |
 
 ### 🏗️ **"I'm building this type of project"**
 
 | Project Type | Case Study | Key Insights |
 |--------------|------------|--------------|
 | **Web App** (React + API) | [Human-based Digital Signer](feedback/digital-signer-feedback.md) | Monorepo patterns, E2E testing with 586 unit tests |
-| **Crypto Library** | [blindpipe](feedback/blindpipe-adoption-2026-03-19.md) | Security-critical development, selective adoption |
-| **Document Processing** | [OpenDocKit](feedback/2026-03-18-opendockit-fidelity-session.md) | 5,824 tests, progressive fidelity rendering |
-| **Enterprise Platform** | [Scalability Assessment](feedback/scalability-assessment-2026-03-20.md) | Multi-repo coordination, governance patterns |
+| **Crypto Library** | [blindpipe](feedback/processed/blindpipe-adoption-2026-03-19.md) | Security-critical development, selective adoption |
+| **Document Processing** | [OpenDocKit](feedback/processed/2026-03-18-opendockit-fidelity-session.md) | 5,824 tests, progressive fidelity rendering |
+| **Enterprise Platform** | [Scalability Assessment](feedback/processed/scalability-assessment-2026-03-20.md) | Multi-repo coordination, governance patterns |
 
 ### 👥 **"My team looks like this"**
 
 | Team Size | Case Study | Coordination Patterns |
 |-----------|------------|---------------------|
-| **Solo Developer** | [blindpipe](feedback/blindpipe-adoption-2026-03-19.md) | ASK CLI for 10x context efficiency |
+| **Solo Developer** | [blindpipe](feedback/processed/blindpipe-adoption-2026-03-19.md) | ASK CLI for 10x context efficiency |
 | **Small Team (2-10)** | [Human-based Digital Signer](feedback/digital-signer-feedback.md) | 18 agents, 3 phases, 0 merge conflicts |
-| **Department (10+)** | [Scalability Assessment](feedback/scalability-assessment-2026-03-20.md) | Cross-repo contracts, breaking change detection |
-| **Multi-Agent Swarms** | [OpenDocKit](feedback/2026-03-18-opendockit-fidelity-session.md) | 9 simultaneous agents, failure recovery |
+| **Department (10+)** | [Scalability Assessment](feedback/processed/scalability-assessment-2026-03-20.md) | Cross-repo contracts, breaking change detection |
+| **Multi-Agent Swarms** | [OpenDocKit](feedback/processed/2026-03-18-opendockit-fidelity-session.md) | 9 simultaneous agents, failure recovery |
 
 ---
 
@@ -69,7 +69,7 @@ This directory contains 12 detailed adoption reports from production systems tha
 **Best for:** Web application teams, monorepos, heavy automation, quality obsessed teams
 
 ### 🔐 **blindpipe** — Crypto-Critical Selective Adoption
-**File:** [feedback/blindpipe-adoption-2026-03-19.md](feedback/blindpipe-adoption-2026-03-19.md) • **Size:** 6.1K
+**File:** [feedback/processed/blindpipe-adoption-2026-03-19.md](feedback/processed/blindpipe-adoption-2026-03-19.md) • **Size:** 6.1K
 
 **Project:** Zero-knowledge collaborative office suite (Go + TypeScript)
 **Context:** Mature codebase with existing contract system
@@ -86,7 +86,7 @@ This directory contains 12 detailed adoption reports from production systems tha
 **Best for:** Mature projects, security-critical systems, incremental adoption
 
 ### 📄 **OpenDocKit** — Massive Multi-Agent Coordination
-**File:** [feedback/2026-03-18-opendockit-fidelity-session.md](feedback/2026-03-18-opendockit-fidelity-session.md) • **Size:** 17.6K
+**File:** [feedback/processed/2026-03-18-opendockit-fidelity-session.md](feedback/processed/2026-03-18-opendockit-fidelity-session.md) • **Size:** 17.6K
 
 **Project:** Progressive-fidelity OOXML renderer
 **Scale:** 5,824 tests, 9 simultaneous agents
@@ -105,7 +105,7 @@ This directory contains 12 detailed adoption reports from production systems tha
 ## Strategic & Scaling Patterns
 
 ### 📈 **Scalability Assessment** — Solo to Enterprise
-**File:** [feedback/scalability-assessment-2026-03-20.md](feedback/scalability-assessment-2026-03-20.md) • **Size:** 19.7K
+**File:** [feedback/processed/scalability-assessment-2026-03-20.md](feedback/processed/scalability-assessment-2026-03-20.md) • **Size:** 19.7K
 
 **Scope:** Tier 1 (solo) → Tier 2 (team) → Tier 3 (department) → Enterprise
 **Focus:** What breaks at each scale transition and how to evolve gracefully
@@ -121,7 +121,7 @@ This directory contains 12 detailed adoption reports from production systems tha
 **Best for:** Growing teams, scaling strategies, organizational evolution planning
 
 ### 🔧 **Scalability Deep Review** — Technical Implementation
-**File:** [feedback/scalability-deep-review-2026-03-20.md](feedback/scalability-deep-review-2026-03-20.md) • **Size:** 20.7K
+**File:** [feedback/processed/scalability-deep-review-2026-03-20.md](feedback/processed/scalability-deep-review-2026-03-20.md) • **Size:** 20.7K
 
 **Companion to:** Scalability Assessment (focuses on technical implementation details)
 
@@ -140,7 +140,7 @@ This directory contains 12 detailed adoption reports from production systems tha
 **Key Insights:** Testing cascade application, risk-based quality decisions
 
 ### 📋 **PDF Signer Migration** — Legacy Integration
-**File:** [feedback/pdf-signer-migration-feedback.md](feedback/pdf-signer-migration-feedback.md) • **Size:** 24.6K
+**File:** [feedback/processed/pdf-signer-migration-feedback.md](feedback/processed/pdf-signer-migration-feedback.md) • **Size:** 24.6K
 
 **Project:** Migrating legacy PDF signing system to rebar patterns
 **Focus:** Incremental adoption in brownfield systems
@@ -148,19 +148,19 @@ This directory contains 12 detailed adoption reports from production systems tha
 ## Framework Evolution
 
 ### 🤖 **AI-Native Contracts** — Agent-Optimized Design
-**File:** [feedback/ai-native-contracts-2026-03-20.md](feedback/ai-native-contracts-2026-03-20.md) • **Size:** 4.8K
+**File:** [feedback/processed/ai-native-contracts-2026-03-20.md](feedback/processed/ai-native-contracts-2026-03-20.md) • **Size:** 4.8K
 
 **Focus:** Contract frontmatter and structure optimized for AI agent consumption
 **Key Insights:** Machine-readable specifications, agent-friendly formats
 
 ### 👥 **Role Definitions** — Agent Responsibility Boundaries
-**File:** [feedback/role-definitions-feedback.md](feedback/role-definitions-feedback.md) • **Size:** 9.3K
+**File:** [feedback/processed/role-definitions-feedback.md](feedback/processed/role-definitions-feedback.md) • **Size:** 9.3K
 
 **Focus:** Clarifying architect vs. product vs. englead vs. steward responsibilities
 **Key Insights:** Role boundary design, coordination handoff patterns
 
 ### 🔄 **Swarm Orchestration SOP** — Advanced Coordination
-**File:** [feedback/2026-03-21-swarm-orchestration-sop.md](feedback/2026-03-21-swarm-orchestration-sop.md) • **Size:** 16.9K
+**File:** [feedback/processed/2026-03-21-swarm-orchestration-sop.md](feedback/processed/2026-03-21-swarm-orchestration-sop.md) • **Size:** 16.9K
 
 **Focus:** Collective learning frameworks, cross-agent knowledge sharing
 **Key Insights:** P0-P5 enhancement roadmap for swarm intelligence
@@ -202,9 +202,9 @@ This directory contains 12 detailed adoption reports from production systems tha
 # How to Use This Guide
 
 ## 📚 **For Learning**
-- **Start with:** [Human-based Digital Signer](feedback/digital-signer-feedback.md) or [blindpipe](feedback/blindpipe-adoption-2026-03-19.md) — see rebar in action
-- **Then read:** [Scalability Assessment](feedback/scalability-assessment-2026-03-20.md) — understand growth patterns
-- **Deep dive:** [OpenDocKit](feedback/2026-03-18-opendockit-fidelity-session.md) — see complex coordination patterns
+- **Start with:** [Human-based Digital Signer](feedback/digital-signer-feedback.md) or [blindpipe](feedback/processed/blindpipe-adoption-2026-03-19.md) — see rebar in action
+- **Then read:** [Scalability Assessment](feedback/processed/scalability-assessment-2026-03-20.md) — understand growth patterns
+- **Deep dive:** [OpenDocKit](feedback/processed/2026-03-18-opendockit-fidelity-session.md) — see complex coordination patterns
 
 ## 🔧 **For Solving Problems**
 1. **Check the problem navigation table** above for your specific issue
@@ -213,10 +213,10 @@ This directory contains 12 detailed adoption reports from production systems tha
 4. **Refer to practice guides** for tactical implementation details
 
 ## 📈 **For Planning**
-- **Team scaling:** [Scalability Assessment](feedback/scalability-assessment-2026-03-20.md)
-- **Adoption strategy:** [blindpipe](feedback/blindpipe-adoption-2026-03-19.md) (mature projects) or [SETUP.md](SETUP.md) (new projects)
+- **Team scaling:** [Scalability Assessment](feedback/processed/scalability-assessment-2026-03-20.md)
+- **Adoption strategy:** [blindpipe](feedback/processed/blindpipe-adoption-2026-03-19.md) (mature projects) or [SETUP.md](SETUP.md) (new projects)
 - **Quality standards:** [Zero-Tolerance Testing](feedback/zero-tolerance-testing-feedback.md)
-- **Migration planning:** [PDF Signer Migration](feedback/pdf-signer-migration-feedback.md)
+- **Migration planning:** [PDF Signer Migration](feedback/processed/pdf-signer-migration-feedback.md)
 
 ---
 
