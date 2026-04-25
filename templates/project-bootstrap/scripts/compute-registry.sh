@@ -67,15 +67,21 @@ classify_prefix() {
   esac
 }
 
-# Count implementing files for a contract
+# Count implementing files for a contract.
+# `grep` returns 1 when there are no matches; under `set -o pipefail` that
+# would abort the whole script for any orphan contract. The two greps in
+# this pipeline both legitimately return 1 on empty input, so we run the
+# pipeline with pipefail temporarily disabled.
 count_implementations() {
   local id="$1"
+  set +o pipefail
   grep -rn "CONTRACT:${id}" "$PROJECT_ROOT" \
     --include='*.go' --include='*.ts' --include='*.tsx' --include='*.js' \
     --include='*.py' --include='*.rs' --include='*.java' --include='*.rb' \
     --include='*.jsx' --include='*.sh' 2>/dev/null \
     | grep -v "node_modules\|vendor\|dist\|\.git\|architecture/" \
     | wc -l | tr -d ' '
+  set -o pipefail
 }
 
 # ─── Collect Contracts ──────────────────────────────────────────────────────
@@ -126,27 +132,27 @@ generate_registry() {
 
 HEADER
 
-  for category in "Services" "Components" "Interfaces" "Protocols" "Other"; do
-    local -n entries_ref
-    case "$category" in
-      Services)   entries_ref=services ;;
-      Components) entries_ref=components ;;
-      Interfaces) entries_ref=interfaces ;;
-      Protocols)  entries_ref=protocols ;;
-      Other)      entries_ref=other ;;
-    esac
-
-    [ ${#entries_ref[@]} -eq 0 ] && continue
-
+  # bash 3.2-compatible: pass array entries through a function instead of
+  # using `local -n` namerefs (bash 4.3+). macOS ships bash 3.2 by default.
+  emit_category() {
+    local category="$1"; shift
+    [ $# -eq 0 ] && return
     echo "## $category"
     echo ""
     echo "| ID | Version | Status | Impl Files | Purpose |"
     echo "|----|---------|--------|------------|---------|"
-    for entry in "${entries_ref[@]}"; do
+    local entry
+    for entry in "$@"; do
       echo "$entry"
     done
     echo ""
-  done
+  }
+
+  emit_category "Services"   ${services[@]+"${services[@]}"}
+  emit_category "Components" ${components[@]+"${components[@]}"}
+  emit_category "Interfaces" ${interfaces[@]+"${interfaces[@]}"}
+  emit_category "Protocols"  ${protocols[@]+"${protocols[@]}"}
+  emit_category "Other"      ${other[@]+"${other[@]}"}
 
   # Contract files section (for tooling compatibility)
   echo "## Contract Files"

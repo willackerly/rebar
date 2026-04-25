@@ -16,6 +16,9 @@
 #   SKIP_GROUND_TRUTH=1     — skip ground truth metric verification
 #   SKIP_COMPLIANCE=1       — skip rebar compliance check
 #   SKIP_STEWARD=1          — skip steward health scan
+#   SKIP_DOC_REFS=1         — skip cross-doc reference check
+#   SKIP_DECAY_PATTERNS=1   — skip soft-hardening decay pattern check
+#   SKIP_BOOTSTRAP_SYNC=1   — skip templates/project-bootstrap/scripts drift check
 #
 # Exit code: 0 = all pass, 1 = failures in strict mode
 
@@ -64,12 +67,20 @@ echo "Running contract and documentation checks..."
 
 run_check "Contract Headers"    SKIP_CONTRACT_HEADERS "$SCRIPT_DIR/check-contract-headers.sh"
 run_check "Contract References" SKIP_CONTRACT_REFS    "$SCRIPT_DIR/check-contract-refs.sh"
+run_check "Doc References"      SKIP_DOC_REFS         "$SCRIPT_DIR/check-doc-refs.sh"
 run_check "TODO Tracking"       SKIP_TODOS            "$SCRIPT_DIR/check-todos.sh"
 run_check "Doc Freshness"       SKIP_FRESHNESS        "$SCRIPT_DIR/check-freshness.sh"
 run_check "Registry Consistency" SKIP_REGISTRY         "$SCRIPT_DIR/compute-registry.sh" --check
 run_check "Ground Truth"        SKIP_GROUND_TRUTH     "$SCRIPT_DIR/check-ground-truth.sh"
 run_check "Rebar Compliance"    SKIP_COMPLIANCE       "$SCRIPT_DIR/check-compliance.sh"
+run_check "Decay Patterns"      SKIP_DECAY_PATTERNS   "$SCRIPT_DIR/check-decay-patterns.sh"
+run_check "Bootstrap Sync"      SKIP_BOOTSTRAP_SYNC   "$SCRIPT_DIR/sync-bootstrap.sh" --check
 run_check "Steward"             SKIP_STEWARD          "$SCRIPT_DIR/steward.sh"
+
+# NOTE: Tag-to-CI coverage check (Node.js, project-specific) lives at
+# templates/scripts/check-tag-ci-coverage.mjs. Adopters with Playwright
+# or @-tagged spec files should copy it into their own scripts/ and wire
+# it into their CI workflow directly, not via this universal ci-check.
 
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"

@@ -85,10 +85,10 @@ done
 
 if command -v bash &>/dev/null; then
   bash_version=$(bash -c 'echo ${BASH_VERSINFO[0]}')
-  if [ "$bash_version" -ge 4 ] 2>/dev/null; then
+  if [ "$bash_version" -ge 3 ] 2>/dev/null; then
     echo "  [ok] bash $bash_version.x"
   else
-    echo "  [warn] bash $bash_version.x (need 4.0+, brew install bash)"
+    echo "  [warn] bash $bash_version.x (need 3.2+ — macOS default is fine)"
     ok=false
   fi
 fi
