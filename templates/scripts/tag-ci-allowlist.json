@@ -1,0 +1,6 @@
+{
+  "_doc": "Allowlist for check-tag-ci-coverage.mjs. Each entry maps a `@tag` (key) to a reason string explaining why it intentionally has no CI path. Tags listed here are reported but don't fail the check. Entries should be reviewed quarterly — see them all with `node scripts/check-tag-ci-coverage.mjs --strict`. Remove the `_doc` key in production use, or leave it; the script ignores it.",
+  "_examples": "@local-only: requires a local browser session; @manual-visual: requires human eyes; @flaky-investigating: temporarily quarantined while a flake is diagnosed (give a date)",
+  "@local-only": "requires a local Playwright browser session; not safe to run in CI",
+  "@manual-visual": "requires human visual review; not automatable"
+}
