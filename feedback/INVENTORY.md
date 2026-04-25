@@ -172,6 +172,10 @@ broken (stdout pollution) and nothing in the adoption flow wired it up.
 | `docs/MCP-SETUP.md` — new user-facing setup guide | Covers project-level vs user-level paths, verify procedures, pitfalls, commit-or-gitignore guidance |
 | README, QUICKSTART, SETUP, bin/README all link MCP-SETUP | MCP is a first-class setup step, not a footnote |
 | Will's `~/.claude.json` configured | `rebar-ask` user-level entry; 32 tools across 7 rebar-adopted repos verified end-to-end (TALOS, blindpipe, filedag, fontkit, office180, pdf-signer-web, rebar). Makes ASK available in opendockit + OpenTDF/{TDFLite,otdfctl-main,platform-main} as consumers. |
+| **Wave 2.5 follow-ups (2026-04-22 → 2026-04-24)** | |
+| Notification handling fix in `ask-mcp-server` | `0db9073` — server was replying to JSON-RPC notifications with id=null, tripping Claude Code's Zod validator and silently dropping the connection. The MCP wiring landed but didn't actually work end-to-end until this. |
+| First-paragraph extraction for tool descriptions | `bc936cf` — descriptions were truncating mid-sentence at line wraps (~80 chars). Now extracts full paragraph. |
+| Caller-facing role preambles (centralized A1) | `2f52983` — `ROLE_DESCRIPTIONS` dict in MCP server gives each tool description a caller-facing lead ("Owns X. Best for: Y. Prefer over grep when: Z."). All 32 tools now read as tool descriptions, not agent instructions. |
 
 ### Prior cycle
 
