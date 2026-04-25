@@ -31,10 +31,13 @@ Each script is standalone, runs in <5 seconds, and exits 0 (pass) or 1 (fail).
 |--------|---------------|
 | `check-contract-headers.sh` | Every source file has a `CONTRACT:` header |
 | `check-contract-refs.sh` | Every `CONTRACT:` ref points to a real contract file |
+| `check-doc-refs.sh` | Every `[text](path)` link in tracked `*.md` resolves to a tracked file |
 | `check-todos.sh` | No untracked `TODO:` comments (two-tag system) |
 | `check-freshness.sh` | Doc freshness dates aren't stale (>14 days) |
 | `check-registry.sh` | Contract registry matches actual files |
 | `check-ground-truth.sh` | METRICS file matches codebase reality |
+| `check-decay-patterns.sh` | Soft-hardening anti-patterns in spec/test files |
+| `sync-bootstrap.sh --check` | `templates/project-bootstrap/scripts/` matches `/scripts/` |
 
 ## Composite Runners
 
@@ -68,6 +71,9 @@ chmod +x scripts/*.sh
 | `SKIP_FRESHNESS` | `0` | Skip freshness check |
 | `SKIP_REGISTRY` | `0` | Skip registry check |
 | `SKIP_GROUND_TRUTH` | `0` | Skip ground truth check |
+| `SKIP_DOC_REFS` | `0` | Skip cross-doc reference check |
+| `SKIP_DECAY_PATTERNS` | `0` | Skip soft-hardening pattern check |
+| `SKIP_BOOTSTRAP_SYNC` | `0` | Skip templates/scripts drift check (rebar-source-only) |
 | `SKIP_STEWARD` | `0` | Skip steward scan |
 
 ## Automation Hierarchy
@@ -84,6 +90,15 @@ Pre-commit (fast, <5s)       CI (thorough, <30s)          Full scan (comprehensi
 
 ## Dependencies
 
-- **bash** — all scripts are bash
+- **bash 3.2+** — all shell scripts are bash 3.2 compatible (macOS default)
 - **jq** — required by steward.sh and ground truth verification
 - **grep, find** — standard Unix tools
+- **node** (optional) — only for `templates/scripts/check-tag-ci-coverage.mjs`,
+  which is project-specific and not in the universal `ci-check.sh` flow
+
+## Source-of-truth structure
+
+`/scripts/` is canonical. `templates/project-bootstrap/scripts/` is mirrored
+from it by `sync-bootstrap.sh` so adopters running `cp -r templates/project-bootstrap/*`
+get a working project in one command. Drift between the two trees is caught
+by `sync-bootstrap.sh --check` (wired into `ci-check.sh`).

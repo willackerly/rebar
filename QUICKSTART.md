@@ -19,10 +19,13 @@ cd rebar
 # Copy complete working project template
 cp -r templates/project-bootstrap/* ../my-new-project/
 cd ../my-new-project
-
-# Install rebar CLI tools + agent access
-../rebar/bin/install --server 192.168.0.181:7232
 ```
+
+> **Optional — put the ASK CLI on your PATH:**
+> `../rebar/bin/install` adds rebar's `bin/` to your shell RC. You can
+> skip this for the 5-minute walkthrough; the contract you write below
+> doesn't need it. If you later run a remote ASK server, pass
+> `--server HOST:PORT` to record it as `ASK_SERVER` in your shell.
 
 ### Step 2: Write your first contract (3 minutes)
 
@@ -117,7 +120,7 @@ rebar status     # Quick health dashboard
 **→ [FEATURE-DEVELOPMENT.md](FEATURE-DEVELOPMENT.md)** — Complete BDD → Contract → Code → Test workflow (1 hour)
 
 ### Want to understand agent coordination?
-**→ [AGENTS-QUICKSTART.md](AGENTS-QUICKSTART.md)** — Role agents vs subagent templates (15 min)
+**→ [agents/README.md](agents/README.md)** — Role agents vs subagent templates, decision tree, the 6 core roles
 
 ### Need to solve a specific problem?
 **→ [CASE-STUDIES.md](CASE-STUDIES.md)** — Real-world solutions indexed by problem type

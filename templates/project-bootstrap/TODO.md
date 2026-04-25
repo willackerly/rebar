@@ -27,7 +27,7 @@ _None currently._
 ### Gotchas
 
 - **Rebar learning curve** — Team members new to contract-driven development may need time to adapt.
-  Fix: Start with CONTRACT-QUICKSTART.md and FEATURE-DEVELOPMENT.md guides
+  Fix: Start with QUICKSTART.md and FEATURE-DEVELOPMENT.md guides
 
 ## Discoveries
 

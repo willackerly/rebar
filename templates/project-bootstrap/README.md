@@ -112,7 +112,8 @@ ask steward "ready to ship?"     # Health check
 
 ## Learn More
 
-- **[Contract quickstart](https://github.com/willackerly/rebar/blob/main/CONTRACT-QUICKSTART.md)** — Write your first contract in 5 minutes
-- **[Agent coordination](https://github.com/willackerly/rebar/blob/main/AGENTS-QUICKSTART.md)** — Role agents vs subagent templates
+- **[Quickstart](https://github.com/willackerly/rebar/blob/main/QUICKSTART.md)** — 5-minute setup, write your first contract
+- **[Contract template](https://github.com/willackerly/rebar/blob/main/architecture/CONTRACT-TEMPLATE.md)** — annotated template for new contracts
+- **[Agent coordination](https://github.com/willackerly/rebar/blob/main/agents/README.md)** — Role agents vs subagent templates
 - **[Feature development](https://github.com/willackerly/rebar/blob/main/FEATURE-DEVELOPMENT.md)** — Complete BDD→Contract→Code workflow
 - **[Case studies](https://github.com/willackerly/rebar/blob/main/CASE-STUDIES.md)** — Real-world solutions by problem type

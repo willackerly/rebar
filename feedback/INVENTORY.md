@@ -215,6 +215,35 @@ broken (stdout pollution) and nothing in the adoption flow wired it up.
 
 ---
 
+## 🧰 Maintainer Queue (rolled in from NEXT-SESSION-TODO 2026-04-25)
+
+Items that are concrete implementation actions but don't fit the
+feedback-driven Watchlist / Queued shape. Pick up between feedback waves.
+
+### MCP / ASK follow-ups
+
+- [ ] **A2 — Fix fontkit AGENT.md copy/paste error.** `~/dev/fontkit/agents/architect/AGENT.md` says *"You are the architect agent for **rebar**"* instead of fontkit. 30-second edit, foreign repo. Track here so it doesn't get lost.
+- [ ] **A3 — Optional `examples` array in tools/list inputSchema** (MCP server). Helps Claude formulate better queries. ~30 min; low priority.
+
+### Triage backlog
+
+- [ ] **`feedback/2026-04-22-testing-rigor-six-moments.md` per-proposal disposition.** Watchlist has all six items; needs explicit "Queued / Defer / Reject" decisions. Proposal 5 has a working prototype lifted into `templates/scripts/check-tag-ci-coverage.mjs` (2026-04-25). Proposal 6 (security-test commit template) is still unassigned.
+- [ ] **`feedback/2026-04-24-contract-discipline-and-jtbd-framing.md` — full disposition.** Why/Who/Scenarios already shipped in `architecture/CONTRACT-TEMPLATE.md` (2026-04-25). Remaining proposals: spike-first practice doc, contract-supersession practice doc, JTBD-presence ci-check, prefix-number-uniqueness ci-check, cross-repo promotion checklist enforcement.
+- [ ] **`feedback/2026-04-24-fidelity-decay-soft-hardening-patterns.md` — followups.** Grep-detectable patterns (P1, P4, P5, P7) shipped in `scripts/check-decay-patterns.sh` (2026-04-25). Semantic patterns (P2 inverted assertions, P6 hermeticity, P8 single-key gates) still need self-audit-prompt addition to AGENTS.template.md.
+
+### Promotion candidate (opportunistic)
+
+- [ ] **Session-start repo-state check** — currently 1 vote in Watchlist (Session Lifecycle section). Promote when a 2nd adopter reports the same drift surprise OR while you're already editing `rebar status` / `practices/session-lifecycle.md` for another reason.
+
+### Repo housekeeping
+
+- [ ] Working tree has untracked deletions from stale worktrees: `.claude/worktrees/agent-a28b156a/` and `.claude/worktrees/agent-a3c77b08/`. Either `git clean` them or commit the deletions.
+- [ ] `.DS_Store` modified in root — confirm it's in `.gitignore`.
+- [ ] `bin/__pycache__/` appears as untracked — add to `.gitignore` if not already.
+
+---
+
 ## Document History
 
+- **2026-04-25** — NEXT-SESSION-TODO.md folded into this file (Maintainer Queue section above) so there's one canonical planning surface, not two. Concurrent ship: `check-doc-refs.sh`, `check-decay-patterns.sh`, `templates/scripts/check-tag-ci-coverage.mjs`, `sync-bootstrap.sh` + drift check, bash 3.2 fixes for compute-registry.sh, Why/Who/Scenarios required in CONTRACT-TEMPLATE.md, README/QUICKSTART/SETUP cleanup. See commit log for the precise diffs.
 - **2026-04-19** — Inventory created during full feedback scrub. 14 source files triaged (1 duplicate deleted, 9 moved to processed/, 4 kept in feedback/ as in-progress Wave 1/2).

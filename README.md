@@ -44,7 +44,12 @@ ask product "Does this contract match our user stories?"
 
 **The result:** Your codebase becomes a *living system* where information stays organized, agents coordinate seamlessly, and collective intelligence compounds across every session. 10x context efficiency. Coordinated decision-making across your entire workflow.
 
-30 minutes to set up. Zero infrastructure. Everything is plain text — bash, markdown, grep, jq. No framework to install. Copy files into your project, and both your organization model AND agent coordination work immediately.
+**Setup time** depends on your profile (see [SETUP.md](SETUP.md)):
+solo dev ~15 min, small team ~45 min, department ~2 hours. The substrate
+is plain text — markdown, bash, grep, jq — plus optional Go and Python
+binaries (`rebar` CLI, ASK CLI, MCP server) when you want them. The 5-minute
+[QUICKSTART](QUICKSTART.md) gets you a working contract without any
+binaries built; everything else is opt-in.
 
 ---
 
@@ -89,7 +94,7 @@ cd my-project && ../rebar/bin/rebar init
 - **[Coordination](practices/)** — Multi-agent → Worktrees → Swarms
 - **[Case Studies](CASE-STUDIES.md)** — Real-world solutions indexed by problem
 
-**What you get:** Battle-tested patterns from 100+ agent launches
+**What you get:** Battle-tested patterns from 200+ agent launches
 **Perfect for:** Teams hitting limits, complex coordination needs
 
 ---
@@ -244,43 +249,18 @@ Routes action items by role: draft contracts → architect, testing gaps → eng
 | Tier | What's Enforced | Scripts |
 |------|----------------|---------|
 | **1 - Partial** | Contract refs + TODOs | `check-contract-refs.sh`, `check-todos.sh` |
-| **2 - Adopted** | + headers, freshness, ground truth, compliance | + `check-contract-headers.sh`, `check-freshness.sh`, `check-ground-truth.sh`, `check-compliance.sh` |
+| **2 - Adopted** | + headers, freshness, ground truth, compliance, doc-refs, soft-hardening decay | + `check-contract-headers.sh`, `check-freshness.sh`, `check-ground-truth.sh`, `check-compliance.sh`, `check-doc-refs.sh`, `check-decay-patterns.sh` |
 | **3 - Enforced** | + strict steward, full lifecycle | + full Steward with computed lifecycles |
 
 *Run all: `scripts/ci-check.sh` | Pre-commit: `scripts/pre-commit.sh`*
 
-</details>
-
----
-
-<details>
-<summary><strong>📁 Project Structure</strong> <em>(expand to see full layout)</em></summary>
-
-```
-rebar/
-├── # Getting Started Files
-├── QUICKSTART.md               # 5-minute solo dev setup
-├── FEATURE-DEVELOPMENT.md      # 1-hour guided workflow
-├── CASE-STUDIES.md             # Problem-indexed war stories
-│
-├── # Core Philosophy
-├── DESIGN.md                   # Complete methodology
-├── conventions.md              # Standards & naming
-├── SETUP.md                    # Full adoption guide
-│
-├── # Copy Into Your Project
-├── *.template.md               # Cold Start Quad templates
-├── architecture/               # Contract system + templates
-├── scripts/                    # Enforcement & scanning
-│
-├── # Advanced Patterns
-├── practices/                  # Specialized workflows
-├── profiles/                   # Team size & project type guides
-├── agents/                     # Role definitions & subagent templates
-├── bin/                        # ASK CLI for persistent sessions
-├── feedback/                   # Real-world adoption reports
-└── docs/                       # Proposals & design documents
-```
+`check-doc-refs.sh` catches the class of drift where a doc cites a file
+that's never `git add`-ed — green on the author's machine, broken on a
+fresh clone. `check-decay-patterns.sh` flags soft-hardening patterns
+(silenced failures, inverted assertions, magic-string project gating,
+"keep in sync" comments) that survive code review and decay six months
+later. See `feedback/2026-04-21-...`, `2026-04-22-...`, and
+`2026-04-24-fidelity-decay-...` for the source incidents.
 
 </details>
 
@@ -317,27 +297,34 @@ anyone looking at your repo: "this project speaks rebar, here's what's enforced.
 
 ```
 rebar/
-├── DESIGN.md                    # The philosophy (read first for depth)
-├── conventions.md               # Branch naming, commits, headers, reviews
-├── SETUP.md                     # Step-by-step adoption guide
-├── CHANGELOG.md                 # Version history + migration guides
+├── # Getting started
+│   QUICKSTART.md                # 5-minute solo dev setup
+│   FEATURE-DEVELOPMENT.md       # 1-hour guided BDD → Contract → Code workflow
+│   CASE-STUDIES.md              # Real-world solutions indexed by problem
+│   SETUP.md                     # Full adoption guide (per profile)
+│
+├── # Methodology
+│   DESIGN.md                    # The philosophy (read first for depth)
+│   conventions.md               # Branch naming, commits, headers, discoveries
+│   CHANGELOG.md                 # Version history + migration notes
 │
 ├── templates/
-│   ├── project-bootstrap/       # Copy this into your project to get started
-│   │   ├── README.md, QUICKCONTEXT.md, TODO.md, AGENTS.md, CLAUDE.md
-│   │   ├── architecture/, scripts/
-│   │   └── .rebarrc, METRICS.md
-│   └── component-templates/     # Individual file templates for advanced use
+│   ├── project-bootstrap/       # `cp -r project-bootstrap/* ../my-project/` is one-shot
+│   │   └── README.md, QUICKCONTEXT.md, TODO.md, AGENTS.md, CLAUDE.md, METRICS.md,
+│   │       architecture/, scripts/ (synced from /scripts/), .rebarrc
+│   ├── component-templates/     # Individual file templates for advanced use
+│   └── scripts/                 # Optional Node.js checks (e.g., check-tag-ci-coverage)
 │
-├── architecture/                # Contract system + templates
-├── agents/                      # Role definitions + subagent templates
-├── bin/                         # ASK CLI (persistent agent sessions)
-├── cli/                         # Rebar CLI (Go binary — commit, verify, context)
-├── scripts/                     # Enforcement + quality scanning
-├── practices/                   # Session lifecycle, orchestration, red team, fidelity, etc.
-├── profiles/                    # Adoption guides (by project type + team size)
-├── feedback/                    # Real-world adoption reports
-└── docs/                        # Proposals + design documents
+├── architecture/                # Contract system + CONTRACT-TEMPLATE.md
+├── agents/                      # Role agents (architect/product/englead/steward/tester/merger)
+│                                #   + subagent prompt templates
+├── bin/                         # ASK CLI (Python) + ask-mcp-server
+├── cli/                         # rebar CLI (Go binary — init, commit, verify, audit)
+├── scripts/                     # Enforcement + quality scanning (canonical bash)
+├── practices/                   # Session lifecycle, orchestration, red team, fidelity
+├── profiles/                    # Adoption guides (by project type × team size)
+├── feedback/                    # Adoption reports — active in root, decided in processed/
+└── docs/                        # Proposals + design documents (maintainer-facing)
 ```
 
 ---

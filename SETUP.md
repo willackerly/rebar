@@ -62,9 +62,11 @@ cp -r agents/                "$PROJECT/agents/"
 # Practice reference guides (recommended)
 cp -r practices/             "$PROJECT/practices/"
 
-# Enforcement scripts and conventions (recommended)
+# Enforcement scripts and conventions (recommended).
+# Scripts/ is the single source of truth — `templates/project-bootstrap/scripts/`
+# is mechanically synced from it (see scripts/sync-bootstrap.sh) so either copy
+# yields the same result. We use the root copy here.
 cp -r scripts/               "$PROJECT/scripts/"
-cp -r "$BOOTSTRAP/scripts/"  "$PROJECT/scripts/"   # includes refresh-context.sh
 cp conventions.md            "$PROJECT/conventions.md"
 # State directory for steward
 mkdir -p "$PROJECT/architecture/.state"
