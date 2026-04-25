@@ -1,5 +1,7 @@
 # rebar
 
+> **rebar v2.0.0** | **Tier 3: ENFORCED**
+
 **The dual-purpose foundation for AI-powered development teams.**
 
 Rebar is **two things in one**:

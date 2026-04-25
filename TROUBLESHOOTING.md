@@ -131,7 +131,7 @@ ls architecture/CONTRACT-*.md
 2. **Touch files when you modify them:**
    ```bash
    # Update freshness date in file header
-   <!-- freshness: 2026-03-21 -->
+   <!-- freshness: YYYY-MM-DD -->
    ```
 
 3. **Consider agent-driven updates** — agents can update docs as they work
