@@ -69,17 +69,28 @@ classify_prefix() {
 
 # Count implementing files for a contract.
 # `grep` returns 1 when there are no matches; under `set -o pipefail` that
-# would abort the whole script for any orphan contract. The two greps in
-# this pipeline both legitimately return 1 on empty input, so we run the
-# pipeline with pipefail temporarily disabled.
+# would abort the whole script for any orphan contract. The greps in this
+# pipeline legitimately return 1 on empty input, so we run with pipefail
+# temporarily disabled.
+#
+# Two passes, deduplicated by file path:
+#   1. Source files matching the standard extension whitelist
+#   2. Files anywhere under `bin/` (CLI entry points often have no extension —
+#      `bin/ask`, `bin/ask-mcp-server`, `bin/rebar`)
 count_implementations() {
   local id="$1"
   set +o pipefail
-  grep -rn "CONTRACT:${id}" "$PROJECT_ROOT" \
-    --include='*.go' --include='*.ts' --include='*.tsx' --include='*.js' \
-    --include='*.py' --include='*.rs' --include='*.java' --include='*.rb' \
-    --include='*.jsx' --include='*.sh' 2>/dev/null \
+  {
+    grep -rln "CONTRACT:${id}" "$PROJECT_ROOT" \
+      --include='*.go' --include='*.ts' --include='*.tsx' --include='*.js' \
+      --include='*.py' --include='*.rs' --include='*.java' --include='*.rb' \
+      --include='*.jsx' --include='*.sh' 2>/dev/null
+    if [ -d "$PROJECT_ROOT/bin" ]; then
+      grep -rln "CONTRACT:${id}" "$PROJECT_ROOT/bin" 2>/dev/null
+    fi
+  } \
     | grep -v "node_modules\|vendor\|dist\|\.git\|architecture/" \
+    | sort -u \
     | wc -l | tr -d ' '
   set -o pipefail
 }
@@ -95,7 +106,7 @@ for contract in "$ARCH_DIR"/CONTRACT-*.md; do
 
   # Skip non-contract files
   case "$basename" in
-    CONTRACT-TEMPLATE.md|CONTRACT-REGISTRY.md|CONTRACT-REGISTRY.template.md|CONTRACT-GAPS.md)
+    CONTRACT-TEMPLATE.md|CONTRACT-SEAM-TEMPLATE.md|CONTRACT-REGISTRY.md|CONTRACT-REGISTRY.template.md|CONTRACT-GAPS.md)
       continue ;;
     *.impl.md)
       continue ;;
@@ -162,7 +173,7 @@ HEADER
     [ ! -f "$contract" ] && continue
     basename=$(basename "$contract")
     case "$basename" in
-      CONTRACT-TEMPLATE.md|CONTRACT-REGISTRY.md|CONTRACT-REGISTRY.template.md|CONTRACT-GAPS.md)
+      CONTRACT-TEMPLATE.md|CONTRACT-SEAM-TEMPLATE.md|CONTRACT-REGISTRY.md|CONTRACT-REGISTRY.template.md|CONTRACT-GAPS.md)
         continue ;;
       *.impl.md)
         continue ;;
@@ -177,7 +188,7 @@ HEADER
     [ ! -f "$contract" ] && continue
     basename=$(basename "$contract")
     case "$basename" in
-      CONTRACT-TEMPLATE.md|CONTRACT-REGISTRY.md|CONTRACT-REGISTRY.template.md|CONTRACT-GAPS.md)
+      CONTRACT-TEMPLATE.md|CONTRACT-SEAM-TEMPLATE.md|CONTRACT-REGISTRY.md|CONTRACT-REGISTRY.template.md|CONTRACT-GAPS.md)
         continue ;;
       *.impl.md)
         continue ;;
