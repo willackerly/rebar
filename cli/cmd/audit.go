@@ -82,51 +82,98 @@ func runAudit(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func runAuditAll(dir string) error {
+type repoScore struct {
+	Name  string // display name (parent/child for nested)
+	Path  string
+	Score float64
+	Tier  string
+}
+
+// skipForRepoScan returns true for directory names that should never be
+// descended into during --all repo discovery (caches, deps, build output).
+func skipForRepoScan(name string) bool {
+	if strings.HasPrefix(name, ".") {
+		return true
+	}
+	switch name {
+	case "node_modules", "vendor", "dist", "build", "target",
+		"out", ".next", ".nuxt", "coverage":
+		return true
+	}
+	return false
+}
+
+// collectRepos walks `dir` to find git repos, recursing into non-repo
+// subdirectories up to `depth` levels. Each found repo gets a display name
+// that includes its parent path relative to the original --all root, so
+// `~/dev/opentdf/TDFLite` shows up as `opentdf/TDFLite` in the table.
+func collectRepos(dir, prefix string, depth int, scores *[]repoScore) {
+	if depth <= 0 {
+		return
+	}
 	entries, err := os.ReadDir(dir)
 	if err != nil {
-		return fmt.Errorf("reading directory: %w", err)
+		return
 	}
-
-	type repoScore struct {
-		Name  string
-		Score float64
-		Tier  string
-	}
-	var scores []repoScore
-
 	for _, e := range entries {
 		if !e.IsDir() {
 			continue
 		}
-		path := filepath.Join(dir, e.Name())
-		// Must be a git repo
-		if _, err := os.Stat(filepath.Join(path, ".git")); err != nil {
+		if skipForRepoScan(e.Name()) {
 			continue
 		}
-		score, _ := auditRepo(path)
-		tier := "none"
-		if data, err := os.ReadFile(filepath.Join(path, ".rebarrc")); err == nil {
-			for _, line := range strings.Split(string(data), "\n") {
-				if strings.Contains(line, "tier") {
-					parts := strings.SplitN(line, "=", 2)
-					if len(parts) == 2 {
-						tier = strings.TrimSpace(parts[1])
+		path := filepath.Join(dir, e.Name())
+		displayName := e.Name()
+		if prefix != "" {
+			displayName = prefix + "/" + displayName
+		}
+		if _, err := os.Stat(filepath.Join(path, ".git")); err == nil {
+			// Git repo: audit it.
+			score, _ := auditRepo(path)
+			tier := "none"
+			if data, err := os.ReadFile(filepath.Join(path, ".rebarrc")); err == nil {
+				for _, line := range strings.Split(string(data), "\n") {
+					if strings.Contains(line, "tier") {
+						parts := strings.SplitN(line, "=", 2)
+						if len(parts) == 2 {
+							tier = strings.TrimSpace(parts[1])
+						}
 					}
 				}
 			}
+			*scores = append(*scores, repoScore{Name: displayName, Path: path, Score: score, Tier: tier})
+		} else if depth > 1 {
+			// Not a repo — descend one more level to find nested repos
+			// (e.g., ~/dev/opentdf/TDFLite under ~/dev).
+			collectRepos(path, displayName, depth-1, scores)
 		}
-		scores = append(scores, repoScore{Name: e.Name(), Score: score, Tier: tier})
 	}
+}
+
+func runAuditAll(dir string) error {
+	if _, err := os.Stat(dir); err != nil {
+		return fmt.Errorf("reading directory: %w", err)
+	}
+
+	var scores []repoScore
+	collectRepos(dir, "", 2, &scores)
 
 	sort.Slice(scores, func(i, j int) bool { return scores[i].Score > scores[j].Score })
 
+	// Right-size the name column to the longest display name (min 20).
+	nameWidth := 20
+	for _, s := range scores {
+		if len(s.Name) > nameWidth {
+			nameWidth = len(s.Name)
+		}
+	}
+
 	fmt.Println()
-	fmt.Printf("  %-20s %6s  %s\n", "REPOSITORY", "SCORE", "TIER")
-	fmt.Printf("  %-20s %6s  %s\n", "──────────", "─────", "────")
+	fmt.Printf("  %-*s %6s  %s\n", nameWidth, "REPOSITORY", "SCORE", "TIER")
+	fmt.Printf("  %-*s %6s  %s\n", nameWidth, strings.Repeat("─", 10), "─────", "────")
 	for _, s := range scores {
 		bar := scoreBar(s.Score)
-		fmt.Printf("  %-20s %5.1f  %s  tier %s\n", s.Name, s.Score, bar, s.Tier)
+		fmt.Printf("  %-*s %5.1f  %s  tier %s\n", nameWidth, s.Name, s.Score, bar, s.Tier)
 	}
 	fmt.Println()
 
