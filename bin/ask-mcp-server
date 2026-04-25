@@ -32,6 +32,7 @@ MCP-over-HTTP:
 import argparse
 import json
 import os
+import re
 import subprocess
 import sys
 import threading
@@ -300,31 +301,90 @@ class MCPServer:
         except Exception as e:
             return self._error(-32603, "Resource read failed", str(e), req_id)
 
+    # Caller-facing role descriptions. Lead with what the role OWNS and
+    # what kinds of questions it's BEST for, so a Claude Code agent
+    # deciding among tools can recognize when to reach for ASK vs grep.
+    # AGENT.md prose is addressed to the agent itself ("You are the..."),
+    # which is the wrong audience for an MCP tool description.
+    ROLE_DESCRIPTIONS = {
+        "architect": (
+            "Architect agent for {repo}. Owns system design, contract definitions, "
+            "component boundaries, and architectural trade-offs. "
+            "Best for: 'why' questions about design choices, integration decisions, "
+            "cross-repo interface choices, and contract-level reasoning. "
+            "Prefer over grep when the question is intent-shaped rather than location-shaped."
+        ),
+        "product": (
+            "Product agent for {repo}. Owns user personas, requirements, priorities, "
+            "and scope decisions. "
+            "Best for: 'who is this for?', 'what does success look like?', "
+            "'does this match user needs?', and forward-from-intent reasoning."
+        ),
+        "englead": (
+            "Engineering Lead agent for {repo}. Owns implementation strategy, "
+            "test approach, build/deploy mechanics, and codebase navigation. "
+            "Best for: 'where do I start?', 'how do I run X?', 'what test tier?', "
+            "and operational questions. Default for ENG-style human questions."
+        ),
+        "steward": (
+            "Steward agent for {repo}. Runs automated quality scans, tracks "
+            "contract lifecycle, detects drift, and reports compliance posture. "
+            "Best for: 'is the codebase healthy?', 'which contracts need attention?', "
+            "'what's drifting?'. Returns structured summaries computed from current state."
+        ),
+        "merger": (
+            "Merger agent for {repo}. Coordinates merges, post-fanout integration, "
+            "conflict resolution, and cherry-pick ordering. "
+            "Best for: 'how do I land N parallel agent branches?', 'safe merge order?', "
+            "'is this conflict mechanical or semantic?'."
+        ),
+        "tester": (
+            "Tester agent for {repo}. Owns test strategy, regression analysis, "
+            "rigor evaluation, and tier-appropriate coverage. "
+            "Best for: 'is my test actually proving what its name claims?', "
+            "'what negative controls?', 'is this passing-but-narrow?'."
+        ),
+        "engineer": (
+            "Engineer agent for {repo}. Scoped to implementation within an "
+            "assigned contract — the most narrowly bounded of the agents. "
+            "Best for: 'help me implement this contract', 'what's in scope vs out?', "
+            "'is this change inside my contract?'."
+        ),
+    }
+
     def _get_agent_description(self, repo, role):
-        """Get agent description from AGENT.md file.
+        """Build a caller-facing tool description for {repo}:{role}.
 
-        Extracts the first full paragraph (consecutive non-empty,
-        non-heading lines) after any leading headings. Previous version
-        returned only the first line, which truncated mid-sentence on
-        any AGENT.md that hard-wrapped its Role paragraph.
+        Strategy: lead with a role-keyed preamble that tells the *caller*
+        (a Claude Code session deciding which tool to use) when to reach
+        for this agent. Then append repo-specific specifics from AGENT.md
+        if available, with redundant "You are the X agent for Y" intros
+        stripped (those address the agent, not the caller).
         """
-        repo_path = self.registry.get_repo_path(repo)
-        fallback = f"Query the {role} agent for {repo}."
+        # Caller-facing preamble (known roles get rich copy; unknown
+        # roles get a generic placeholder).
+        template = self.ROLE_DESCRIPTIONS.get(role)
+        if template:
+            preamble = template.format(repo=repo)
+        else:
+            preamble = f"Query the {role} agent for {repo}."
 
+        # Try to extract repo-specific specifics from AGENT.md
+        repo_path = self.registry.get_repo_path(repo)
         if not repo_path:
-            return fallback
+            return preamble
 
         agent_file = Path(repo_path) / "agents" / role / "AGENT.md"
         if not agent_file.is_file():
-            return fallback
+            return preamble
 
         try:
             content = agent_file.read_text()
         except Exception:
-            return fallback
+            return preamble
 
-        # Walk lines, skip headings and blanks, then collect the first
-        # paragraph (until blank line or next heading).
+        # First-paragraph extraction: collect consecutive non-empty,
+        # non-heading lines after any leading headings/blanks.
         paragraph = []
         in_paragraph = False
         for raw in content.split('\n'):
@@ -340,13 +400,28 @@ class MCPServer:
                 paragraph.append(line)
 
         if not paragraph:
-            return fallback
+            return preamble
 
-        # Join wrapped lines with single spaces; prepend a caller-facing
-        # preamble so Claude sees "Query X agent about: <prose>" rather
-        # than raw second-person instruction to the agent itself.
         prose = ' '.join(paragraph)
-        return f"Query the {role} agent for {repo}. {prose}"
+
+        # Strip leading second-person sentences that address the agent
+        # itself rather than the caller. Iterate so we strip multiple if
+        # they stack (e.g., "You are X. You own Y. You don't Z. <real content>").
+        agent_voice_pattern = re.compile(
+            r'^(You are\b[^.]*[.!?](?:\s*[—-]\s*[^.]*[.!?])?'  # "You are the X agent." or "You are X — you ...."
+            r'|You (own|make decisions about|represent|are responsible for|do not|don\'t|receive|run|report)\b[^.]*[.!?])'
+            r'\s*',
+            re.IGNORECASE,
+        )
+        while True:
+            new_prose = agent_voice_pattern.sub('', prose, count=1)
+            if new_prose == prose:
+                break
+            prose = new_prose.strip()
+
+        if prose:
+            return f"{preamble} Repo specifics: {prose}"
+        return preamble
 
     def _get_resource_content(self, resource_type, repo, role):
         """Get content for a specific resource type."""
