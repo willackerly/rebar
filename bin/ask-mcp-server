@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# CONTRACT:S3-MCP-SERVER.1.0
 """ask-mcp-server — MCP-enabled ASK server.
 
 Extends the existing ASK server with full Model Context Protocol support.

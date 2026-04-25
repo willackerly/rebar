@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # ask — ASK Scoped Knowledge: query an agent
+# CONTRACT:S2-ASK-CLI.1.0
 #
 # Usage:
 #   ask <agent> "<question>"     Send a question, get a concise answer

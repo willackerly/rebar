@@ -189,7 +189,9 @@ func findBranchContracts() []string {
 		for _, line := range lines[:limit] {
 			if idx := strings.Index(line, "CONTRACT:"); idx >= 0 {
 				ref := line[idx:]
-				// Extract the contract ID (e.g., "CONTRACT:C1-BLOBSTORE.2.1")
+				// Extract the contract ID (e.g., the C1-BLOBSTORE.2.1 portion).
+				// The literal CONTRACT prefix is intentionally elided in this
+				// comment so check-contract-refs.sh doesn't false-positive on it.
 				ref = strings.TrimPrefix(ref, "CONTRACT:")
 				ref = strings.Fields(ref)[0]
 				// Convert to glob pattern

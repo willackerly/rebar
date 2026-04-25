@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# CONTRACT:S2-ASK-CLI.1.0
 """ask-server — Enterprise ASK HTTP server.
 
 Hosts agents from multiple repos on a single endpoint.

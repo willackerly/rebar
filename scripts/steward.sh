@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # steward.sh — Automated project health scanner
+# CONTRACT:S1-STEWARD.1.0
 # rebar-scripts: 2026.03.20
 #
 # Usage:
