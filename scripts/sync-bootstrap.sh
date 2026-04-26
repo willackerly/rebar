@@ -53,11 +53,16 @@ fi
 
 mkdir -p "$DST"
 
-# Files we don't sync (templates copy has its own README that may diverge,
-# and sync-bootstrap.sh itself doesn't belong inside the bootstrap copy).
+# Files we don't sync into the bootstrap copy:
+#   README.md                — adopter copy may diverge with project-specific notes
+#   sync-bootstrap.sh        — only meaningful in the rebar source repo itself
+#   check-bootstrap-sync.sh  — same
+#   test-e2e-live.sh         — maintainer-facing; assumes the rebar dev layout
+#                              (~/dev/<adopted-repos>) that's only true for the
+#                              rebar maintainer
 skip_file() {
   case "$1" in
-    README.md|sync-bootstrap.sh|check-bootstrap-sync.sh) return 0 ;;
+    README.md|sync-bootstrap.sh|check-bootstrap-sync.sh|test-e2e-live.sh) return 0 ;;
   esac
   return 1
 }

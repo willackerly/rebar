@@ -96,6 +96,17 @@ Pre-commit (fast, <5s)       CI (thorough, <30s)          Full scan (comprehensi
 - **node** (optional) — only for `templates/scripts/check-tag-ci-coverage.mjs`,
   which is project-specific and not in the universal `ci-check.sh` flow
 
+## Maintainer-facing tools
+
+| Script | What it does |
+|--------|--------------|
+| `sync-bootstrap.sh` (+ `--check`) | Mirror `/scripts/` into `templates/project-bootstrap/scripts/`; drift caught by ci-check |
+| `test-e2e-live.sh` | End-to-end smoke against a live LLM. Gated on `claude` CLI; per-repo gates skip cleanly when adopted repos aren't on disk. Includes version triple-check (binary / `.rebar-version` / latest tag), MCP server discovery + tools/list smoke, ASK HTTP server smoke (if running), and 4 live LLM keyword-acceptance queries (rebar:steward, rebar:architect, local-mode, cross-repo). Run after every meaningful update — single command answer to "is this still working?" |
+
+The maintainer-facing scripts are NOT mirrored into the bootstrap copy
+(they assume the rebar source repo's dev layout) — `sync-bootstrap.sh`
+explicitly skips them.
+
 ## Source-of-truth structure
 
 `/scripts/` is canonical. `templates/project-bootstrap/scripts/` is mirrored
