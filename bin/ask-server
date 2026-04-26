@@ -66,15 +66,35 @@ class RepoRegistry:
         self.repos = {}  # name → absolute path
         self._lock = threading.Lock()
 
-    def scan_dir(self, repos_dir):
-        """Scan a directory for repos (subdirs containing agents/)."""
+    # Subdir names we never recurse into during repo discovery.
+    _SCAN_SKIP = {
+        "node_modules", "vendor", "dist", "build", "target",
+        "out", ".next", ".nuxt", "coverage", "__pycache__",
+    }
+
+    def scan_dir(self, repos_dir, _depth=2):
+        """Scan a directory for repos (subdirs containing agents/).
+
+        Recurses one level into non-repo directories so nested repos are
+        discovered automatically — e.g., ``--repos-dir ~/dev`` finds
+        ``~/dev/OpenTDF/TDFLite`` without needing a separate flag.
+        Mirrors the ask-mcp-server discovery convention for consistency.
+        """
         repos_dir = Path(repos_dir).resolve()
         if not repos_dir.is_dir():
             print(f"ask-server: warning: repos-dir not found: {repos_dir}", file=sys.stderr)
             return
+        if _depth <= 0:
+            return
         for entry in sorted(repos_dir.iterdir()):
-            if entry.is_dir() and (entry / "agents").is_dir():
+            if not entry.is_dir():
+                continue
+            if entry.name.startswith(".") or entry.name in self._SCAN_SKIP:
+                continue
+            if (entry / "agents").is_dir():
                 self.add_repo(entry.name, str(entry))
+            elif _depth > 1:
+                self.scan_dir(str(entry), _depth=_depth - 1)
 
     def add_repos(self, paths):
         """Add explicit repo paths (comma-separated or list)."""
