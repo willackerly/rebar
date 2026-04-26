@@ -19,6 +19,8 @@
 #   SKIP_DOC_REFS=1         — skip cross-doc reference check
 #   SKIP_DECAY_PATTERNS=1   — skip soft-hardening decay pattern check
 #   SKIP_BOOTSTRAP_SYNC=1   — skip templates/project-bootstrap/scripts drift check
+#   SKIP_FIX_COMMIT=1       — skip Gate G (HEAD's fix:/regression: must have Reproduced on:)
+#   SKIP_BYPASS_FLAGS=1     — skip Gate I (HEAD's bypass mentions must have Bypass tickets:)
 #
 # Exit code: 0 = all pass, 1 = failures in strict mode
 
@@ -75,6 +77,8 @@ run_check "Ground Truth"        SKIP_GROUND_TRUTH     "$SCRIPT_DIR/check-ground-
 run_check "Rebar Compliance"    SKIP_COMPLIANCE       "$SCRIPT_DIR/check-compliance.sh"
 run_check "Decay Patterns"      SKIP_DECAY_PATTERNS   "$SCRIPT_DIR/check-decay-patterns.sh"
 run_check "Bootstrap Sync"      SKIP_BOOTSTRAP_SYNC   "$SCRIPT_DIR/sync-bootstrap.sh" --check
+run_check "Fix Commit Gate"     SKIP_FIX_COMMIT       "$SCRIPT_DIR/check-fix-commit.sh"
+run_check "Bypass Flags Gate"   SKIP_BYPASS_FLAGS     "$SCRIPT_DIR/check-bypass-flags.sh"
 run_check "Steward"             SKIP_STEWARD          "$SCRIPT_DIR/steward.sh"
 
 # NOTE: Tag-to-CI coverage check (Node.js, project-specific) lives at

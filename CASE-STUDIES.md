@@ -18,13 +18,13 @@ This directory contains 12 detailed adoption reports from production systems tha
 
 | Problem | See This Case Study | Key Solution |
 |---------|---------------------|--------------|
-| **Numbers in docs drift from reality** | [Human-based Digital Signer](feedback/digital-signer-feedback.md) | Ground truth enforcement layer |
+| **Numbers in docs drift from reality** | [Human-based Digital Signer](feedback/processed/digital-signer-feedback.md) | Ground truth enforcement layer |
 | **Want to adopt rebar in mature codebase** | [blindpipe Adoption](feedback/processed/blindpipe-adoption-2026-03-19.md) | Selective adoption strategy |
 | **Scaling beyond solo development** | [Scalability Assessment](feedback/processed/scalability-assessment-2026-03-20.md) | Tier progression patterns |
-| **Version migration and compatibility** | [Versioning & Upgrade Path](feedback/versioning-and-upgrade-path-2026-03-20.md) | Backwards compatibility strategies |
+| **Version migration and compatibility** | [Versioning & Upgrade Path](feedback/processed/versioning-and-upgrade-path-2026-03-20.md) | Backwards compatibility strategies |
 | **Multi-agent coordination failures** | [OpenDocKit Fidelity Session](feedback/processed/2026-03-18-opendockit-fidelity-session.md) | Swarm orchestration protocols |
 | **Role boundaries unclear** | [Role Definitions Feedback](feedback/processed/role-definitions-feedback.md) | Agent responsibility clarification |
-| **Testing everything vs. testing enough** | [Zero-Tolerance Testing](feedback/zero-tolerance-testing-feedback.md) | Pragmatic quality gates |
+| **Testing everything vs. testing enough** | [Zero-Tolerance Testing](feedback/processed/zero-tolerance-testing-feedback.md) | Pragmatic quality gates |
 | **Contract design for AI agents** | [AI-Native Contracts](feedback/processed/ai-native-contracts-2026-03-20.md) | Machine-readable specifications |
 | **Legacy system migration** | [PDF Signer Migration](feedback/processed/pdf-signer-migration-feedback.md) | Incremental adoption patterns |
 
@@ -32,7 +32,7 @@ This directory contains 12 detailed adoption reports from production systems tha
 
 | Project Type | Case Study | Key Insights |
 |--------------|------------|--------------|
-| **Web App** (React + API) | [Human-based Digital Signer](feedback/digital-signer-feedback.md) | Monorepo patterns, E2E testing with 586 unit tests |
+| **Web App** (React + API) | [Human-based Digital Signer](feedback/processed/digital-signer-feedback.md) | Monorepo patterns, E2E testing with 586 unit tests |
 | **Crypto Library** | [blindpipe](feedback/processed/blindpipe-adoption-2026-03-19.md) | Security-critical development, selective adoption |
 | **Document Processing** | [OpenDocKit](feedback/processed/2026-03-18-opendockit-fidelity-session.md) | 5,824 tests, progressive fidelity rendering |
 | **Enterprise Platform** | [Scalability Assessment](feedback/processed/scalability-assessment-2026-03-20.md) | Multi-repo coordination, governance patterns |
@@ -42,7 +42,7 @@ This directory contains 12 detailed adoption reports from production systems tha
 | Team Size | Case Study | Coordination Patterns |
 |-----------|------------|---------------------|
 | **Solo Developer** | [blindpipe](feedback/processed/blindpipe-adoption-2026-03-19.md) | ASK CLI for 10x context efficiency |
-| **Small Team (2-10)** | [Human-based Digital Signer](feedback/digital-signer-feedback.md) | 18 agents, 3 phases, 0 merge conflicts |
+| **Small Team (2-10)** | [Human-based Digital Signer](feedback/processed/digital-signer-feedback.md) | 18 agents, 3 phases, 0 merge conflicts |
 | **Department (10+)** | [Scalability Assessment](feedback/processed/scalability-assessment-2026-03-20.md) | Cross-repo contracts, breaking change detection |
 | **Multi-Agent Swarms** | [OpenDocKit](feedback/processed/2026-03-18-opendockit-fidelity-session.md) | 9 simultaneous agents, failure recovery |
 
@@ -53,7 +53,7 @@ This directory contains 12 detailed adoption reports from production systems tha
 ## Production Success Stories
 
 ### 🎯 **Human-based Digital Signer** — Web App Excellence
-**File:** [feedback/digital-signer-feedback.md](feedback/digital-signer-feedback.md) • **Size:** 20.3K
+**File:** [feedback/processed/digital-signer-feedback.md](feedback/processed/digital-signer-feedback.md) • **Size:** 20.3K
 
 **Project:** React/Vite + Express API monorepo with biometric identity
 **Scale:** 586 unit tests, 80 E2E specs, ~50k LOC
@@ -126,7 +126,7 @@ This directory contains 12 detailed adoption reports from production systems tha
 **Companion to:** Scalability Assessment (focuses on technical implementation details)
 
 ### 🔄 **Versioning & Upgrade Path** — Change Management
-**File:** [feedback/versioning-and-upgrade-path-2026-03-20.md](feedback/versioning-and-upgrade-path-2026-03-20.md) • **Size:** 4.5K
+**File:** [feedback/processed/versioning-and-upgrade-path-2026-03-20.md](feedback/processed/versioning-and-upgrade-path-2026-03-20.md) • **Size:** 4.5K
 
 **Focus:** Backwards compatibility, migration strategies, version management
 **Key Insights:** Compliance markers, tier enforcement, upgrade automation
@@ -134,7 +134,7 @@ This directory contains 12 detailed adoption reports from production systems tha
 ## Quality & Testing Patterns
 
 ### 🧪 **Zero-Tolerance Testing** — Quality Extremes
-**File:** [feedback/zero-tolerance-testing-feedback.md](feedback/zero-tolerance-testing-feedback.md) • **Size:** 4.4K
+**File:** [feedback/processed/zero-tolerance-testing-feedback.md](feedback/processed/zero-tolerance-testing-feedback.md) • **Size:** 4.4K
 
 **Focus:** When to apply maximum testing rigor vs. pragmatic quality gates
 **Key Insights:** Testing cascade application, risk-based quality decisions
@@ -202,7 +202,7 @@ This directory contains 12 detailed adoption reports from production systems tha
 # How to Use This Guide
 
 ## 📚 **For Learning**
-- **Start with:** [Human-based Digital Signer](feedback/digital-signer-feedback.md) or [blindpipe](feedback/processed/blindpipe-adoption-2026-03-19.md) — see rebar in action
+- **Start with:** [Human-based Digital Signer](feedback/processed/digital-signer-feedback.md) or [blindpipe](feedback/processed/blindpipe-adoption-2026-03-19.md) — see rebar in action
 - **Then read:** [Scalability Assessment](feedback/processed/scalability-assessment-2026-03-20.md) — understand growth patterns
 - **Deep dive:** [OpenDocKit](feedback/processed/2026-03-18-opendockit-fidelity-session.md) — see complex coordination patterns
 
@@ -215,7 +215,7 @@ This directory contains 12 detailed adoption reports from production systems tha
 ## 📈 **For Planning**
 - **Team scaling:** [Scalability Assessment](feedback/processed/scalability-assessment-2026-03-20.md)
 - **Adoption strategy:** [blindpipe](feedback/processed/blindpipe-adoption-2026-03-19.md) (mature projects) or [SETUP.md](SETUP.md) (new projects)
-- **Quality standards:** [Zero-Tolerance Testing](feedback/zero-tolerance-testing-feedback.md)
+- **Quality standards:** [Zero-Tolerance Testing](feedback/processed/zero-tolerance-testing-feedback.md)
 - **Migration planning:** [PDF Signer Migration](feedback/processed/pdf-signer-migration-feedback.md)
 
 ---

@@ -26,35 +26,8 @@ thing, the accumulation is visible at a glance and we can promote to action.
 Accepted items with decision made, pending implementation. Source files
 remain in `feedback/` root until implementation lands, then move to processed/.
 
-### Wave 1 — Doc-only, ~1 day
-
-| # | Item | Source | Effort |
-|---|------|--------|--------|
-| W1-1 | Numeric drift principle in DESIGN.md (§Anti-Drift) | [digital-signer-feedback.md](digital-signer-feedback.md) | S |
-| W1-2 | Single Source of Truth Table section in AGENTS.template.md | [digital-signer-feedback.md](digital-signer-feedback.md) | S |
-| W1-3 | Deploy confirmation TTY-guard pattern in AGENTS.template.md | [digital-signer-feedback.md](digital-signer-feedback.md) | XS |
-| W1-4 | Zero-tolerance testing doctrine (AGENTS.template.md + DESIGN.md ref) | [zero-tolerance-testing-feedback.md](zero-tolerance-testing-feedback.md) | S |
-| W1-5 | CHANGELOG per-version `### Migration` subsections | [versioning-and-upgrade-path-2026-03-20.md](versioning-and-upgrade-path-2026-03-20.md) | S |
-
-### Wave 2 — Script + template surgery, ~1 day
-
-| # | Item | Source | Effort |
-|---|------|--------|--------|
-| W2-1 | `O-` operational-contract prefix in CONTRACT-TEMPLATE.md + filedag O1/O2 as reference examples | [2026-04-18-filedag-deep-audit-insights.md](2026-04-18-filedag-deep-audit-insights.md) #1 | M |
-| W2-2 | Extend `compute-registry.sh` to detect drift / shadow / ghost / zombie / unlisted contracts | [2026-04-18-filedag-deep-audit-insights.md](2026-04-18-filedag-deep-audit-insights.md) #5 | M |
-
-### Wave 3 — Regression-fix mechanical gates, ~1 day
-
-Source: [`feedback/processed/2026-04-24-process-gates-G-through-L.md`](processed/2026-04-24-process-gates-G-through-L.md). Self-postmortem of the same Dapple SafeSign session that produced the testing-rigor + fidelity-decay feedback. Author's closing thesis: *"prose-form REBAR guidance does not bind agent behavior; what binds behavior is mechanical gates that fail closed."* Aligns with the 2026-04-25 wave (check-doc-refs, check-decay-patterns, sync-bootstrap drift check). Top 3 author-ranked gates plus a doctrine doc.
-
-| # | Item | Gate | Effort |
-|---|------|------|--------|
-| W3-1 | `practices/regression-fix-protocol.md` — codify Gates G/H/I/J/K/L as a single practice doc adopters reference per-project | all six | S |
-| W3-2 | `scripts/check-fix-commit.sh` — commit-msg lint: `fix:`/`regression:`-prefixed commits must contain a `Reproduced on:` line referencing a SHA / deploy URL / log excerpt | Gate G | S |
-| W3-3 | `scripts/check-bypass-flags.sh` — commit-msg lint: when commit body mentions `--skip-*` / `--no-verify` / `--force` usage, require a `Bypass tickets:` line listing the broken-test IDs | Gate I | S |
-| W3-4 | AGENTS.template.md doctrine: Gates H (single-fix-isolation: each `fix:` commit pairs with a verify step) and L (fix-your-own-test-drift: when your change breaks tests, those tests are part of the same PR or it's incomplete) | Gates H, L | XS |
-
-**On completion:** source already in `processed/` (no implementation-pending file at root); update Implemented section.
+_Wave 1, Wave 2, and Wave 3 all implemented 2026-04-25 — see Implemented
+section below._ Queue is empty pending the next batch of triaged feedback.
 
 ### Wave 2.5 — MCP activation (COMPLETED 2026-04-20)
 
@@ -188,6 +161,41 @@ These items were substantially addressed by commits in the last cycle.
 Listed so future feedback on the same topic can see prior work and not
 re-request.
 
+### Wave 1 + Wave 2 + Wave 3 close-out (2026-04-25)
+
+All three waves landed in a single push after rebar's own Tier-3 dogfooding.
+Source files moved to `processed/`.
+
+**Wave 1 — doc-only (5 items)**
+
+| Item | Disposition |
+|------|-------------|
+| W1-1: Numeric drift principle in DESIGN.md §Anti-Drift | Already shipped during v2.0.0 evolution — DESIGN.md §"Numeric Claims: The Fastest Drift Vector" (line 482). Source now in `processed/digital-signer-feedback.md`. |
+| W1-2: Single Source of Truth Table | Implemented for adopters in `templates/project-bootstrap/AGENTS.md` §"Single Source of Truth for Metrics". |
+| W1-3: Deploy TTY-guard pattern | Implemented inline in `templates/project-bootstrap/AGENTS.md` §"Production Deploy Confirmation" — full pattern listed alongside link to `practices/deployment-patterns.md` for the broader catalog. |
+| W1-4: Zero-tolerance testing doctrine | Implemented in `templates/project-bootstrap/AGENTS.md` §"The Scout Rule: Zero Tolerance for Broken Tests". Source now in `processed/zero-tolerance-testing-feedback.md`. |
+| W1-5: CHANGELOG `### Migration` per-version subsections | Already shipped in CHANGELOG since v1.0.0 (every release entry has its own Migration subsection). Source now in `processed/versioning-and-upgrade-path-2026-03-20.md`. |
+
+**Wave 2 — script + template surgery (2 items)**
+
+| Item | Disposition |
+|------|-------------|
+| W2-1: `O-` operational-contract prefix + D / T prefixes | Added to DESIGN.md §"ID prefixes (suggested)" and `architecture/README.md` naming-convention table. Filedag's O1-PIPELINE-DAEMON and O2-API-GATEWAY cited as worked examples inline. CONTRACT-TEMPLATE.md already had `Operational` in the `Type` field as of 2026-04-25 dogfooding. Source now in `processed/2026-04-18-filedag-deep-audit-insights.md`. |
+| W2-2: Extend `compute-registry.sh` for drift/shadow/ghost/zombie/unlisted | Implemented as a "Contract Health" section appended to the auto-generated registry. Drift caught by existing `--check` mode; zombies (0 impl refs) caught by existing orphan detection (renamed Zombies for clarity); shadows (CONTRACT: refs to nonexistent IDs) added as a new pass over source — same extension whitelist + bin/ second-pass as `count_implementations`. Ghost / unlisted are both architecturally prevented (registry is regenerated from files, never hand-maintained). Same source. |
+
+**Wave 3 — regression-fix mechanical gates (4 items)**
+
+| Item | Disposition |
+|------|-------------|
+| W3-1: `practices/regression-fix-protocol.md` codifying Gates G/H/I/J/K/L | Shipped as a single practice doc with the cross-cutting "enumerate dimensions before verifying" insight. |
+| W3-2: `scripts/check-fix-commit.sh` (Gate G) | Shipped. commit-msg hook that fails `fix:`/`regression:` commits without a `Reproduced on:` line. Bash 3.2 compatible (uses `grep -E` instead of bash regex for portability). |
+| W3-3: `scripts/check-bypass-flags.sh` (Gate I) | Shipped. commit-msg hook that fails commits mentioning `--skip-*` / `--no-verify` / `--force` / `SKIP_*=` without a `Bypass tickets:` line. |
+| W3-4: AGENTS.template.md doctrine for Gates H + L | Added to both `project-bootstrap/AGENTS.md` (slim adopter copy) and `component-templates/AGENTS.template.md` (full reference) just above the Scout Rule, with cross-link to the practice doc. |
+
+Both new scripts wired into `scripts/ci-check.sh` (Fix Commit Gate, Bypass Flags Gate); ci-check now runs 13 checks, 13/13 green on rebar itself. Bootstrap copies synced via `sync-bootstrap.sh`.
+
+Side benefit: discovered and fixed a CONTRACT-shadow false-positive on `scripts/check-contract-headers.sh` example strings (same trick as the earlier `cli/cmd/context.go` fix — split the literal `CONTRACT:` prefix via shell variable so the regex can't construct it from source).
+
 ### Cross-Representation Oracle Pattern (rediscovered 2026-04-26)
 
 Already shipped in DESIGN.md §"Debugging with Cross-Representation Oracles" (the "implementation closest to ground truth becomes oracle for debugging the others" pattern from OpenDocKit). The Watchlist entry for this was stale; flagged during 2026-04-26 webcrypto-ed25519 triage when filedag's fixture pattern landed adjacent to it. The fixture-byte-agreement pattern from filedag is a sibling, not a duplicate — that one stays on Watchlist as a separate entry.
@@ -291,6 +299,7 @@ feedback-driven Watchlist / Queued shape. Pick up between feedback waves.
 
 ## Document History
 
+- **2026-04-25 (eve)** — Knocked out all queued waves (Wave 1, 2, 3 → Implemented). Net new artifacts: `practices/regression-fix-protocol.md`, `scripts/check-fix-commit.sh`, `scripts/check-bypass-flags.sh`, doctrine additions to AGENTS templates, D/O/T contract prefixes in DESIGN + architecture/README, "Contract Health" section in compute-registry.sh output. ci-check.sh now runs 13/13 enforcement on rebar itself. Five more source files moved to `processed/` (digital-signer, zero-tolerance, versioning, filedag-deep-audit + the two from the 2026-04-26 triage round).
 - **2026-04-26** — Triaged 2026-04-24-process-gates-G-through-L.md (Wave 3 queued for the 3 universal gates G/I/L, Watchlist for project-specific H/J/K) and 2026-04-26-webcrypto-ed25519-quirks.md (Watchlist entry for cross-language canonical-fixture pattern; rediscovered Oracle Pattern was already implemented in DESIGN.md and moved its stale Watchlist entry to Implemented). Both source files moved to `processed/`.
 - **2026-04-25** — NEXT-SESSION-TODO.md folded into this file (Maintainer Queue section above) so there's one canonical planning surface, not two. Concurrent ship: `check-doc-refs.sh`, `check-decay-patterns.sh`, `templates/scripts/check-tag-ci-coverage.mjs`, `sync-bootstrap.sh` + drift check, bash 3.2 fixes for compute-registry.sh, Why/Who/Scenarios required in CONTRACT-TEMPLATE.md, README/QUICKSTART/SETUP cleanup. See commit log for the precise diffs.
 - **2026-04-19** — Inventory created during full feedback scrub. 14 source files triaged (1 duplicate deleted, 9 moved to processed/, 4 kept in feedback/ as in-progress Wave 1/2).

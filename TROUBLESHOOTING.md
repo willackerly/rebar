@@ -95,7 +95,7 @@ ls architecture/CONTRACT-*.md
 1. **Use worktree isolation** — each agent gets its own working copy
 2. **Follow practices/worktree-collaboration.md** for coordination patterns
 3. **See [OpenDocKit case study](feedback/processed/2026-03-18-opendockit-fidelity-session.md)** for 9-agent coordination patterns
-4. **Consider [Human-based Digital Signer approach](feedback/digital-signer-feedback.md)** — 18 agents, 0 conflicts
+4. **Consider [Human-based Digital Signer approach](feedback/processed/digital-signer-feedback.md)** — 18 agents, 0 conflicts
 
 ---
 
@@ -114,7 +114,7 @@ ls architecture/CONTRACT-*.md
 **Symptoms:** Docs say "126 tests" but you have 586, test counts wrong, metrics stale
 
 **Solution:**
-- Implement **ground truth enforcement** from [Human-based Digital Signer case](feedback/digital-signer-feedback.md)
+- Implement **ground truth enforcement** from [Human-based Digital Signer case](feedback/processed/digital-signer-feedback.md)
 - Use `METRICS.template` file with computed values
 - Set up `scripts/check-ground-truth.sh` to verify claims
 - Consider tier 2 or 3 for automated enforcement
@@ -163,7 +163,7 @@ REBAR_TIER=3  # Enforced: + ground truth, strict steward
 **Practical approach:**
 1. **Start with T0-T1:** Unit tests + basic integration
 2. **Add T2 for security-critical code:** Auth, crypto, input validation
-3. **T3+ for production systems:** See [zero-tolerance testing](feedback/zero-tolerance-testing-feedback.md)
+3. **T3+ for production systems:** See [zero-tolerance testing](feedback/processed/zero-tolerance-testing-feedback.md)
 4. **Follow [FEATURE-DEVELOPMENT.md](FEATURE-DEVELOPMENT.md)** example for progression
 
 ### "CI takes too long with all the checks"
@@ -229,7 +229,7 @@ REBAR_TIER=3  # Enforced: + ground truth, strict steward
    ```
 
 2. **See migration guide:**
-   - [versioning-and-upgrade-path](feedback/versioning-and-upgrade-path-2026-03-20.md)
+   - [versioning-and-upgrade-path](feedback/processed/versioning-and-upgrade-path-2026-03-20.md)
    - Follow backwards compatibility patterns
 
 ---
@@ -251,7 +251,7 @@ REBAR_TIER=3  # Enforced: + ground truth, strict steward
    - Introduce agents after team sees value
 
 3. **Show real results:**
-   - [Human-based Digital Signer](feedback/digital-signer-feedback.md): 0 merge conflicts
+   - [Human-based Digital Signer](feedback/processed/digital-signer-feedback.md): 0 merge conflicts
    - [blindpipe](feedback/processed/blindpipe-adoption-2026-03-19.md): 10x context efficiency
    - [OpenDocKit](feedback/processed/2026-03-18-opendockit-fidelity-session.md): 100% work recovery
 

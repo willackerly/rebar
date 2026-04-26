@@ -222,6 +222,26 @@ beside code or inside `__tests__`. E2E specs should be tagged
 (`@critical`, `@regression`) for CI selection.
 -->
 
+### Regression-Fix Gates H + L
+
+When the prompt is "fix this regression," two doctrines bind:
+
+**Gate H — Single-fix-isolation.** Each `fix:` commit must be paired with a
+verify step in your reasoning: *"I applied X; the symptom is now Y;
+therefore X was/wasn't the cause."* Don't apply Fix A + Fix B + cleanup all
+at once and declare victory — when the result is good you can't attribute
+it; when it's bad you can't isolate it.
+
+**Gate L — Fix-your-own-test-drift.** When a test fails after your change,
+the FIRST hypothesis is *"I broke the test's contract assumption"* —
+investigate before bypassing. If the contract change is intended, the test
+update is part of the same PR. "Test contract drift" is not a free pass.
+
+Mechanical commit-msg gates (`scripts/check-fix-commit.sh` for Gate G,
+`scripts/check-bypass-flags.sh` for Gate I) catch the related failure modes
+that ARE script-detectable. See `practices/regression-fix-protocol.md` for
+the full six-gate protocol.
+
 ### The Scout Rule: Zero Tolerance for Broken Tests
 
 **"You're a scout. You leave the camp cleaner than when you came."**

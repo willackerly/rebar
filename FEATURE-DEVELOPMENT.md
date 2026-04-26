@@ -438,7 +438,7 @@ Closes: #auth-service-implementation"
 
 ### Want to see war stories?
 - **[OpenDocKit case study](feedback/processed/2026-03-18-opendockit-fidelity-session.md)** - 9 simultaneous agents, 5,824 tests
-- **[Human-based Digital Signer case study](feedback/digital-signer-feedback.md)** - 18 agents, 0 merge conflicts, 3 hours wall clock
+- **[Human-based Digital Signer case study](feedback/processed/digital-signer-feedback.md)** - 18 agents, 0 merge conflicts, 3 hours wall clock
 
 **You've just experienced the full rebar methodology. Every feature you build from now on follows this same pattern: BDD → Contract → Multi-agent coordination → Implementation → Quality cascade → Integration.**
 
