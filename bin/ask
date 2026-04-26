@@ -994,55 +994,86 @@ _ask_direct() {
   fi
   dbg "session=$session_id has_session=$has_session"
 
-  # Build the prompt
-  local prompt
-  if [ "$has_session" = true ]; then
-    # Continuing session — agent already has context, just ask
-    local write_hint=""
-    if [ "$WRITE_MODE" = "1" ]; then
-      write_hint="
+  # Log the question event
+  local ts
+  ts=$(timestamp)
+  local event
+  event=$(jq -n \
+    --arg id "$msg_id" \
+    --arg from "human" \
+    --arg to "$agent" \
+    --arg type "question" \
+    --arg ts "$ts" \
+    --arg body "$question" \
+    '{id: $id, from: $from, to: $to, type: $type, timestamp: $ts, body: $body}')
+  append_event "$event"
+
+  log "Invoking claude..."
+
+  # If querying a remote project, cd there so claude can access its files
+  if [ -n "$_RESOLVED_PROJECT_DIR" ]; then
+    log "Changing to project dir: $_RESOLVED_PROJECT_DIR"
+    cd "$_RESOLVED_PROJECT_DIR"
+  fi
+
+  # Invoke claude with one resilient retry: if --resume hits a vanished
+  # session ("No conversation found with session ID …"), rotate to a fresh
+  # session and replay with full context. Anything else fails normally.
+  local progress_file="$agent_dir/.progress"
+  local raw_response response
+  local attempt=0
+  while :; do
+    attempt=$((attempt + 1))
+
+    # Build the prompt (depends on has_session, which can flip on retry)
+    local prompt
+    if [ "$has_session" = true ]; then
+      # Continuing session — agent already has context, just ask
+      local write_hint=""
+      if [ "$WRITE_MODE" = "1" ]; then
+        write_hint="
 
 You have write access. Use Edit, Write, and Bash tools to make changes directly."
-    fi
-    if [ "$VERBOSE" = "1" ]; then
-      prompt="$question${write_hint}
+      fi
+      if [ "$VERBOSE" = "1" ]; then
+        prompt="$question${write_hint}
 
 Respond with: a concise answer paragraph, then a blank line, then
 1-3 sentences of reasoning, then a blank line, then relevant file
 paths as a bulleted list. No labels."
-    else
-      prompt="$question${write_hint}
+      else
+        prompt="$question${write_hint}
 
 Respond with a single concise paragraph — the answer itself, nothing else."
-    fi
-  else
-    # First invocation — send full context to establish the agent
-    local context=""
-    if [ -f "$agent_dir/AGENT.md" ]; then
-      context=$(cat "$agent_dir/AGENT.md")
-    fi
-    if [ -f "$agent_dir/memory.md" ]; then
-      context="$context
+      fi
+    else
+      # First invocation — send full context to establish the agent
+      local context=""
+      if [ -f "$agent_dir/AGENT.md" ]; then
+        context=$(cat "$agent_dir/AGENT.md")
+      fi
+      if [ -f "$agent_dir/memory.md" ]; then
+        context="$context
 
 --- Current Memory ---
 $(cat "$agent_dir/memory.md")"
-    fi
+      fi
 
-    # Build tool/permission preamble based on mode
-    local tools_preamble
-    if [ "$WRITE_MODE" = "1" ]; then
-      tools_preamble="You have full access to the project filesystem including write access.
+      # Build tool/permission preamble based on mode
+      local tools_preamble
+      if [ "$WRITE_MODE" = "1" ]; then
+        tools_preamble="You have full access to the project filesystem including write access.
 Use Read, Grep, and Glob to research. Use Edit and Write to modify or
 create files. Use Bash for shell commands (tests, builds, git).
 Do not guess — look it up, then act on it."
-    else
-      tools_preamble="You have full access to the project filesystem. Use Read, Grep, and Glob
+      else
+        tools_preamble="You have full access to the project filesystem. Use Read, Grep, and Glob
 tools to look up files, search code, and verify claims before answering.
 Do not guess — look it up."
-    fi
+      fi
 
-    if [ "$VERBOSE" = "1" ]; then
-      prompt="You are the $agent agent.
+      if [ "$VERBOSE" = "1" ]; then
+        prompt="You are the $agent agent.
 
 Your role and context:
 $context
@@ -1067,8 +1098,8 @@ Rules:
 - Second block is reasoning — only if it adds value
 - Third block is file references — only list files that exist and matter
 - If you cannot answer, say so directly and explain why"
-    else
-      prompt="You are the $agent agent.
+      else
+        prompt="You are the $agent agent.
 
 Your role and context:
 $context
@@ -1082,79 +1113,74 @@ Rules:
 - No labels, no preamble, no \"ANSWER:\" prefix
 - No rationale or references unless the question explicitly asks for them
 - Be direct and specific"
+      fi
     fi
-  fi
 
-  # Log the question event
-  local ts
-  ts=$(timestamp)
-  local event
-  event=$(jq -n \
-    --arg id "$msg_id" \
-    --arg from "human" \
-    --arg to "$agent" \
-    --arg type "question" \
-    --arg ts "$ts" \
-    --arg body "$question" \
-    '{id: $id, from: $from, to: $to, type: $type, timestamp: $ts, body: $body}')
-  append_event "$event"
-
-  log "Invoking claude..."
-
-  # If querying a remote project, cd there so claude can access its files
-  if [ -n "$_RESOLVED_PROJECT_DIR" ]; then
-    log "Changing to project dir: $_RESOLVED_PROJECT_DIR"
-    cd "$_RESOLVED_PROJECT_DIR"
-  fi
-
-  # Build claude command with session resumption if available
-  local claude_args=(--print --model "$MODEL")
-  if [ "$has_session" = true ]; then
-    claude_args+=(--resume "$session_id")
-  else
-    claude_args+=(--session-id "$session_id")
-  fi
-
-  # Write mode: grant file editing tools and appropriate permissions
-  if [ "$WRITE_MODE" = "1" ]; then
-    claude_args+=(--allowedTools "Read Grep Glob Edit Write Bash")
-    claude_args+=(--permission-mode acceptEdits)
-    log "Write mode enabled — agent can edit/create files"
-  fi
-
-  # Streaming progress: use stream-json for incremental updates,
-  # fall back to json for read-only queries
-  local progress_file="$agent_dir/.progress"
-  if [ "$WRITE_MODE" = "1" ]; then
-    claude_args+=(--output-format stream-json)
-  else
-    claude_args+=(--output-format json)
-  fi
-
-  dbg "claude ${claude_args[*]} <prompt>"
-
-  # Invoke claude
-  local raw_response response
-  if [ "$WRITE_MODE" = "1" ]; then
-    # Stream mode: pipe through progress tracker, collect final result
-    _init_progress "$agent" "$question"
-    if raw_response=$(claude "${claude_args[@]}" "$prompt" 2>"$agent_dir/.last-stderr" \
-        | _stream_progress "$agent"); then
-      _finish_progress "$agent" "done"
+    # Build claude command with session resumption if available
+    local claude_args=(--print --model "$MODEL")
+    if [ "$has_session" = true ]; then
+      claude_args+=(--resume "$session_id")
     else
-      _finish_progress "$agent" "error"
-      echo "ask: error: claude invocation failed" >&2
-      [ -f "$agent_dir/.last-stderr" ] && cat "$agent_dir/.last-stderr" >&2
-      exit 1
+      claude_args+=(--session-id "$session_id")
     fi
-  else
-    # Non-stream mode: capture full response
-    if ! raw_response=$(claude "${claude_args[@]}" "$prompt" 2>"$agent_dir/.last-stderr"); then
-      echo "ask: error: claude invocation failed" >&2
-      [ -f "$agent_dir/.last-stderr" ] && cat "$agent_dir/.last-stderr" >&2
-      exit 1
+
+    # Write mode: grant file editing tools and appropriate permissions
+    if [ "$WRITE_MODE" = "1" ]; then
+      claude_args+=(--allowedTools "Read Grep Glob Edit Write Bash")
+      claude_args+=(--permission-mode acceptEdits)
+      log "Write mode enabled — agent can edit/create files"
     fi
-  fi
+
+    # Streaming progress: use stream-json for incremental updates,
+    # fall back to json for read-only queries
+    if [ "$WRITE_MODE" = "1" ]; then
+      claude_args+=(--output-format stream-json)
+    else
+      claude_args+=(--output-format json)
+    fi
+
+    dbg "claude ${claude_args[*]} <prompt> (attempt $attempt)"
+
+    local invoke_ok=true
+    if [ "$WRITE_MODE" = "1" ]; then
+      _init_progress "$agent" "$question"
+      if raw_response=$(claude "${claude_args[@]}" "$prompt" 2>"$agent_dir/.last-stderr" \
+          | _stream_progress "$agent"); then
+        _finish_progress "$agent" "done"
+      else
+        _finish_progress "$agent" "error"
+        invoke_ok=false
+      fi
+    else
+      if ! raw_response=$(claude "${claude_args[@]}" "$prompt" 2>"$agent_dir/.last-stderr"); then
+        invoke_ok=false
+      fi
+    fi
+
+    if [ "$invoke_ok" = true ]; then
+      break
+    fi
+
+    # Detect a vanished --resume target and retry once with a fresh session.
+    # The stale ID can come from a wiped ~/.claude store, an interrupted first
+    # call, or a server-side retention boundary — in all cases, replaying with
+    # full context recovers cleanly.
+    if [ "$attempt" -lt 2 ] \
+        && [ "$has_session" = true ] \
+        && grep -q "No conversation found with session ID" "$agent_dir/.last-stderr" 2>/dev/null; then
+      echo "[${agent}] session expired, restarting fresh" >&2
+      log "Stale session $session_id — rotating and replaying with full context"
+      rm -f "$session_file"
+      session_id=$(uuidgen | tr '[:upper:]' '[:lower:]')
+      echo "$session_id" > "$session_file"
+      has_session=false
+      continue
+    fi
+
+    echo "ask: error: claude invocation failed" >&2
+    [ -f "$agent_dir/.last-stderr" ] && cat "$agent_dir/.last-stderr" >&2
+    exit 1
+  done
 
   # Extract and store session ID for next invocation
   local new_session_id

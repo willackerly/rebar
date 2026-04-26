@@ -9,6 +9,13 @@ All notable changes to rebar. Versioned with [semver](https://semver.org/).
 
 ---
 
+## v2.0.1 (2026-04-26)
+
+### Fixed
+- **`bin/ask` resilient session resume** — when `claude --resume <id>` returns "No conversation found with session ID …" (vanished `~/.claude` store, interrupted first call, server-side retention boundary), `_ask_direct` now wipes the stale `.session-id`, regenerates a fresh UUID, and replays the question once with full agent context. Prints `[<agent>] session expired, restarting fresh` to stderr so the recovery is visible. Retry is capped at one attempt and only fires on the specific stale-session signature — auth/network/rate-limit errors still surface immediately.
+
+---
+
 ## v2.0.0 (2026-04-01)
 
 ### Added
