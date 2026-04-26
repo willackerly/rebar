@@ -43,6 +43,19 @@ remain in `feedback/` root until implementation lands, then move to processed/.
 | W2-1 | `O-` operational-contract prefix in CONTRACT-TEMPLATE.md + filedag O1/O2 as reference examples | [2026-04-18-filedag-deep-audit-insights.md](2026-04-18-filedag-deep-audit-insights.md) #1 | M |
 | W2-2 | Extend `compute-registry.sh` to detect drift / shadow / ghost / zombie / unlisted contracts | [2026-04-18-filedag-deep-audit-insights.md](2026-04-18-filedag-deep-audit-insights.md) #5 | M |
 
+### Wave 3 — Regression-fix mechanical gates, ~1 day
+
+Source: [`feedback/processed/2026-04-24-process-gates-G-through-L.md`](processed/2026-04-24-process-gates-G-through-L.md). Self-postmortem of the same Dapple SafeSign session that produced the testing-rigor + fidelity-decay feedback. Author's closing thesis: *"prose-form REBAR guidance does not bind agent behavior; what binds behavior is mechanical gates that fail closed."* Aligns with the 2026-04-25 wave (check-doc-refs, check-decay-patterns, sync-bootstrap drift check). Top 3 author-ranked gates plus a doctrine doc.
+
+| # | Item | Gate | Effort |
+|---|------|------|--------|
+| W3-1 | `practices/regression-fix-protocol.md` — codify Gates G/H/I/J/K/L as a single practice doc adopters reference per-project | all six | S |
+| W3-2 | `scripts/check-fix-commit.sh` — commit-msg lint: `fix:`/`regression:`-prefixed commits must contain a `Reproduced on:` line referencing a SHA / deploy URL / log excerpt | Gate G | S |
+| W3-3 | `scripts/check-bypass-flags.sh` — commit-msg lint: when commit body mentions `--skip-*` / `--no-verify` / `--force` usage, require a `Bypass tickets:` line listing the broken-test IDs | Gate I | S |
+| W3-4 | AGENTS.template.md doctrine: Gates H (single-fix-isolation: each `fix:` commit pairs with a verify step) and L (fix-your-own-test-drift: when your change breaks tests, those tests are part of the same PR or it's incomplete) | Gates H, L | XS |
+
+**On completion:** source already in `processed/` (no implementation-pending file at root); update Implemented section.
+
 ### Wave 2.5 — MCP activation (COMPLETED 2026-04-20)
 
 Turning a latent MCP server into a discoverable first-class tool for
@@ -79,7 +92,7 @@ source project(s) so accumulation is visible.
 |------|------:|---------|--------|-----------|
 | GC protection + `git fsck --unreachable` recovery protocol in `practices/multi-agent-orchestration.md` | 1 | OpenDocKit | S | Real pattern, low cost — promote opportunistically on next orchestration-doc touch |
 | Fan-out overlap detection (conflict matrix pre-launch checklist) | 1 | OpenDocKit | S | Add as text checklist when next editing orchestration doc |
-| Oracle Pattern as DESIGN.md primitive | 1 | OpenDocKit | XS | Add as short section on next DESIGN.md touch — zero risk, low cost |
+| ~~Oracle Pattern as DESIGN.md primitive~~ | ~~1~~ | ~~OpenDocKit~~ | ~~XS~~ | **IMPLEMENTED** — DESIGN.md §"Debugging with Cross-Representation Oracles" already exists. Discovered during 2026-04-26 triage (this Watchlist entry was stale). Moved to Implemented below. |
 | Namespaced auto-generated outputs (P5.1: `<file>-<agent-id>.<ext>`) | 1 | OpenDocKit | S | Worth a note in orchestration doc; not enough pain to codify a pattern |
 | Agent health monitor + heartbeat + shared progress JSONL (P0-P2) | 1 | OpenDocKit | M | Harness-level concern; Claude Code owns the session lifecycle |
 | Swarm collective-intelligence (P6-P10: agent_broadcast, cross-repo swarm memory, role-routing, failure-lib, auto-retro) | 1 | OpenDocKit | XL | Different product direction — keep as north-star in DESIGN.md only |
@@ -140,6 +153,22 @@ source project(s) so accumulation is visible.
 |------|------:|---------|--------|-----------|
 | **Pre-flight repo-state check** (read `.rebar-version`, compare to latest tag, warn if behind, link CHANGELOG migration) | 1 | FontKit (via conversation 2026-04-19) | S | Real pain reported; if 1 more adopter hits this, promote. Candidate: `rebar doctor` or extend `rebar status`. |
 
+### Regression-fix process (from 2026-04-24-process-gates-G-through-L.md)
+
+The 3 universal gates (G, I, L) are queued as Wave 3 above. The remaining 3 are project-specific in their mechanism — Watchlist for now.
+
+| Item | Votes | Sources | Effort | Rationale for defer |
+|------|------:|---------|--------|---------------------|
+| Gate H — `fix:` commit PR-size limit (≤2 files unless commit body explains why isolation isn't possible) | 1 | Dapple SafeSign 2026-04-24 | S | Project-specific repo-size norms; doctrine in AGENTS.template.md (W3-4) covers the spirit. Promote to Queued if a 2nd adopter reports the spray-fix pattern. |
+| Gate J — Test-fixture matrix (`test-fixture-matrix.md` per category enumerating dimensions) | 1 | Dapple SafeSign 2026-04-24 | M | Test infra varies by project (PDF formats, browser DPRs, etc.); rebar can't ship a universal matrix. Could ship a template skeleton. Promote when 2nd adopter codifies one. |
+| Gate K — Trust-state-as-variable doctrine for external-verifier tests | 1 | Dapple SafeSign 2026-04-24 | XS | Domain-bound (trust stores, OS keychains, Adobe trust list) — not every project has external verifiers. Add as text in `practices/regression-fix-protocol.md` (W3-1) when written. |
+
+### Cross-language signed-bytes pattern (from 2026-04-26-webcrypto-ed25519-quirks.md)
+
+| Item | Votes | Sources | Effort | Rationale |
+|------|------:|---------|--------|-----------|
+| `templates/canonical-fixture-pattern.md` — when two repos must agree on signed bytes (assertion chains, audit logs, federated query receipts), freeze a canonicalization spec + ship a fixture both impls test against | 1 | filedag DP3c (D2-RECEIPT cross-impl Go ↔ WebCrypto) | S | Distinct from the existing Oracle Pattern (debugging by closest-to-truth) — this one is about *byte-level cross-language agreement*. Promote when a 2nd cross-language pair lands (likely TALOS ↔ blindpipe assertion chains). |
+
 ### Testing rigor (from 2026-04-22-testing-rigor-six-moments.md)
 
 | Item | Votes | Sources | Effort | Rationale |
@@ -158,6 +187,10 @@ source project(s) so accumulation is visible.
 These items were substantially addressed by commits in the last cycle.
 Listed so future feedback on the same topic can see prior work and not
 re-request.
+
+### Cross-Representation Oracle Pattern (rediscovered 2026-04-26)
+
+Already shipped in DESIGN.md §"Debugging with Cross-Representation Oracles" (the "implementation closest to ground truth becomes oracle for debugging the others" pattern from OpenDocKit). The Watchlist entry for this was stale; flagged during 2026-04-26 webcrypto-ed25519 triage when filedag's fixture pattern landed adjacent to it. The fixture-byte-agreement pattern from filedag is a sibling, not a duplicate — that one stays on Watchlist as a separate entry.
 
 ### Bootstrap drift + bash 3.2 path-norm + steward arg-skip (2026-04-25)
 
@@ -258,5 +291,6 @@ feedback-driven Watchlist / Queued shape. Pick up between feedback waves.
 
 ## Document History
 
+- **2026-04-26** — Triaged 2026-04-24-process-gates-G-through-L.md (Wave 3 queued for the 3 universal gates G/I/L, Watchlist for project-specific H/J/K) and 2026-04-26-webcrypto-ed25519-quirks.md (Watchlist entry for cross-language canonical-fixture pattern; rediscovered Oracle Pattern was already implemented in DESIGN.md and moved its stale Watchlist entry to Implemented). Both source files moved to `processed/`.
 - **2026-04-25** — NEXT-SESSION-TODO.md folded into this file (Maintainer Queue section above) so there's one canonical planning surface, not two. Concurrent ship: `check-doc-refs.sh`, `check-decay-patterns.sh`, `templates/scripts/check-tag-ci-coverage.mjs`, `sync-bootstrap.sh` + drift check, bash 3.2 fixes for compute-registry.sh, Why/Who/Scenarios required in CONTRACT-TEMPLATE.md, README/QUICKSTART/SETUP cleanup. See commit log for the precise diffs.
 - **2026-04-19** — Inventory created during full feedback scrub. 14 source files triaged (1 duplicate deleted, 9 moved to processed/, 4 kept in feedback/ as in-progress Wave 1/2).
