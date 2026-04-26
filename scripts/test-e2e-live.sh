@@ -269,7 +269,98 @@ else
     "What are the four contract principles in rebar? Just list them." \
     "implement|modify|update|search|plan mode"
 
-  # 3) Local mode (cd-into-repo, no server) — works even when ASK_SERVER is unset
+  # 3) Live MCP tools/call (production codepath for Claude Code) — spawn
+  #    ask-mcp-server, send initialize + tools/call with a real question,
+  #    parse result.content[0].text, keyword-check. Tests the MCP envelope
+  #    on top of the LLM round-trip — different surface from the direct ASK
+  #    CLI tests above (the MCP path has its own JSON-RPC shape, env-
+  #    stripping, error forwarding, response wrapping).
+  mcp_tools_call_keyword_check() {
+    local label="$1" tool="$2" question="$3" accept_pattern="$4"
+    local mcp_out mcp_err
+    mcp_out="$(mktemp)"
+    mcp_err="$(mktemp)"
+
+    # Reset the underlying agent session for symmetry with the direct ASK
+    # tests — same staleness considerations apply since the MCP server
+    # invokes `ask <role>` as a subprocess against the same session file.
+    local target_role="${tool#ask_*_}"
+    local target_repo="${tool#ask_}"
+    target_repo="${target_repo%_*}"
+    ask reset "${target_repo}:${target_role}" >/dev/null 2>&1 || true
+
+    # Send initialize + tools/call. Use python3 to JSON-escape the question.
+    local question_json
+    question_json="$(python3 -c 'import json,sys; print(json.dumps(sys.argv[1]))' "$question" 2>/dev/null)"
+    {
+      echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}'
+      printf '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"%s","arguments":{"question":%s}}}\n' \
+        "$tool" "$question_json"
+    } | "$PROJECT_ROOT/bin/ask-mcp-server" --stdio --repos-dir "$DEV_DIR" >"$mcp_out" 2>"$mcp_err" &
+    local mcp_pid=$!
+
+    # Wait up to $LLM_TIMEOUT for the id=2 response to land. tools/call is
+    # slower than initialize because it shells out to claude.
+    local waited=0
+    while [ "$waited" -lt "$LLM_TIMEOUT" ]; do
+      if grep -q '"id":[[:space:]]*2' "$mcp_out" 2>/dev/null; then
+        break
+      fi
+      sleep 1
+      waited=$((waited + 1))
+    done
+    kill "$mcp_pid" 2>/dev/null
+    wait "$mcp_pid" 2>/dev/null
+
+    # Extract the answer text from the id=2 response.
+    local text
+    text="$(python3 - "$mcp_out" <<'PYEOF' 2>/dev/null
+import json, sys
+with open(sys.argv[1]) as f:
+    for line in f:
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            msg = json.loads(line)
+        except Exception:
+            continue
+        if msg.get("id") != 2:
+            continue
+        if "result" in msg:
+            content = msg["result"].get("content", [])
+            if content and isinstance(content, list):
+                print(content[0].get("text", ""))
+        elif "error" in msg:
+            err = msg["error"]
+            print("MCP-ERROR code=", err.get("code"), "message=", err.get("message"), "data=", err.get("data"))
+        break
+PYEOF
+)"
+    rm -f "$mcp_out" "$mcp_err"
+
+    if [ -z "$text" ]; then
+      record FAIL "$label" "no id=2 response within ${LLM_TIMEOUT}s timeout"
+      return
+    fi
+    if echo "$text" | grep -qiE "$accept_pattern"; then
+      local snippet
+      snippet="$(echo "$text" | tr '\n' ' ' | head -c 80)"
+      record PASS "$label" "matched (response: ${snippet}…)"
+    else
+      local snippet
+      snippet="$(echo "$text" | tr '\n' ' ' | head -c 120)"
+      record FAIL "$label" "no expected keyword. Response: ${snippet}…"
+    fi
+  }
+
+  mcp_tools_call_keyword_check \
+    "MCP tools/call ask_rebar_architect (production codepath)" \
+    "ask_rebar_architect" \
+    "What are the four contract principles in rebar? Just list them." \
+    "implement|modify|update|search|plan mode"
+
+  # 4) Local mode (cd-into-repo, no server) — works even when ASK_SERVER is unset
   ask_keyword_check \
     "ASK local-mode (cd rebar; ask architect)" \
     "architect" \
@@ -277,7 +368,7 @@ else
     "swarm|contract|methodology|coordination|framework" \
     "$PROJECT_ROOT"
 
-  # 4) Cross-repo ask (gated on filedag presence + ASK_SERVER reachable)
+  # 5) Cross-repo ask (gated on filedag presence + ASK_SERVER reachable)
   if [ -d "$DEV_DIR/filedag/agents/architect" ] && curl -s -o /dev/null -m 2 "http://${ASK_SERVER_URL}/v1/health" 2>/dev/null; then
     ask_keyword_check \
       "ASK cross-repo filedag:architect" \
