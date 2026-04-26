@@ -49,6 +49,15 @@ CONTRACT-{ID}-{NAME}.{MAJOR}.{MINOR}.md
 | `C` | Component | `C1-BLOBSTORE`, `C2-RELAY` |
 | `I` | Interface | `I1-SESSION`, `I2-KEY-EXCHANGE` |
 | `P` | Protocol | `P1-WIRE-FORMAT`, `P2-SIGNALING` |
+| `D` | Data Model | `D1-USER-SCHEMA`, `D2-RECEIPT` (frozen schemas + canonicalization) |
+| `O` | Operational | `O1-PIPELINE-DAEMON`, `O2-API-GATEWAY` (SLOs, startup/shutdown, health) |
+| `T` | Integration Seam | `T1-WIRE-CODEC`, `T2-TDFBOT-API` (cross-language type/error mappings) |
+
+See [DESIGN.md §Contract System](../DESIGN.md#contract-system) for when to
+reach for each prefix. The `D`, `O`, and `T` prefixes were promoted to
+the canonical taxonomy after filedag's 2026-04-24 architectural-spike
+retrospective demonstrated they partition cleanly under real
+production pressure.
 
 ## Contract Lifecycle
 

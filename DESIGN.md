@@ -136,11 +136,23 @@ CONTRACT-{ID}-{NAME}.{MAJOR}.{MINOR}.md
 - `C` = Component (e.g., `C1-BLOBSTORE`, `C2-RELAY`)
 - `I` = Interface (e.g., `I1-SESSION`, `I2-KEY-EXCHANGE`)
 - `P` = Protocol (e.g., `P1-WIRE-FORMAT`, `P2-SIGNALING`)
+- `D` = Data Model (e.g., `D1-USER-SCHEMA`, `D2-RECEIPT`) — frozen schemas + canonicalization rules
+- `O` = Operational (e.g., `O1-PIPELINE-DAEMON`, `O2-API-GATEWAY`) — SLOs, startup/shutdown invariants, health signals, error-recovery policy
+- `T` = Integration Seam (e.g., `T1-WIRE-CODEC`, `T2-TDFBOT-API`) — type/error mappings across language or service boundaries
+
+S/C/I/P describe **structure + interfaces**; D describes **shape of data
+crossing boundaries**; O describes **operational behavior over time**
+(uptime, latency, drain semantics); T describes **agreement at
+cross-language seams** (where Go `*bool` → JSON `null` → TS `undefined`
+mismatches live). The 7-letter taxonomy survived contact at filedag
+(2026-04-24 architectural-spike retrospective).
 
 **Examples:**
 - `CONTRACT-S4-STORAGE.1.0.md`
 - `CONTRACT-C1-BLOBSTORE.2.1.md`
 - `CONTRACT-P1-WIRE-FORMAT.1.0.md`
+- `CONTRACT-O1-PIPELINE-DAEMON.1.0.md` (worked example: filedag's continuous-indexing daemon SLOs — ≥99% uptime, <60s indexing lag, <30min cycle, <4GB resident, <1% enrichment error rate)
+- `CONTRACT-O2-API-GATEWAY.1.0.md` (worked example: filedag's API SLOs — p50 <50ms, p95 <500ms, p99 <2s; <0.1% 5xx; ≥100 concurrent)
 
 ### Contract Lifecycle Status
 
