@@ -231,13 +231,26 @@ run_enforcement() {
 
   for entry in "${checks[@]}"; do
     local key="${entry%%:*}"
-    local script="${entry##*:}"
+    # The value half of "key:script [args...]" can include arguments
+    # (e.g., "registry:compute-registry.sh --check"). Split the script name
+    # from its args so the `-x` test resolves to a real file path and the
+    # invocation passes the args properly.
+    # Source: feedback/2026-04-25-bootstrap-template-script-drift-and-bash3.2.md §Bug 3.
+    local script_with_args="${entry##*:}"
+    local script="${script_with_args%% *}"
+    local args=""
+    if [ "$script" != "$script_with_args" ]; then
+      args="${script_with_args#* }"
+    fi
     local script_path="$SCRIPT_DIR/$script"
     total=$((total + 1))
 
     local result="skip"
     if [ -x "$script_path" ]; then
-      if "$script_path" >/dev/null 2>&1; then
+      # Word-split args intentionally (no quoting of $args) — these come from
+      # the trusted in-script `checks` array, not user input.
+      # shellcheck disable=SC2086
+      if "$script_path" $args >/dev/null 2>&1; then
         result="pass"
         passing=$((passing + 1))
       else

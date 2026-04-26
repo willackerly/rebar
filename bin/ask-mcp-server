@@ -472,6 +472,13 @@ class MCPServer:
             cmd.append("-v")
         cmd.extend([role, question])
 
+        # Build a sanitized env for the ask subprocess:
+        #   - ASK_SERVER explicitly cleared so the MCP path always routes
+        #     locally (prevents recursion AND prevents an unrelated remote
+        #     LAN address in the user's shell rc from breaking MCP calls)
+        #   - everything else inherited
+        sub_env = {**os.environ, "ASK_SERVER": ""}
+
         try:
             result = subprocess.run(
                 cmd,
@@ -479,18 +486,33 @@ class MCPServer:
                 capture_output=True,
                 text=True,
                 timeout=300,  # 5 minute timeout
-                env={**os.environ, "ASK_SERVER": ""},  # Prevent recursion
+                env=sub_env,
             )
 
             if result.returncode == 0:
                 return {"success": True, "answer": result.stdout.strip()}
             else:
-                return {"success": False, "error": result.stderr.strip() or "Ask command failed"}
+                # Forward the underlying failure verbatim so callers (and
+                # diagnostic tools reading the -32603 error data) see the
+                # real cause: missing `claude` on PATH, agent file not
+                # found, an LLM endpoint error, etc. Past versions stripped
+                # to empty and reported only "Ask command failed", which
+                # routinely caused users to misdiagnose env-var issues.
+                err_lines = []
+                if result.stderr:
+                    err_lines.append(result.stderr.rstrip())
+                if result.stdout:
+                    err_lines.append(f"(stdout) {result.stdout.rstrip()}")
+                err_lines.append(f"(exit code: {result.returncode})")
+                err_lines.append(f"(cmd: {' '.join(cmd)} cwd={repo_path})")
+                return {"success": False, "error": "\n".join(err_lines)}
 
         except subprocess.TimeoutExpired:
-            return {"success": False, "error": "Agent query timed out (300s)"}
+            return {"success": False, "error": f"Agent query timed out after 300s (cmd: {' '.join(cmd)})"}
+        except FileNotFoundError as e:
+            return {"success": False, "error": f"ask binary not found: {e} (looked at: {ask_bin})"}
         except Exception as e:
-            return {"success": False, "error": f"Execution error: {e}"}
+            return {"success": False, "error": f"Execution error: {e!r}"}
 
     def _error(self, code, message, data=None, req_id=None):
         """Create a JSON-RPC error response."""
@@ -804,6 +826,19 @@ Examples:
 
     # Build registry
     registry = RepoRegistry()
+
+    # If the user has ASK_SERVER set in their shell, log a one-line note so
+    # they know it's NOT the cause of any tool/call -32603 errors. The
+    # subprocess that runs `ask` for each tool/call clears ASK_SERVER
+    # explicitly (see _exec_ask). Surfacing this defuses a common
+    # misdiagnosis: "MCP errors must be ASK_SERVER" — they're not.
+    if os.environ.get("ASK_SERVER"):
+        print(
+            f"ask-mcp-server: note: ASK_SERVER={os.environ['ASK_SERVER']} is set in env;"
+            f" tool/call subprocesses will clear it and route locally",
+            file=sys.stderr,
+        )
+
     print("ask-mcp-server: scanning repos...", file=sys.stderr)
 
     if args.repos_dir:

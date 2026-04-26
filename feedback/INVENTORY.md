@@ -159,6 +159,19 @@ These items were substantially addressed by commits in the last cycle.
 Listed so future feedback on the same topic can see prior work and not
 re-request.
 
+### Bootstrap drift + bash 3.2 path-norm + steward arg-skip (2026-04-25)
+
+Filed during TDFLite's Tier-3 push. Three independent bugs, all
+script-side, surfaced by an actual adopter doing real Tier-3 work.
+Source: `feedback/processed/2026-04-25-bootstrap-template-script-drift-and-bash3.2.md`.
+
+| Item | Disposition |
+|------|-------------|
+| Bug 1: `check-doc-refs.sh` `${var/\/.\//\/}` produces literal backslashes on macOS bash 3.2 | **Implemented** — replaced parameter expansion with sed (portable across bash 3.2/4+/zsh). Both canonical + bootstrap copy. |
+| Bug 2: bootstrap copy of `check-freshness.sh` was stale relative to canonical | **Already fixed** by the 2026-04-25 sync-bootstrap run earlier in the day. The infrastructure exists — `sync-bootstrap.sh --check` is wired into ci-check.sh. The drift the feedback caught is what the check is designed to prevent going forward. |
+| Bug 3: `steward.sh` silently downgrades arg-bearing checks to `skip` (e.g., `compute-registry.sh --check`) | **Implemented** — split script-name from args in the for-loop body so `-x` test resolves and the args are passed through. Steward enforcement count corrected (now 7/7, was 6/7 due to silent skip). |
+| Bonus diagnosis correction | The feedback hypothesized that a remote `ASK_SERVER=192.168.0.181:7232` env var inherited via `~/.zshrc` was causing MCP tool/call -32603 errors. The code at `bin/ask-mcp-server:482` already strips ASK_SERVER from the subprocess env. Real cause was opaque because stderr was `.strip()`-ed and the error message defaulted to "Ask command failed". **Implemented** — error result now forwards the full stderr verbatim plus exit code + cmd + cwd. Future -32603s will name their actual cause. Plus a startup note when ASK_SERVER is in env to defuse the misdiagnosis. |
+
 ### Wave 2.5 — MCP activation (2026-04-20)
 
 Turning a latent MCP server into a discoverable, first-class tool for

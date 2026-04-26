@@ -149,17 +149,18 @@ while IFS= read -r src; do
 
     # Normalize ./ and ../ segments without invoking realpath (which fails
     # for not-yet-existing files in pre-merge contexts).
-    # Repeated substitution; bash 3.2 compatible.
-    while [[ "$resolved" == */./* ]]; do
-      resolved="${resolved/\/.\//\/}"
-    done
-    while [[ "$resolved" == ./* ]]; do
-      resolved="${resolved#./}"
-    done
+    #
+    # NOTE: an earlier version used `${resolved/\/.\//\/}` parameter
+    # expansion. On macOS bash 3.2.57 that produces a literal backslash
+    # in the result (e.g., `docs/./X.md` → `docs\/X.md`), causing every
+    # relative link with a `./` segment to be reported as broken. Use
+    # sed instead — portable across bash 3.2, bash 4+, and zsh.
+    # Source: feedback/2026-04-25-bootstrap-template-script-drift-and-bash3.2.md §Bug 1.
+    resolved="$(printf '%s' "$resolved" | sed -e 's#/\./#/#g' -e 's#^\./##')"
     # Collapse a/b/../c → a/c (one level at a time).
     while [[ "$resolved" == *"/../"* ]]; do
       # shellcheck disable=SC2001
-      resolved="$(echo "$resolved" | sed -E 's#[^/]+/\.\./##')"
+      resolved="$(printf '%s' "$resolved" | sed -E 's#[^/]+/\.\./##')"
     done
 
     # Allowlist check.
