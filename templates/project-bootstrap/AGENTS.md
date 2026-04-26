@@ -1,7 +1,9 @@
 # Agent Guidelines
 
 <!-- FRESHNESS: Update this date every time you modify this file -->
-<!-- freshness: 2026-03-21 -->
+<!-- freshness: YYYY-MM-DD -->
+<!-- adopters: replace YYYY-MM-DD with the date you copied this template,
+     and bump it whenever you edit. Stale dates >14 days fail check-freshness.sh. -->
 
 **How AI agents work effectively in this project.**
 
@@ -98,6 +100,58 @@ and merge strategy in `practices/multi-agent-orchestration.md`.
 
 ---
 
+## Single Source of Truth for Metrics (W1-2)
+
+Every quantitative claim in documentation must have ONE authoritative source.
+All other documents cross-reference it. Numeric drift is the fastest-moving
+form of doc rot — every commit that adds a test file silently invalidates
+counts in 3-5 documents unless there's a single computed source.
+
+The `METRICS` file is the canonical location for project-wide numbers.
+`scripts/check-ground-truth.sh` verifies it against code. When the metric
+changes, update `METRICS`; the ground truth script catches stale
+cross-references.
+
+| Metric | Authoritative Source | Verified By | Cross-Referenced In |
+|--------|---------------------|-------------|---------------------|
+| Test count | `METRICS` (computed via test runner) | `check-ground-truth.sh` | QUICKCONTEXT.md, CLAUDE.md |
+| Contract count | `METRICS` (computed from `architecture/CONTRACT-*.md`) | `check-ground-truth.sh` | CONTRACT-REGISTRY.md |
+| Endpoint count | `METRICS` (computed from route handlers) | `check-ground-truth.sh` | API specs |
+
+**Anti-pattern:** hardcoding the same number in 5 documents. **Pattern:** put
+the number in `METRICS`, reference it from prose, regenerate on commit.
+
+---
+
+## Production Deploy Confirmation (W1-3)
+
+Deploy scripts that target production MUST require interactive confirmation.
+Without this, agents with "maximum autonomy" can deploy autonomously —
+autonomy grants are for development workflow, not production operations.
+
+```bash
+# In your production deploy script:
+if [ -t 0 ]; then
+  read -p "Deploy to PRODUCTION? Type 'yes' to confirm: " confirm
+  [ "$confirm" = "yes" ] || { echo "Aborted."; exit 1; }
+else
+  echo "ERROR: Production deploy requires interactive terminal (TTY)."
+  echo "This prevents automated/scripted deploys without human confirmation."
+  exit 1
+fi
+```
+
+The `-t 0` test ensures the script is running in an interactive terminal,
+not piped or scripted. **This is a deliberate friction point** — the one
+place where we want to slow agents down. Document for your project: which
+deploy commands target production vs staging, which have this guard, and
+how to bypass for CI/CD pipelines (e.g., `DEPLOY_CONFIRMED=1`).
+
+For the full deployment-pattern catalog (origin allowlists, MIME types,
+build-time env vars, etc.), see `practices/deployment-patterns.md`.
+
+---
+
 ## Testing Cascade
 
 **Fast inner loops, rigorous outer gates.** Never run the full suite when a
@@ -128,6 +182,57 @@ scripts/check-contract-refs.sh  # Contract links valid
 scripts/check-todos.sh         # No untracked TODOs
 scripts/ci-check.sh           # Full quality scan
 ```
+
+### Regression-Fix Gates H + L (W3-4)
+
+When the prompt is "fix this regression," two doctrines bind:
+
+**Gate H — Single-fix-isolation.** Each `fix:` commit must be paired with a
+verify step in your reasoning: *"I applied X; the symptom is now Y;
+therefore X was/wasn't the cause."* Don't apply Fix A + Fix B + cleanup all
+at once and declare victory — when the result is good you can't attribute
+it; when it's bad you can't isolate it.
+
+**Gate L — Fix-your-own-test-drift.** When a test fails after your change,
+the FIRST hypothesis is *"I broke the test's contract assumption"* —
+investigate before bypassing. If the contract change is intended, the test
+update is part of the same PR. "Test contract drift" is not a free pass.
+
+Mechanical commit-msg gates (`scripts/check-fix-commit.sh` for Gate G,
+`scripts/check-bypass-flags.sh` for Gate I) catch the related failure modes
+that ARE script-detectable. See `practices/regression-fix-protocol.md` for
+the full six-gate protocol.
+
+### The Scout Rule: Zero Tolerance for Broken Tests (W1-4)
+
+**You're a scout. Leave the camp cleaner than you found it.**
+
+| Situation | Action |
+|-----------|--------|
+| Test fails after your change | Fix the code or fix the test |
+| Test was already failing before your change | Fix it NOW — you found it, you own it |
+| Test times out | Timeout is wrong OR product is broken — fix one |
+| Skipped test | Fix the skip. Scope it properly or delete. Never leave a `skip`. |
+| Flaky test | Stabilize or delete. Flaky = lying about coverage. |
+| Obsolete test (OBE) | Remove carefully. Verify behavior is gone or covered elsewhere. |
+| Platform-specific test | Use proper conditions (`if platform == X`), not blanket `skip`. |
+
+**Forbidden phrases:**
+- "Pre-existing failure" — that's a tracking failure, not an excuse
+- "Not caused by our changes" — investigate every failure
+- "Flaky" without a root cause in the commit message
+
+**Why absolute:** A `skipped` test is invisible debt; it rots and gives false
+confidence. Every session that walks past a broken test makes the problem
+worse. Fixing a test you didn't break is not extra work — it's the cost of
+working in a shared codebase. The 30-second fix you defer today becomes a
+30-minute archaeology project next month.
+
+**Practical:** before starting a task, run the relevant tier; if anything is
+red or skipped, fix first. After finishing, run again — leave them greener
+than you found them. If a fix would take >30 min and block your task,
+create a P0 in TODO.md with a deadline — but this is the exception, not the
+norm.
 
 ---
 
