@@ -193,6 +193,20 @@ class MCPServer:
         except ValueError:
             return self._error(-32602, "Invalid params", "Invalid agent ID format", req_id)
 
+        # Case-insensitive lookup. ask_TDFLite_architect, ask_tdflite_architect,
+        # and ask_TDFLITE_ARCHITECT all resolve to the canonical TDFLite/architect.
+        # Red-team finding C2 — without this, wrong-case calls returned a misleading
+        # "Repository tdflite not found" -32603.
+        canonical_repo = self.registry.resolve_repo(repo)
+        if not canonical_repo:
+            return self._error(-32603, "Tool execution failed",
+                               f"Repository {repo} not found", req_id)
+        canonical_role = self.registry.resolve_role(canonical_repo, role)
+        if not canonical_role:
+            return self._error(-32603, "Tool execution failed",
+                               f"Role {role} not found in {canonical_repo}", req_id)
+        repo, role = canonical_repo, canonical_role
+
         question = arguments.get("question")
         verbose = arguments.get("verbose", False)
 
@@ -282,6 +296,13 @@ class MCPServer:
 
             resource_type, agent_id = parts
             repo, role = agent_id.split(":", 1)
+
+            # Case-insensitive resolution (mirrors _handle_tools_call).
+            canonical_repo = self.registry.resolve_repo(repo)
+            if canonical_repo:
+                canonical_role = self.registry.resolve_role(canonical_repo, role)
+                if canonical_role:
+                    repo, role = canonical_repo, canonical_role
 
             content = self._get_resource_content(resource_type, repo, role)
 
@@ -617,6 +638,39 @@ class RepoRegistry:
     def get_repo_path(self, repo_name):
         with self._lock:
             return self.repos.get(repo_name)
+
+    def resolve_repo(self, repo_name):
+        """Case-insensitive repo lookup. Returns the canonical repo name
+        (as registered) when an inexact-case match exists, else None.
+
+        Without this, `ask_tdflite_architect` returns -32603 even when
+        the canonical `TDFLite` repo is registered. Red-team finding C2.
+        """
+        with self._lock:
+            if repo_name in self.repos:
+                return repo_name  # exact match — fast path
+            lc_target = repo_name.lower()
+            for canonical in self.repos:
+                if canonical.lower() == lc_target:
+                    return canonical
+            return None
+
+    def resolve_role(self, repo_name, role_name):
+        """Case-insensitive role lookup within a registered repo.
+        Returns the canonical role name (as it appears in agents/<role>/)
+        when a case-insensitive match exists, else None.
+        """
+        path = self.get_repo_path(repo_name)
+        if not path:
+            return None
+        roles = self._list_agents_for(path)
+        if role_name in roles:
+            return role_name
+        lc_target = role_name.lower()
+        for canonical in roles:
+            if canonical.lower() == lc_target:
+                return canonical
+        return None
 
     def has_agent(self, repo_name, role):
         path = self.get_repo_path(repo_name)

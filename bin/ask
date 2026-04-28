@@ -279,9 +279,41 @@ _server_curl() {
 }
 
 _is_remote_query() {
-  # Returns 0 (true) if this should be routed to the server
-  # Conditions: ASK_SERVER is set AND the agent spec contains ':'
-  [ -n "$SERVER" ] && [[ "$1" == *:* ]]
+  # Returns 0 (true) if this should be routed to the server.
+  # Conditions: ASK_SERVER is set AND the agent spec contains ':' AND the
+  # project half doesn't resolve locally (case-insensitive).
+  #
+  # Without the local-first check, an adopter with ASK_SERVER set in env
+  # who types `ask tdflite:architect` (wrong case) would fall through to
+  # a remote that typically isn't there, getting "all servers failed"
+  # instead of the case-insensitive local match (red-team finding M1).
+  [ -n "$SERVER" ] || return 1
+  [[ "$1" == *:* ]] || return 1
+
+  # Empty halves are malformed — let resolve_project_agent emit the proper
+  # error rather than masking it as a remote routing miss (M9).
+  local proj="${1%%:*}"
+  local role="${1#*:}"
+  if [ -z "$proj" ] || [ -z "$role" ]; then
+    return 1
+  fi
+
+  # Local-first: if the project half matches a registry entry (case-
+  # insensitive), prefer local resolution.
+  if [ -f "$REGISTRY" ]; then
+    local lc_proj line registered
+    lc_proj=$(echo "$proj" | tr '[:upper:]' '[:lower:]')
+    while IFS= read -r line; do
+      registered="${line%%=*}"
+      registered=$(echo "$registered" | sed 's/[[:space:]]*$//')
+      [ -z "$registered" ] && continue
+      if [ "$(echo "$registered" | tr '[:upper:]' '[:lower:]')" = "$lc_proj" ]; then
+        return 1  # local match found — not a remote query
+      fi
+    done < "$REGISTRY"
+  fi
+
+  return 0  # genuinely remote
 }
 
 cmd_serve() {
@@ -422,15 +454,54 @@ require_agent_name() {
   fi
 }
 
+# Resolve an agent name case-insensitively against $AGENTS_DIR. Echoes
+# the canonical directory name on stdout (or empty string if no match).
+# Stays bash 3.2 compatible (no nameref, no associative arrays).
+_canonicalize_agent() {
+  local input="$1"
+  [ -z "$input" ] && return 0
+
+  # Fast path: exact match
+  if [ -d "$AGENTS_DIR/$input" ] && [ -f "$AGENTS_DIR/$input/AGENT.md" ]; then
+    echo "$input"
+    return 0
+  fi
+
+  # Case-insensitive scan
+  [ -d "$AGENTS_DIR" ] || return 0
+  local lc_input base lc_base
+  lc_input=$(echo "$input" | tr '[:upper:]' '[:lower:]')
+  for d in "$AGENTS_DIR"/*/; do
+    [ -d "$d" ] || continue
+    [ -f "$d/AGENT.md" ] || continue
+    base=$(basename "$d")
+    lc_base=$(echo "$base" | tr '[:upper:]' '[:lower:]')
+    if [ "$lc_base" = "$lc_input" ]; then
+      echo "$base"
+      return 0
+    fi
+  done
+  return 0
+}
+
 require_agent_exists() {
   local agent="$1"
-  local agent_dir="$AGENTS_DIR/$agent"
-  if [ ! -d "$agent_dir" ]; then
-    echo "ask: error: agent '$agent' not found (no directory at $agent_dir)" >&2
-    echo "Available agents:" >&2
-    cmd_who >&2
-    exit 2
+  local canonical
+  canonical=$(_canonicalize_agent "$agent")
+  if [ -n "$canonical" ]; then
+    # Set the global so callers can normalize their agent variable.
+    # Shell call sites that haven't been updated still work on macOS
+    # (case-insensitive APFS) but should read $_CANONICAL_AGENT for
+    # Linux portability.
+    _CANONICAL_AGENT="$canonical"
+    [ "$canonical" != "$agent" ] && log "Resolved agent '$agent' → '$canonical' (case-insensitive)"
+    return 0
   fi
+
+  echo "ask: error: agent '$agent' not found (no directory at $AGENTS_DIR/$agent)" >&2
+  echo "Available agents:" >&2
+  cmd_who >&2
+  exit 2
 }
 
 require_jq() {
@@ -449,6 +520,11 @@ resolve_project_agent() {
   # Parse "project:agent" syntax. Sets _RESOLVED_AGENT and updates
   # AGENTS_DIR/SHARED_DIR if a project prefix is found.
   # Must be called directly (not in a subshell) so variable changes persist.
+  #
+  # Project lookup is case-insensitive: `tdflite:architect` resolves to
+  # the registered `TDFLite` repo. Without this, a user typing the wrong
+  # case fell through to ASK_SERVER and got the misleading "all servers
+  # failed" error (red-team finding M1).
   local spec="$1"
   _RESOLVED_AGENT="$spec"
   _RESOLVED_PROJECT_DIR=""
@@ -458,13 +534,39 @@ resolve_project_agent() {
       local project="${spec%%:*}"
       _RESOLVED_AGENT="${spec#*:}"
 
+      # M9: reject empty project or agent halves explicitly.
+      if [ -z "$project" ] || [ -z "$_RESOLVED_AGENT" ]; then
+        echo "ask: error: malformed cross-repo spec '$spec' — expected '<project>:<agent>'" >&2
+        exit 2
+      fi
+
       if [ ! -f "$REGISTRY" ]; then
         die "no project registry at $REGISTRY — run 'ask register <name>' in a project first"
       fi
 
-      local project_path
+      # Case-insensitive registry lookup. Try exact match first (fast path),
+      # then fall back to case-insensitive scan returning the canonical name.
+      local project_path canonical_project
       project_path=$(grep "^${project}[[:space:]]*=" "$REGISTRY" 2>/dev/null \
         | head -1 | cut -d'=' -f2 | xargs) || true
+      canonical_project="$project"
+
+      if [ -z "$project_path" ]; then
+        local lc_project line registered
+        lc_project=$(echo "$project" | tr '[:upper:]' '[:lower:]')
+        while IFS= read -r line; do
+          registered="${line%%=*}"
+          # trim trailing whitespace
+          registered=$(echo "$registered" | sed 's/[[:space:]]*$//')
+          [ -z "$registered" ] && continue
+          if [ "$(echo "$registered" | tr '[:upper:]' '[:lower:]')" = "$lc_project" ]; then
+            project_path=$(echo "${line#*=}" | xargs)
+            canonical_project="$registered"
+            log "Resolved project '$project' → '$canonical_project' (case-insensitive)"
+            break
+          fi
+        done < "$REGISTRY"
+      fi
 
       if [ -z "$project_path" ]; then
         echo "ask: error: project '$project' not found in registry" >&2
@@ -474,14 +576,13 @@ resolve_project_agent() {
       fi
 
       if [ ! -d "$project_path" ]; then
-        die "registered path for '$project' no longer exists: $project_path"
+        die "registered path for '$canonical_project' no longer exists: $project_path"
       fi
 
       AGENTS_DIR="$project_path/agents"
       SHARED_DIR="$project_path/shared"
       EVENTS_LOG="$SHARED_DIR/messages/events.jsonl"
       _RESOLVED_PROJECT_DIR="$project_path"
-      log "Resolved project '$project' → $project_path"
       ;;
   esac
 }
@@ -1925,9 +2026,14 @@ case "$CMD" in
     # --- Local mode ---
     resolve_project_agent "$CMD"
     AGENT="$_RESOLVED_AGENT"
-    AGENT_DIR="$AGENTS_DIR/$AGENT"
 
+    # require_agent_exists exits on miss; on hit it sets _CANONICAL_AGENT
+    # to the actual case-correct directory name (e.g. 'architect' if user
+    # typed 'Architect'). Use the canonical form so path construction
+    # works on case-sensitive filesystems (Linux).
     require_agent_exists "$AGENT"
+    AGENT="$_CANONICAL_AGENT"
+    AGENT_DIR="$AGENTS_DIR/$AGENT"
 
     CMD_WORD="${2:-}"
 
