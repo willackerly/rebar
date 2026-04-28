@@ -4,6 +4,7 @@ agents/*/outbox/
 agents/*/.pid
 agents/*/.last-stderr
 agents/*/.session-id
+agents/*/.progress
 agents/*/memory.log.md
 shared/messages/events.jsonl
 
