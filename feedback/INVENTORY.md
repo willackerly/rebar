@@ -46,13 +46,13 @@ source project(s) so accumulation is visible.
 
 | Item | Votes | Sources | Effort | Rationale for defer |
 |------|------:|---------|--------|---------------------|
-| Cross-repo `CONTRACT:namespace/ID` syntax | 1 | Office180 | XS | Tiny change — add when 2nd ask lands or a real multi-repo dep appears |
+| ~~Cross-repo `CONTRACT:namespace/ID` syntax~~ | ~~1~~ | ~~Office180~~ | ~~XS~~ | **SUPERSEDED 2026-04-28** by `CONSUMES.md` declaration in cross-repo federation design (CHARTER §1.6). Cross-repo coordination uses owner-repo + contract-id + version_pinned in CONSUMES.md, not inline namespace syntax in CONTRACT: refs. Source: `feedback/2026-04-28-cross-repo-contract-federation.md`. |
 | YAML frontmatter on contracts (`id`/`version`/`namespace`/`depends_on`/`implements`/`mcp_tools`/`tags`) | 1 | Office180 | M | Template friction for solo users; no measured pain yet |
 | `security_tier: critical/standard/internal` field on contracts | 1 | Office180 (scalability) | S | Defer with YAML frontmatter; no crypto-team-review workflow yet |
 | Contract tiering (Tier-1 contract-owning / Tier-2 architecture-belonging / Tier-3 no-header) formal framework | 1 | Digital Signer | S | conventions.md already has the distinction; formalization waits for explicit adopter confusion |
 | `CONTRACT-GAPS.md` template + `check-contract-gaps.sh` | 1 | Digital Signer | S | Redundant with W2-2 extended registry; kill if W2-2 handles it |
 | ADR pattern (`decisions/NNNN-title.md`) | 1 | filedag | M | Adds a new convention; wait for 2nd ask OR dogfood in rebar repo itself first |
-| Contract impact DAG (`depends_on`/`consumed_by` frontmatter + `check-contract-graph.sh`) | 1 | filedag | L | Piggy-backs on YAML frontmatter decision above |
+| ~~Contract impact DAG (`depends_on`/`consumed_by` frontmatter + `check-contract-graph.sh`)~~ | ~~1~~ | ~~filedag~~ | ~~L~~ | **SUPERSEDED 2026-04-28** by `CONSUMES.md` + `rebar contract drift-check` in cross-repo federation design (CHARTER §1.6). The drift-check command derives the consumer→owner DAG from CONSUMES.md declarations and reports deltas. The reverse direction (owner→consumers) is via `scripts/scan-consumers.sh`. No frontmatter required. Source: `feedback/2026-04-28-cross-repo-contract-federation.md`. |
 | Amendment discipline lint (structured `## Amendment <L>` template + >2-amendments warning) | 1 | filedag | S | Over-engineered for current maturity — no amendment rot problem yet |
 | Cold-start coherence check (`check-cold-start-coherence.sh`) | 1 | filedag | S | Interesting layering on ground-truth; watchlist for 2nd ask |
 | Seam-contract metadata w/ Ed25519 signatures, adapter manifests | 1 | filedag | L | Pre-emptive; wait for 2nd federation use case |
@@ -75,9 +75,9 @@ source project(s) so accumulation is visible.
 
 | Item | Votes | Sources | Effort | Rationale |
 |------|------:|---------|--------|-----------|
-| Contract catalog (git-repo-based, `catalog-collect.sh` + `build-index.sh`) | 2 | Office180, scalability-deep-review | M | No adopter at Tier 3 yet; premature to build |
-| CI-triggered catalog collection | 1 | scalability-deep-review | M | Follows catalog; premature |
-| Cross-repo breaking-change detection script | 1 | scalability-deep-review | S | Follows catalog |
+| ~~Contract catalog (git-repo-based, `catalog-collect.sh` + `build-index.sh`)~~ | ~~2~~ | ~~Office180, scalability-deep-review~~ | ~~M~~ | **REJECTED 2026-04-28** as superseded by the distributed federation model (CHARTER §1.6 + §2.10). Central catalog violates §2.10 ("not a federation registry"); consumer-side `CONSUMES.md` self-declaration achieves the same coordination goal without a central index. Adopters who need cross-machine discovery run `scripts/scan-consumers.sh` with explicit repos lists. Source: `feedback/2026-04-28-cross-repo-contract-federation.md`. |
+| ~~CI-triggered catalog collection~~ | ~~1~~ | ~~scalability-deep-review~~ | ~~M~~ | **REJECTED 2026-04-28** — depended on the rejected catalog above. |
+| ~~Cross-repo breaking-change detection script~~ | ~~1~~ | ~~scalability-deep-review~~ | ~~S~~ | **SUPERSEDED 2026-04-28** by `rebar contract drift-check` (consumer-side) + `scripts/check-version-bump.sh` (owner-side) in the federation design. |
 | `WORKSTREAMS.md` split from AGENTS.md | 1 | scalability-deep-review | S | Document as optional in small-team profile instead of structural change |
 | `compute-metrics.sh` (generate METRICS, not verify) | 1 | scalability-assessment | S | Tier 2 optimization; wait for real merge-conflict pain |
 | Un-gitignore shared agent memory + summarizer | 1 | scalability-assessment | M | log/summary split done; summarizer waits for demand |
@@ -174,6 +174,26 @@ The 3 universal gates (G, I, L) are queued as Wave 3 above. The remaining 3 are 
 These items were substantially addressed by commits in the last cycle.
 Listed so future feedback on the same topic can see prior work and not
 re-request.
+
+### Cross-Repo Contract Federation — CHARTER amendments (2026-04-28 eve)
+
+CHARTER §1.6 (Cross-Repo Contract Federation) and §2.10 (Not a federation
+registry / package manager) amendments landed. Source proposal:
+`feedback/2026-04-28-cross-repo-contract-federation.md`. Subsequent
+commits land the implementation: CONSUMES.md template, owner-side
+scan/flush scripts + post-commit version-bump detector, consumer-side
+`rebar contract drift-check` + `rebar contract upstream` commands,
+compliance gating when CONSUMES.md present.
+
+| Item | Disposition |
+|------|-------------|
+| CHARTER §1.6 (federation as IS-positive) | **Implemented** — pure addition; "discipline, not infrastructure" framing locks composition-over-inheritance + async outbox model. |
+| CHARTER §2.10 (NOT a federation registry / package manager) | **Implemented** — preempts the central-registry temptation; mandates local-machine discovery via CONSUMES.md greping. |
+| Cross-repo `CONTRACT:namespace/ID` syntax (Office180) | **Superseded** — Watchlist entry struck-through; CONSUMES.md achieves the same coordination via owner_repo + contract_id + version_pinned fields, no inline syntax change needed. |
+| Contract impact DAG (filedag) | **Superseded** — Watchlist entry struck-through; `rebar contract drift-check` derives consumer→owner DAG from CONSUMES.md, no frontmatter required. |
+| Contract catalog (Office180 + scalability-deep-review, 2 votes) | **Rejected** — Watchlist entry struck-through; central catalog violates new CHARTER §2.10. The 2-vote-promotion threshold doesn't override charter constraints. |
+| CI-triggered catalog collection | **Rejected** — depended on rejected catalog. |
+| Cross-repo breaking-change detection script | **Superseded** — covered by drift-check + check-version-bump. |
 
 ### CHARTER + `ask featurerequest` intake role (2026-04-28)
 
@@ -328,6 +348,15 @@ feedback-driven Watchlist / Queued shape. Pick up between feedback waves.
 
 ## Document History
 
+- **2026-04-28 (eve)** — CHARTER §1.6 + §2.10 amendments for cross-repo
+  contract federation landed. Three predecessor Watchlist items struck
+  through (Office180 cross-repo syntax, filedag impact DAG, contract
+  catalog) — first two superseded by CONSUMES.md + drift-check, third
+  rejected as charter-incompatible (would have created a central
+  registry, violating new §2.10). Source proposal:
+  `feedback/2026-04-28-cross-repo-contract-federation.md`.
+  Subsequent commits land the implementation across 5 themed clusters
+  (CHARTER → CONSUMES.md → owner-side → consumer-side → compliance).
 - **2026-04-28** — Landed CHARTER.md + `ask featurerequest` gated intake role. New artifacts: `CHARTER.md` (§1 IS, §2 IS NOT, §3 hard gates, §4 fork-instead, §5 amendment process), `agents/featurerequest/AGENT.md` (four-path triage doctrine), `feedback/FR-TEMPLATE.md` (provenance + charter mapping). MCP wiring: ROLE_DESCRIPTIONS entry in `bin/ask-mcp-server`; WRITE_MODE auto-enable in `cmd_ask` for `featurerequest`. Architect + product AGENT.md updated to route missing-feature asks through the intake gate. Bounded-exception carve-out in ASK CLI feature-requests table reconciles with prior rejection of `do/peek/diff/trace/broadcast`.
 - **2026-04-25 (eve)** — Knocked out all queued waves (Wave 1, 2, 3 → Implemented). Net new artifacts: `practices/regression-fix-protocol.md`, `scripts/check-fix-commit.sh`, `scripts/check-bypass-flags.sh`, doctrine additions to AGENTS templates, D/O/T contract prefixes in DESIGN + architecture/README, "Contract Health" section in compute-registry.sh output. ci-check.sh now runs 13/13 enforcement on rebar itself. Five more source files moved to `processed/` (digital-signer, zero-tolerance, versioning, filedag-deep-audit + the two from the 2026-04-26 triage round).
 - **2026-04-26** — Triaged 2026-04-24-process-gates-G-through-L.md (Wave 3 queued for the 3 universal gates G/I/L, Watchlist for project-specific H/J/K) and 2026-04-26-webcrypto-ed25519-quirks.md (Watchlist entry for cross-language canonical-fixture pattern; rediscovered Oracle Pattern was already implemented in DESIGN.md and moved its stale Watchlist entry to Implemented). Both source files moved to `processed/`.

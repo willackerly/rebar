@@ -49,6 +49,16 @@ The `rebar` repo itself runs at Tier 3 (ENFORCED) on its own conventions. Any
 addition to rebar must pass `scripts/ci-check.sh` against rebar itself, not
 just template projects.
 
+### §1.6 Cross-Repo Contract Federation
+A discipline (not infrastructure) for coordinating contracts across
+multiple rebar-adopting repos: explicit consumer declaration via
+`CONSUMES.md`, mandatory semver for cross-repo contracts, async
+notification via the existing featurerequest gate (no daemons, no
+central registry), and owner-pulled reconciliation of consumer
+extensions. Forking is the default state; divergence is made visible
+via `rebar contract drift-check`. Composition over inheritance — local
+extensions are local first-class contracts, not `extends:` metadata.
+
 ---
 
 ## §2 — What rebar IS NOT
@@ -112,6 +122,18 @@ operation is the bounded exception — its write surface is a single
 deterministic file shape in `feedback/FR-*.md`, validated by gates before
 submission.
 
+### §2.10 Not a federation registry / package manager
+rebar does not host a central index of contracts, consumers, or
+versions. Cross-repo discovery is local-machine derivation from
+`CONSUMES.md` declarations across known sibling repos. There is no
+"rebar federation server," no auto-update mechanism, no central
+authority. A consumer can declare and forget; an owner can publish and
+forget. Reconciliation requires deliberate maintainer action on both
+sides.
+**Out of scope:** "add a contract registry server," "auto-update
+consumers when owner revs," "centralized federation index," "automatic
+extension upstreaming."
+
 ---
 
 ## §3 — Acceptance gates for feature requests
@@ -169,6 +191,13 @@ Document History for the trigger events that motivated past amendments.
 
 ## Document History
 
+- **2026-04-28 (eve)** — §1.6 (Cross-Repo Contract Federation) and §2.10
+  (Not a federation registry / package manager) amendments landed
+  together. Motivating proposal: `feedback/2026-04-28-cross-repo-contract-federation.md`.
+  §1.6 makes federation an explicit IS-positive (discipline, not
+  infrastructure); §2.10 preempts the central-registry temptation
+  (mandatory local-machine discovery). Together they unblock CONSUMES.md
+  + drift-check + flush-notifications implementation.
 - **2026-04-28** — Charter created. Motivating commit: introduction of
   `ask featurerequest` as a gated MCP intake channel. CHARTER is the
   in-scope/out-of-scope anchor that makes the gate deterministic.
