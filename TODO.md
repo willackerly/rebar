@@ -1,6 +1,6 @@
 # TODO — rebar
 
-**Last synced:** 2026-04-25
+**Last synced:** 2026-04-28
 
 The canonical, vote-shaped backlog lives in [`feedback/INVENTORY.md`](feedback/INVENTORY.md).
 This file holds short-horizon work that's actively in flight or imminent.
@@ -18,6 +18,7 @@ This file holds short-horizon work that's actively in flight or imminent.
 - [ ] Triage `feedback/2026-04-24-process-gates-G-through-L.md` (untracked, dropped by Will 2026-04-24).
 - [ ] Wave 1 doc-only items (5 items, ~1 day) — see `INVENTORY.md` §Queued.
 - [ ] Wave 2 script + template surgery (2 items, ~1 day) — see `INVENTORY.md` §Queued.
+- [ ] **Next big push: opportunistic auto-federation** — see [`feedback/2026-04-28-auto-federation-experiment.md`](feedback/2026-04-28-auto-federation-experiment.md). 5 candidate experiments (auto-flush cron, consumer-hello on first declaration, auto-PR for minor pin bumps, auto-discover via git remotes, age-out stale outbox entries). Goal: test "without trying too hard" — repos auto-link + auto-notify when both sides have the conventions wired, but every fallback intact. Doctrine anchor: [`practices/federation.md`](practices/federation.md) Principle 4 ("automation tries, doesn't require").
 
 ## P2 — Maintainer Queue
 

@@ -338,6 +338,10 @@ feedback-driven Watchlist / Queued shape. Pick up between feedback waves.
 
 - [ ] **Session-start repo-state check** — currently 1 vote in Watchlist (Session Lifecycle section). Promote when a 2nd adopter reports the same drift surprise OR while you're already editing `rebar status` / `practices/session-lifecycle.md` for another reason.
 
+### Next big push (queued)
+
+- [ ] **Opportunistic auto-federation experiments** — `feedback/2026-04-28-auto-federation-experiment.md`. 5 candidate experiments to close the federation loop end-to-end while preserving CHARTER §1.6 + §2.10 + `practices/federation.md` Principle 4 ("tries, doesn't require"). Test plan staged in 3 phases (manual baseline → one auto-arrow at a time → measure). 7 open questions await maintainer decisions (test partner repo, cron cadence, auto-PR bot identity, fatigue thresholds, etc.).
+
 ### Repo housekeeping
 
 - [ ] Working tree has untracked deletions from stale worktrees: `.claude/worktrees/agent-a28b156a/` and `.claude/worktrees/agent-a3c77b08/`. Either `git clean` them or commit the deletions.
