@@ -57,6 +57,11 @@ cp DESIGN.md            "$PROJECT/DESIGN.md"
 cp -r architecture/          "$PROJECT/architecture/"
 
 # Agent orchestration (recommended)
+# Copies the role-AGENT.md *templates* from the rebar repo. To populate
+# your project's per-role agent skeletons (architect, product, englead,
+# steward, merger, featurerequest), run `bin/ask init` from inside
+# $PROJECT after this copy completes. (`rebar new` and `rebar adopt`
+# call this automatically.)
 cp -r agents/                "$PROJECT/agents/"
 
 # Practice reference guides (recommended)

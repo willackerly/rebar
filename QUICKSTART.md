@@ -19,7 +19,16 @@ cd rebar
 # Copy complete working project template
 cp -r templates/project-bootstrap/* ../my-new-project/
 cd ../my-new-project
+
+# Create the ASK role agents (architect, product, englead, steward, merger, featurerequest)
+../rebar/bin/ask init
 ```
+
+> **Why `ask init` matters:** the bootstrap template ships scaffolding
+> docs but not agent skeletons. Without `ask init`, `ask architect "X"`
+> fails with "no agents directory" and the MCP tool list in Claude Code
+> is empty. `rebar new` and `rebar adopt` run this automatically; the
+> manual `cp -r` path needs it explicitly.
 
 > **Optional — put the ASK CLI on your PATH:**
 > `../rebar/bin/install` adds rebar's `bin/` to your shell RC. You can

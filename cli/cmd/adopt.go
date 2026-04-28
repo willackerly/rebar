@@ -60,7 +60,11 @@ func runAdopt(cmd *cobra.Command, args []string) error {
 	// Phase 1: Assess current state
 	fmt.Println("  Phase 1: Assessment")
 	score, results := auditRepo(root)
-	fmt.Printf("  Current compliance: %.1f/10\n\n", score)
+	fmt.Printf("  Current compliance: %.1f/10\n", score)
+	if score < 3.0 {
+		fmt.Printf("  (low score is normal pre-adoption — improves as scaffolding lands below)\n")
+	}
+	fmt.Println()
 
 	// Phase 2: Scaffold (always — equivalent to rebar init + fixes)
 	fmt.Println("  Phase 2: Scaffolding")
@@ -156,6 +160,12 @@ Only propose contracts for code that actually exists — don't invent components
 	newScore, _ := auditRepo(root)
 	fmt.Printf("  Compliance: %.1f/10 (was %.1f/10)\n", newScore, score)
 	fmt.Printf("  %s\n\n", scoreBar(newScore))
+
+	fmt.Println("  Next steps:")
+	fmt.Println("    rebar context              # see your project's current state")
+	fmt.Println("    ask architect \"<question>\"  # talk to the architect agent")
+	fmt.Println("    ask who                    # list all available agents")
+	fmt.Println()
 
 	// Print unused results to satisfy compiler
 	_ = results

@@ -152,6 +152,16 @@ func runContext(cmd *cobra.Command, args []string) error {
 		fmt.Println("Ensure the Cold Start Quad exists: README.md, QUICKCONTEXT.md, TODO.md, AGENTS.md")
 	}
 
+	// Nudge: if agents/ exists but the architect has never been queried,
+	// surface the next-most-useful command. Caller is likely a fresh
+	// adopter who just ran `rebar new` or `rebar context` for the first
+	// time and hasn't discovered ASK yet.
+	logPath := filepath.Join(cfg.RepoRoot, "agents", "architect", "memory.log.md")
+	if info, err := os.Stat(logPath); err == nil && info.Size() == 0 {
+		fmt.Println()
+		fmt.Println("Try: ask architect \"what should I implement first?\"")
+	}
+
 	return nil
 }
 

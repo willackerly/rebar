@@ -221,7 +221,11 @@ Be practical and specific. Don't over-engineer — this is a fresh project.`, na
 	fmt.Printf("  %s\n", scoreBar(score))
 
 	fmt.Printf("\n  Project ready at: %s\n", root)
-	fmt.Printf("  Next: cd %s && rebar context\n\n", name)
+	fmt.Printf("\n  Next steps:\n")
+	fmt.Printf("    cd %s\n", name)
+	fmt.Printf("    rebar context                    # see your project's current state\n")
+	fmt.Printf("    ask architect \"where do I start?\" # talk to the architect agent\n")
+	fmt.Printf("    ask who                          # list all available agents\n\n")
 
 	return nil
 }
