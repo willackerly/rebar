@@ -337,6 +337,7 @@ rebar/
 
 ## Learn More
 
+- [CHARTER.md](CHARTER.md) — IS / IS NOT scope statement; anchors `ask featurerequest` intake gates
 - [DESIGN.md](DESIGN.md) — the full philosophy: contracts, BDD, lifecycle, autonomy, testing cascade
 - [conventions.md](conventions.md) — branch naming, commit format, file headers, discovery taxonomy
 - [architecture/README.md](architecture/README.md) — contract naming, linking, and lifecycle reference

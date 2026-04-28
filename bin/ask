@@ -903,7 +903,7 @@ cmd_init() {
   # --- Create agents ---
   local created=()
 
-  for role in architect product englead steward merger; do
+  for role in architect product englead steward merger featurerequest; do
     local agent_dir="$AGENTS_DIR/$role"
     if [ -f "$agent_dir/AGENT.md" ]; then
       # Ensure inbox/outbox exist for existing agents
@@ -934,6 +934,15 @@ cmd_init() {
 cmd_ask() {
   local agent="$1"
   local question="$2"
+
+  # Roles with default write access (gated intake — see CHARTER §2.9 / §3).
+  # MCP callers don't pass -w; the role itself implies the write surface.
+  case "$agent" in
+    featurerequest)
+      WRITE_MODE=1
+      log "Auto-enabling write mode for write-capable role: $agent"
+      ;;
+  esac
 
   require_agent_exists "$agent"
   require_jq

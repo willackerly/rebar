@@ -351,6 +351,17 @@ class MCPServer:
             "Best for: 'help me implement this contract', 'what's in scope vs out?', "
             "'is this change inside my contract?'."
         ),
+        "featurerequest": (
+            "Feature-request intake agent for {repo}. Gated MCP contribution "
+            "channel for callers without git write access. Receives typed "
+            "missing-feature asks, scores them against CHARTER.md (§3 hard "
+            "gates: in-scope, not blocked, concrete use case, novel), and "
+            "either files a structured FR-*.md artifact or returns a precise "
+            "rejection reason. "
+            "Best for: 'we hit X gap doing Y in our project, please track it'. "
+            "NOT for: open-ended discussion, design proposals, or methodology "
+            "questions — fork the repo for those (CHARTER §4)."
+        ),
     }
 
     def _get_agent_description(self, repo, role):

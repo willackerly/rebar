@@ -92,9 +92,23 @@ source project(s) so accumulation is visible.
 
 | Item | Votes | Sources | Decision |
 |------|------:|---------|----------|
-| `ask peek` / `ask diff` / `ask trace` / `ask broadcast` | 1 | OpenDocKit | **REJECT** — expands ASK from interrogation into orchestration; muddies clean value prop |
-| `do <role> "..."` imperative variant of ask | 1 | OpenDocKit | **REJECT** — same rationale; keep ASK purely interrogative |
+| `ask peek` / `ask diff` / `ask trace` / `ask broadcast` | 1 | OpenDocKit | **REJECT** — expands ASK from interrogation into orchestration; muddies clean value prop. *(Scope reaffirmed 2026-04-28 alongside `ask featurerequest` — see note below.)* |
+| `do <role> "..."` imperative variant of ask | 1 | OpenDocKit | **REJECT** — same rationale; keep ASK purely interrogative. *(Scope reaffirmed 2026-04-28 — see note below.)* |
 | "Context preservation" reframe in ASK README | 1 | blindpipe | XS — opportunistic README copy-edit; low cost, clear improvement |
+| `ask featurerequest` gated intake role | (maintainer) | rebar-direct 2026-04-28 | **IMPLEMENTED** — see CHARTER §2.9 + `agents/featurerequest/AGENT.md`. The bounded exception to the no-orchestration doctrine: write surface is a single deterministic file shape (`feedback/FR-*.md`), guarded by CHARTER §3 acceptance gates, no `git commit`. |
+
+**Note on no-orchestration doctrine (2026-04-28):** The `ask featurerequest`
+role files structured artifacts as a side effect — formally a write op,
+which the prior rejection of `do/peek/diff/trace/broadcast` would seem to
+preclude. The reconciliation: featurerequest is still interrogative in
+shape (caller asks, agent decides+responds), but produces a deterministic
+filed artifact instead of a free-text answer when CHARTER §3 gates pass.
+The rejected `do/peek/diff/trace/broadcast` proposals were unbounded
+action surfaces; featurerequest's write surface is `feedback/FR-*.md`
+plus vote increments on `INVENTORY.md` — bounded and auditable. CHARTER
+§2.9 makes this carve-out explicit. Future write-capable ASK roles must
+similarly justify their bounded surface vs the default no-orchestration
+posture.
 
 ### Subagent Skills
 
@@ -160,6 +174,21 @@ The 3 universal gates (G, I, L) are queued as Wave 3 above. The remaining 3 are 
 These items were substantially addressed by commits in the last cycle.
 Listed so future feedback on the same topic can see prior work and not
 re-request.
+
+### CHARTER + `ask featurerequest` intake role (2026-04-28)
+
+A formal scope anchor (`CHARTER.md`) and a gated MCP intake channel for
+external callers who cannot push to rebar directly.
+
+| Item | Disposition |
+|------|-------------|
+| `CHARTER.md` (IS / IS NOT statement, §3 acceptance gates, §4 fork-instead doctrine) | **Implemented** — anchors all FR triage; amendment-only at section level per §5. Cited from feedback/README.md, agents/featurerequest/AGENT.md, and the bounded-exception note above. |
+| `agents/featurerequest/AGENT.md` (four-path triage, append-only, no-commit, provenance fields) | **Implemented** — single ASK role with default file-write permission. Permissions explicitly restrict to `feedback/FR-*.md` (new files only) + INVENTORY.md vote increments. |
+| `feedback/FR-TEMPLATE.md` (provenance + charter mapping + triage recommendation) | **Implemented** — required-fields shape for every filed FR. |
+| MCP `ROLE_DESCRIPTIONS` entry for `featurerequest` | **Implemented** — `bin/ask-mcp-server` ROLE_DESCRIPTIONS dict; tool surface `ask_<repo>_featurerequest` discoverable to MCP callers. |
+| `bin/ask` auto-enables WRITE_MODE for `featurerequest` role | **Implemented** — case-statement in `cmd_ask` so MCP callers (which don't pass `-w`) get the role's intended write surface. Other roles unchanged. |
+| `feedback/README.md` documents the FR flow | **Implemented** — covers CHARTER §3 gates, lifecycle, what-the-agent-can/cannot-write, and the "fork instead" boundary. |
+| Architect + Product role doctrine for routing missing-feature asks | **Implemented** — both AGENT.md files now point callers at `ask_rebar_featurerequest` instead of filing feedback themselves. Keeps interrogative ASK roles interrogative. |
 
 ### Wave 1 + Wave 2 + Wave 3 close-out (2026-04-25)
 
@@ -299,6 +328,7 @@ feedback-driven Watchlist / Queued shape. Pick up between feedback waves.
 
 ## Document History
 
+- **2026-04-28** — Landed CHARTER.md + `ask featurerequest` gated intake role. New artifacts: `CHARTER.md` (§1 IS, §2 IS NOT, §3 hard gates, §4 fork-instead, §5 amendment process), `agents/featurerequest/AGENT.md` (four-path triage doctrine), `feedback/FR-TEMPLATE.md` (provenance + charter mapping). MCP wiring: ROLE_DESCRIPTIONS entry in `bin/ask-mcp-server`; WRITE_MODE auto-enable in `cmd_ask` for `featurerequest`. Architect + product AGENT.md updated to route missing-feature asks through the intake gate. Bounded-exception carve-out in ASK CLI feature-requests table reconciles with prior rejection of `do/peek/diff/trace/broadcast`.
 - **2026-04-25 (eve)** — Knocked out all queued waves (Wave 1, 2, 3 → Implemented). Net new artifacts: `practices/regression-fix-protocol.md`, `scripts/check-fix-commit.sh`, `scripts/check-bypass-flags.sh`, doctrine additions to AGENTS templates, D/O/T contract prefixes in DESIGN + architecture/README, "Contract Health" section in compute-registry.sh output. ci-check.sh now runs 13/13 enforcement on rebar itself. Five more source files moved to `processed/` (digital-signer, zero-tolerance, versioning, filedag-deep-audit + the two from the 2026-04-26 triage round).
 - **2026-04-26** — Triaged 2026-04-24-process-gates-G-through-L.md (Wave 3 queued for the 3 universal gates G/I/L, Watchlist for project-specific H/J/K) and 2026-04-26-webcrypto-ed25519-quirks.md (Watchlist entry for cross-language canonical-fixture pattern; rediscovered Oracle Pattern was already implemented in DESIGN.md and moved its stale Watchlist entry to Implemented). Both source files moved to `processed/`.
 - **2026-04-25** — NEXT-SESSION-TODO.md folded into this file (Maintainer Queue section above) so there's one canonical planning surface, not two. Concurrent ship: `check-doc-refs.sh`, `check-decay-patterns.sh`, `templates/scripts/check-tag-ci-coverage.mjs`, `sync-bootstrap.sh` + drift check, bash 3.2 fixes for compute-registry.sh, Why/Who/Scenarios required in CONTRACT-TEMPLATE.md, README/QUICKSTART/SETUP cleanup. See commit log for the precise diffs.
