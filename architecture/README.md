@@ -119,3 +119,59 @@ package httputil
 
 This creates doubly-linked traceability — searchable in either direction
 with `grep`.
+
+## Cross-Repo Contract Federation
+
+When this repo's contracts are consumed by other rebar-adopting repos,
+or when this repo consumes contracts from other repos, the federation
+discipline applies (CHARTER §1.6):
+
+### As an owner (your contracts are consumed)
+
+- **Mandatory semver** for any contract that has external consumers.
+  File renames `CONTRACT-<id>.<v>.md → CONTRACT-<id>.<v+1>.md` are the
+  bump signal.
+- The post-commit hook `scripts/check-version-bump.sh` detects bumps
+  and queues a notification to `architecture/.state/pending-notifications.md`.
+- Run `scripts/scan-consumers.sh <contract-id>` to see who declares
+  consumption of your contract (greps `CONSUMES.md` across registered
+  sibling repos).
+- Run `scripts/flush-notifications.sh` to dispatch queued notifications
+  via the existing `ask_<consumer>_featurerequest` gate. Manually flush
+  on your schedule — non-blocking by design (CHARTER §2.8).
+
+### As a consumer (you depend on other repos' contracts)
+
+- Declare each cross-repo dep in a top-level `CONSUMES.md` (see
+  `templates/project-bootstrap/CONSUMES.md` for the format).
+- **Mandatory semver pin** in `version_pinned`. Optional
+  `notify_on_change: true` opts in to upstream notification dispatch.
+- Run `rebar contract drift-check` to compare your pins against current
+  upstream. **Required in CI** when CONSUMES.md exists with at least
+  one entry — `scripts/check-compliance.sh` enforces this.
+- For local extensions of upstream contracts, write a *new* local
+  contract (e.g., `CONTRACT-C2-AGENTS-MYAUDIT.1.0.md`) that documents
+  in prose how it relates to the upstream. **Composition over
+  inheritance** — no `extends:` field. List the extension contract IDs
+  in the consumer entry's `extension_contracts:` field for owner
+  visibility.
+- To propose your local extension be absorbed upstream, run
+  `rebar contract upstream <path-to-extension>` — files an FR via the
+  owner's `ask_<owner>_featurerequest` gate. Owner triages on their
+  schedule (owner-pulled reconciliation, never auto-merge).
+
+### Where this lives in rebar's substrate
+
+| Concern | Where |
+|---------|-------|
+| Who consumes what | `CONSUMES.md` (per-repo, opt-in declaration) |
+| Outbox of pending change notifications | `architecture/.state/pending-notifications.md` |
+| Outbox schema | `practices/federation-outbox.md` |
+| Owner-side scripts | `scripts/{scan-consumers,flush-notifications,check-version-bump}.sh` |
+| Consumer-side commands | `rebar contract drift-check`, `rebar contract upstream` |
+| Status surfacing | `rebar status` shows pending notifications |
+| Compliance gating | `scripts/check-compliance.sh` requires drift-check in CI when CONSUMES.md present |
+
+This is "federation as discipline, not infrastructure" — no daemon, no
+server, no central registry. Consumer self-declaration + owner-pulled
+reconciliation through the existing featurerequest gate.

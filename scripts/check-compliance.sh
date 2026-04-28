@@ -187,6 +187,55 @@ elif [ "$current_tier" -ge 2 ] && [ ! -f "$AGENTS" ]; then
   errors=$((errors + 1))
 fi
 
+# ─── Check 8: Federation — drift-check wired when CONSUMES.md exists ─────
+#
+# CHARTER §1.6 makes federation opt-in but compliance-gated: once a repo
+# adds a CONSUMES.md (declaring cross-repo dependencies), it MUST run
+# `rebar contract drift-check` in CI so consumers don't silently age out
+# while owner contracts evolve. Adopters self-select by adding the file.
+
+CONSUMES_FILE="$PROJECT_ROOT/CONSUMES.md"
+if [ -f "$CONSUMES_FILE" ]; then
+  echo ""
+  echo "=== Federation (CONSUMES.md present) ==="
+
+  # Has at least one real entry (## owner/contract.version section)?
+  consumes_entries=$(grep -cE '^## [A-Za-z0-9_-]+/[A-Za-z0-9_.-]+$' "$CONSUMES_FILE" 2>/dev/null | tr -d '[:space:]' || echo 0)
+  if [ "${consumes_entries:-0}" = "0" ]; then
+    echo "OK: CONSUMES.md present but no entries declared (federation opt-in not yet active)"
+  else
+    echo "OK: CONSUMES.md declares $consumes_entries cross-repo dependency(ies)"
+
+    # drift-check must be wired into a CI-relevant script. Check the
+    # standard rebar surfaces in priority order. An adopter can override
+    # by adding their own framework (Makefile, GitHub Actions, etc.) —
+    # we look across the obvious places.
+    drift_wired=0
+    for f in "$PROJECT_ROOT/scripts/ci-check.sh" "$PROJECT_ROOT/scripts/pre-commit.sh" "$PROJECT_ROOT/Makefile" "$PROJECT_ROOT/.github/workflows"/*; do
+      [ -e "$f" ] || continue
+      if [ -d "$f" ]; then
+        if grep -rq "drift-check" "$f" 2>/dev/null; then
+          drift_wired=1
+          break
+        fi
+      elif grep -q "drift-check" "$f" 2>/dev/null; then
+        drift_wired=1
+        break
+      fi
+    done
+
+    if [ "$drift_wired" -eq 1 ]; then
+      echo "OK: drift-check is wired into CI"
+    else
+      echo "FAIL: CONSUMES.md declares dependencies but \`rebar contract drift-check\` is not wired into CI"
+      echo "  Add to scripts/ci-check.sh (or your CI of choice):"
+      echo "    rebar contract drift-check"
+      echo "  Without this, consumed contracts can silently age out as upstream evolves (CHARTER §1.6)."
+      errors=$((errors + 1))
+    fi
+  fi
+fi
+
 # ─── Summary ──────────────────────────────────────────────────────────────
 
 echo ""

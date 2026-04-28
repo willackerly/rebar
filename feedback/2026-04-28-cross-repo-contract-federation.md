@@ -3,7 +3,7 @@
 **Date:** 2026-04-28
 **Source:** maintainer-direct design conversation post v2.1.0 UX pass
 **Type:** missing-feature | proposal
-**Status:** proposed (research-only — no code lands until reviewed)
+**Status:** implemented (CHARTER + tooling landed across 5 commits 2026-04-28 eve)
 **Template impact:** `CHARTER.md` (new §1.6), `templates/project-bootstrap/` (new `CONSUMES.md`), `scripts/`, `cli/cmd/contract.go`, `architecture/README.md`
 **From:** maintainer-direct (assistant-conducted design exploration)
 
@@ -309,10 +309,29 @@ resolve which way, and the implementation follows in subsequent commits.
 
 ## Disposition (maintainer-filled)
 
-- [ ] Accepted as designed — proceed with deliverables list
-- [ ] Accepted with modifications — see notes below
-- [ ] Deferred — see notes below
-- [ ] Rejected — see notes below
+- [x] **Accepted with modifications** — proceed with deliverables list
+- [ ] Accepted as designed
+- [ ] Deferred
+- [ ] Rejected
 
-**Triaged:** YYYY-MM-DD by [maintainer]
-**Notes:** [maintainer's adjudication; especially on the 7 open questions above]
+**Triaged:** 2026-04-28 by maintainer (Will)
+**Implemented across 5 commits the same day:**
+- e79c56b — Cluster 1: CHARTER §1.6 + §2.10 + INVENTORY closures
+- 614b353 — Cluster 2: CONSUMES.md template + format spec
+- (TBD)   — Cluster 3: Owner-side scripts + outbox
+- (TBD)   — Cluster 4: Consumer-side rebar commands
+- (TBD)   — Cluster 5: Compliance gating + docs (this commit)
+
+**Resolutions on the 7 open questions:**
+
+1. **CHARTER amendment text** — accepted as drafted ("looks EXCELLENT"); shipped verbatim.
+2. **Mandatory semver** — strict (per-CHARTER text says "mandatory semver for cross-repo contracts").
+3. **CONSUMES.md format** — single file with H2 sections per dep (deferred per-dep dir to future need).
+4. **drift-check exit codes** — final mapping: 0 (current or minor-behind), 1 (major-behind), 2 (removed), 3 (no CONSUMES.md), 4 (parse/registry error).
+5. **Notification severity** — scripted-infer with `--severity` manual override (per maintainer).
+6. **INVENTORY treatment** — predecessor Watchlist items struck through with explicit closure entries; contract-catalog REJECTED.
+7. **Adoption path** — opportunistic (CONSUMES.md is opt-in; no Tier-promotion gate). Compliance check fires only when CONSUMES.md is present and has entries — adopters self-select when ready. Phase 2 (warn on cross-repo CONTRACT: refs without CONSUMES.md) and Phase 3 (require) deferred until 2+ adopters use the federation in production.
+
+**Bonus addition (maintainer-introduced):** Optional `notify_on_change` field in CONSUMES.md per-dep section — consumer-side hint that owner may use to filter dispatch list. Default behavior when absent: notify (overridable via `REBAR_NOTIFY_DEFAULT=skip`).
+
+**Notes:** Federation lands as a discipline, not infrastructure. No daemons, no central registry, no real-time. Consumer self-declaration + owner-pulled reconciliation via the existing featurerequest gate. CHARTER §2.10 explicitly preempts the central-registry temptation. All 5 clusters delivered ~600 net lines (charter + template + 3 scripts + 2 Go commands + status integration + compliance gate + docs). No new dependencies. ci-check 13/13 green throughout.
