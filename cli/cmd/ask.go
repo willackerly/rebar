@@ -10,9 +10,17 @@ import (
 )
 
 var askCmd = &cobra.Command{
-	Use:                "ask [agent] [question]",
-	Short:              "Query a role-based agent (delegates to bin/ask)",
-	Long:               `Passes all arguments through to the ASK CLI. Equivalent to running 'ask' directly.`,
+	Use:   "ask [agent] [question]",
+	Short: "Query a role-based agent (delegates to bin/ask)",
+	Long: `Passes all arguments through to the ASK CLI.
+
+  rebar ask <agent> "<question>"     # delegate to bin/ask
+  rebar ask --help                   # forwards to ask --help
+
+This is a thin wrapper around the standalone 'ask' CLI — they're
+equivalent. Use 'rebar ask' when you've installed the rebar binary but
+not added bin/ to your PATH; use 'ask' directly once bin/ is on PATH
+(via bin/install). All flags, agent names, and behaviors are identical.`,
 	DisableFlagParsing: true,
 	RunE:               runAsk,
 }

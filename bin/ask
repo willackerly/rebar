@@ -43,6 +43,12 @@
 
 set -euo pipefail
 
+# Tracks rebar's version line. Bumped together when ASK changes
+# materially. `ask --version` reports both this and the host rebar
+# version detected from .rebar-version when run in a project.
+ASK_VERSION="1.0.0"
+REBAR_VERSION_FALLBACK="v2.0.0"
+
 # --- Configuration -----------------------------------------------------------
 
 AGENTS_DIR="${ASK_AGENTS_DIR:-./agents}"
@@ -454,6 +460,103 @@ require_agent_name() {
   fi
 }
 
+# Levenshtein distance via awk. Returns edit distance between $1 and $2
+# on stdout. Used by _suggest_agent for "did you mean?" hints. Bash 3.2
+# compatible — no associative arrays, no advanced parameter expansion.
+_lev_distance() {
+  awk -v a="$1" -v b="$2" 'BEGIN {
+    la = length(a); lb = length(b);
+    if (la == 0) { print lb; exit; }
+    if (lb == 0) { print la; exit; }
+    for (i = 0; i <= la; i++) d[i, 0] = i;
+    for (j = 0; j <= lb; j++) d[0, j] = j;
+    for (i = 1; i <= la; i++) {
+      ai = substr(a, i, 1);
+      for (j = 1; j <= lb; j++) {
+        cost = (ai == substr(b, j, 1)) ? 0 : 1;
+        m = d[i-1, j] + 1;
+        n = d[i, j-1] + 1;
+        if (n < m) m = n;
+        n = d[i-1, j-1] + cost;
+        if (n < m) m = n;
+        d[i, j] = m;
+      }
+    }
+    print d[la, lb];
+  }'
+}
+
+# Suggest the closest matching agent name when the user typo'd. Emits
+# "Did you mean: <name>?" to stderr if a candidate within edit-distance
+# 4 exists. Silent otherwise. Red-team finding M8.
+_suggest_agent() {
+  local target="$1"
+  [ -z "$target" ] && return 0
+  [ -d "$AGENTS_DIR" ] || return 0
+
+  local lc_target best best_dist=999 base lc_base dist
+  lc_target=$(echo "$target" | tr '[:upper:]' '[:lower:]')
+  for d in "$AGENTS_DIR"/*/; do
+    [ -d "$d" ] || continue
+    [ -f "$d/AGENT.md" ] || continue
+    base=$(basename "$d")
+    lc_base=$(echo "$base" | tr '[:upper:]' '[:lower:]')
+    dist=$(_lev_distance "$lc_target" "$lc_base")
+    if [ "$dist" -lt "$best_dist" ]; then
+      best_dist="$dist"
+      best="$base"
+    fi
+  done
+
+  # Threshold: distance ≤ 4 OR ≤ half the target length, whichever is
+  # smaller. Prevents false suggestions for wildly different inputs.
+  local target_len max_dist=4
+  target_len=${#target}
+  if [ "$((target_len / 2))" -lt "$max_dist" ]; then
+    max_dist=$((target_len / 2))
+  fi
+
+  if [ -n "$best" ] && [ "$best_dist" -le "$max_dist" ]; then
+    echo "Did you mean: $best?" >&2
+    echo "" >&2
+  fi
+}
+
+# Extract a caller-facing first paragraph from an AGENT.md file. Mirrors
+# the logic in bin/ask-mcp-server's _get_agent_description: skip leading
+# headings/blanks, collect consecutive content lines, then strip leading
+# "You are the X..." sentences that address the agent rather than the
+# caller. Echoes the cleaned paragraph to stdout. Red-team finding M4.
+_caller_facing_description() {
+  local agent_md="$1"
+  [ -f "$agent_md" ] || return 0
+
+  awk '
+    BEGIN { in_para=0; }
+    {
+      # Trim trailing whitespace
+      sub(/[[:space:]]+$/, "", $0);
+      if (!in_para) {
+        if ($0 == "" || $0 ~ /^#/) next;
+        in_para = 1;
+        para = $0;
+      } else {
+        if ($0 == "" || $0 ~ /^#/) { exit; }
+        para = para " " $0;
+      }
+    }
+    END {
+      # Strip leading "You are..." / "You own..." / "You receive..." sentences
+      # that target the agent voice. Iterate until no further match.
+      while (match(para, /^You (are|own|make decisions|represent|are responsible|do not|don'\''t|receive|run|report)[^.!?]*[.!?]([[:space:]]+|$)/)) {
+        para = substr(para, RLENGTH + 1);
+        sub(/^[[:space:]]+/, "", para);
+      }
+      print para;
+    }
+  ' "$agent_md"
+}
+
 # Resolve an agent name case-insensitively against $AGENTS_DIR. Echoes
 # the canonical directory name on stdout (or empty string if no match).
 # Stays bash 3.2 compatible (no nameref, no associative arrays).
@@ -499,6 +602,8 @@ require_agent_exists() {
   fi
 
   echo "ask: error: agent '$agent' not found (no directory at $AGENTS_DIR/$agent)" >&2
+  echo "" >&2
+  _suggest_agent "$agent"
   echo "Available agents:" >&2
   cmd_who >&2
   exit 2
@@ -698,6 +803,14 @@ cmd_who() {
   printf "${_C_BOLD}  %s — Available Agents${_C_RESET}\n" "$proj_name"
   echo ""
 
+  # Adjust width to terminal — fall back to 80 cols if tput unavailable.
+  # Description column gets terminal_width - name_width(14) - margin(4).
+  local term_width desc_width
+  term_width=$(tput cols 2>/dev/null || echo 80)
+  desc_width=$((term_width - 18))
+  [ "$desc_width" -lt 30 ] && desc_width=30
+  [ "$desc_width" -gt 100 ] && desc_width=100
+
   for d in "$AGENTS_DIR"/*/; do
     [ -d "$d" ] || continue
     if [ -f "$d/AGENT.md" ]; then
@@ -705,15 +818,41 @@ cmd_who() {
       name=$(basename "$d")
       local color
       color=$(_role_color "$name")
+
+      # Caller-facing description (strips agent-voice "You are..." preambles
+      # so the listing reads as third-person help text rather than agent
+      # instructions). Red-team finding M4. Falls back to legacy sed
+      # extraction if nothing usable comes back.
       local desc=""
-      # Try to extract role description from first line after "## Role"
-      # Try: first Responsibilities bullet, then first Role line, then first line
-      desc=$(sed -n '/^## Responsibilities/,/^##/{s/^- *//p;}' "$d/AGENT.md" 2>/dev/null | head -1 | cut -c1-55)
+      desc=$(_caller_facing_description "$d/AGENT.md")
       if [ -z "$desc" ]; then
-        desc=$(sed -n '/^## Role/,/^##/{/^## Role/d;/^##/d;/^$/d;p;}' "$d/AGENT.md" 2>/dev/null | head -1 | sed 's/^[[:space:]]*//' | cut -c1-55)
+        desc=$(sed -n '/^## Responsibilities/,/^##/{s/^- *//p;}' "$d/AGENT.md" 2>/dev/null | head -1)
       fi
+      if [ -z "$desc" ]; then
+        desc=$(sed -n '/^## Role/,/^##/{/^## Role/d;/^##/d;/^$/d;p;}' "$d/AGENT.md" 2>/dev/null | head -1 | sed 's/^[[:space:]]*//')
+      fi
+
+      # Word-break truncation (M5): if the description exceeds the column
+      # width, truncate at the last space before the limit and append "…".
+      if [ -n "$desc" ] && [ "${#desc}" -gt "$desc_width" ]; then
+        local trunc cut_at
+        trunc="${desc:0:$desc_width}"
+        cut_at=$(echo "$trunc" | awk '{
+          n = length($0);
+          for (i = n; i > 0; i--) {
+            if (substr($0, i, 1) == " ") { print i - 1; exit; }
+          }
+          print n;
+        }')
+        if [ -n "$cut_at" ] && [ "$cut_at" -gt 10 ]; then
+          desc="${desc:0:$cut_at}…"
+        else
+          desc="${trunc}…"
+        fi
+      fi
+
       if [ -n "$desc" ]; then
-        printf "  ${color}${_C_BOLD}%-12s${_C_RESET} ${_C_DIM}%s${_C_RESET}\n" "$name" "$desc"
+        printf "  ${color}${_C_BOLD}%-14s${_C_RESET} ${_C_DIM}%s${_C_RESET}\n" "$name" "$desc"
       else
         printf "  ${color}${_C_BOLD}%s${_C_RESET}\n" "$name"
       fi
@@ -1900,7 +2039,30 @@ while [ $# -gt 0 ]; do
     -v|--verbose) VERBOSE=1; shift ;;
     -d|--debug)   DEBUG=1; VERBOSE=1; shift ;;
     -w|--write)   WRITE_MODE=1; shift ;;
-    *)            break ;;
+    -V|--version)
+      # Detect host rebar version if we're in a rebar project; fall back
+      # to the compile-time constant otherwise. Useful for adopters who
+      # want to know which rebar their `ask` was synced against.
+      _rebar_v="$REBAR_VERSION_FALLBACK"
+      [ -f ./.rebar-version ] && _rebar_v=$(tr -d ' \n' < ./.rebar-version)
+      echo "ask v$ASK_VERSION ($_rebar_v)"
+      exit 0
+      ;;
+    --)
+      # Conventional end-of-flags marker. Anything after is positional.
+      shift
+      break
+      ;;
+    --*|-?)
+      # Reject unknown short/long flags rather than silently treating
+      # them as agent names (red-team finding M6). `ask --foo` was
+      # producing "agent '--foo' not found"; not actionable.
+      echo "ask: error: unknown flag '$1'" >&2
+      echo "" >&2
+      echo "Try: ask --help" >&2
+      exit 4
+      ;;
+    *) break ;;
   esac
 done
 
