@@ -64,6 +64,12 @@ cp -r architecture/          "$PROJECT/architecture/"
 # call this automatically.)
 cp -r agents/                "$PROJECT/agents/"
 
+# Cross-repo federation (optional — only if your project depends on
+# contracts from other rebar repos). CHARTER §1.6. Adding entries to
+# CONSUMES.md activates `rebar contract drift-check` as a required CI
+# check via scripts/check-compliance.sh. Single-repo projects skip.
+cp "$BOOTSTRAP/CONSUMES.md"  "$PROJECT/CONSUMES.md"  # then edit or delete
+
 # Practice reference guides (recommended)
 cp -r practices/             "$PROJECT/practices/"
 
