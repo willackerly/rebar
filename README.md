@@ -2,6 +2,8 @@
 
 > **rebar v2.0.0** | **Tier 3: ENFORCED**
 
+[![rebar v2.0.0](https://img.shields.io/badge/rebar-v2.0.0-orange)](DESIGN.md)
+[![Tier 3: Enforced](https://img.shields.io/badge/tier-3_enforced-brightgreen)](DESIGN.md)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
 **The dual-purpose foundation for AI-powered development teams.**
