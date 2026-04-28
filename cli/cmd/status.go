@@ -74,6 +74,10 @@ func runStatus(cmd *cobra.Command, args []string) error {
 	// Session lifecycle
 	printSessionFreshness(cfg.RepoRoot)
 
+	// Federation outbox — surface pending consumer notifications so the
+	// queue is visible without being noisy. CHARTER §1.6.
+	printPendingNotifications(cfg.RepoRoot)
+
 	// Quick verify (just check if clean)
 	salt, _ := integrity.LoadSalt(cfg.RebarDir)
 	result, err := integrity.Verify(cfg.RepoRoot, manifest, salt)
@@ -164,6 +168,28 @@ func extractDate(text, key string) string {
 		}
 	}
 	return ""
+}
+
+// printPendingNotifications counts entries in
+// architecture/.state/pending-notifications.md with status: pending and
+// surfaces a one-liner. Silent when no outbox or zero pending.
+func printPendingNotifications(repoRoot string) {
+	outbox := filepath.Join(repoRoot, "architecture", ".state", "pending-notifications.md")
+	data, err := os.ReadFile(outbox)
+	if err != nil {
+		return
+	}
+	pending := 0
+	for _, line := range strings.Split(string(data), "\n") {
+		if strings.HasPrefix(strings.TrimSpace(line), "- **status:** pending") {
+			pending++
+		}
+	}
+	if pending == 0 {
+		return
+	}
+	fmt.Println("\n  Federation:")
+	fmt.Printf("    %d pending consumer notification(s) — run scripts/flush-notifications.sh\n", pending)
 }
 
 func gitOutput(args ...string) string {
