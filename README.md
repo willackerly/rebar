@@ -2,6 +2,8 @@
 
 > **rebar v2.0.0** | **Tier 3: ENFORCED**
 
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
+
 **The dual-purpose foundation for AI-powered development teams.**
 
 Rebar is **two things in one**:
@@ -340,3 +342,14 @@ rebar/
 - [docs/learnings-from-opendockit.md](docs/learnings-from-opendockit.md) — war stories from 5,800+ tests and 9 simultaneous agents
 - [feedback/](feedback/) — adoption reports from blindpipe, Dapple SafeSign, Office 180
 - [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md) — ASK CLI roadmap (bash v0 → Go v2)
+
+---
+
+## License
+
+Copyright 2026 Will Ackerly.
+
+Licensed under the [Apache License, Version 2.0](LICENSE). You may not use this
+project except in compliance with the License. Unless required by applicable law
+or agreed to in writing, software distributed under the License is distributed on
+an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND.
