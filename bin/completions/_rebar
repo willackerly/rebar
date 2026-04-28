@@ -1,0 +1,46 @@
+#compdef rebar
+# zsh completion for the `rebar` CLI
+
+_rebar() {
+  local -a commands roles agents
+  commands=(
+    'new:Create a new REBAR project from scratch'
+    'adopt:Adopt REBAR in an existing project'
+    'init:Initialize integrity tracking'
+    'context:Print role-relevant context files'
+    'commit:Enforced commit with integrity'
+    'audit:Check compliance score'
+    'push:Push with hooks'
+    'ask:Query a role-based agent'
+    'agent:Sealed envelope agent execution'
+    'verify:Check file integrity'
+    'status:Health dashboard'
+    'check:Run all enforcement checks'
+    'diff:Diff against baseline'
+    'contract:Contract operations'
+    'sign:Signing operations'
+    'key:Key management'
+    'version:Print rebar version'
+    'help:Show help'
+  )
+  roles=(architect product security developer session-start)
+
+  if (( CURRENT == 2 )); then
+    _describe 'command' commands
+    return
+  fi
+
+  case "${words[2]}" in
+    context)
+      _values 'role' "${roles[@]}"
+      ;;
+    ask)
+      if [[ -d ./agents ]]; then
+        agents=( "${(@f)$(find ./agents -maxdepth 2 -name AGENT.md -exec dirname {} \; 2>/dev/null | xargs -n1 basename 2>/dev/null)}" )
+        _values 'agent' "${agents[@]}"
+      fi
+      ;;
+  esac
+}
+
+_rebar "$@"

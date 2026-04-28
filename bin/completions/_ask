@@ -1,0 +1,60 @@
+#compdef ask
+# zsh completion for the `ask` CLI
+#
+# Install:
+#   fpath+=(/path/to/rebar/bin/completions); autoload -U _ask
+# Or via bin/install:
+#   ln -s "$(pwd)/bin/completions/_ask" /usr/local/share/zsh/site-functions/_ask
+
+_ask() {
+  local -a subcommands flags agents
+  subcommands=(
+    'help:Show usage'
+    'who:List available agents'
+    'where:Resolve agent directory path'
+    'status:Check agent health'
+    'log:View interaction history (paged on TTY)'
+    'peek:Inspect pending inbox messages'
+    'tail:Follow live event log'
+    'watch:Follow agent incremental progress'
+    'up:Bring an agent online'
+    'reset:Clear agent session (start fresh)'
+    'compact:Compact memory log'
+    'register:Register current project globally'
+    'projects:List registered projects'
+    'init:Initialize directory structure'
+    'serve:Start enterprise server'
+    'agents:List agents on remote server'
+  )
+  flags=(
+    '-v[Verbose: answer + rationale + refs]'
+    '-d[Debug: show session ID, context %, timings]'
+    '-w[Write mode: agent can edit/create files]'
+    '-V[Show version]'
+    '--verbose[Verbose mode]'
+    '--debug[Debug mode]'
+    '--write[Write mode]'
+    '--version[Show version]'
+    '--help[Show help]'
+  )
+
+  if [[ -d ./agents ]]; then
+    agents=( "${(@f)$(find ./agents -maxdepth 2 -name AGENT.md -exec dirname {} \; 2>/dev/null | xargs -n1 basename 2>/dev/null)}" )
+  fi
+
+  if (( CURRENT == 2 )); then
+    _alternative \
+      'subcommands:subcommand:_describe "subcommand" subcommands' \
+      'agents:agent:(${agents})' \
+      'flags:flag:_describe "flag" flags'
+    return
+  fi
+
+  case "${words[2]}" in
+    where|status|log|peek|watch|up|reset|compact|tail)
+      _values 'agent' "${agents[@]}"
+      ;;
+  esac
+}
+
+_ask "$@"

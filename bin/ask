@@ -916,12 +916,26 @@ cmd_status() {
 cmd_log() {
   require_agent_name "${1:-}"
   require_agent_exists "$1"
-  local logfile="$AGENTS_DIR/$1/memory.log.md"
-  if [ -f "$logfile" ]; then
-    cat "$logfile"
-  else
+  local agent="$_CANONICAL_AGENT"
+  local logfile="$AGENTS_DIR/$agent/memory.log.md"
+  if [ ! -f "$logfile" ]; then
     echo "(no log entries yet)"
+    return 0
   fi
+  # Auto-pipe through a pager when stdout is a TTY — agent logs can run
+  # to thousands of lines and dumping to terminal makes them unreadable.
+  # Falls through to plain cat when piped or PAGER explicitly disabled.
+  # Red-team finding L2.
+  if [ -t 1 ] && [ "${PAGER-}" != "cat" ]; then
+    local pager="${PAGER:-less}"
+    if command -v "$pager" &>/dev/null; then
+      # -R: pass through ANSI colors, -F: exit if shorter than screen,
+      # -X: don't clear screen on exit (keep content visible).
+      "$pager" -RFX "$logfile"
+      return 0
+    fi
+  fi
+  cat "$logfile"
 }
 
 cmd_peek() {

@@ -598,6 +598,14 @@ class RepoRegistry:
                 continue
             if entry.name.startswith(".") or entry.name in self._SCAN_SKIP:
                 continue
+            # Sentinel skip: a `.rebar-skip-mcp` file in a repo's root opts it
+            # out of MCP tool enumeration. Useful for git worktrees and
+            # short-lived branches that would otherwise pollute the tool
+            # list with near-duplicate `ask_<repo>-wt-<branch>_*` entries.
+            # Red-team finding M11.
+            if (entry / ".rebar-skip-mcp").exists():
+                print(f"  skipped: {entry.name} (.rebar-skip-mcp present)", file=sys.stderr)
+                continue
             if (entry / "agents").is_dir():
                 self.add_repo(entry.name, str(entry))
             elif _depth > 1:

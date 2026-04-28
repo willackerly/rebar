@@ -52,6 +52,39 @@ else
   echo "[added] PATH → $RC_FILE"
 fi
 
+# --- Tab completions ---
+# Source the completion files from the RC file so `ask` and `rebar` get
+# tab completion automatically. Idempotent: only adds if not already
+# referenced. Bash and zsh have separate completion formats; we source
+# whichever fits the user's shell.
+COMPLETION_DIR="$BIN_DIR/completions"
+if [ -d "$COMPLETION_DIR" ]; then
+  case "$SHELL_NAME" in
+    bash)
+      if ! grep -qF "$COMPLETION_DIR/ask.bash" "$RC_FILE" 2>/dev/null; then
+        echo "" >> "$RC_FILE"
+        echo "# rebar tab completions (bash)" >> "$RC_FILE"
+        echo "[ -f \"$COMPLETION_DIR/ask.bash\" ] && source \"$COMPLETION_DIR/ask.bash\"" >> "$RC_FILE"
+        echo "[ -f \"$COMPLETION_DIR/rebar.bash\" ] && source \"$COMPLETION_DIR/rebar.bash\"" >> "$RC_FILE"
+        echo "[added] tab completion (bash) → $RC_FILE"
+      else
+        echo "[ok] tab completion already wired"
+      fi
+      ;;
+    zsh)
+      if ! grep -qF "$COMPLETION_DIR" "$RC_FILE" 2>/dev/null; then
+        echo "" >> "$RC_FILE"
+        echo "# rebar tab completions (zsh)" >> "$RC_FILE"
+        echo "fpath=(\"$COMPLETION_DIR\" \$fpath)" >> "$RC_FILE"
+        echo "autoload -Uz compinit && compinit -u" >> "$RC_FILE"
+        echo "[added] tab completion (zsh) → $RC_FILE"
+      else
+        echo "[ok] tab completion already wired"
+      fi
+      ;;
+  esac
+fi
+
 # --- ASK_SERVER ---
 if [ -n "$ASK_SERVER_VAL" ]; then
   if grep -qF "ASK_SERVER" "$RC_FILE" 2>/dev/null; then
