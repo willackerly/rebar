@@ -1141,9 +1141,11 @@ Rules:
     fi
 
     # Streaming progress: use stream-json for incremental updates,
-    # fall back to json for read-only queries
+    # fall back to json for read-only queries.
+    # claude requires --verbose when combining --print with stream-json,
+    # so include both together or neither.
     if [ "$WRITE_MODE" = "1" ]; then
-      claude_args+=(--output-format stream-json)
+      claude_args+=(--output-format stream-json --verbose)
     else
       claude_args+=(--output-format json)
     fi
@@ -1949,6 +1951,22 @@ case "$CMD" in
         exit 4
       fi
     fi
+
+    # --- Reject leading flags in question position ---
+    # Common ask flags must come before the agent name. Without this guard
+    # `ask architect -v` passes -v through to the underlying claude binary
+    # as its own --version flag, printing the claude version instead of
+    # answering the user. Long questions can legitimately start with a
+    # dash (e.g., '-v doesn't work in...') so only reject the known short
+    # flags and our long-flag forms.
+    case "$CMD_WORD" in
+      -v|-d|-w|-V|--verbose|--debug|--write|--version|--help|-h)
+        echo "ask: error: flag '$CMD_WORD' must come before the agent name" >&2
+        echo "" >&2
+        echo "Usage: ask $CMD_WORD $AGENT \"<question>\"" >&2
+        exit 4
+        ;;
+    esac
 
     # --- Check if CMD_WORD matches a command script ---
     if [ -x "$AGENT_DIR/commands/$CMD_WORD.sh" ]; then
