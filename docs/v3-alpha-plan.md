@@ -27,7 +27,7 @@ Major bump because:
 
 Alpha because we want real-world failure to refine, not pre-engineer.
 
-## Six clusters
+## Five clusters (reduced from six 2026-04-29 — see note below)
 
 | # | Cluster | Source |
 |---|---------|--------|
@@ -35,8 +35,14 @@ Alpha because we want real-world failure to refine, not pre-engineer.
 | 2 | SessionStart hook for cold-start enforcement | `feedback/2026-04-26-sessionstart-hook-cold-start-enforcement.md` |
 | 3 | TEST_FIDELITY.md + UAKS tier + closed-loop demo gate | `feedback/2026-04-22-testing-rigor-six-moments.md`, `2026-04-27-e2e-test-bypass-closed-loop-verification-drift.md`, `2026-04-27-user-at-keyboard-story-tier.md` |
 | 4 | agents/FANOUT_PATTERN.md | `feedback/2026-04-28-multi-subagent-fanout-playbook.md` |
-| 5 | Cold-start UX completeness (Clusters A+C from usability RT) | `feedback/2026-04-28-usability-red-team.md` |
-| 6 | Contract discipline followups | `feedback/2026-04-24-contract-discipline-and-jtbd-framing.md` |
+| 5 | Contract discipline followups | `feedback/2026-04-24-contract-discipline-and-jtbd-framing.md` |
+
+**Note (2026-04-29):** Cluster 5 from the original draft (cold-start UX
+completeness — C1/C3/C4/M10/L3/L4 from usability red team) was already
+shipped on main in commits `b09f9fb` + `b8894f6` (2026-04-28) before the
+v3-alpha branch was cut. Verified: `bin/ask featurerequest "test"`
+works, `rebar new` auto-runs `ask init`, compliance score annotated.
+Five-cluster scope below reflects this.
 
 ### Cluster 1 — Maturity tagging
 
@@ -113,22 +119,7 @@ shipped 9 zero-conflict fanouts in one session:
 - Worktree-isolation fallback documented (raw `git worktree add` when
   Agent tool's `isolation: 'worktree'` flag fails)
 
-### Cluster 5 — Cold-start UX completeness
-
-Two parts:
-
-**5a (regression first):** Fix C3 — `bin/ask` forces `stream-json` in
-WRITE_MODE without `--verbose`, breaking the just-shipped
-`featurerequest` intake. Land before anything else; ~10 LOC.
-
-**5b (Cluster A from usability RT):** Make `rebar new` / `rebar adopt`
-get a fresh adopter to a working `ask architect` state without human
-intervention. Auto-run `ask init`. Bootstrap template ships skeleton
-`agents/<role>/AGENT.md`. Welcome message + QUICKSTART + SETUP mention
-`ask init`. Annotate alarming `0.9/10` compliance score. `rebar
-context` suggests `ask architect` next-step on empty memory.log.md.
-
-### Cluster 6 — Contract discipline followups
+### Cluster 5 — Contract discipline followups
 
 Cleans up the 2026-04-24 feedback. Most parts already shipped (Why/
 Who/Scenarios in CONTRACT-TEMPLATE landed 2026-04-25). Remaining:
@@ -142,17 +133,15 @@ Who/Scenarios in CONTRACT-TEMPLATE landed 2026-04-25). Remaining:
 
 ## Sequence
 
-1. **Cluster 5a** — regression fix (C3) [10 LOC, unblocks featurerequest]
-2. **Cluster 1** — maturity tagging [establishes vocabulary]
-3. **Cluster 2** — SessionStart hook [surfaces Cluster 1]
-4. **Cluster 5b** — rest of cold-start UX
-5. **Cluster 3** — TEST_FIDELITY.md / UAKS / closed-loop gate
-6. **Cluster 4** — FANOUT_PATTERN.md
-7. **Tag `v3.0.0-alpha`**
-8. **Cluster 6** — contract discipline followups (alpha refinement)
+1. **Cluster 1** — maturity tagging [establishes vocabulary]
+2. **Cluster 2** — SessionStart hook [surfaces Cluster 1]
+3. **Cluster 3** — TEST_FIDELITY.md / UAKS / closed-loop gate
+4. **Cluster 4** — FANOUT_PATTERN.md
+5. **Tag `v3.0.0-alpha`**
+6. **Cluster 5** — contract discipline followups (alpha refinement)
 
 Each cluster commits independently. After Cluster 4, the alpha is
-tag-able and externally testable. Cluster 6 is post-tag refinement.
+tag-able and externally testable. Cluster 5 is post-tag refinement.
 
 ## What's deferred (with rationale)
 
@@ -166,7 +155,7 @@ tag-able and externally testable. Cluster 6 is post-tag refinement.
 
 `v3.0.0-alpha` ships when:
 
-- Clusters 1, 2, 3, 4, 5 land
+- Clusters 1, 2, 3, 4 land (Cluster 5 is post-tag refinement)
 - `rebar audit` passes 9-10/10 on rebar itself
 - Cold-start hook fires + emits the maturity-aware status block
 - A clean `rebar new` produces a working `ask architect` state
