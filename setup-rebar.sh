@@ -11,7 +11,7 @@
 # Go CLI so it stays in sync with the rest of the project.
 #
 # Usage (curl pipe):
-#   curl -fsSL https://raw.githubusercontent.com/willackerly/rebar/v3.0.0-alpha/setup-rebar.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/willackerly/rebar/v3.0.1-alpha/setup-rebar.sh | bash
 #
 # Usage (local):
 #   ./setup-rebar.sh [--server HOST:PORT] [--dir PATH]
@@ -19,7 +19,7 @@
 set -euo pipefail
 
 REBAR_REPO="${REBAR_REPO:-https://github.com/willackerly/rebar.git}"
-REBAR_REF="${REBAR_REF:-v3.0.0-alpha}"
+REBAR_REF="${REBAR_REF:-v3.0.1-alpha}"
 REBAR_DIR="${REBAR_DIR:-$HOME/.rebar}"
 ASK_SERVER="${ASK_SERVER:-}"
 
@@ -51,7 +51,7 @@ Usage:
 Env vars (override flags):
   REBAR_DIR    target install dir            (default: ~/.rebar)
   REBAR_REPO   git remote to clone from      (default: github.com/willackerly/rebar)
-  REBAR_REF    branch/tag to check out       (default: v3.0.0-alpha)
+  REBAR_REF    branch/tag to check out       (default: v3.0.1-alpha)
   ASK_SERVER   remote ASK server, written to your shell RC by bin/install
 
 Next steps after install:

@@ -74,7 +74,7 @@ cp -r templates/project-bootstrap/* ../my-project/ && cd ../my-project
 cd my-project && ../rebar/bin/rebar init
 
 # Option C: One-line installer (clones rebar to ~/.rebar, wires PATH)
-curl -fsSL https://raw.githubusercontent.com/willackerly/rebar/v3.0.0-alpha/setup-rebar.sh | bash
+curl -fsSL https://raw.githubusercontent.com/willackerly/rebar/v3.0.1-alpha/setup-rebar.sh | bash
 # then: rebar new my-project -d "what it does"
 ```
 
