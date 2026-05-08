@@ -72,6 +72,10 @@ cp -r templates/project-bootstrap/* ../my-project/ && cd ../my-project
 
 # Option B: Use the CLI (builds v2 scaffolding automatically)
 cd my-project && ../rebar/bin/rebar init
+
+# Option C: One-line installer (clones rebar to ~/.rebar, wires PATH)
+curl -fsSL https://raw.githubusercontent.com/willackerly/rebar/v3.0.0-alpha/setup-rebar.sh | bash
+# then: rebar new my-project -d "what it does"
 ```
 
 **What you get:** Contracts linked to code + agent coordination + immediate productivity boost
