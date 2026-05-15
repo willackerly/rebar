@@ -21,8 +21,9 @@ cd ../my-new-project
 ### Individual Components
 ```bash
 # Copy specific template files
-cp templates/component-templates/contract.md architecture/CONTRACT-C1-MYSERVICE.1.0.md
-cp templates/component-templates/agent-role.md agents/specialist/AGENT.md
+cp templates/component-templates/AGENTS.template.md AGENTS.md
+cp templates/component-templates/CLAUDE.template.md CLAUDE.md
+cp architecture/CONTRACT-TEMPLATE.md architecture/CONTRACT-C1-MYSERVICE.1.0.md
 ```
 
 ---
@@ -59,9 +60,6 @@ cp templates/component-templates/agent-role.md agents/specialist/AGENT.md
 - **TODO.template.md** — Task tracking template
 - **.rebarrc.template** — Tier configuration template
 - **METRICS.template** — Ground truth metrics template
-- **contract.md** — Single contract template
-- **agent-role.md** — New agent role template
-- **subagent-prompt.md** — Subagent template template
 
 **Perfect for:** Adding individual components, customizing existing setups, advanced users
 

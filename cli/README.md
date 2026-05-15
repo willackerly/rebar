@@ -15,13 +15,17 @@ Requires Go 1.22+.
 ## Quick Start
 
 ```bash
-rebar init                    # Bootstrap .rebar/ with salt, manifest
+rebar init                    # Bootstrap .rebar/ + v2 files (QUICKCONTEXT, TODO, scripts, architecture/)
 rebar verify                  # Check integrity of protected files
 rebar status                  # Health dashboard
 
 rebar commit -m "message"     # Enforced commit (no --no-verify)
 rebar check                   # Run all enforcement checks
 rebar push                    # Verify + check + push
+
+rebar context                     # Cold Start Quad in reading order
+rebar context architect           # + DESIGN.md, contracts
+rebar context session-start       # Cold Start Quad + staleness check
 
 rebar ask architect "question"  # Query agents (delegates to bin/ask)
 

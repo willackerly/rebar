@@ -189,7 +189,7 @@ A post-merge hook or CI step can flag commits where `docs-updated: no` but the d
 Every documentation file that contains status claims should have a machine-readable freshness marker:
 
 ```markdown
-<!-- freshness: 2026-03-16 -->
+<!-- freshness: YYYY-MM-DD -->
 ```
 
 A weekly cron job or `/freshness-audit` skill scans for files where the freshness date is more than 2 weeks old relative to the last commit that modified the related source code. This turns "docs might be stale" into "these specific docs are probably stale."

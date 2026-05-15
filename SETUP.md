@@ -36,15 +36,19 @@ and which enforcement tier to configure.
 ```bash
 # From the rebar directory:
 PROJECT=/path/to/your/project
+BOOTSTRAP=templates/project-bootstrap
 
 # The Cold Start Quad (required)
-cp README.template.md        "$PROJECT/README.md"
-cp QUICKCONTEXT.template.md  "$PROJECT/QUICKCONTEXT.md"
-cp TODO.template.md          "$PROJECT/TODO.md"
-cp AGENTS.template.md        "$PROJECT/AGENTS.md"
+cp "$BOOTSTRAP/README.md"        "$PROJECT/README.md"
+cp "$BOOTSTRAP/QUICKCONTEXT.md"  "$PROJECT/QUICKCONTEXT.md"
+cp "$BOOTSTRAP/TODO.md"          "$PROJECT/TODO.md"
+cp "$BOOTSTRAP/AGENTS.md"        "$PROJECT/AGENTS.md"
 
 # Claude Code config (required for Claude Code users)
-cp CLAUDE.template.md        "$PROJECT/CLAUDE.md"
+cp "$BOOTSTRAP/CLAUDE.md"        "$PROJECT/CLAUDE.md"
+
+# Metrics ground truth (recommended)
+cp "$BOOTSTRAP/METRICS.md"       "$PROJECT/METRICS"
 
 # Methodology (required — the philosophy)
 cp DESIGN.md            "$PROJECT/DESIGN.md"
@@ -53,32 +57,49 @@ cp DESIGN.md            "$PROJECT/DESIGN.md"
 cp -r architecture/          "$PROJECT/architecture/"
 
 # Agent orchestration (recommended)
+# Copies the role-AGENT.md *templates* from the rebar repo. To populate
+# your project's per-role agent skeletons (architect, product, englead,
+# steward, merger, featurerequest), run `bin/ask init` from inside
+# $PROJECT after this copy completes. (`rebar new` and `rebar adopt`
+# call this automatically.)
 cp -r agents/                "$PROJECT/agents/"
+
+# Cross-repo federation (optional — only if your project depends on
+# contracts from other rebar repos). CHARTER §1.6. Adding entries to
+# CONSUMES.md activates `rebar contract drift-check` as a required CI
+# check via scripts/check-compliance.sh. Single-repo projects skip.
+cp "$BOOTSTRAP/CONSUMES.md"  "$PROJECT/CONSUMES.md"  # then edit or delete
 
 # Practice reference guides (recommended)
 cp -r practices/             "$PROJECT/practices/"
 
-# Enforcement scripts and conventions (recommended)
+# Enforcement scripts and conventions (recommended).
+# Scripts/ is the single source of truth — `templates/project-bootstrap/scripts/`
+# is mechanically synced from it (see scripts/sync-bootstrap.sh) so either copy
+# yields the same result. We use the root copy here.
 cp -r scripts/               "$PROJECT/scripts/"
 cp conventions.md            "$PROJECT/conventions.md"
-cp METRICS.template           "$PROJECT/METRICS"
 # State directory for steward
 mkdir -p "$PROJECT/architecture/.state"
 touch "$PROJECT/architecture/.state/.gitkeep"
 
 # Tier configuration (set your enforcement level)
-cp .rebarrc.template         "$PROJECT/.rebarrc"
+cp "$BOOTSTRAP/.rebarrc"     "$PROJECT/.rebarrc"  2>/dev/null || true
 
 # Version tracking (so you know which rebar you adopted)
-echo "v1.2.0" > "$PROJECT/.rebar-version"
+echo "v2.0.0" > "$PROJECT/.rebar-version"
 
 mkdir -p "$PROJECT/.github"
-cp .github/pull_request_template.md "$PROJECT/.github/"
+cp .github/pull_request_template.md "$PROJECT/.github/" 2>/dev/null || true
 chmod +x "$PROJECT/scripts/"*.sh
 
-# Install pre-commit hook
+# CRITICAL: Install pre-commit hook — without this, nothing is enforced
 ln -sf ../../scripts/pre-commit.sh "$PROJECT/.git/hooks/pre-commit"
 ```
+
+**The hook installation is not optional.** Scripts without hooks are decorative —
+your repo can have `check-todos.sh` and `check-freshness.sh` for weeks with
+zero enforcement if the hook isn't linked. Verify with: `ls -la .git/hooks/pre-commit`
 
 If you already have `README.md`, `AGENTS.md`, or `CLAUDE.md`, diff the
 templates against yours and merge the sections you're missing.
@@ -94,7 +115,7 @@ The universal first-read. Every agent, every session, no exceptions.
 
 1. **Rebar badge** — First line after `# Title` MUST be the rebar badge:
    ```markdown
-   > **rebar v1.2.0** | **Tier 2: ADOPTED**
+   > **rebar v2.0.0** | **Tier 2: ADOPTED**
    ```
    This is validated by `scripts/check-compliance.sh`. Update version when you
    upgrade rebar. Update tier when you change `.rebarrc`.
@@ -201,6 +222,18 @@ rebar status
 This creates `.rebar/integrity.json` (hash manifest), `.rebar/salt` (gitignored),
 and tracks all enforcement scripts, contracts, and test files. From this point
 forward, use `rebar commit` instead of `git commit` to ensure integrity tracking.
+
+**`rebar init` also writes `.mcp.json`** — a Claude Code MCP config
+that exposes ASK agents as first-class tools (`ask_<repo>_<role>`).
+Reload Claude Code in this directory and the tools appear automatically.
+If you prefer user-level config (available in all projects, not just
+adopted ones), or if your layout needs a non-default `--repos-dir`,
+see **[docs/MCP-SETUP.md](docs/MCP-SETUP.md)**.
+
+**Commit `.mcp.json`?** It contains absolute paths specific to the
+machine that ran `rebar init`. Solo devs: commit. Team projects with
+heterogeneous dev environments: add to `.gitignore` and let each dev
+regenerate via `rebar init`. Rebar does not auto-gitignore it.
 
 ## Step 5: Commit
 

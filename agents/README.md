@@ -5,6 +5,36 @@ structured prompt templates for parallel fan-out.
 
 See the [root README](../README.md) for how agents fit into the overall system.
 
+## Quick decision tree
+
+| You want… | Use | Example |
+|-----------|-----|---------|
+| **An answer to a question** | Role-based agent (`ask <role>`) | `ask architect "should this contract handle encryption?"` |
+| **A focused task done** | Subagent template (`agents/subagent-prompts/*.md`) | Code review, security scan, contract audit |
+| **Cross-cutting decision** | A sequence of role calls | `ask architect` → `ask product` → `ask englead` |
+| **Parallel work distribution** | Subagent templates fanned out across worktrees | See `practices/multi-agent-orchestration.md` |
+
+**Rule of thumb:** Questions accumulate knowledge in a persistent ASK
+session (10 questions cost 1× context). Subagent templates execute
+ephemeral, focused work. Use both — they're complementary, not
+alternatives.
+
+## The 6 core roles
+
+| Role | Owns | Best for |
+|------|------|----------|
+| 🏗️ **architect** | Contracts, system design, integration patterns | "Should we add caching here?" "Review CONTRACT:S3-AUTH for integration issues." |
+| 📋 **product** | BDD scenarios, personas, requirements gaps | "Does this contract serve the user need?" "What scenarios are missing?" |
+| 👥 **englead** | Delivery coordination, QA flow, fan-out planning | "Are we ready to ship?" "Coordinate these 3 parallel branches." |
+| 🔍 **steward** | Automated quality scanning, contract health | `ask steward summary`, `ask steward check C1` |
+| 🧪 **tester** | Test strategy, coverage, fidelity ladder | "What's the coverage gap?" "E2E plan for this flow?" |
+| 🔄 **merger** | Branch integration, conflict resolution (actor) | "Merge worktree-X and worktree-Y onto main." |
+
+Each role has its own `AGENT.md` (role definition), an optional
+`commands/` directory for unquoted invocations (e.g. `ask steward summary`
+→ `commands/summary.sh`), and a memory file (`memory.md`) that persists
+across sessions.
+
 ## Directory Layout
 
 ```

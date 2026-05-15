@@ -26,13 +26,16 @@ Project instructions for Claude Code. These override defaults—follow them exac
 **Read in order (5 min total):**
 1. `README.md` → universal orientation (ALWAYS read first, every session)
 2. `QUICKCONTEXT.md` → current state (verify against `git log --oneline -10`)
-3. `TODO.md` → tasks + known issues + blockers
-4. `AGENTS.md` → norms, testing cascade, contracts, collaboration
+3. **VERIFY:** `git log --since='7 days' --oneline | head -20` — cross-reference
+   against QUICKCONTEXT claims. If `last-synced` is >1 week old, treat all claims as suspect.
+4. `TODO.md` → tasks + known issues + blockers (open items only)
+5. `AGENTS.md` → norms, testing cascade, contracts, collaboration
 
 **Reference:**
 - `DESIGN.md` → the philosophy (contracts, BDD, autonomy model)
 - `architecture/` → contract documents
 - `agents/` → subagent templates
+- `practices/session-lifecycle.md` → session start/checkpoint/end protocol
 
 <!-- Add project-specific deep-dive files here, e.g.:
 5. `docs/README.md` → full documentation tree

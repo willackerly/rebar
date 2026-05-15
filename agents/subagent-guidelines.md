@@ -19,35 +19,93 @@ When you start, read files in this order:
 
 Do not skip steps. Do not start working before reading your template.
 
-## Isolation & Branching (MANDATORY)
+## The 10 Rules (non-negotiable)
 
-- **If you are writing ANY code, you MUST use worktree isolation.** This is
-  non-negotiable. No exceptions.
-- **Use `rebar agent start` to create your worktree.** This is the canonical
-  way to begin a coding task — it creates the worktree, snapshots integrity
-  state, and enforces role-based file permissions automatically.
-  ```bash
-  rebar agent start --role developer "implement feature X"
-  ```
-- Read-only research tasks (exploration, analysis, audits) may run in the
-  main working tree.
-- Work in your worktree branch. Do not modify the main working tree.
+These rules are the difference between 100% work survival and total loss.
+They are numbered for reference — cite "Rule 3" in findings, not prose.
 
-## Results & Checkpointing
+### Rule 1: Worktree Isolation for Code Changes
+
+If you are writing ANY code, you MUST use worktree isolation. No exceptions.
+Read-only research tasks (exploration, analysis, audits) may run in the
+main working tree.
+
+```bash
+rebar agent start --role developer "implement feature X"
+```
+
+### Rule 2: Commit After Every Logical Chunk
+
+Don't accumulate changes. If you get logged out, only uncommitted work is
+lost. One fix = one commit. Use `rebar commit` (not `git commit`) — it
+runs pre-commit checks and updates integrity. There is no `--no-verify`.
+
+```bash
+rebar commit -m "agents/<template-name>: <brief description>"
+```
+
+### Rule 3: Strict File Ownership
+
+Your prompt includes an allowlist of files you may create or modify.
+Everything else is read-only. If your prompt doesn't specify, you may
+modify files directly related to your assigned task. You may NOT modify:
+
+- Shared interface definitions (Store, Scanner, etc.)
+- Shared type files, routers, app entry points
+- Migration files, lock files, auto-generated files
+
+If you need a change to a restricted file, document it as a finding.
+
+### Rule 4: No Removals Without Explicit Authorization
+
+You may ADD types, functions, methods, and files. You may NOT REMOVE or
+RENAME anything unless your prompt explicitly says "delete X." If
+something appears unused, add a `// DEPRECATED` comment and note it in
+your results.
+
+**Why:** Your worktree snapshot is stale. References exist in files
+modified by concurrent agents that you can't see.
+
+### Rule 5: Measure Before AND After
+
+Run the relevant test suite before your first change and after each fix.
+Record the metric. If it regressed, revert. Don't guess — use an oracle
+(reference implementation, spec, or ground truth data) when available.
+
+### Rule 6: Run Package Tests After Each Change
+
+Not the full suite — just the affected package. This should take <10s and
+catches compile errors immediately.
+
+### Rule 7: Write Progress
+
+After each commit, append to the shared progress file so the orchestrator
+knows what you accomplished without reading your transcript.
+
+### Rule 8: Don't Touch Shared Files
+
+High-conflict files (shared types, auto-generated bundles, theme/config,
+`App.tsx`, `router.go`) must be explicitly assigned to at most one agent.
+If a shared file isn't in your allowlist, don't touch it.
+
+### Rule 9: Respect the Context Briefing
+
+Your prompt may include a "Recent Changes" section listing what changed on
+main since your worktree branched. Do NOT modify files listed there — your
+changes will conflict with work you can't see.
+
+### Rule 10: Commit Before Completing
+
+Your worktree is ephemeral. Uncommitted work = lost work. When done, run
+`rebar agent finish <id>` to audit your work against the sealed envelope.
+
+---
+
+## Results & Output
 
 - Write results to the location specified in your parameters.
 - If no output path is specified, write to
   `agents/results/<template-name>-<scope>.md`
-- **You MUST commit before completing.** Your worktree is ephemeral —
-  uncommitted work is lost. No commit = no work happened.
-- **Use `rebar commit` instead of `git commit`.** This ensures pre-commit
-  checks run (no bypass possible), the integrity manifest is updated, and
-  ratchets are enforced. There is no `--no-verify` flag.
-  ```bash
-  rebar commit -m "agents/<template-name>: <brief description>"
-  ```
-- When done, run `rebar agent finish <id>` to audit your work against the
-  sealed envelope (role permissions, ratchets, integrity).
 
 ## Architectural Change Detection
 

@@ -136,11 +136,23 @@ CONTRACT-{ID}-{NAME}.{MAJOR}.{MINOR}.md
 - `C` = Component (e.g., `C1-BLOBSTORE`, `C2-RELAY`)
 - `I` = Interface (e.g., `I1-SESSION`, `I2-KEY-EXCHANGE`)
 - `P` = Protocol (e.g., `P1-WIRE-FORMAT`, `P2-SIGNALING`)
+- `D` = Data Model (e.g., `D1-USER-SCHEMA`, `D2-RECEIPT`) — frozen schemas + canonicalization rules
+- `O` = Operational (e.g., `O1-PIPELINE-DAEMON`, `O2-API-GATEWAY`) — SLOs, startup/shutdown invariants, health signals, error-recovery policy
+- `T` = Integration Seam (e.g., `T1-WIRE-CODEC`, `T2-TDFBOT-API`) — type/error mappings across language or service boundaries
+
+S/C/I/P describe **structure + interfaces**; D describes **shape of data
+crossing boundaries**; O describes **operational behavior over time**
+(uptime, latency, drain semantics); T describes **agreement at
+cross-language seams** (where Go `*bool` → JSON `null` → TS `undefined`
+mismatches live). The 7-letter taxonomy survived contact at filedag
+(2026-04-24 architectural-spike retrospective).
 
 **Examples:**
 - `CONTRACT-S4-STORAGE.1.0.md`
 - `CONTRACT-C1-BLOBSTORE.2.1.md`
 - `CONTRACT-P1-WIRE-FORMAT.1.0.md`
+- `CONTRACT-O1-PIPELINE-DAEMON.1.0.md` (worked example: filedag's continuous-indexing daemon SLOs — ≥99% uptime, <60s indexing lag, <30min cycle, <4GB resident, <1% enrichment error rate)
+- `CONTRACT-O2-API-GATEWAY.1.0.md` (worked example: filedag's API SLOs — p50 <50ms, p95 <500ms, p99 <2s; <0.1% 5xx; ≥100 concurrent)
 
 ### Contract Lifecycle Status
 
@@ -231,6 +243,83 @@ ls architecture/CONTRACT-*.md
 # Find all code with ANY contract reference
 grep -rn "CONTRACT:" --include="*.go" --include="*.ts" .
 ```
+
+### Seam Contracts (Integration Points)
+
+Regular contracts define what a component does. **Seam contracts** define
+how two components talk to each other — especially across language, protocol,
+or service boundaries where type mapping bugs hide.
+
+The bugs that bite hardest aren't inside components — they're at the seams.
+Go `*bool` becomes JSON `null` becomes TypeScript `undefined`. Go `[]string`
+(nil) becomes JSON `null`, but Go `[]string{}` (empty) becomes JSON `[]`.
+These mappings are implicit in code and invisible until they break in production.
+
+**When to write a seam contract:**
+- Two components communicate across a language boundary (Go ↔ TypeScript)
+- Data crosses a protocol boundary (function call → HTTP → JSON → object)
+- A serialization format sits between producer and consumer
+
+**Seam contract naming:**
+```
+CONTRACT-SEAM-{source}-{target}.{version}.md
+```
+
+**Key sections in a seam contract:**
+- **Type mapping table:** Source type → Wire format → Target type
+- **Error mapping:** Source error → wire code → target exception
+- **Behavioral contracts:** Invariants that hold across the seam (empty vs
+  null, idempotency, pagination)
+
+See `architecture/CONTRACT-SEAM-TEMPLATE.md` for the full template.
+
+**Searching:**
+```bash
+# Find all seam contracts
+ls architecture/CONTRACT-SEAM-*.md
+
+# Find code implementing a seam
+grep -rn "CONTRACT:SEAM-API-FRONTEND" src/ internal/
+```
+
+### Output Format Contracts
+
+Contracts should cover **output format** for components that produce
+structured output (renderers, serializers, formatters), not just
+input/method interfaces. When a renderer changes its DOM structure, every
+consumer (test helpers, inspectors, E2E tests) breaks.
+
+```markdown
+## Output Format
+
+SVGBackend emits SVG with this structure:
+- `<g data-shape-id="N">` — shape wrapper
+  - `<g transform="matrix(...)">` — position/rotation wrapper
+    - `<text x="..." y="..." data-run="N">` — individual runs
+```
+
+When the output structure changes, use `CONTRACT:` grep to find all
+consumers. This prevents the ripple failure pattern: one output change
+breaks a helper that breaks a test that gets reported as "test framework
+issue" when the actual fix is 5 lines.
+
+### Module Lifecycle Status
+
+Modules that are superseded or deprecated should declare their status so
+stale tests don't rot silently:
+
+```markdown
+---
+status: active | superseded | deprecated
+superseded-by: svg-interaction/
+---
+```
+
+The Steward can flag modules that are `superseded` but still have failing
+tests, and suggest either fixing or removing them. Without this tracking,
+partially-replaced modules accumulate broken tests that waste hours to
+diagnose (see OpenDocKit test rot post-mortem: 38 failures from a
+superseded module).
 
 ### Version Bumping
 
@@ -335,6 +424,42 @@ allowed operations).
 (QUICKCONTEXT), then tasks (TODO), then norms (AGENTS). Agents must
 understand the project before they understand the process.
 
+### Session Lifecycle
+
+The Cold Start Quad covers session start. But sessions also need
+checkpoints and endings. Without lifecycle management, marathon sessions
+leave QUICKCONTEXT stale, TODO listing completed items as open, worktrees
+abandoned, and the next session spending 20-30 minutes on context
+archaeology.
+
+```
+Session Lifecycle:
+  START      → Cold Start Quad + staleness verification
+  CHECKPOINT → every 10 commits or 2 hours
+  END        → structured wrapup + handoff
+```
+
+**The meta-insight from four production deployments:** Agents reliably
+forget any protocol that requires manual action after the exciting work is
+done. The protocols that work best are structural (contract headers,
+grep-based linking) rather than behavioral (update QUICKCONTEXT, clean up
+worktrees). Session lifecycle triggers make the right thing the expected
+thing by defining clear "when" conditions.
+
+**Start:** Cold Start Quad + run `git log --since='7 days'` to verify
+QUICKCONTEXT claims. If `last-synced` is >1 week old, treat all claims
+as suspect.
+
+**Checkpoint:** Every 10 commits, every 2 hours, or at sprint boundaries.
+Update QUICKCONTEXT, commit WIP, check context quality. In marathon
+sessions, context compaction = mandatory break.
+
+**End:** Structured wrapup documenting what shipped, test state, known
+failures, decisions made, and next session entry point. Takes 5 minutes,
+saves the next session 30 minutes.
+
+See `practices/session-lifecycle.md` for the full protocol and templates.
+
 ### Anti-Drift Mechanisms
 
 Documentation drifts from reality at the speed of code changes. Agents both
@@ -382,12 +507,20 @@ doesn't break anything — it just makes documentation fictional.
 1. **Structured metrics file** — A `METRICS` file with key=value pairs is
    the single source of truth for all quantitative claims. No prose matching,
    no fragile grep-against-docs. One file, one format, machine-verifiable.
+   **This is a Tier 2 requirement** — structural compliance without content
+   accuracy is ceremony, not methodology.
 2. **Ground truth script** — `scripts/check-ground-truth.sh` computes
    metrics from code and compares against the `METRICS` file. Fails on drift.
+   **Also Tier 2** — if ground truth is only enforced at Tier 3, projects
+   can claim Tier 2 compliance while QUICKCONTEXT lies about test counts.
 3. **Known locations** — By convention, all tests live in `tests/` and all
    contracts live in `architecture/`. Known locations make counting reliable.
 4. **Cold start verification** — New sessions run the ground truth script
    before trusting QUICKCONTEXT.md claims.
+5. **Single source, not duplication** — Quantitative facts live in METRICS
+   and are *referenced* from other docs, not duplicated. When QUICKCONTEXT
+   says "271 tests," that number should come from METRICS, not from memory.
+   Duplicated numbers always drift.
 
 ---
 

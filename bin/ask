@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # ask — ASK Scoped Knowledge: query an agent
+# CONTRACT:S2-ASK-CLI.1.0
 #
 # Usage:
 #   ask <agent> "<question>"     Send a question, get a concise answer
@@ -42,6 +43,12 @@
 
 set -euo pipefail
 
+# Tracks rebar's version line. Bumped together when ASK changes
+# materially. `ask --version` reports both this and the host rebar
+# version detected from .rebar-version when run in a project.
+ASK_VERSION="1.0.0"
+REBAR_VERSION_FALLBACK="v2.0.0"
+
 # --- Configuration -----------------------------------------------------------
 
 AGENTS_DIR="${ASK_AGENTS_DIR:-./agents}"
@@ -56,6 +63,124 @@ REGISTRY="${ASK_REGISTRY:-$HOME/.config/ask/projects}"
 SERVER="${ASK_SERVER:-}"
 SERVER_API_KEY="${ASK_API_KEY:-}"
 EVENTS_LOG="$SHARED_DIR/messages/events.jsonl"
+NO_COLOR="${NO_COLOR:-}"
+
+# --- Pretty Output -----------------------------------------------------------
+
+# Colors (suppressed if NO_COLOR is set or stdout is not a terminal)
+if [ -z "$NO_COLOR" ] && [ -t 1 ]; then
+  _C_RESET='\033[0m'
+  _C_BOLD='\033[1m'
+  _C_DIM='\033[2m'
+  _C_CYAN='\033[36m'
+  _C_GREEN='\033[32m'
+  _C_YELLOW='\033[33m'
+  _C_BLUE='\033[34m'
+  _C_MAGENTA='\033[35m'
+  _C_WHITE='\033[37m'
+  _C_BAR='\033[38;5;240m'  # dark gray for the separator bar
+else
+  _C_RESET='' _C_BOLD='' _C_DIM='' _C_CYAN='' _C_GREEN=''
+  _C_YELLOW='' _C_BLUE='' _C_MAGENTA='' _C_WHITE='' _C_BAR=''
+fi
+
+# Map agent roles to colors for visual distinction
+_role_color() {
+  case "$1" in
+    architect) echo "$_C_CYAN" ;;
+    product)   echo "$_C_GREEN" ;;
+    englead)   echo "$_C_YELLOW" ;;
+    steward)   echo "$_C_MAGENTA" ;;
+    tester)    echo "$_C_BLUE" ;;
+    merger)    echo "$_C_BLUE" ;;
+    engineer)  echo "$_C_GREEN" ;;
+    *)         echo "$_C_WHITE" ;;
+  esac
+}
+
+# Format and display an agent response with header, word-wrap, and separator.
+# When stdout is not a TTY (piped, captured by server), output raw text only —
+# the receiving end will format if needed.
+_format_response() {
+  local agent="$1"
+  local response="$2"
+  local project="${3:-}"  # optional project name for cross-project queries
+
+  # If not a terminal, output raw text (server subprocess, pipe, redirect)
+  if [ ! -t 1 ]; then
+    echo "$response"
+    return
+  fi
+
+  local color
+  color=$(_role_color "$agent")
+
+  # Build the header
+  local header
+  if [ -n "$project" ]; then
+    header="${project}:${agent}"
+  else
+    # Try to derive project name from current directory
+    local proj_name
+    proj_name=$(basename "$(pwd)")
+    header="${proj_name}:${agent}"
+  fi
+
+  # Capitalize first letter of each component for display
+  local display_header
+  display_header=$(echo "$header" | sed 's/\(^\|:\)\([a-z]\)/\1\u\2/g' 2>/dev/null || echo "$header")
+
+  local term_width
+  term_width=$(tput cols 2>/dev/null || echo 80)
+  local bar_width=$((term_width < 80 ? term_width : 80))
+  local bar
+  bar=$(printf '%.0s─' $(seq 1 "$bar_width"))
+
+  # Print header
+  echo ""
+  printf "${_C_BAR}%s${_C_RESET}\n" "$bar"
+  printf "${color}${_C_BOLD}  %s${_C_RESET}\n" "$display_header"
+  printf "${_C_BAR}%s${_C_RESET}\n" "$bar"
+  echo ""
+
+  # Print response with left margin, word-wrapped to terminal width
+  local wrap_width=$((term_width - 4))
+  [ "$wrap_width" -lt 40 ] && wrap_width=40
+  echo "$response" | fmt -w "$wrap_width" 2>/dev/null | sed 's/^/  /' || echo "$response" | sed 's/^/  /'
+
+  echo ""
+}
+
+# Format project list with colors
+_format_projects() {
+  if [ ! -f "$REGISTRY" ]; then
+    echo "  (no projects registered — run 'ask register <name>' in a project)"
+    return 0
+  fi
+  echo ""
+  printf "${_C_BOLD}  Registered Projects${_C_RESET}\n"
+  echo ""
+  while IFS='=' read -r name path; do
+    name=$(echo "$name" | xargs)
+    path=$(echo "$path" | xargs)
+    [ -z "$name" ] && continue
+    echo "$name" | grep -q '^#' && continue
+    local count=0
+    if [ -d "$path/agents" ]; then
+      count=$(find "$path/agents" -maxdepth 2 -name 'AGENT.md' 2>/dev/null | wc -l | tr -d ' ')
+    fi
+    local agents_list=""
+    if [ -d "$path/agents" ]; then
+      agents_list=$(find "$path/agents" -maxdepth 2 -name 'AGENT.md' -exec dirname {} \; 2>/dev/null \
+        | xargs -I{} basename {} | sort | tr '\n' ',' | sed 's/,$//' | sed 's/,/, /g')
+    fi
+    printf "  ${_C_BOLD}%-14s${_C_RESET} ${_C_DIM}%s${_C_RESET}\n" "$name" "$path"
+    if [ -n "$agents_list" ]; then
+      printf "  ${_C_DIM}%-14s${_C_RESET} %s\n" "" "$count agents: $agents_list"
+    fi
+  done < "$REGISTRY"
+  echo ""
+}
 
 # --- Remote (ASK_SERVER) Functions --------------------------------------------
 #
@@ -160,9 +285,41 @@ _server_curl() {
 }
 
 _is_remote_query() {
-  # Returns 0 (true) if this should be routed to the server
-  # Conditions: ASK_SERVER is set AND the agent spec contains ':'
-  [ -n "$SERVER" ] && [[ "$1" == *:* ]]
+  # Returns 0 (true) if this should be routed to the server.
+  # Conditions: ASK_SERVER is set AND the agent spec contains ':' AND the
+  # project half doesn't resolve locally (case-insensitive).
+  #
+  # Without the local-first check, an adopter with ASK_SERVER set in env
+  # who types `ask tdflite:architect` (wrong case) would fall through to
+  # a remote that typically isn't there, getting "all servers failed"
+  # instead of the case-insensitive local match (red-team finding M1).
+  [ -n "$SERVER" ] || return 1
+  [[ "$1" == *:* ]] || return 1
+
+  # Empty halves are malformed — let resolve_project_agent emit the proper
+  # error rather than masking it as a remote routing miss (M9).
+  local proj="${1%%:*}"
+  local role="${1#*:}"
+  if [ -z "$proj" ] || [ -z "$role" ]; then
+    return 1
+  fi
+
+  # Local-first: if the project half matches a registry entry (case-
+  # insensitive), prefer local resolution.
+  if [ -f "$REGISTRY" ]; then
+    local lc_proj line registered
+    lc_proj=$(echo "$proj" | tr '[:upper:]' '[:lower:]')
+    while IFS= read -r line; do
+      registered="${line%%=*}"
+      registered=$(echo "$registered" | sed 's/[[:space:]]*$//')
+      [ -z "$registered" ] && continue
+      if [ "$(echo "$registered" | tr '[:upper:]' '[:lower:]')" = "$lc_proj" ]; then
+        return 1  # local match found — not a remote query
+      fi
+    done < "$REGISTRY"
+  fi
+
+  return 0  # genuinely remote
 }
 
 cmd_serve() {
@@ -240,7 +397,7 @@ _remote_ask() {
   error=$(echo "$response" | jq -r '.error // empty' 2>/dev/null)
 
   if [ -n "$answer" ]; then
-    echo "$answer"
+    _format_response "$role" "$answer" "$repo"
   fi
   if [ -n "$error" ]; then
     echo "$error" >&2
@@ -303,15 +460,153 @@ require_agent_name() {
   fi
 }
 
+# Levenshtein distance via awk. Returns edit distance between $1 and $2
+# on stdout. Used by _suggest_agent for "did you mean?" hints. Bash 3.2
+# compatible — no associative arrays, no advanced parameter expansion.
+_lev_distance() {
+  awk -v a="$1" -v b="$2" 'BEGIN {
+    la = length(a); lb = length(b);
+    if (la == 0) { print lb; exit; }
+    if (lb == 0) { print la; exit; }
+    for (i = 0; i <= la; i++) d[i, 0] = i;
+    for (j = 0; j <= lb; j++) d[0, j] = j;
+    for (i = 1; i <= la; i++) {
+      ai = substr(a, i, 1);
+      for (j = 1; j <= lb; j++) {
+        cost = (ai == substr(b, j, 1)) ? 0 : 1;
+        m = d[i-1, j] + 1;
+        n = d[i, j-1] + 1;
+        if (n < m) m = n;
+        n = d[i-1, j-1] + cost;
+        if (n < m) m = n;
+        d[i, j] = m;
+      }
+    }
+    print d[la, lb];
+  }'
+}
+
+# Suggest the closest matching agent name when the user typo'd. Emits
+# "Did you mean: <name>?" to stderr if a candidate within edit-distance
+# 4 exists. Silent otherwise. Red-team finding M8.
+_suggest_agent() {
+  local target="$1"
+  [ -z "$target" ] && return 0
+  [ -d "$AGENTS_DIR" ] || return 0
+
+  local lc_target best best_dist=999 base lc_base dist
+  lc_target=$(echo "$target" | tr '[:upper:]' '[:lower:]')
+  for d in "$AGENTS_DIR"/*/; do
+    [ -d "$d" ] || continue
+    [ -f "$d/AGENT.md" ] || continue
+    base=$(basename "$d")
+    lc_base=$(echo "$base" | tr '[:upper:]' '[:lower:]')
+    dist=$(_lev_distance "$lc_target" "$lc_base")
+    if [ "$dist" -lt "$best_dist" ]; then
+      best_dist="$dist"
+      best="$base"
+    fi
+  done
+
+  # Threshold: distance ≤ 4 OR ≤ half the target length, whichever is
+  # smaller. Prevents false suggestions for wildly different inputs.
+  local target_len max_dist=4
+  target_len=${#target}
+  if [ "$((target_len / 2))" -lt "$max_dist" ]; then
+    max_dist=$((target_len / 2))
+  fi
+
+  if [ -n "$best" ] && [ "$best_dist" -le "$max_dist" ]; then
+    echo "Did you mean: $best?" >&2
+    echo "" >&2
+  fi
+}
+
+# Extract a caller-facing first paragraph from an AGENT.md file. Mirrors
+# the logic in bin/ask-mcp-server's _get_agent_description: skip leading
+# headings/blanks, collect consecutive content lines, then strip leading
+# "You are the X..." sentences that address the agent rather than the
+# caller. Echoes the cleaned paragraph to stdout. Red-team finding M4.
+_caller_facing_description() {
+  local agent_md="$1"
+  [ -f "$agent_md" ] || return 0
+
+  awk '
+    BEGIN { in_para=0; }
+    {
+      # Trim trailing whitespace
+      sub(/[[:space:]]+$/, "", $0);
+      if (!in_para) {
+        if ($0 == "" || $0 ~ /^#/) next;
+        in_para = 1;
+        para = $0;
+      } else {
+        if ($0 == "" || $0 ~ /^#/) { exit; }
+        para = para " " $0;
+      }
+    }
+    END {
+      # Strip leading "You are..." / "You own..." / "You receive..." sentences
+      # that target the agent voice. Iterate until no further match.
+      while (match(para, /^You (are|own|make decisions|represent|are responsible|do not|don'\''t|receive|run|report)[^.!?]*[.!?]([[:space:]]+|$)/)) {
+        para = substr(para, RLENGTH + 1);
+        sub(/^[[:space:]]+/, "", para);
+      }
+      print para;
+    }
+  ' "$agent_md"
+}
+
+# Resolve an agent name case-insensitively against $AGENTS_DIR. Echoes
+# the canonical directory name on stdout (or empty string if no match).
+# Stays bash 3.2 compatible (no nameref, no associative arrays).
+_canonicalize_agent() {
+  local input="$1"
+  [ -z "$input" ] && return 0
+
+  # Fast path: exact match
+  if [ -d "$AGENTS_DIR/$input" ] && [ -f "$AGENTS_DIR/$input/AGENT.md" ]; then
+    echo "$input"
+    return 0
+  fi
+
+  # Case-insensitive scan
+  [ -d "$AGENTS_DIR" ] || return 0
+  local lc_input base lc_base
+  lc_input=$(echo "$input" | tr '[:upper:]' '[:lower:]')
+  for d in "$AGENTS_DIR"/*/; do
+    [ -d "$d" ] || continue
+    [ -f "$d/AGENT.md" ] || continue
+    base=$(basename "$d")
+    lc_base=$(echo "$base" | tr '[:upper:]' '[:lower:]')
+    if [ "$lc_base" = "$lc_input" ]; then
+      echo "$base"
+      return 0
+    fi
+  done
+  return 0
+}
+
 require_agent_exists() {
   local agent="$1"
-  local agent_dir="$AGENTS_DIR/$agent"
-  if [ ! -d "$agent_dir" ]; then
-    echo "ask: error: agent '$agent' not found (no directory at $agent_dir)" >&2
-    echo "Available agents:" >&2
-    cmd_who >&2
-    exit 2
+  local canonical
+  canonical=$(_canonicalize_agent "$agent")
+  if [ -n "$canonical" ]; then
+    # Set the global so callers can normalize their agent variable.
+    # Shell call sites that haven't been updated still work on macOS
+    # (case-insensitive APFS) but should read $_CANONICAL_AGENT for
+    # Linux portability.
+    _CANONICAL_AGENT="$canonical"
+    [ "$canonical" != "$agent" ] && log "Resolved agent '$agent' → '$canonical' (case-insensitive)"
+    return 0
   fi
+
+  echo "ask: error: agent '$agent' not found (no directory at $AGENTS_DIR/$agent)" >&2
+  echo "" >&2
+  _suggest_agent "$agent"
+  echo "Available agents:" >&2
+  cmd_who >&2
+  exit 2
 }
 
 require_jq() {
@@ -330,6 +625,11 @@ resolve_project_agent() {
   # Parse "project:agent" syntax. Sets _RESOLVED_AGENT and updates
   # AGENTS_DIR/SHARED_DIR if a project prefix is found.
   # Must be called directly (not in a subshell) so variable changes persist.
+  #
+  # Project lookup is case-insensitive: `tdflite:architect` resolves to
+  # the registered `TDFLite` repo. Without this, a user typing the wrong
+  # case fell through to ASK_SERVER and got the misleading "all servers
+  # failed" error (red-team finding M1).
   local spec="$1"
   _RESOLVED_AGENT="$spec"
   _RESOLVED_PROJECT_DIR=""
@@ -339,13 +639,39 @@ resolve_project_agent() {
       local project="${spec%%:*}"
       _RESOLVED_AGENT="${spec#*:}"
 
+      # M9: reject empty project or agent halves explicitly.
+      if [ -z "$project" ] || [ -z "$_RESOLVED_AGENT" ]; then
+        echo "ask: error: malformed cross-repo spec '$spec' — expected '<project>:<agent>'" >&2
+        exit 2
+      fi
+
       if [ ! -f "$REGISTRY" ]; then
         die "no project registry at $REGISTRY — run 'ask register <name>' in a project first"
       fi
 
-      local project_path
+      # Case-insensitive registry lookup. Try exact match first (fast path),
+      # then fall back to case-insensitive scan returning the canonical name.
+      local project_path canonical_project
       project_path=$(grep "^${project}[[:space:]]*=" "$REGISTRY" 2>/dev/null \
         | head -1 | cut -d'=' -f2 | xargs) || true
+      canonical_project="$project"
+
+      if [ -z "$project_path" ]; then
+        local lc_project line registered
+        lc_project=$(echo "$project" | tr '[:upper:]' '[:lower:]')
+        while IFS= read -r line; do
+          registered="${line%%=*}"
+          # trim trailing whitespace
+          registered=$(echo "$registered" | sed 's/[[:space:]]*$//')
+          [ -z "$registered" ] && continue
+          if [ "$(echo "$registered" | tr '[:upper:]' '[:lower:]')" = "$lc_project" ]; then
+            project_path=$(echo "${line#*=}" | xargs)
+            canonical_project="$registered"
+            log "Resolved project '$project' → '$canonical_project' (case-insensitive)"
+            break
+          fi
+        done < "$REGISTRY"
+      fi
 
       if [ -z "$project_path" ]; then
         echo "ask: error: project '$project' not found in registry" >&2
@@ -355,14 +681,13 @@ resolve_project_agent() {
       fi
 
       if [ ! -d "$project_path" ]; then
-        die "registered path for '$project' no longer exists: $project_path"
+        die "registered path for '$canonical_project' no longer exists: $project_path"
       fi
 
       AGENTS_DIR="$project_path/agents"
       SHARED_DIR="$project_path/shared"
       EVENTS_LOG="$SHARED_DIR/messages/events.jsonl"
       _RESOLVED_PROJECT_DIR="$project_path"
-      log "Resolved project '$project' → $project_path"
       ;;
   esac
 }
@@ -398,22 +723,7 @@ cmd_register() {
 }
 
 cmd_projects() {
-  if [ ! -f "$REGISTRY" ]; then
-    echo "(no projects registered — run 'ask register <name>' in a project)"
-    return 0
-  fi
-  # Show registered projects with agent counts
-  while IFS='=' read -r name path; do
-    name=$(echo "$name" | xargs)
-    path=$(echo "$path" | xargs)
-    [ -z "$name" ] && continue
-    echo "$name" | grep -q '^#' && continue
-    local count=0
-    if [ -d "$path/agents" ]; then
-      count=$(find "$path/agents" -maxdepth 2 -name 'AGENT.md' 2>/dev/null | wc -l | tr -d ' ')
-    fi
-    echo "  $name → $path ($count agents)"
-  done < "$REGISTRY"
+  _format_projects
 }
 
 generate_msg_id() {
@@ -486,12 +796,69 @@ cmd_who() {
     echo "ask: no agents directory at $AGENTS_DIR" >&2
     exit 2
   fi
+
+  local proj_name
+  proj_name=$(basename "$(pwd)")
+  echo ""
+  printf "${_C_BOLD}  %s — Available Agents${_C_RESET}\n" "$proj_name"
+  echo ""
+
+  # Adjust width to terminal — fall back to 80 cols if tput unavailable.
+  # Description column gets terminal_width - name_width(14) - margin(4).
+  local term_width desc_width
+  term_width=$(tput cols 2>/dev/null || echo 80)
+  desc_width=$((term_width - 18))
+  [ "$desc_width" -lt 30 ] && desc_width=30
+  [ "$desc_width" -gt 100 ] && desc_width=100
+
   for d in "$AGENTS_DIR"/*/; do
     [ -d "$d" ] || continue
     if [ -f "$d/AGENT.md" ]; then
-      basename "$d"
+      local name
+      name=$(basename "$d")
+      local color
+      color=$(_role_color "$name")
+
+      # Caller-facing description (strips agent-voice "You are..." preambles
+      # so the listing reads as third-person help text rather than agent
+      # instructions). Red-team finding M4. Falls back to legacy sed
+      # extraction if nothing usable comes back.
+      local desc=""
+      desc=$(_caller_facing_description "$d/AGENT.md")
+      if [ -z "$desc" ]; then
+        desc=$(sed -n '/^## Responsibilities/,/^##/{s/^- *//p;}' "$d/AGENT.md" 2>/dev/null | head -1)
+      fi
+      if [ -z "$desc" ]; then
+        desc=$(sed -n '/^## Role/,/^##/{/^## Role/d;/^##/d;/^$/d;p;}' "$d/AGENT.md" 2>/dev/null | head -1 | sed 's/^[[:space:]]*//')
+      fi
+
+      # Word-break truncation (M5): if the description exceeds the column
+      # width, truncate at the last space before the limit and append "…".
+      if [ -n "$desc" ] && [ "${#desc}" -gt "$desc_width" ]; then
+        local trunc cut_at
+        trunc="${desc:0:$desc_width}"
+        cut_at=$(echo "$trunc" | awk '{
+          n = length($0);
+          for (i = n; i > 0; i--) {
+            if (substr($0, i, 1) == " ") { print i - 1; exit; }
+          }
+          print n;
+        }')
+        if [ -n "$cut_at" ] && [ "$cut_at" -gt 10 ]; then
+          desc="${desc:0:$cut_at}…"
+        else
+          desc="${trunc}…"
+        fi
+      fi
+
+      if [ -n "$desc" ]; then
+        printf "  ${color}${_C_BOLD}%-14s${_C_RESET} ${_C_DIM}%s${_C_RESET}\n" "$name" "$desc"
+      else
+        printf "  ${color}${_C_BOLD}%s${_C_RESET}\n" "$name"
+      fi
     fi
   done
+  echo ""
 }
 
 cmd_where() {
@@ -549,12 +916,26 @@ cmd_status() {
 cmd_log() {
   require_agent_name "${1:-}"
   require_agent_exists "$1"
-  local logfile="$AGENTS_DIR/$1/memory.log.md"
-  if [ -f "$logfile" ]; then
-    cat "$logfile"
-  else
+  local agent="$_CANONICAL_AGENT"
+  local logfile="$AGENTS_DIR/$agent/memory.log.md"
+  if [ ! -f "$logfile" ]; then
     echo "(no log entries yet)"
+    return 0
   fi
+  # Auto-pipe through a pager when stdout is a TTY — agent logs can run
+  # to thousands of lines and dumping to terminal makes them unreadable.
+  # Falls through to plain cat when piped or PAGER explicitly disabled.
+  # Red-team finding L2.
+  if [ -t 1 ] && [ "${PAGER-}" != "cat" ]; then
+    local pager="${PAGER:-less}"
+    if command -v "$pager" &>/dev/null; then
+      # -R: pass through ANSI colors, -F: exit if shorter than screen,
+      # -X: don't clear screen on exit (keep content visible).
+      "$pager" -RFX "$logfile"
+      return 0
+    fi
+  fi
+  cat "$logfile"
 }
 
 cmd_peek() {
@@ -776,7 +1157,7 @@ cmd_init() {
   # --- Create agents ---
   local created=()
 
-  for role in architect product englead steward merger; do
+  for role in architect product englead steward merger featurerequest; do
     local agent_dir="$AGENTS_DIR/$role"
     if [ -f "$agent_dir/AGENT.md" ]; then
       # Ensure inbox/outbox exist for existing agents
@@ -807,6 +1188,15 @@ cmd_init() {
 cmd_ask() {
   local agent="$1"
   local question="$2"
+
+  # Roles with default write access (gated intake — see CHARTER §2.9 / §3).
+  # MCP callers don't pass -w; the role itself implies the write surface.
+  case "$agent" in
+    featurerequest)
+      WRITE_MODE=1
+      log "Auto-enabling write mode for write-capable role: $agent"
+      ;;
+  esac
 
   require_agent_exists "$agent"
   require_jq
@@ -867,55 +1257,86 @@ _ask_direct() {
   fi
   dbg "session=$session_id has_session=$has_session"
 
-  # Build the prompt
-  local prompt
-  if [ "$has_session" = true ]; then
-    # Continuing session — agent already has context, just ask
-    local write_hint=""
-    if [ "$WRITE_MODE" = "1" ]; then
-      write_hint="
+  # Log the question event
+  local ts
+  ts=$(timestamp)
+  local event
+  event=$(jq -n \
+    --arg id "$msg_id" \
+    --arg from "human" \
+    --arg to "$agent" \
+    --arg type "question" \
+    --arg ts "$ts" \
+    --arg body "$question" \
+    '{id: $id, from: $from, to: $to, type: $type, timestamp: $ts, body: $body}')
+  append_event "$event"
+
+  log "Invoking claude..."
+
+  # If querying a remote project, cd there so claude can access its files
+  if [ -n "$_RESOLVED_PROJECT_DIR" ]; then
+    log "Changing to project dir: $_RESOLVED_PROJECT_DIR"
+    cd "$_RESOLVED_PROJECT_DIR"
+  fi
+
+  # Invoke claude with one resilient retry: if --resume hits a vanished
+  # session ("No conversation found with session ID …"), rotate to a fresh
+  # session and replay with full context. Anything else fails normally.
+  local progress_file="$agent_dir/.progress"
+  local raw_response response
+  local attempt=0
+  while :; do
+    attempt=$((attempt + 1))
+
+    # Build the prompt (depends on has_session, which can flip on retry)
+    local prompt
+    if [ "$has_session" = true ]; then
+      # Continuing session — agent already has context, just ask
+      local write_hint=""
+      if [ "$WRITE_MODE" = "1" ]; then
+        write_hint="
 
 You have write access. Use Edit, Write, and Bash tools to make changes directly."
-    fi
-    if [ "$VERBOSE" = "1" ]; then
-      prompt="$question${write_hint}
+      fi
+      if [ "$VERBOSE" = "1" ]; then
+        prompt="$question${write_hint}
 
 Respond with: a concise answer paragraph, then a blank line, then
 1-3 sentences of reasoning, then a blank line, then relevant file
 paths as a bulleted list. No labels."
-    else
-      prompt="$question${write_hint}
+      else
+        prompt="$question${write_hint}
 
 Respond with a single concise paragraph — the answer itself, nothing else."
-    fi
-  else
-    # First invocation — send full context to establish the agent
-    local context=""
-    if [ -f "$agent_dir/AGENT.md" ]; then
-      context=$(cat "$agent_dir/AGENT.md")
-    fi
-    if [ -f "$agent_dir/memory.md" ]; then
-      context="$context
+      fi
+    else
+      # First invocation — send full context to establish the agent
+      local context=""
+      if [ -f "$agent_dir/AGENT.md" ]; then
+        context=$(cat "$agent_dir/AGENT.md")
+      fi
+      if [ -f "$agent_dir/memory.md" ]; then
+        context="$context
 
 --- Current Memory ---
 $(cat "$agent_dir/memory.md")"
-    fi
+      fi
 
-    # Build tool/permission preamble based on mode
-    local tools_preamble
-    if [ "$WRITE_MODE" = "1" ]; then
-      tools_preamble="You have full access to the project filesystem including write access.
+      # Build tool/permission preamble based on mode
+      local tools_preamble
+      if [ "$WRITE_MODE" = "1" ]; then
+        tools_preamble="You have full access to the project filesystem including write access.
 Use Read, Grep, and Glob to research. Use Edit and Write to modify or
 create files. Use Bash for shell commands (tests, builds, git).
 Do not guess — look it up, then act on it."
-    else
-      tools_preamble="You have full access to the project filesystem. Use Read, Grep, and Glob
+      else
+        tools_preamble="You have full access to the project filesystem. Use Read, Grep, and Glob
 tools to look up files, search code, and verify claims before answering.
 Do not guess — look it up."
-    fi
+      fi
 
-    if [ "$VERBOSE" = "1" ]; then
-      prompt="You are the $agent agent.
+      if [ "$VERBOSE" = "1" ]; then
+        prompt="You are the $agent agent.
 
 Your role and context:
 $context
@@ -940,8 +1361,8 @@ Rules:
 - Second block is reasoning — only if it adds value
 - Third block is file references — only list files that exist and matter
 - If you cannot answer, say so directly and explain why"
-    else
-      prompt="You are the $agent agent.
+      else
+        prompt="You are the $agent agent.
 
 Your role and context:
 $context
@@ -955,79 +1376,76 @@ Rules:
 - No labels, no preamble, no \"ANSWER:\" prefix
 - No rationale or references unless the question explicitly asks for them
 - Be direct and specific"
+      fi
     fi
-  fi
 
-  # Log the question event
-  local ts
-  ts=$(timestamp)
-  local event
-  event=$(jq -n \
-    --arg id "$msg_id" \
-    --arg from "human" \
-    --arg to "$agent" \
-    --arg type "question" \
-    --arg ts "$ts" \
-    --arg body "$question" \
-    '{id: $id, from: $from, to: $to, type: $type, timestamp: $ts, body: $body}')
-  append_event "$event"
-
-  log "Invoking claude..."
-
-  # If querying a remote project, cd there so claude can access its files
-  if [ -n "$_RESOLVED_PROJECT_DIR" ]; then
-    log "Changing to project dir: $_RESOLVED_PROJECT_DIR"
-    cd "$_RESOLVED_PROJECT_DIR"
-  fi
-
-  # Build claude command with session resumption if available
-  local claude_args=(--print --model "$MODEL")
-  if [ "$has_session" = true ]; then
-    claude_args+=(--resume "$session_id")
-  else
-    claude_args+=(--session-id "$session_id")
-  fi
-
-  # Write mode: grant file editing tools and appropriate permissions
-  if [ "$WRITE_MODE" = "1" ]; then
-    claude_args+=(--allowedTools "Read Grep Glob Edit Write Bash")
-    claude_args+=(--permission-mode acceptEdits)
-    log "Write mode enabled — agent can edit/create files"
-  fi
-
-  # Streaming progress: use stream-json for incremental updates,
-  # fall back to json for read-only queries
-  local progress_file="$agent_dir/.progress"
-  if [ "$WRITE_MODE" = "1" ]; then
-    claude_args+=(--output-format stream-json)
-  else
-    claude_args+=(--output-format json)
-  fi
-
-  dbg "claude ${claude_args[*]} <prompt>"
-
-  # Invoke claude
-  local raw_response response
-  if [ "$WRITE_MODE" = "1" ]; then
-    # Stream mode: pipe through progress tracker, collect final result
-    _init_progress "$agent" "$question"
-    if raw_response=$(claude "${claude_args[@]}" "$prompt" 2>"$agent_dir/.last-stderr" \
-        | _stream_progress "$agent"); then
-      _finish_progress "$agent" "done"
+    # Build claude command with session resumption if available
+    local claude_args=(--print --model "$MODEL")
+    if [ "$has_session" = true ]; then
+      claude_args+=(--resume "$session_id")
     else
-      _finish_progress "$agent" "error"
-      echo "ask: error: claude invocation failed" >&2
-      [ -f "$agent_dir/.last-stderr" ] && cat "$agent_dir/.last-stderr" >&2
-      exit 1
+      claude_args+=(--session-id "$session_id")
     fi
-  else
-    # Non-stream mode: capture full response
-    if ! raw_response=$(claude "${claude_args[@]}" "$prompt" 2>"$agent_dir/.last-stderr"); then
-      echo "ask: error: claude invocation failed" >&2
-      [ -f "$agent_dir/.last-stderr" ] && cat "$agent_dir/.last-stderr" >&2
-      exit 1
+
+    # Write mode: grant file editing tools and appropriate permissions
+    if [ "$WRITE_MODE" = "1" ]; then
+      claude_args+=(--allowedTools "Read Grep Glob Edit Write Bash")
+      claude_args+=(--permission-mode acceptEdits)
+      log "Write mode enabled — agent can edit/create files"
     fi
-  fi
+
+    # Streaming progress: use stream-json for incremental updates,
+    # fall back to json for read-only queries.
+    # claude requires --verbose when combining --print with stream-json,
+    # so include both together or neither.
+    if [ "$WRITE_MODE" = "1" ]; then
+      claude_args+=(--output-format stream-json --verbose)
+    else
+      claude_args+=(--output-format json)
+    fi
+
+    dbg "claude ${claude_args[*]} <prompt> (attempt $attempt)"
+
+    local invoke_ok=true
+    if [ "$WRITE_MODE" = "1" ]; then
+      _init_progress "$agent" "$question"
+      if raw_response=$(claude "${claude_args[@]}" "$prompt" 2>"$agent_dir/.last-stderr" \
+          | _stream_progress "$agent"); then
+        _finish_progress "$agent" "done"
+      else
+        _finish_progress "$agent" "error"
+        invoke_ok=false
+      fi
+    else
+      if ! raw_response=$(claude "${claude_args[@]}" "$prompt" 2>"$agent_dir/.last-stderr"); then
+        invoke_ok=false
+      fi
+    fi
+
+    if [ "$invoke_ok" = true ]; then
+      break
+    fi
+
+    # Detect a vanished --resume target and retry once with a fresh session.
+    # The stale ID can come from a wiped ~/.claude store, an interrupted first
+    # call, or a server-side retention boundary — in all cases, replaying with
+    # full context recovers cleanly.
+    if [ "$attempt" -lt 2 ] \
+        && [ "$has_session" = true ] \
+        && grep -q "No conversation found with session ID" "$agent_dir/.last-stderr" 2>/dev/null; then
+      echo "[${agent}] session expired, restarting fresh" >&2
+      log "Stale session $session_id — rotating and replaying with full context"
+      rm -f "$session_file"
+      session_id=$(uuidgen | tr '[:upper:]' '[:lower:]')
+      echo "$session_id" > "$session_file"
+      has_session=false
+      continue
+    fi
+
+    echo "ask: error: claude invocation failed" >&2
+    [ -f "$agent_dir/.last-stderr" ] && cat "$agent_dir/.last-stderr" >&2
+    exit 1
+  done
 
   # Extract and store session ID for next invocation
   local new_session_id
@@ -1078,7 +1496,7 @@ Rules:
   _maybe_compact "$agent"
 
   # Output the response
-  echo "$response"
+  _format_response "$agent" "$response" "${_RESOLVED_PROJECT:-}"
   exit 0
 }
 
@@ -1137,13 +1555,13 @@ EOJSON
   local answer
   answer=$(cat "$outbox_file")
 
-  # Try to parse as JSON and format nicely; fall back to raw output
+  # Format the response
   if echo "$answer" | jq -e '.answer' &>/dev/null; then
-    echo "$answer" | jq -r '
-      "ANSWER: \(.answer)\n\nRATIONALE:\n\(.rationale // "(none)")\n\nREFS:\n\(.refs // [] | map("- " + .) | join("\n"))"
-    '
+    local parsed
+    parsed=$(echo "$answer" | jq -r '.answer' 2>/dev/null)
+    _format_response "$agent" "$parsed"
   else
-    echo "$answer"
+    _format_response "$agent" "$answer"
   fi
 
   # Clean up outbox
@@ -1635,7 +2053,30 @@ while [ $# -gt 0 ]; do
     -v|--verbose) VERBOSE=1; shift ;;
     -d|--debug)   DEBUG=1; VERBOSE=1; shift ;;
     -w|--write)   WRITE_MODE=1; shift ;;
-    *)            break ;;
+    -V|--version)
+      # Detect host rebar version if we're in a rebar project; fall back
+      # to the compile-time constant otherwise. Useful for adopters who
+      # want to know which rebar their `ask` was synced against.
+      _rebar_v="$REBAR_VERSION_FALLBACK"
+      [ -f ./.rebar-version ] && _rebar_v=$(tr -d ' \n' < ./.rebar-version)
+      echo "ask v$ASK_VERSION ($_rebar_v)"
+      exit 0
+      ;;
+    --)
+      # Conventional end-of-flags marker. Anything after is positional.
+      shift
+      break
+      ;;
+    --*|-?)
+      # Reject unknown short/long flags rather than silently treating
+      # them as agent names (red-team finding M6). `ask --foo` was
+      # producing "agent '--foo' not found"; not actionable.
+      echo "ask: error: unknown flag '$1'" >&2
+      echo "" >&2
+      echo "Try: ask --help" >&2
+      exit 4
+      ;;
+    *) break ;;
   esac
 done
 
@@ -1761,9 +2202,14 @@ case "$CMD" in
     # --- Local mode ---
     resolve_project_agent "$CMD"
     AGENT="$_RESOLVED_AGENT"
-    AGENT_DIR="$AGENTS_DIR/$AGENT"
 
+    # require_agent_exists exits on miss; on hit it sets _CANONICAL_AGENT
+    # to the actual case-correct directory name (e.g. 'architect' if user
+    # typed 'Architect'). Use the canonical form so path construction
+    # works on case-sensitive filesystems (Linux).
     require_agent_exists "$AGENT"
+    AGENT="$_CANONICAL_AGENT"
+    AGENT_DIR="$AGENTS_DIR/$AGENT"
 
     CMD_WORD="${2:-}"
 
@@ -1787,6 +2233,22 @@ case "$CMD" in
         exit 4
       fi
     fi
+
+    # --- Reject leading flags in question position ---
+    # Common ask flags must come before the agent name. Without this guard
+    # `ask architect -v` passes -v through to the underlying claude binary
+    # as its own --version flag, printing the claude version instead of
+    # answering the user. Long questions can legitimately start with a
+    # dash (e.g., '-v doesn't work in...') so only reject the known short
+    # flags and our long-flag forms.
+    case "$CMD_WORD" in
+      -v|-d|-w|-V|--verbose|--debug|--write|--version|--help|-h)
+        echo "ask: error: flag '$CMD_WORD' must come before the agent name" >&2
+        echo "" >&2
+        echo "Usage: ask $CMD_WORD $AGENT \"<question>\"" >&2
+        exit 4
+        ;;
+    esac
 
     # --- Check if CMD_WORD matches a command script ---
     if [ -x "$AGENT_DIR/commands/$CMD_WORD.sh" ]; then

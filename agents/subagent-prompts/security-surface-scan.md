@@ -75,6 +75,22 @@ vector, assess exploitability, and provide a concrete remediation.
 - Are resources bounded (no unbounded allocations from user input)?
 - Are timeouts set on network operations?
 
+### 7. Red Team Mode (Adversarial Mindset)
+
+When invoked as part of a red team exercise (or whenever you want to go
+deeper), adopt an attacker's perspective:
+
+- **Cheapest path to damage:** What's the single lowest-effort attack that
+  would have the highest impact? Start there.
+- **Deployment surface:** Don't just audit the code — consider env vars,
+  secrets in CI logs, debug endpoints left enabled, default credentials.
+- **Blast radius:** For each finding, estimate the worst case if exploited.
+  "Read one user's data" vs "read ALL users' data" vs "execute arbitrary code."
+- **Chained attacks:** Can two low-severity findings combine into a
+  high-severity attack? (e.g., info disclosure + SSRF = internal network access)
+- **Supply chain:** Are dependencies pinned? Could a malicious update to a
+  transitive dependency compromise the system?
+
 ## Context Files
 
 Read these before starting:

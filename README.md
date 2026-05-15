@@ -1,5 +1,11 @@
 # rebar
 
+> **rebar v2.0.0** | **Tier 3: ENFORCED**
+
+[![rebar v2.0.0](https://img.shields.io/badge/rebar-v2.0.0-orange)](DESIGN.md)
+[![Tier 3: Enforced](https://img.shields.io/badge/tier-3_enforced-brightgreen)](DESIGN.md)
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
+
 **The dual-purpose foundation for AI-powered development teams.**
 
 Rebar is **two things in one**:
@@ -18,14 +24,21 @@ How 10+ agents work together without destroying each other's work:
 ### The ASK Tool — Persistent Multi-Role Agent System
 **What it is:** Enterprise-grade CLI that maintains persistent agent sessions across projects and time. Instead of ephemeral subagents that cost 10x context on each question, ASK agents accumulate knowledge and coordinate through specialized roles.
 
-**MCP-Enabled for Swarms:** Now supports Model Context Protocol (MCP), allowing a single ASK agent instance to answer questions from multiple users and agents simultaneously. This enables true swarm intelligence where one expert agent can serve an entire development team or agent collective.
+**MCP-Enabled for Claude Code:** ASK exposes every agent as an MCP tool
+(`ask_<repo>_<role>`), so Claude Code instances working in your project
+can call the architect, product, or englead agent as a first-class tool —
+no shell-out, no context cost. `rebar init` and `rebar adopt` write a
+project-local `.mcp.json` automatically.
+**[→ MCP Setup Guide](docs/MCP-SETUP.md)**
 
 **How it's used:**
 ```bash
+# From your shell
 ask architect "Should we add caching to the user service?"
 ask product "Does this contract match our user stories?"
-ask englead "Are we ready to merge this feature?"
-ask steward "What contracts need attention?"
+
+# From Claude Code (after MCP wiring, tools appear automatically)
+# → agent reaches for ask_rebar_architect the same way it reaches for Grep
 ```
 
 **What it accomplishes:**
@@ -35,11 +48,14 @@ ask steward "What contracts need attention?"
 - **Cross-session** — today's agent learns what yesterday's agent discovered
 - **Cross-failure** — when agents fail, failure modes become swarm knowledge
 
-**The result:** 10x context efficiency + coordinated decision-making across your entire development workflow.
+**The result:** Your codebase becomes a *living system* where information stays organized, agents coordinate seamlessly, and collective intelligence compounds across every session. 10x context efficiency. Coordinated decision-making across your entire workflow.
 
-**The result:** Your codebase becomes a *living system* where information stays organized, agents coordinate seamlessly, and collective intelligence compounds across every session.
-
-30 minutes to set up. Zero infrastructure. Everything is plain text — bash, markdown, grep, jq. No framework to install. Copy files into your project, and both your organization model AND agent coordination work immediately.
+**Setup time** depends on your profile (see [SETUP.md](SETUP.md)):
+solo dev ~15 min, small team ~45 min, department ~2 hours. The substrate
+is plain text — markdown, bash, grep, jq — plus optional Go and Python
+binaries (`rebar` CLI, ASK CLI, MCP server) when you want them. The 5-minute
+[QUICKSTART](QUICKSTART.md) gets you a working contract without any
+binaries built; everything else is opt-in.
 
 ---
 
@@ -50,10 +66,12 @@ ask steward "What contracts need attention?"
 
 **Solo developer quickstart:**
 ```bash
-# Clone and bootstrap
+# Option A: Copy templates
 git clone https://github.com/willackerly/rebar.git && cd rebar
 cp -r templates/project-bootstrap/* ../my-project/ && cd ../my-project
-# Edit your first contract → link it to code → see the magic
+
+# Option B: Use the CLI (builds v2 scaffolding automatically)
+cd my-project && ../rebar/bin/rebar init
 ```
 
 OR from via installer setup script:
@@ -87,7 +105,7 @@ curl -fsSL https://raw.githubusercontent.com/willackerly/rebar/main/setup-rebar.
 - **[Coordination](practices/)** — Multi-agent → Worktrees → Swarms
 - **[Case Studies](CASE-STUDIES.md)** — Real-world solutions indexed by problem
 
-**What you get:** Battle-tested patterns from 100+ agent launches
+**What you get:** Battle-tested patterns from 200+ agent launches
 **Perfect for:** Teams hitting limits, complex coordination needs
 
 ---
@@ -157,13 +175,14 @@ $ ask product "does offline sync need a new contract?"
 
 # Battle-Tested Results
 
-Rebar has been proven across 100+ worktree agent launches in four production projects:
+Rebar has been proven across 200+ worktree agent launches in five production projects:
 
 | Project | Swarm Scale | What Happened |
 |---------|------------|--------------|
 | **Dapple SafeSign** | 18 agents, 3 phases | 17 contracts, 169 headers, **0 merge conflicts**, 3 hours wall clock |
 | **blindpipe** | Selective adoption | Crypto-critical ZK suite. ASK sessions save **10x context** vs ephemeral subagents |
-| **OpenDocKit** | 9 simultaneous agents | 5,824 tests, progressive-fidelity OOXML renderer. Proved the 6-rule agent protocol |
+| **OpenDocKit** | 15+ parallel agents | 8,000+ tests, 20hr marathon. Red team protocol: 18 issues found, 18 fixed. Visual fidelity RMSE 0.159→0.102 |
+| **filedag** | 40+ parallel agents | 62 commits in 48hrs, 28K lines Go + 10K TypeScript, 87 Playwright tests. Proved session lifecycle need |
 | **Office 180** | Multi-repo swarm | Cross-repo namespacing, AI-native contract frontmatter |
 
 **Key insight from OpenDocKit:** 100% of committed agent work was recoverable after login expiration incidents. Uncommitted work was the only true loss — which the commit-per-chunk protocol minimizes.
@@ -211,7 +230,7 @@ The swarm gets smarter over time. What one agent discovers, all agents benefit f
 - **Role-based expertise** — architect, product, tester each accumulate domain knowledge
 - **Failure pattern library** — every crash, conflict, and regression becomes a mitigation for the next run
 
-**The four contract rules** (the foundation everything else builds on):
+**The four contract principles** (the foundation everything else builds on):
 
 1. Don't implement without a contract
 2. Don't modify code without checking its contract
@@ -241,43 +260,18 @@ Routes action items by role: draft contracts → architect, testing gaps → eng
 | Tier | What's Enforced | Scripts |
 |------|----------------|---------|
 | **1 - Partial** | Contract refs + TODOs | `check-contract-refs.sh`, `check-todos.sh` |
-| **2 - Adopted** | + headers, freshness, registry | + `check-contract-headers.sh`, `check-freshness.sh` |
-| **3 - Enforced** | + ground truth, strict steward | + `check-ground-truth.sh`, full Steward |
+| **2 - Adopted** | + headers, freshness, ground truth, compliance, doc-refs, soft-hardening decay | + `check-contract-headers.sh`, `check-freshness.sh`, `check-ground-truth.sh`, `check-compliance.sh`, `check-doc-refs.sh`, `check-decay-patterns.sh` |
+| **3 - Enforced** | + strict steward, full lifecycle | + full Steward with computed lifecycles |
 
 *Run all: `scripts/ci-check.sh` | Pre-commit: `scripts/pre-commit.sh`*
 
-</details>
-
----
-
-<details>
-<summary><strong>📁 Project Structure</strong> <em>(expand to see full layout)</em></summary>
-
-```
-rebar/
-├── # Getting Started Files
-├── QUICKSTART.md               # 5-minute solo dev setup
-├── FEATURE-DEVELOPMENT.md      # 1-hour guided workflow
-├── CASE-STUDIES.md             # Problem-indexed war stories
-│
-├── # Core Philosophy
-├── DESIGN.md                   # Complete methodology
-├── conventions.md              # Standards & naming
-├── SETUP.md                    # Full adoption guide
-│
-├── # Copy Into Your Project
-├── *.template.md               # Cold Start Quad templates
-├── architecture/               # Contract system + templates
-├── scripts/                    # Enforcement & scanning
-│
-├── # Advanced Patterns
-├── practices/                  # Specialized workflows
-├── profiles/                   # Team size & project type guides
-├── agents/                     # Role definitions & subagent templates
-├── bin/                        # ASK CLI for persistent sessions
-├── feedback/                   # Real-world adoption reports
-└── docs/                       # Proposals & design documents
-```
+`check-doc-refs.sh` catches the class of drift where a doc cites a file
+that's never `git add`-ed — green on the author's machine, broken on a
+fresh clone. `check-decay-patterns.sh` flags soft-hardening patterns
+(silenced failures, inverted assertions, magic-string project gating,
+"keep in sync" comments) that survive code review and decay six months
+later. See `feedback/2026-04-21-...`, `2026-04-22-...`, and
+`2026-04-24-fidelity-decay-...` for the source incidents.
 
 </details>
 
@@ -289,7 +283,7 @@ rebar/
 **Ready to adopt?** → [❤️ Love It (1 hour)](FEATURE-DEVELOPMENT.md)
 **Need advanced patterns?** → [🎯 Master It](CASE-STUDIES.md)
 
-**Questions?** → [Ask the architect agent](bin/README.md#ask-cli-reference)
+**Questions?** → [Ask the architect agent](bin/README.md)
 
 ### Pick Your Profile
 
@@ -302,7 +296,7 @@ rebar/
 Every rebar repo declares its version and tier at the top of README.md:
 
 ```markdown
-> **rebar v1.2.0** | **Tier 2: ADOPTED**
+> **rebar v2.0.0** | **Tier 2: ADOPTED**
 ```
 
 This is validated by `scripts/check-compliance.sh` and the Steward. It tells
@@ -314,34 +308,41 @@ anyone looking at your repo: "this project speaks rebar, here's what's enforced.
 
 ```
 rebar/
-├── DESIGN.md               # The philosophy (read first for depth)
-├── conventions.md               # Branch naming, commits, headers, reviews
-├── SETUP.md                     # Step-by-step adoption guide
-├── CHANGELOG.md                 # Version history + migration guides
+├── # Getting started
+│   QUICKSTART.md                # 5-minute solo dev setup
+│   FEATURE-DEVELOPMENT.md       # 1-hour guided BDD → Contract → Code workflow
+│   CASE-STUDIES.md              # Real-world solutions indexed by problem
+│   SETUP.md                     # Full adoption guide (per profile)
 │
-├── # Templates (copy into your project)
-├── README.template.md           # Cold Start Quad #1
-├── QUICKCONTEXT.template.md     # Cold Start Quad #2
-├── TODO.template.md             # Cold Start Quad #3
-├── AGENTS.template.md           # Cold Start Quad #4
-├── CLAUDE.template.md           # Claude Code config
-├── METRICS.template             # Ground truth metrics
-├── .rebarrc.template            # Tier configuration
+├── # Methodology
+│   DESIGN.md                    # The philosophy (read first for depth)
+│   conventions.md               # Branch naming, commits, headers, discoveries
+│   CHANGELOG.md                 # Version history + migration notes
 │
-├── architecture/                # Contract system + templates
-├── agents/                      # Role definitions + subagent templates
-├── bin/                         # ASK CLI (persistent agent sessions)
-├── scripts/                     # Enforcement + quality scanning
-├── practices/                   # Reference guides (E2E, deployment, orchestration, worktrees)
-├── profiles/                    # Adoption guides (by project type + team size)
-├── feedback/                    # Real-world adoption reports
-└── docs/                        # Proposals + design documents
+├── templates/
+│   ├── project-bootstrap/       # `cp -r project-bootstrap/* ../my-project/` is one-shot
+│   │   └── README.md, QUICKCONTEXT.md, TODO.md, AGENTS.md, CLAUDE.md, METRICS.md,
+│   │       architecture/, scripts/ (synced from /scripts/), .rebarrc
+│   ├── component-templates/     # Individual file templates for advanced use
+│   └── scripts/                 # Optional Node.js checks (e.g., check-tag-ci-coverage)
+│
+├── architecture/                # Contract system + CONTRACT-TEMPLATE.md
+├── agents/                      # Role agents (architect/product/englead/steward/tester/merger)
+│                                #   + subagent prompt templates
+├── bin/                         # ASK CLI (Python) + ask-mcp-server
+├── cli/                         # rebar CLI (Go binary — init, commit, verify, audit)
+├── scripts/                     # Enforcement + quality scanning (canonical bash)
+├── practices/                   # Session lifecycle, orchestration, red team, fidelity
+├── profiles/                    # Adoption guides (by project type × team size)
+├── feedback/                    # Adoption reports — active in root, decided in processed/
+└── docs/                        # Proposals + design documents (maintainer-facing)
 ```
 
 ---
 
 ## Learn More
 
+- [CHARTER.md](CHARTER.md) — IS / IS NOT scope statement; anchors `ask featurerequest` intake gates
 - [DESIGN.md](DESIGN.md) — the full philosophy: contracts, BDD, lifecycle, autonomy, testing cascade
 - [conventions.md](conventions.md) — branch naming, commit format, file headers, discovery taxonomy
 - [architecture/README.md](architecture/README.md) — contract naming, linking, and lifecycle reference
@@ -349,3 +350,14 @@ rebar/
 - [docs/learnings-from-opendockit.md](docs/learnings-from-opendockit.md) — war stories from 5,800+ tests and 9 simultaneous agents
 - [feedback/](feedback/) — adoption reports from blindpipe, Dapple SafeSign, Office 180
 - [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md) — ASK CLI roadmap (bash v0 → Go v2)
+
+---
+
+## License
+
+Copyright 2026 Will Ackerly.
+
+Licensed under the [Apache License, Version 2.0](LICENSE). You may not use this
+project except in compliance with the License. Unless required by applicable law
+or agreed to in writing, software distributed under the License is distributed on
+an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND.

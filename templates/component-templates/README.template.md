@@ -1,6 +1,6 @@
 # <PROJECT_NAME>
 
-> **rebar v1.2.0** | **Tier 2: ADOPTED**
+> **rebar v2.0.0** | **Tier 2: ADOPTED**
 
 <!-- REQUIRED: The rebar badge above MUST be the first line after the title.
      Format: > **rebar vX.Y.Z** | **Tier N: LEVEL**

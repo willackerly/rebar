@@ -67,10 +67,15 @@ echo ""
 echo "Scanned $total source files, $missing missing contract headers."
 
 if [ "$missing" -gt 0 ]; then
+  # NOTE: literal CONTRACT prefix split via variable so the shadow-ref
+  # detector in compute-registry.sh doesn't false-positive on these example
+  # strings. See feedback/processed/2026-04-25-bootstrap-template-script-drift-and-bash3.2.md
+  # for the related cli/cmd/context.go fix.
+  P="CONTRACT:"
   echo ""
   echo "Every source file must declare which contract it implements:"
-  echo '  // CONTRACT:C1-BLOBSTORE.2.1'
-  echo '  // Architecture: CONTRACT:S2-API-GATEWAY.1.0'
+  echo "  // ${P}C1-BLOBSTORE.2.1"
+  echo "  // Architecture: ${P}S2-API-GATEWAY.1.0"
   echo ""
   echo "See architecture/README.md for the full convention."
   exit 1

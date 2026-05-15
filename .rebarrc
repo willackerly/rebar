@@ -1,5 +1,5 @@
-# REBAR Configuration
+# REBAR Configuration (rebar source repo — dogfoods its own methodology)
 # See: https://github.com/willackerly/rebar
 
 # Enforcement tier (1=Partial, 2=Adopted, 3=Enforced)
-tier = 1
+tier = 3

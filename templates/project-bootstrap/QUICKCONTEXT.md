@@ -22,6 +22,16 @@
 - **E2E tests:** Not yet implemented
 - **Coverage:** 0% (baseline)
 
+## What's Next (in priority order)
+
+<!-- This is the SINGLE SOURCE OF TRUTH for priorities.
+     TODO.md has task details, but this list sets the order.
+     Work top to bottom. -->
+
+1. Define first contract for core component
+2. Implement basic project structure
+3. Set up development environment and dependencies
+
 ## Active Work
 
 **Current sprint/focus:** Project setup and first contract implementation
@@ -29,7 +39,6 @@
 **In progress:**
 - Initial rebar setup and configuration
 - First contract definition
-- Basic project structure
 
 **Recently completed:**
 - Rebar bootstrap installation
@@ -79,7 +88,7 @@
 - Ready for first contract implementation
 
 **Dependencies:**
-- Rebar framework v1.2.0
+- Rebar framework v2.0.0
 - [Your project dependencies]
 
 ---

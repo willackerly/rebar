@@ -67,15 +67,32 @@ classify_prefix() {
   esac
 }
 
-# Count implementing files for a contract
+# Count implementing files for a contract.
+# `grep` returns 1 when there are no matches; under `set -o pipefail` that
+# would abort the whole script for any orphan contract. The greps in this
+# pipeline legitimately return 1 on empty input, so we run with pipefail
+# temporarily disabled.
+#
+# Two passes, deduplicated by file path:
+#   1. Source files matching the standard extension whitelist
+#   2. Files anywhere under `bin/` (CLI entry points often have no extension —
+#      `bin/ask`, `bin/ask-mcp-server`, `bin/rebar`)
 count_implementations() {
   local id="$1"
-  grep -rn "CONTRACT:${id}" "$PROJECT_ROOT" \
-    --include='*.go' --include='*.ts' --include='*.tsx' --include='*.js' \
-    --include='*.py' --include='*.rs' --include='*.java' --include='*.rb' \
-    --include='*.jsx' --include='*.sh' 2>/dev/null \
+  set +o pipefail
+  {
+    grep -rln "CONTRACT:${id}" "$PROJECT_ROOT" \
+      --include='*.go' --include='*.ts' --include='*.tsx' --include='*.js' \
+      --include='*.py' --include='*.rs' --include='*.java' --include='*.rb' \
+      --include='*.jsx' --include='*.sh' 2>/dev/null
+    if [ -d "$PROJECT_ROOT/bin" ]; then
+      grep -rln "CONTRACT:${id}" "$PROJECT_ROOT/bin" 2>/dev/null
+    fi
+  } \
     | grep -v "node_modules\|vendor\|dist\|\.git\|architecture/" \
+    | sort -u \
     | wc -l | tr -d ' '
+  set -o pipefail
 }
 
 # ─── Collect Contracts ──────────────────────────────────────────────────────
@@ -89,7 +106,7 @@ for contract in "$ARCH_DIR"/CONTRACT-*.md; do
 
   # Skip non-contract files
   case "$basename" in
-    CONTRACT-TEMPLATE.md|CONTRACT-REGISTRY.md|CONTRACT-REGISTRY.template.md|CONTRACT-GAPS.md)
+    CONTRACT-TEMPLATE.md|CONTRACT-SEAM-TEMPLATE.md|CONTRACT-REGISTRY.md|CONTRACT-REGISTRY.template.md|CONTRACT-GAPS.md)
       continue ;;
     *.impl.md)
       continue ;;
@@ -126,27 +143,27 @@ generate_registry() {
 
 HEADER
 
-  for category in "Services" "Components" "Interfaces" "Protocols" "Other"; do
-    local -n entries_ref
-    case "$category" in
-      Services)   entries_ref=services ;;
-      Components) entries_ref=components ;;
-      Interfaces) entries_ref=interfaces ;;
-      Protocols)  entries_ref=protocols ;;
-      Other)      entries_ref=other ;;
-    esac
-
-    [ ${#entries_ref[@]} -eq 0 ] && continue
-
+  # bash 3.2-compatible: pass array entries through a function instead of
+  # using `local -n` namerefs (bash 4.3+). macOS ships bash 3.2 by default.
+  emit_category() {
+    local category="$1"; shift
+    [ $# -eq 0 ] && return
     echo "## $category"
     echo ""
     echo "| ID | Version | Status | Impl Files | Purpose |"
     echo "|----|---------|--------|------------|---------|"
-    for entry in "${entries_ref[@]}"; do
+    local entry
+    for entry in "$@"; do
       echo "$entry"
     done
     echo ""
-  done
+  }
+
+  emit_category "Services"   ${services[@]+"${services[@]}"}
+  emit_category "Components" ${components[@]+"${components[@]}"}
+  emit_category "Interfaces" ${interfaces[@]+"${interfaces[@]}"}
+  emit_category "Protocols"  ${protocols[@]+"${protocols[@]}"}
+  emit_category "Other"      ${other[@]+"${other[@]}"}
 
   # Contract files section (for tooling compatibility)
   echo "## Contract Files"
@@ -156,7 +173,7 @@ HEADER
     [ ! -f "$contract" ] && continue
     basename=$(basename "$contract")
     case "$basename" in
-      CONTRACT-TEMPLATE.md|CONTRACT-REGISTRY.md|CONTRACT-REGISTRY.template.md|CONTRACT-GAPS.md)
+      CONTRACT-TEMPLATE.md|CONTRACT-SEAM-TEMPLATE.md|CONTRACT-REGISTRY.md|CONTRACT-REGISTRY.template.md|CONTRACT-GAPS.md)
         continue ;;
       *.impl.md)
         continue ;;
@@ -165,39 +182,94 @@ HEADER
   done
   echo ""
 
-  # Orphan detection
-  local orphans=()
+  # ─── Contract Health: zombie + shadow detection ──────────────────────────
+  # zombie  — contract file exists but no CONTRACT:<ID> headers in source
+  #           (deletion candidate unless tracked in TODO.md)
+  # shadow  — CONTRACT:<ID> reference in source but no architecture/<ID>.md
+  #           file (typo, deleted contract, or not-yet-written spec)
+
+  local zombies=()
+  local known_ids=" "  # space-padded list for easy substring matching
   for contract in "$ARCH_DIR"/CONTRACT-*.md; do
     [ ! -f "$contract" ] && continue
     basename=$(basename "$contract")
     case "$basename" in
-      CONTRACT-TEMPLATE.md|CONTRACT-REGISTRY.md|CONTRACT-REGISTRY.template.md|CONTRACT-GAPS.md)
+      CONTRACT-TEMPLATE.md|CONTRACT-SEAM-TEMPLATE.md|CONTRACT-REGISTRY.md|CONTRACT-REGISTRY.template.md|CONTRACT-GAPS.md)
         continue ;;
       *.impl.md)
         continue ;;
     esac
 
     parse_contract_file "$contract"
+    known_ids="$known_ids$CONTRACT_ID "
+
     local count
     count=$(count_implementations "$CONTRACT_ID")
     if [ "$count" -eq 0 ]; then
       if [ -f "$PROJECT_ROOT/TODO.md" ] && grep -q "$CONTRACT_ID" "$PROJECT_ROOT/TODO.md" 2>/dev/null; then
-        orphans+=("- **$CONTRACT_ID** — tracked in TODO.md")
+        zombies+=("- **$CONTRACT_ID** — tracked in TODO.md")
       else
-        orphans+=("- **$CONTRACT_ID** — ⚠ untracked, 0 implementing files")
+        zombies+=("- **$CONTRACT_ID** — ⚠ untracked, 0 implementing files")
       fi
     fi
   done
 
-  if [ ${#orphans[@]} -gt 0 ]; then
-    echo "## Orphaned Contracts"
+  # Shadow detection: every CONTRACT:<ID>.<v.v> reference in source,
+  # filtered to IDs not in known_ids. Same extension whitelist + bin/
+  # second-pass as count_implementations() so we don't miss CLI scripts.
+  local shadows_tmp
+  shadows_tmp="$(mktemp)"
+  set +o pipefail
+  {
+    grep -rEhno 'CONTRACT:[A-Za-z0-9_-]+\.[0-9]+\.[0-9]+' "$PROJECT_ROOT" \
+      --include='*.go' --include='*.ts' --include='*.tsx' --include='*.js' \
+      --include='*.py' --include='*.rs' --include='*.java' --include='*.rb' \
+      --include='*.jsx' --include='*.sh' 2>/dev/null
+    if [ -d "$PROJECT_ROOT/bin" ]; then
+      grep -rEhno 'CONTRACT:[A-Za-z0-9_-]+\.[0-9]+\.[0-9]+' "$PROJECT_ROOT/bin" 2>/dev/null
+    fi
+  } \
+    | grep -v "node_modules\|vendor\|dist\|\.git\|architecture/" \
+    | sed -E 's/^[^:]*:[^:]*://; s/^CONTRACT://; s/\.[0-9]+\.[0-9]+$//' \
+    | sort -u > "$shadows_tmp"
+  set -o pipefail
+
+  local shadows=()
+  while IFS= read -r ref_id; do
+    [ -z "$ref_id" ] && continue
+    case "$known_ids" in
+      *" $ref_id "*) ;;  # known — not a shadow
+      *) shadows+=("- **$ref_id** — referenced in source, no architecture/CONTRACT-${ref_id}.*.md found") ;;
+    esac
+  done < "$shadows_tmp"
+  rm -f "$shadows_tmp"
+
+  if [ ${#zombies[@]} -gt 0 ] || [ ${#shadows[@]} -gt 0 ]; then
+    echo "## Contract Health"
     echo ""
-    echo "Contracts with no implementing code (no \`CONTRACT:{ID}\` headers in source):"
-    echo ""
-    for orphan in "${orphans[@]}"; do
-      echo "$orphan"
-    done
-    echo ""
+
+    if [ ${#zombies[@]} -gt 0 ]; then
+      echo "### Zombies — contract files with no implementing code"
+      echo ""
+      echo "(Deletion candidates unless intentionally pre-impl. Add a TODO.md entry"
+      echo "to suppress this warning while implementation is in flight.)"
+      echo ""
+      for z in "${zombies[@]}"; do
+        echo "$z"
+      done
+      echo ""
+    fi
+
+    if [ ${#shadows[@]} -gt 0 ]; then
+      echo "### Shadow refs — code references to nonexistent contracts"
+      echo ""
+      echo "(Either write the missing contract file or fix the typo in source.)"
+      echo ""
+      for s in "${shadows[@]}"; do
+        echo "$s"
+      done
+      echo ""
+    fi
   fi
 }
 

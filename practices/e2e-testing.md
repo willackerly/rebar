@@ -4,6 +4,83 @@
 
 ---
 
+## Test Fidelity Ladder
+
+Not all E2E tests are equal. A test that calls the API directly and one
+that clicks through the UI like a human are testing fundamentally different
+things. Declare the fidelity level for each user journey so there's no
+ambiguity about what's actually covered.
+
+| Level | Name | What It Tests | When to Use |
+|-------|------|---------------|-------------|
+| **L1** | API contract | Request/response shapes, status codes | Every endpoint, always |
+| **L2** | UI happy path | Click through the primary flow via browser | Every user-facing journey |
+| **L3** | Human emulation | Every click, every screen state, every persona | Critical journeys (auth, signing, payment) |
+| **L4** | Visual baseline | Pixel-level screenshot comparison | Journeys where layout/styling is part of the contract |
+
+**The key rule:** API helpers may set up preconditions at any level, but
+**the journey under test must be driven at the declared fidelity level.**
+
+If the compose wizard is the journey, L2+ means clicking through all 4
+steps. Using `createEnvelope()` via API is only acceptable when the wizard
+is a *precondition* for testing something else (e.g., the signing flow).
+
+**Declare fidelity per journey in your spec or test plan:**
+```markdown
+### Journey: Create and Send Envelope
+Test fidelity: L3 (human emulation)
+Personas: Alice (power user), Bob (first-time)
+Visual baseline: L4 for compose wizard review step
+```
+
+### When to Use Visual Baselines (L4)
+
+- **Use `toHaveScreenshot()`** for screen states that are part of the
+  product contract (login page, signing page, completed state). Layout
+  regressions in these states are real bugs.
+- **Skip it** for highly dynamic content (dashboards with live data, lists
+  with variable items). Baseline maintenance cost exceeds bug-detection value.
+- **Always** capture baselines on a fixed viewport size and with
+  deterministic data (seeded test accounts, fixed timestamps).
+- Update baselines explicitly (`--update-snapshots`) — never auto-accept.
+- Review baseline diffs in PRs the same way you review code diffs.
+
+### Persona Coverage Enforcement
+
+When a spec defines personas, each persona must have corresponding tests
+or an explicit deferral with reasoning:
+
+```markdown
+### Pre-Merge Checklist: Persona Coverage
+- [x] Alice (power user): tested in auth-alice.spec.ts
+- [x] Bob (first-time signer): tested in auth-bob.spec.ts
+- [ ] Carol (upgrade path): deferred — requires migration API not yet built
+- [x] Eve (impersonator): tested in auth-adversarial.spec.ts
+```
+
+"Explicitly deferred with reason" is acceptable. "Silently absent" is not.
+
+### Notification Parity Testing
+
+When a system sends notifications through multiple channels (email +
+in-app, email + SMS, push + in-app), add a parity assertion:
+
+```typescript
+// Both channels reference the same event
+const email = await waitForEmail(recipient, 'Document Ready');
+const inApp = await api.getNotifications(recipient);
+const match = inApp.find(n => n.type === 'document_ready');
+
+expect(match).toBeDefined();
+expect(match.documentId).toBe(email.metadata.documentId);
+```
+
+This is straightforward when mock transports exist (mock-resend,
+mock-sendgrid). The pattern catches silent failures where one channel
+works but the other doesn't.
+
+---
+
 ## Managed Test Stack
 
 When E2E tests require multiple servers (API, frontend, mock services), use a **managed test stack** approach for reliability. The core problems with Playwright's built-in `webServer` are: sequential startup (slow), no PID tracking (orphans), no hard timeouts (hangs), and opaque failures (no logs).

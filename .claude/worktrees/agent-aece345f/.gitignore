@@ -1,7 +1,0 @@
-# ASK runtime artifacts
-agents/*/inbox/
-agents/*/outbox/
-agents/*/.pid
-agents/*/.last-stderr
-agents/*/memory.log.md
-shared/messages/events.jsonl

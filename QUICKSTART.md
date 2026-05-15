@@ -20,9 +20,21 @@ cd rebar
 cp -r templates/project-bootstrap/* ../my-new-project/
 cd ../my-new-project
 
-# Install rebar CLI tools + agent access
-../rebar/bin/install --server 192.168.0.181:7232
+# Create the ASK role agents (architect, product, englead, steward, merger, featurerequest)
+../rebar/bin/ask init
 ```
+
+> **Why `ask init` matters:** the bootstrap template ships scaffolding
+> docs but not agent skeletons. Without `ask init`, `ask architect "X"`
+> fails with "no agents directory" and the MCP tool list in Claude Code
+> is empty. `rebar new` and `rebar adopt` run this automatically; the
+> manual `cp -r` path needs it explicitly.
+
+> **Optional — put the ASK CLI on your PATH:**
+> `../rebar/bin/install` adds rebar's `bin/` to your shell RC. You can
+> skip this for the 5-minute walkthrough; the contract you write below
+> doesn't need it. If you later run a remote ASK server, pass
+> `--server HOST:PORT` to record it as `ASK_SERVER` in your shell.
 
 ### Step 2: Write your first contract (3 minutes)
 
@@ -95,9 +107,16 @@ rebar ask architect "Review CONTRACT:C1-FILESTORE.1.0 - any integration concerns
 rebar ask product "Does this file storage meet basic user needs?"
 ```
 
+**Wire ASK into Claude Code (MCP):**
+`rebar init` already wrote `.mcp.json` to your project root. Reload
+Claude Code in this directory and the `ask_<repo>_<role>` tools appear
+in the tool list automatically — no more shelling out.
+**[→ MCP Setup Guide](docs/MCP-SETUP.md)** if you want user-level or
+multi-repo setups.
+
 **Check integrity:**
 ```bash
-rebar init       # Initialize integrity tracking
+rebar init       # Initialize integrity tracking + MCP wiring
 rebar verify     # Verify all protected files are clean
 rebar status     # Quick health dashboard
 ```
@@ -110,7 +129,7 @@ rebar status     # Quick health dashboard
 **→ [FEATURE-DEVELOPMENT.md](FEATURE-DEVELOPMENT.md)** — Complete BDD → Contract → Code → Test workflow (1 hour)
 
 ### Want to understand agent coordination?
-**→ [AGENTS-QUICKSTART.md](AGENTS-QUICKSTART.md)** — Role agents vs subagent templates (15 min)
+**→ [agents/README.md](agents/README.md)** — Role agents vs subagent templates, decision tree, the 6 core roles
 
 ### Need to solve a specific problem?
 **→ [CASE-STUDIES.md](CASE-STUDIES.md)** — Real-world solutions indexed by problem type

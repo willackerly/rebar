@@ -22,8 +22,27 @@ stale=0
 total=0
 
 while IFS= read -r file; do
-  # Extract freshness date
+  # Skip template files — their freshness markers are placeholders that
+  # adopters update on copy. Holding them to the freshness threshold
+  # produces noise, not signal.
+  case "$file" in
+    ./templates/*) continue ;;
+  esac
+
+  # Honor an explicit "freshness: archived" opt-out for historical
+  # retrospectives, decided design docs, and other intentionally-static
+  # content. The literal token is searched before the date pattern.
+  if grep -q 'freshness: archived' "$file" 2>/dev/null; then
+    continue
+  fi
+
+  # Extract freshness date.
+  # `grep -o` exits 1 when the marker is absent (most files have no
+  # freshness comment). Under `set -o pipefail` that aborts the whole
+  # pipeline, so disable pipefail just for this lookup.
+  set +o pipefail
   date_str=$(grep -o 'freshness: [0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\}' "$file" 2>/dev/null | head -1 | sed 's/freshness: //')
+  set -o pipefail
 
   [ -z "$date_str" ] && continue
 

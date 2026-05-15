@@ -1,0 +1,30 @@
+# Ground truth metrics — verified by scripts/check-ground-truth.sh
+# Last verified: 2026-04-25
+
+# Contracts (rebar's own, not templates)
+contracts = 3
+contract_templates = 2
+
+# Enforcement scripts
+shell_scripts = 17
+
+# Documentation surface
+practice_docs = 8
+profile_docs = 8
+root_md_files = 10
+
+# Agent surface
+role_agents = 6
+subagent_prompts = 13
+
+# Feedback inventory
+active_feedback = 10
+processed_feedback = 19
+
+# CLI surface
+go_cli_commands = 17
+go_test_files = 1
+
+# Adopter fleet (verified via `rebar audit --all ~/dev`)
+adopted_repos = 8
+mcp_registered_agents = 37

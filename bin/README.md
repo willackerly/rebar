@@ -282,9 +282,20 @@ variable only affects `repo:agent` cross-project queries.
 **Dependencies:** Python 3.7+ (zero external packages), plus the
 standard `ask` dependencies (bash 4.0+, jq, claude CLI).
 
+### MCP server
+
+`ask-mcp-server` exposes every registered ASK agent as an MCP tool
+(`ask_<repo>_<role>`) plus resources (`ask://memory/...`,
+`ask://log/...`, `ask://agent/...`) via stdio or HTTP transport.
+
+- `rebar init` / `rebar adopt` auto-write `.mcp.json` for Claude Code
+- User-level wiring (available in all projects) via `~/.claude.json`
+- Full setup + troubleshooting: **[docs/MCP-SETUP.md](../docs/MCP-SETUP.md)**
+- Protocol-level implementation: [docs/MCP-IMPLEMENTATION.md](../docs/MCP-IMPLEMENTATION.md)
+
 ### Future
 
-- MCP protocol layer (SSE transport, tool/resource discovery)
+- SSE transport for MCP-over-HTTP streaming
 - TLS / HTTPS (use a reverse proxy for now)
 - Write mode over network (`-w` flag)
 - PROGRAM concept (bundled multi-repo scopes)
