@@ -10,13 +10,14 @@ import (
 )
 
 type Config struct {
-	RepoRoot   string
-	RebarDir   string // .rebar/
-	Tier       int    // 1, 2, or 3
-	Version    string // from .rebar-version
-	ScriptsDir string // scripts/
-	AgentsDir  string // agents/
-	BinDir     string // bin/
+	RepoRoot          string
+	RebarDir          string // .rebar/
+	Tier              int    // 1, 2, or 3
+	Version           string // from .rebar-version
+	ScriptsDir        string // scripts/
+	AgentsDir         string // agents/
+	BinDir            string // bin/
+	ContractNamespace string // e.g. github.com/willackerly/rebar; empty = legacy/unmigrated
 }
 
 // Load reads configuration from .rebarrc and .rebar-version, respecting
@@ -43,6 +44,14 @@ func Load(repoRoot string) (*Config, error) {
 		if err == nil && tier >= 1 && tier <= 3 {
 			c.Tier = tier
 		}
+	}
+
+	// Contract namespace (Go-module form, e.g. github.com/owner/repo).
+	// Sourced from .rebarrc; REBAR_CONTRACT_NAMESPACE env var overrides.
+	if env := strings.TrimSpace(os.Getenv("REBAR_CONTRACT_NAMESPACE")); env != "" {
+		c.ContractNamespace = env
+	} else {
+		c.ContractNamespace = readRebarRCString(filepath.Join(repoRoot, ".rebarrc"), "contract_namespace")
 	}
 
 	// Read version
@@ -107,6 +116,35 @@ func readRebarRC(path string) (int, error) {
 		}
 	}
 	return 0, fmt.Errorf("tier not found in .rebarrc")
+}
+
+// readRebarRCString reads a string-valued key from .rebarrc. Returns
+// empty string if the file is missing, the key is absent, or the value
+// is blank. Matches keys case-insensitively.
+func readRebarRCString(path, key string) string {
+	f, err := os.Open(path)
+	if err != nil {
+		return ""
+	}
+	defer f.Close()
+
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		parts := strings.SplitN(line, "=", 2)
+		if len(parts) != 2 {
+			continue
+		}
+		k := strings.TrimSpace(parts[0])
+		v := strings.TrimSpace(parts[1])
+		if strings.EqualFold(k, key) {
+			return v
+		}
+	}
+	return ""
 }
 
 // EnsureRebarDir creates the .rebar/ directory structure.

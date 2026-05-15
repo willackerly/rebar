@@ -1,12 +1,19 @@
-# CONTRACT-{ID}-{NAME}.{MAJOR}.{MINOR}
+# CONTRACT-{NAMESPACE}:{ID}-{NAME}.{MAJOR}.{MINOR}
 
 <!-- Copy this file to create a new contract.
      Replace all {placeholders} with actual values.
-     Remove these HTML comments when done. -->
+     Remove these HTML comments when done.
+
+     {NAMESPACE} is your repo's namespace in Go-module form
+     (host/org/repo, e.g. github.com/willackerly/rebar). Run
+     `rebar contract migrate-namespace` to populate it across the repo.
+     The filename keeps the legacy unnamespaced form
+     (CONTRACT-{ID}-{NAME}.{MAJOR}.{MINOR}.md); only the title and
+     CONTRACT: references carry the namespace. -->
 
 <!-- VERSIONING:
-     - When this contract is superseded, add: SUPERSEDED BY: CONTRACT-{ID}-{NAME}.{NEW}
-     - When this contract supersedes another, add: SUPERSEDES: CONTRACT-{ID}-{NAME}.{OLD}
+     - When this contract is superseded, add: SUPERSEDED BY: CONTRACT-{NAMESPACE}:{ID}-{NAME}.{NEW}
+     - When this contract supersedes another, add: SUPERSEDES: CONTRACT-{NAMESPACE}:{ID}-{NAME}.{OLD}
 -->
 
 **Version:** {MAJOR}.{MINOR}

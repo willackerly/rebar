@@ -19,7 +19,10 @@ Everything below is recommended for Tier 2+ (teams, shared repos, CI enforcement
 
 ## Branch Naming
 
-Branches reference the contract they're working on:
+Branches reference the contract they're working on. Branch names use the
+**bare contract ID** (no namespace prefix) because `/` and `:` in branch
+names cause portability problems on Windows and some tooling, and the
+repo context is already implicit in the branch's repo.
 
 ```
 <type>/CONTRACT-<id>-<description>
@@ -43,14 +46,17 @@ chore/upgrade-dependencies
 
 ## Commit Messages
 
-Reference contracts in commit messages using conventional commit format:
+Reference contracts in commit messages using conventional commit format.
+The `<type>(<scope>)` prefix uses the **bare ID** for readability (the
+repo context is already implicit in the commit). The trailer line uses
+the full namespaced form.
 
 ```
 <type>(<contract-id>): <description>
 
 <body — optional, explain why not what>
 
-CONTRACT: <full-id>
+CONTRACT: <namespace>:<full-id>
 ```
 
 **Examples:**
@@ -61,7 +67,7 @@ feat(C1-BLOBSTORE): add retry logic for transient storage failures
 Blob uploads occasionally fail with 503 during peak traffic.
 Add exponential backoff with 3 retries.
 
-CONTRACT: C1-BLOBSTORE.2.1
+CONTRACT: github.com/willackerly/rebar:C1-BLOBSTORE.2.1
 ```
 
 ```
@@ -70,7 +76,7 @@ fix(S2-API-GATEWAY): validate auth token expiry before forwarding
 Expired tokens were being forwarded to downstream services,
 causing cascading 401 errors.
 
-CONTRACT: S2-API-GATEWAY.1.0
+CONTRACT: github.com/willackerly/rebar:S2-API-GATEWAY.1.0
 ```
 
 ```
@@ -79,8 +85,8 @@ contract(C3-CRYPTO-BRIDGE): bump to 2.0 — add key rotation interface
 BREAKING: New required method `RotateKey()` on CryptoBridge interface.
 All implementations must add this method.
 
-CONTRACT: C3-CRYPTO-BRIDGE.2.0
-SUPERSEDES: C3-CRYPTO-BRIDGE.1.0
+CONTRACT: github.com/willackerly/rebar:C3-CRYPTO-BRIDGE.2.0
+SUPERSEDES: github.com/willackerly/rebar:C3-CRYPTO-BRIDGE.1.0
 ```
 
 ### Commit Types
@@ -100,6 +106,12 @@ SUPERSEDES: C3-CRYPTO-BRIDGE.1.0
 
 Every source file declares its contract in the first 15 lines:
 
+All `CONTRACT:` references carry a **repo namespace** in Go-module form
+(`host/org/repo`). The namespace is inferred from `git remote get-url
+origin` by `rebar contract migrate-namespace` and recorded in
+`.rebarrc`. The examples below use `github.com/willackerly/rebar`;
+substitute your repo's namespace.
+
 ### Direct Implementation
 
 The file directly implements the contract's interface:
@@ -107,7 +119,7 @@ The file directly implements the contract's interface:
 ```go
 // Package blobstore implements encrypted blob storage.
 //
-// CONTRACT:C1-BLOBSTORE.2.1
+// CONTRACT:github.com/willackerly/rebar:C1-BLOBSTORE.2.1
 package blobstore
 ```
 
@@ -115,7 +127,7 @@ package blobstore
 /**
  * CryptoBridge — client-side AES-256-GCM encryption at the gateway boundary.
  *
- * @contract CONTRACT:C3-CRYPTO-BRIDGE.1.0
+ * @contract CONTRACT:github.com/willackerly/rebar:C3-CRYPTO-BRIDGE.1.0
  */
 export class CryptoBridge {
 ```
@@ -124,7 +136,7 @@ export class CryptoBridge {
 """
 Key exchange primitives for P2P session setup.
 
-CONTRACT:I2-KEY-EXCHANGE.1.0
+CONTRACT:github.com/willackerly/rebar:I2-KEY-EXCHANGE.1.0
 """
 ```
 
@@ -136,7 +148,7 @@ interface:
 ```go
 // Package httputil provides HTTP middleware for the API gateway.
 //
-// Architecture: CONTRACT:S2-API-GATEWAY.1.0
+// Architecture: CONTRACT:github.com/willackerly/rebar:S2-API-GATEWAY.1.0
 package httputil
 ```
 
@@ -178,9 +190,17 @@ Rare, but some files bridge two contracts:
 ```go
 // Package bridge connects the blob store to the relay.
 //
-// CONTRACT:C1-BLOBSTORE.2.1
-// CONTRACT:C2-RELAY.1.0
+// CONTRACT:github.com/willackerly/rebar:C1-BLOBSTORE.2.1
+// CONTRACT:github.com/willackerly/rebar:C2-RELAY.1.0
 package bridge
+```
+
+When a file bridges contracts from **different** repos, the namespaces
+make the cross-repo nature visible at a glance:
+
+```go
+// CONTRACT:github.com/willackerly/rebar:S1-STEWARD.1.0
+// CONTRACT:github.com/filedag/filedag:C7-INDEX.1.0   ← consumed from upstream
 ```
 
 **Dual-tag enforcement:** A file tagged with two contracts will satisfy
@@ -207,7 +227,7 @@ When reviewing a PR that touches contracts:
 ### Modified Contract (type: `contract`, changes existing file)
 
 - [ ] Version bumped appropriately (minor for additive, major for breaking)
-- [ ] `grep -rn "CONTRACT:{old-id}"` run — all implementing code updated
+- [ ] `grep -rn "CONTRACT:.*{old-id}"` run — all implementing code updated (matches both legacy and namespaced refs)
 - [ ] Old version marked `SUPERSEDED BY`
 - [ ] Breaking changes documented in Change History
 - [ ] Contract tests updated to cover new behavior

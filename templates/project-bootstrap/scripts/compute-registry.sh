@@ -19,6 +19,21 @@ ARCH_DIR="$PROJECT_ROOT/architecture"
 REGISTRY="$ARCH_DIR/CONTRACT-REGISTRY.md"
 MODE="${1:-generate}"
 
+# Configured namespace (host/org/repo). Empty in legacy / unmigrated
+# repos. When set, the ID column displays the namespaced form.
+[ -f "$SCRIPT_DIR/_rebar-config.sh" ] && source "$SCRIPT_DIR/_rebar-config.sh"
+REBAR_NS="$(_rebar_namespace 2>/dev/null || true)"
+
+# format_id — Return the canonical display form of a contract ID.
+# Pre-migration: bare ID (S1-STEWARD). Post-migration: <ns>:<id>.
+format_id() {
+  if [ -n "$REBAR_NS" ]; then
+    echo "${REBAR_NS}:$1"
+  else
+    echo "$1"
+  fi
+}
+
 # ─── Helpers ────────────────────────────────────────────────────────────────
 
 # Parse contract filename → ID + version (reused logic from steward.sh)
@@ -79,17 +94,21 @@ classify_prefix() {
 #      `bin/ask`, `bin/ask-mcp-server`, `bin/rebar`)
 count_implementations() {
   local id="$1"
+  # Match both legacy (CONTRACT:<id>.<v>) and namespaced
+  # (CONTRACT:<ns>:<id>.<v>) references. The `\.` anchors the ID so
+  # CONTRACT:S1-STEWARD-EXT.1.0 doesn't match CONTRACT:S1-STEWARD.
+  local pattern="CONTRACT:([a-zA-Z0-9][a-zA-Z0-9_./-]+:)?${id}\\.[0-9]+\\.[0-9]+"
   set +o pipefail
   {
-    grep -rln "CONTRACT:${id}" "$PROJECT_ROOT" \
+    grep -rEln "$pattern" "$PROJECT_ROOT" \
       --include='*.go' --include='*.ts' --include='*.tsx' --include='*.js' \
       --include='*.py' --include='*.rs' --include='*.java' --include='*.rb' \
       --include='*.jsx' --include='*.sh' 2>/dev/null
     if [ -d "$PROJECT_ROOT/bin" ]; then
-      grep -rln "CONTRACT:${id}" "$PROJECT_ROOT/bin" 2>/dev/null
+      grep -rEln "$pattern" "$PROJECT_ROOT/bin" 2>/dev/null
     fi
   } \
-    | grep -v "node_modules\|vendor\|dist\|\.git\|architecture/" \
+    | grep -v "node_modules\|vendor\|dist\|\.git\|architecture/\|\.claude/worktrees" \
     | sort -u \
     | wc -l | tr -d ' '
   set -o pipefail
@@ -116,8 +135,9 @@ for contract in "$ARCH_DIR"/CONTRACT-*.md; do
   local_status=$(extract_status "$contract")
   local_purpose=$(extract_purpose "$contract")
   impl_count=$(count_implementations "$CONTRACT_ID")
+  display_id=$(format_id "$CONTRACT_ID")
 
-  entry="| $CONTRACT_ID | $CONTRACT_VERSION | $local_status | $impl_count | ${local_purpose:-—} |"
+  entry="| $display_id | $CONTRACT_VERSION | $local_status | $impl_count | ${local_purpose:-—} |"
 
   category=$(classify_prefix "$CONTRACT_ID")
   case "$category" in
@@ -220,17 +240,32 @@ HEADER
   local shadows_tmp
   shadows_tmp="$(mktemp)"
   set +o pipefail
+  # Match both legacy and namespaced refs. The awk pass extracts the bare
+  # contract ID (post-colon if namespaced, post-`CONTRACT:` otherwise).
   {
-    grep -rEhno 'CONTRACT:[A-Za-z0-9_-]+\.[0-9]+\.[0-9]+' "$PROJECT_ROOT" \
+    grep -rEhno 'CONTRACT:([a-zA-Z0-9][a-zA-Z0-9_./-]+:)?[A-Z][A-Za-z0-9_-]*\.[0-9]+\.[0-9]+' "$PROJECT_ROOT" \
       --include='*.go' --include='*.ts' --include='*.tsx' --include='*.js' \
       --include='*.py' --include='*.rs' --include='*.java' --include='*.rb' \
       --include='*.jsx' --include='*.sh' 2>/dev/null
     if [ -d "$PROJECT_ROOT/bin" ]; then
-      grep -rEhno 'CONTRACT:[A-Za-z0-9_-]+\.[0-9]+\.[0-9]+' "$PROJECT_ROOT/bin" 2>/dev/null
+      grep -rEhno 'CONTRACT:([a-zA-Z0-9][a-zA-Z0-9_./-]+:)?[A-Z][A-Za-z0-9_-]*\.[0-9]+\.[0-9]+' "$PROJECT_ROOT/bin" 2>/dev/null
     fi
   } \
-    | grep -v "node_modules\|vendor\|dist\|\.git\|architecture/" \
-    | sed -E 's/^[^:]*:[^:]*://; s/^CONTRACT://; s/\.[0-9]+\.[0-9]+$//' \
+    | grep -v "node_modules\|vendor\|dist\|\.git\|architecture/\|\.claude/worktrees" \
+    | awk '{
+        # Strip the leading "<path>:<line>:" that grep -n prepends.
+        sub(/^[^:]*:[^:]*:/, "")
+        # Extract just the CONTRACT:... token (already filtered by grep).
+        match($0, /CONTRACT:[^[:space:]]+/)
+        ref = substr($0, RSTART, RLENGTH)
+        sub(/^CONTRACT:/, "", ref)
+        # Bare ID = everything after the last colon (namespace stripped).
+        n = split(ref, parts, ":")
+        bare = parts[n]
+        # Strip trailing .M.m version.
+        sub(/\.[0-9]+\.[0-9]+$/, "", bare)
+        print bare
+      }' \
     | sort -u > "$shadows_tmp"
   set -o pipefail
 

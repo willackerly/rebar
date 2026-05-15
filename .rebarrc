@@ -3,3 +3,7 @@
 
 # Enforcement tier (1=Partial, 2=Adopted, 3=Enforced)
 tier = 3
+
+# Contract namespace (host/org/repo). All CONTRACT: references in this repo
+# are prefixed with this value. Inferred from `git remote get-url origin`.
+contract_namespace = github.com/willackerly/rebar

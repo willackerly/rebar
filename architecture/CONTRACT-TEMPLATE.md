@@ -1,12 +1,19 @@
-# CONTRACT-{ID}-{NAME}.{MAJOR}.{MINOR}
+# CONTRACT-{NAMESPACE}:{ID}-{NAME}.{MAJOR}.{MINOR}
 
 <!-- Copy this file to create a new contract.
      Replace all {placeholders} with actual values.
-     Remove these HTML comments when done. -->
+     Remove these HTML comments when done.
+
+     {NAMESPACE} is your repo's namespace in Go-module form
+     (host/org/repo, e.g. github.com/willackerly/rebar). The filename
+     keeps the legacy unnamespaced form
+     (CONTRACT-{ID}-{NAME}.{MAJOR}.{MINOR}.md); only the title and
+     in-source CONTRACT: references carry the namespace. Run
+     `rebar contract migrate-namespace` to apply it across a repo. -->
 
 <!-- VERSIONING:
-     - When this contract is superseded, add: SUPERSEDED BY: CONTRACT-{ID}-{NAME}.{NEW}
-     - When this contract supersedes another, add: SUPERSEDES: CONTRACT-{ID}-{NAME}.{OLD}
+     - When this contract is superseded, add: SUPERSEDED BY: CONTRACT-{NAMESPACE}:{ID}-{NAME}.{NEW}
+     - When this contract supersedes another, add: SUPERSEDES: CONTRACT-{NAMESPACE}:{ID}-{NAME}.{OLD}
 -->
 
 **Version:** {MAJOR}.{MINOR}
@@ -98,7 +105,7 @@ type BlobStore interface {
 <!-- What does this component depend on? Other contracts, external services,
      configuration. -->
 
-- Depends on: `CONTRACT:I2-KEY-EXCHANGE.1.0` for encryption keys
+- Depends on: `CONTRACT:{NAMESPACE}:I2-KEY-EXCHANGE.1.0` for encryption keys
 - Configuration: `BLOBSTORE_PATH` environment variable
 - External: none (self-contained)
 
@@ -136,7 +143,7 @@ type BlobStore interface {
 
 <!-- List all files that implement this contract.
      Keep updated — or regenerate with:
-     grep -rn "CONTRACT:{ID}-{NAME}" src/ internal/ client/
+     grep -rn "CONTRACT:{NAMESPACE}:{ID}-{NAME}" src/ internal/ client/
 -->
 
 - `internal/blobstore/file.go` — file-backed implementation

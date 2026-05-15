@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # steward.sh — Automated project health scanner
-# CONTRACT:S1-STEWARD.1.0
+# CONTRACT:github.com/willackerly/rebar:S1-STEWARD.1.0
 # rebar-scripts: 2026.03.20
 #
 # Usage:
@@ -89,11 +89,15 @@ scan_contract() {
   local impl_files=()
   local test_files=()
 
+  # Match both legacy (CONTRACT:<id>.<v>) and namespaced
+  # (CONTRACT:<ns>:<id>.<v>) references for this contract ID. The `\.`
+  # anchors the ID so suffixed IDs (e.g. <id>-EXT) don't collide.
+  local impl_pattern="CONTRACT:([a-zA-Z0-9][a-zA-Z0-9_./-]+:)?${id}\\.[0-9]+\\.[0-9]+"
   while IFS= read -r line; do
     local filepath
     filepath="$(echo "$line" | cut -d: -f1)"
     impl_files+=("$filepath")
-  done < <(grep -rn "CONTRACT:${id}" "$PROJECT_ROOT" \
+  done < <(grep -rEn "$impl_pattern" "$PROJECT_ROOT" \
     --include='*.go' --include='*.ts' --include='*.js' --include='*.py' \
     --include='*.rs' --include='*.java' --include='*.rb' --include='*.c' \
     --include='*.cpp' --include='*.h' --include='*.cs' --include='*.swift' \
@@ -103,6 +107,7 @@ scan_contract() {
     | grep -v "^${ARCH_DIR}" \
     | grep -v "/.git/" \
     | grep -v "/node_modules/" \
+    | grep -v "\.claude/worktrees" \
     | sort -u || true)
 
   # Deduplicate impl_files by filepath

@@ -1,4 +1,4 @@
-# CONTRACT-S2-ASK-CLI.1.0
+# CONTRACT-github.com/willackerly/rebar:S2-ASK-CLI.1.0
 
 **Version:** 1.0
 **Status:** active
@@ -118,13 +118,13 @@ Exit codes: 0 success, 1 ask-level failure, 2 invocation error.
 ## Cross-references
 
 - **Doc:** `bin/README.md` (full reference), `DESIGN.md` §10 (design rationale)
-- **Sister contract:** `CONTRACT:S3-MCP-SERVER.1.0` (the MCP bridge that wraps ASK)
-- **Sister contract:** `CONTRACT:S1-STEWARD.1.0` (Steward exposes itself via `ask steward`)
+- **Sister contract:** `CONTRACT:github.com/willackerly/rebar:S3-MCP-SERVER.1.0` (the MCP bridge that wraps ASK)
+- **Sister contract:** `CONTRACT:github.com/willackerly/rebar:S1-STEWARD.1.0` (Steward exposes itself via `ask steward`)
 
 ## Future evolution
 
 - **Provisional:** the wire protocol between `bin/ask` and `bin/ask-server`
-  isn't yet a versioned contract; it should be `CONTRACT:I2-ASK-WIRE.1.0`
+  isn't yet a versioned contract; it should be `CONTRACT:github.com/willackerly/rebar:I2-ASK-WIRE.1.0`
   once a 2nd implementation appears (e.g., a Go reimplementation).
 - **Major-bump trigger:** changing the quoted-vs-unquoted convention, or
   changing how `ask <repo>:<role>` resolves repos.

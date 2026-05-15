@@ -1,4 +1,4 @@
-# CONTRACT-S3-MCP-SERVER.1.0
+# CONTRACT-github.com/willackerly/rebar:S3-MCP-SERVER.1.0
 
 **Version:** 1.0
 **Status:** active
@@ -119,7 +119,7 @@ JSON-RPC surface:
 
 ## Dependencies
 
-- Depends on: `CONTRACT:S2-ASK-CLI.1.0` (subprocess executor for every tools/call)
+- Depends on: `CONTRACT:github.com/willackerly/rebar:S2-ASK-CLI.1.0` (subprocess executor for every tools/call)
 - Depends on: Python 3.10+
 - Depends on: standard library only (no third-party deps — keeps install zero-friction)
 - Configuration: `.mcp.json` in adopted repos (auto-written by `rebar init`)
@@ -128,7 +128,7 @@ JSON-RPC surface:
 ## Cross-references
 
 - **Doc:** `docs/MCP-SETUP.md` (adopter guide), `docs/MCP-IMPLEMENTATION.md` (protocol-level details)
-- **Sister contract:** `CONTRACT:S2-ASK-CLI.1.0`
+- **Sister contract:** `CONTRACT:github.com/willackerly/rebar:S2-ASK-CLI.1.0`
 - **Wave 2.5 commits:** `d9e68fc` (activation), `0db9073` (notifications fix),
   `bc936cf` (paragraph extraction), `2f52983` (role preambles), `5800647`
   (depth-2 discovery)

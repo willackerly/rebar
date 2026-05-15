@@ -62,3 +62,39 @@ _rebar_script_version() {
   local file="$1"
   grep '^# rebar-scripts:' "$file" 2>/dev/null | head -1 | sed 's/^# rebar-scripts:[[:space:]]*//'
 }
+
+# Return the configured contract namespace (host/org/repo), or empty
+# string if unset. When empty, enforcement scripts run in "legacy" mode
+# (accept bare CONTRACT:<id> references). When set, enforcement runs in
+# "strict" mode and requires CONTRACT:<ns>:<id>.
+_rebar_namespace() {
+  if [ -n "${REBAR_CONTRACT_NAMESPACE:-}" ]; then
+    echo "$REBAR_CONTRACT_NAMESPACE"
+    return
+  fi
+  local script_dir
+  script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  local project_root
+  project_root="$(cd "$script_dir/.." && pwd)"
+  local rc_file="$project_root/.rebarrc"
+  if [ -f "$rc_file" ]; then
+    local ns
+    ns=$(grep '^contract_namespace' "$rc_file" 2>/dev/null | head -1 | sed 's/.*=[[:space:]]*//' | tr -d ' ')
+    echo "$ns"
+    return
+  fi
+  echo ""
+}
+
+# Strip the optional namespace prefix from a CONTRACT: reference, leaving
+# just <id>.<major>.<minor>. The ID never contains ':', so everything
+# after the last ':' is the bare ID + version.
+#
+# Usage:  bare=$(_rebar_strip_namespace "github.com/foo/bar:S1-STEWARD.1.0")
+#         # → S1-STEWARD.1.0
+_rebar_strip_namespace() {
+  local ref="$1"
+  # Use parameter expansion to strip everything up to and including the
+  # last ':' (POSIX-safe in bash 3.2).
+  echo "${ref##*:}"
+}
