@@ -11,13 +11,9 @@
       "include-component-in-tag": false,
       "extra-files": [
         {
-          "type": "json",
-          "path": ".release-please-manifest.json",
-          "jsonpath": "$['.']"
-        },
-        {
-          "type": "plain",
-          "path": ".rebar-version"
+          "type": "generic",
+          "path": ".rebar-version",
+          "glob": false
         }
       ]
     }
