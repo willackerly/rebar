@@ -60,13 +60,18 @@ for contract in "$ARCH_DIR"/CONTRACT-*.md; do
 
   # Extract contract ID from filename (e.g., CONTRACT-C1-BLOBSTORE.2.1.md → C1-BLOBSTORE.2.1)
   id=$(basename "$contract" .md | sed 's/^CONTRACT-//')
+  # Strip trailing .M.m version to get the bare ID, used to anchor the
+  # impl-ref grep so it accepts both legacy and namespaced forms.
+  bare_id=$(echo "$id" | sed -E 's/\.[0-9]+\.[0-9]+$//')
 
-  # Search for references in source code
-  ref_count=$(grep -rn "CONTRACT:${id}" \
+  # Search for references in source code (accepts CONTRACT:<id> and
+  # CONTRACT:<ns>:<id>).
+  ref_pattern="CONTRACT:([a-zA-Z0-9][a-zA-Z0-9_./-]+:)?${bare_id}\\.[0-9]+\\.[0-9]+"
+  ref_count=$(grep -rEn "$ref_pattern" \
     --include="*.go" --include="*.ts" --include="*.tsx" --include="*.js" --include="*.jsx" \
     --include="*.py" --include="*.rs" --include="*.mjs" --include="*.cjs" \
     . 2>/dev/null \
-    | grep -v "node_modules\|vendor\|dist\|\.git\|architecture/" \
+    | grep -v "node_modules\|vendor\|dist\|\.git\|architecture/\|\.claude/worktrees" \
     | wc -l | tr -d ' ')
 
   if [ "$ref_count" -eq 0 ]; then

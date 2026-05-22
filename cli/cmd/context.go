@@ -204,6 +204,12 @@ func findBranchContracts() []string {
 				// comment so check-contract-refs.sh doesn't false-positive on it.
 				ref = strings.TrimPrefix(ref, "CONTRACT:")
 				ref = strings.Fields(ref)[0]
+				// Strip optional namespace prefix (host/org/repo:). The ID
+				// itself never contains ':', so the substring after the
+				// last ':' is the bare ID with version.
+				if colon := strings.LastIndex(ref, ":"); colon >= 0 {
+					ref = ref[colon+1:]
+				}
 				// Convert to glob pattern
 				pattern := fmt.Sprintf("architecture/CONTRACT-%s*.md", strings.Split(ref, ".")[0])
 				contracts[pattern] = true

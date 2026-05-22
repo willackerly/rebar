@@ -40,8 +40,19 @@ architecture/
 ## Naming Convention
 
 ```
-CONTRACT-{ID}-{NAME}.{MAJOR}.{MINOR}.md
+Filename:   CONTRACT-{ID}-{NAME}.{MAJOR}.{MINOR}.md       (filenames stay unnamespaced)
+Title:      # CONTRACT-{NAMESPACE}:{ID}-{NAME}.{MAJOR}.{MINOR}
+Reference:  CONTRACT:{NAMESPACE}:{ID}-{NAME}.{MAJOR}.{MINOR}
 ```
+
+Contracts live under a repo namespace (Go-module form, e.g.
+`github.com/willackerly/rebar`). The filename stays unnamespaced because
+the file path already says "which repo"; the title and in-source
+`CONTRACT:` references carry the namespace so cross-repo greps are
+unambiguous. Run `rebar contract migrate-namespace --write` once per
+repo to apply the namespace; the value is inferred from
+`git remote get-url origin` and recorded in `.rebarrc` as
+`contract_namespace = <ns>`.
 
 | Prefix | Meaning | Example |
 |--------|---------|---------|
@@ -99,26 +110,29 @@ When bumping major:
 
 ## Code-to-Contract Linking
 
-Every source file declares its contract in a header comment:
+Every source file declares its contract in a header comment. Local
+contracts use this repo's namespace; foreign contracts (consumed from
+another repo) carry the owner's namespace, so a `CONTRACT:` ref with an
+unfamiliar prefix is an immediate signal of an upstream dependency.
 
 ```go
-// CONTRACT:C1-BLOBSTORE.2.1
+// CONTRACT:github.com/willackerly/rebar:C1-BLOBSTORE.2.1
 package blobstore
 ```
 
 ```typescript
-/** @contract CONTRACT:C3-CRYPTO-BRIDGE.1.0 */
+/** @contract CONTRACT:github.com/willackerly/rebar:C3-CRYPTO-BRIDGE.1.0 */
 ```
 
 For helpers that don't directly implement a contract:
 
 ```go
-// Architecture: CONTRACT:S2-API-GATEWAY.1.0
+// Architecture: CONTRACT:github.com/willackerly/rebar:S2-API-GATEWAY.1.0
 package httputil
 ```
 
 This creates doubly-linked traceability — searchable in either direction
-with `grep`.
+with `grep`, and provenance is encoded in every reference.
 
 ## Cross-Repo Contract Federation
 
