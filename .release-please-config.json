@@ -1,0 +1,22 @@
+{
+  "packages": {
+    ".": {
+      "release-type": "go",
+      "package-name": "rebar",
+      "changelog-path": "CHANGELOG.md",
+      "bump-minor-pre-major": true,
+      "bump-patch-for-minor-pre-major": true,
+      "draft": false,
+      "prerelease": false,
+      "include-component-in-tag": false,
+      "extra-files": [
+        {
+          "type": "generic",
+          "path": ".rebar-version",
+          "glob": false
+        }
+      ]
+    }
+  },
+  "bootstrap-sha": "775d382"
+}

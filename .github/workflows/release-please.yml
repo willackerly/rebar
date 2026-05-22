@@ -1,0 +1,25 @@
+name: Release Please
+
+on:
+  push:
+    branches:
+      - main
+      - v3.0.1-alpha-updates
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: googleapis/release-please-action@v4
+        id: release
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          # Target branch automatically set to triggering branch
+          target-branch: ${{ github.ref_name }}
+          # Manifest-driven config for multi-branch support
+          manifest-file: .release-please-manifest.json
+          config-file: .release-please-config.json

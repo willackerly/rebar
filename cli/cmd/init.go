@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/spf13/cobra"
 	"github.com/willackerly/rebar/cli/internal/config"
+	"github.com/willackerly/rebar/cli/internal/hooks"
 	"github.com/willackerly/rebar/cli/internal/integrity"
 )
 
@@ -248,23 +249,6 @@ _None currently._
 		}
 	}
 
-	// scripts/refresh-context.sh
-	scriptsDir := filepath.Join(root, "scripts")
-	refreshPath := filepath.Join(scriptsDir, "refresh-context.sh")
-	if _, err := os.Stat(refreshPath); os.IsNotExist(err) {
-		os.MkdirAll(scriptsDir, 0755)
-		// Find rebar's copy to use as source
-		rebarRoot := findRebarRoot()
-		if rebarRoot != "" {
-			src := filepath.Join(rebarRoot, "scripts", "refresh-context.sh")
-			if data, err := os.ReadFile(src); err == nil {
-				os.WriteFile(refreshPath, data, 0755)
-				fmt.Println("  Created scripts/refresh-context.sh")
-				created++
-			}
-		}
-	}
-
 	// architecture/ directory
 	archDir := filepath.Join(root, "architecture")
 	if _, err := os.Stat(archDir); os.IsNotExist(err) {
@@ -296,6 +280,16 @@ _None currently._
 	// has .mcp.json wired but zero agents enumerable, and the MCP tool
 	// list is empty in Claude Code.
 	if ensureAgentsScaffolding(root) {
+		created++
+	}
+
+	// agents/subagent-guidelines.md
+	if ensureSubagentGuidelines(root) {
+		created++
+	}
+
+	// .git/hooks/pre-commit
+	if ensurePreCommitHook(root) {
 		created++
 	}
 
@@ -407,28 +401,96 @@ func ensureAgentsScaffolding(root string) bool {
 	return true
 }
 
-// findRebarRoot locates the rebar framework repo by checking common locations.
+// ensureSubagentGuidelines copies agents/subagent-guidelines.md from the
+// framework if missing. Skipped if already present (users may customize).
+func ensureSubagentGuidelines(root string) bool {
+	guidelinesPath := filepath.Join(root, "agents", "subagent-guidelines.md")
+	if _, err := os.Stat(guidelinesPath); err == nil {
+		return false
+	}
+
+	os.MkdirAll(filepath.Join(root, "agents"), 0755)
+	rebarRoot := findRebarRoot()
+	if rebarRoot == "" {
+		return false
+	}
+
+	src := filepath.Join(rebarRoot, "agents", "subagent-guidelines.md")
+	data, err := os.ReadFile(src)
+	if err != nil {
+		return false
+	}
+
+	if err := os.WriteFile(guidelinesPath, data, 0644); err != nil {
+		return false
+	}
+	fmt.Println("  Created agents/subagent-guidelines.md")
+	return true
+}
+
+// ensurePreCommitHook installs .git/hooks/pre-commit, delegating to
+// framework's scripts/pre-commit.sh. Merges with existing hooks.
+func ensurePreCommitHook(root string) bool {
+	rebarRoot := findRebarRoot()
+	if rebarRoot == "" {
+		fmt.Println("  Skipped pre-commit hook — rebar framework not found")
+		return false
+	}
+
+	if err := hooks.InstallPreCommit(root, rebarRoot, "symlink"); err != nil {
+		fmt.Printf("  ⚠ Could not install pre-commit hook: %v\n", err)
+		return false
+	}
+	fmt.Println("  Installed .git/hooks/pre-commit")
+	return true
+}
+
+// findRebarRoot locates the rebar framework install directory.
+// Precedence: REBAR_DIR env → walk up from executable → ~/.rebar/current/ → ~/.rebar/
 func findRebarRoot() string {
-	// Check if we're inside the rebar repo
+	// 1. REBAR_DIR env (explicit override)
+	if env := os.Getenv("REBAR_DIR"); env != "" {
+		if _, err := os.Stat(filepath.Join(env, "bin", "rebar")); err == nil {
+			return env
+		}
+	}
+
+	// 2. Walk up from this executable (bin/rebar → framework root)
+	if exe, err := os.Executable(); err == nil {
+		// Resolve symlinks
+		if resolved, err := filepath.EvalSymlinks(exe); err == nil {
+			exe = resolved
+		}
+		// bin/rebar → bin/ → framework root
+		frameworkDir := filepath.Dir(filepath.Dir(exe))
+		if _, err := os.Stat(filepath.Join(frameworkDir, "scripts", "pre-commit.sh")); err == nil {
+			return frameworkDir
+		}
+	}
+
+	// 3. ~/.rebar/current/ symlink (versioned install)
+	home, _ := os.UserHomeDir()
+	currentLink := filepath.Join(home, ".rebar", "current")
+	if target, err := os.Readlink(currentLink); err == nil {
+		abs := filepath.Join(home, ".rebar", target)
+		if _, err := os.Stat(filepath.Join(abs, "scripts", "pre-commit.sh")); err == nil {
+			return abs
+		}
+	}
+
+	// 4. ~/.rebar/ (legacy single install)
+	legacy := filepath.Join(home, ".rebar")
+	if _, err := os.Stat(filepath.Join(legacy, "scripts", "pre-commit.sh")); err == nil {
+		return legacy
+	}
+
+	// 5. CWD if it's the rebar source repo (for development)
 	if _, err := os.Stat("DESIGN.md"); err == nil {
-		if _, err := os.Stat("architecture/CONTRACT-TEMPLATE.md"); err == nil {
-			cwd, _ := os.Getwd()
+		if cwd, err := os.Getwd(); err == nil {
 			return cwd
 		}
 	}
 
-	// Check common locations
-	home, _ := os.UserHomeDir()
-	candidates := []string{
-		filepath.Join(home, "dev", "rebar"),
-		filepath.Join(home, "src", "rebar"),
-		filepath.Join(home, "code", "rebar"),
-	}
-	for _, c := range candidates {
-		if _, err := os.Stat(filepath.Join(c, "DESIGN.md")); err == nil {
-			return c
-		}
-	}
 	return ""
 }
 

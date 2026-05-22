@@ -1,4 +1,4 @@
-# CONTRACT-S1-STEWARD.1.0
+# CONTRACT-github.com/willackerly/rebar:S1-STEWARD.1.0
 
 **Version:** 1.0
 **Status:** active
@@ -109,7 +109,7 @@ ask steward check C1 # → commands/check.sh C1
 
 ## Dependencies
 
-- Depends on: `CONTRACT:S2-ASK-CLI.1.0` (ASK CLI invokes the steward via `ask steward`)
+- Depends on: `CONTRACT:github.com/willackerly/rebar:S2-ASK-CLI.1.0` (ASK CLI invokes the steward via `ask steward`)
 - Depends on: bash 3.2+, `jq`, GNU/BSD `grep`, `find`, `awk`, `sed`
 - Configuration: `.rebarrc` (`tier = 1|2|3`)
 - External: none
@@ -123,7 +123,7 @@ ask steward check C1 # → commands/check.sh C1
 ## Future evolution
 
 - **Provisional:** the JSON schema in `architecture/.state/` will get a
-  formal versioned contract (likely `CONTRACT:I1-STEWARD-STATE.1.0`)
+  formal versioned contract (likely `CONTRACT:github.com/willackerly/rebar:I1-STEWARD-STATE.1.0`)
   once a 2nd consumer beyond `rebar audit` emerges.
 - **Major-bump trigger:** if the spec-gate sections change (e.g.,
   Why/Who/Scenarios become required for spec-gate completeness).

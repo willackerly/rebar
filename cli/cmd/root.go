@@ -8,6 +8,10 @@ import (
 	"github.com/willackerly/rebar/cli/internal/config"
 )
 
+// Version is set via ldflags during build (e.g., -X github.com/willackerly/rebar/cli/cmd.Version=v3.1.0)
+// Defaults to "dev" for local builds without version injection
+var Version = "dev"
+
 var (
 	verbose  bool
 	jsonOut  bool
@@ -17,7 +21,7 @@ var (
 
 var rootCmd = &cobra.Command{
 	Use:     "rebar",
-	Version: "v3.0.1-alpha",
+	Version: Version,
 	Short:   "REBAR — contract-driven development framework for AI-powered teams",
 	Long: `REBAR — contract-driven development framework for AI-powered teams.
 
@@ -76,6 +80,16 @@ func Execute() error {
 	return rootCmd.Execute()
 }
 
+func scriptEnv() map[string]string {
+	if cfg == nil {
+		return nil
+	}
+	return map[string]string{
+		"REBAR_CONTRACT_NAMESPACE": cfg.ContractNamespace,
+		"REBAR_TIER":              fmt.Sprintf("%d", cfg.Tier),
+	}
+}
+
 func init() {
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "verbose output")
 	rootCmd.PersistentFlags().BoolVar(&jsonOut, "json", false, "machine-readable JSON output")
@@ -120,11 +134,13 @@ func init() {
 	checkCmd.GroupID = "quality"
 	diffCmd.GroupID = "quality"
 	contractCmd.GroupID = "quality"
+	upgradeCmd.GroupID = "quality"
 	rootCmd.AddCommand(verifyCmd)
 	rootCmd.AddCommand(statusCmd)
 	rootCmd.AddCommand(checkCmd)
 	rootCmd.AddCommand(diffCmd)
 	rootCmd.AddCommand(contractCmd)
+	rootCmd.AddCommand(upgradeCmd)
 
 	// Signing & Keys
 	signCmd.GroupID = "keys"

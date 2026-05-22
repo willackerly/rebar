@@ -10,6 +10,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/willackerly/rebar/cli/internal/llm"
+	"github.com/willackerly/rebar/cli/internal/repo"
 )
 
 var _ = time.Now // ensure time is used
@@ -66,7 +67,7 @@ func runAdopt(cmd *cobra.Command, args []string) error {
 	}
 	fmt.Println()
 
-	// Phase 2: Scaffold (always — equivalent to rebar init + fixes)
+	// Phase 2: Scaffold (always — creates docs, agents, hooks)
 	fmt.Println("  Phase 2: Scaffolding")
 	fixed := applyFixes(root)
 
@@ -105,8 +106,24 @@ func runAdopt(cmd *cobra.Command, args []string) error {
 		}
 	}
 
+	// agents/subagent-guidelines.md
+	if ensureSubagentGuidelines(root) {
+		fixed++
+	}
+
+	// .git/hooks/pre-commit
+	if ensurePreCommitHook(root) {
+		fixed++
+	}
+
 	if fixed == 0 {
 		fmt.Println("  (all scaffolding already in place)")
+	}
+
+	// Initialize integrity tracking (.rebar/ directory, manifest, salt)
+	fmt.Println("\n  Initializing integrity tracking")
+	if err := runInit(cmd, []string{}); err != nil {
+		return fmt.Errorf("initializing .rebar/: %w", err)
 	}
 
 	// Phase 3: Contract proposals (tier 2 only, requires LLM)
@@ -176,19 +193,9 @@ Only propose contracts for code that actually exists — don't invent components
 func gatherCodebaseSummary(root string) string {
 	var sb strings.Builder
 
-	// Find source files
-	exts := []string{"*.go", "*.ts", "*.tsx", "*.py", "*.rs", "*.js", "*.jsx"}
-	var sourceFiles []string
-	for _, ext := range exts {
-		cmd := exec.Command("find", root, "-name", ext, "-not", "-path", "*/node_modules/*", "-not", "-path", "*/.claude/*", "-not", "-path", "*/.git/*", "-not", "-path", "*/vendor/*")
-		out, _ := cmd.Output()
-		for _, f := range strings.Split(strings.TrimSpace(string(out)), "\n") {
-			if f != "" {
-				rel, _ := filepath.Rel(root, f)
-				sourceFiles = append(sourceFiles, rel)
-			}
-		}
-	}
+	// Find tracked source files
+	sourceFiles, _ := repo.TrackedFiles(root,
+		"*.go", "*.ts", "*.tsx", "*.py", "*.rs", "*.js", "*.jsx")
 
 	if len(sourceFiles) == 0 {
 		return ""
@@ -209,11 +216,11 @@ func gatherCodebaseSummary(root string) string {
 
 	// Show directory structure
 	sb.WriteString("\nDirectory structure:\n")
-	cmd := exec.Command("find", root, "-maxdepth", "2", "-type", "d",
+	dirCmd := exec.Command("find", root, "-maxdepth", "2", "-type", "d",
 		"-not", "-path", "*/node_modules/*", "-not", "-path", "*/.git/*",
 		"-not", "-path", "*/.claude/*", "-not", "-path", "*/vendor/*")
-	out, _ := cmd.Output()
-	for _, d := range strings.Split(strings.TrimSpace(string(out)), "\n") {
+	dirOut, _ := dirCmd.Output()
+	for _, d := range strings.Split(strings.TrimSpace(string(dirOut)), "\n") {
 		if d != "" {
 			rel, _ := filepath.Rel(root, d)
 			if rel != "" && rel != "." {
@@ -305,3 +312,4 @@ func writeMinimalClaude(root, name string) {
 
 	os.WriteFile(filepath.Join(root, "CLAUDE.md"), []byte(content), 0644)
 }
+
