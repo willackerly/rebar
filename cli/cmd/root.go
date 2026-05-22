@@ -8,6 +8,10 @@ import (
 	"github.com/willackerly/rebar/cli/internal/config"
 )
 
+// Version is set via ldflags during build (e.g., -X github.com/willackerly/rebar/cli/cmd.Version=v3.1.0)
+// Defaults to "dev" for local builds without version injection
+var Version = "dev"
+
 var (
 	verbose  bool
 	jsonOut  bool
@@ -17,7 +21,7 @@ var (
 
 var rootCmd = &cobra.Command{
 	Use:     "rebar",
-	Version: "v3.0.1-alpha",
+	Version: Version,
 	Short:   "REBAR — contract-driven development framework for AI-powered teams",
 	Long: `REBAR — contract-driven development framework for AI-powered teams.
 
