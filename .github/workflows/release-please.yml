@@ -18,8 +18,8 @@ jobs:
         id: release
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          release-type: go
-          package-name: rebar
+          # Target branch automatically set to triggering branch
+          target-branch: ${{ github.ref_name }}
           # Manifest-driven config for multi-branch support
           manifest-file: .release-please-manifest.json
           config-file: .release-please-config.json

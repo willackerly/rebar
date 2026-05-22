@@ -45,8 +45,10 @@ archives:
       - LICENSE*
       - README*
       - CLAUDE.md
+      - bin/install
       - templates/**/*
       - scripts/**/*
+      - agents/**/*
 
 checksum:
   name_template: 'checksums.txt'
