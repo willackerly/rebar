@@ -210,8 +210,8 @@ ${BLUE}PATH symlink:${NC} ~/.rebar/current → versions/$REBAR_REF
 
 ${BLUE}Next steps:${NC}
   • Open new terminal (or source shell RC)
-  • ${GREEN}rebar new my-project -d "what it does"${NC}
-  • ${GREEN}rebar adopt${NC}
+  • ${GREEN}rebar new my-project -d "what it does"${NC}  (new project)
+  • ${GREEN}rebar adopt${NC}  (add rebar to existing project)
 
 ${BLUE}Multiple versions:${NC}
   Install another: curl ... | bash -s -- v3.2.0

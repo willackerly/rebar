@@ -66,7 +66,7 @@ func runAdopt(cmd *cobra.Command, args []string) error {
 	}
 	fmt.Println()
 
-	// Phase 2: Scaffold (always — equivalent to rebar init + fixes)
+	// Phase 2: Scaffold (always — creates docs, agents, hooks)
 	fmt.Println("  Phase 2: Scaffolding")
 	fixed := applyFixes(root)
 
@@ -117,6 +117,12 @@ func runAdopt(cmd *cobra.Command, args []string) error {
 
 	if fixed == 0 {
 		fmt.Println("  (all scaffolding already in place)")
+	}
+
+	// Initialize integrity tracking (.rebar/ directory, manifest, salt)
+	fmt.Println("\n  Initializing integrity tracking")
+	if err := runInit(cmd, []string{}); err != nil {
+		return fmt.Errorf("initializing .rebar/: %w", err)
 	}
 
 	// Phase 3: Contract proposals (tier 2 only, requires LLM)

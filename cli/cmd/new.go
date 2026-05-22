@@ -203,6 +203,12 @@ Be practical and specific. Don't over-engineer — this is a fresh project.`, na
 	// .git/hooks/pre-commit
 	ensurePreCommitHook(root)
 
+	// Initialize integrity tracking (.rebar/ directory, manifest, salt)
+	fmt.Println("\n  Initializing integrity tracking")
+	if err := runInit(cmd, []string{}); err != nil {
+		return fmt.Errorf("initializing .rebar/: %w", err)
+	}
+
 	// Initial commit
 	fmt.Println("\n  Phase 4: Initial Commit")
 	exec.Command("git", "-C", root, "add", "-A").Run()
