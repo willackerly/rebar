@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -16,6 +17,30 @@ var (
 	auditAll  string // directory to scan for repos
 	auditFix  bool   // auto-fix quick wins
 )
+
+// readTier reads the tier from .rebarrc. Returns 3 (full enforcement) if
+// unset or missing.
+func readTier(root string) int {
+	rcPath := filepath.Join(root, ".rebarrc")
+	data, err := os.ReadFile(rcPath)
+	if err != nil {
+		return 3
+	}
+	for _, line := range strings.Split(string(data), "\n") {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "#") || !strings.Contains(trimmed, "=") {
+			continue
+		}
+		parts := strings.SplitN(trimmed, "=", 2)
+		key := strings.TrimSpace(parts[0])
+		if strings.EqualFold(key, "tier") {
+			if tier, err := strconv.Atoi(strings.TrimSpace(parts[1])); err == nil && tier >= 1 && tier <= 3 {
+				return tier
+			}
+		}
+	}
+	return 3
+}
 
 var auditCmd = &cobra.Command{
 	Use:   "audit [path]",
@@ -208,16 +233,33 @@ func auditRepo(root string) (float64, []auditResult) {
 // --- Section Auditors ---
 
 func auditStructure(root string) auditResult {
-	checks := []checkResult{
-		fileExists(root, "README.md", "Project README"),
-		fileContains(root, "README.md", "rebar v", "Rebar badge in README"),
-		fileExists(root, "QUICKCONTEXT.md", "QUICKCONTEXT.md"),
-		fileContains(root, "QUICKCONTEXT.md", "last-synced", "QUICKCONTEXT has last-synced date"),
+	tier := readTier(root)
+	var checks []checkResult
+
+	// Tier 1: minimal
+	checks = append(checks,
+		fileExists(root, ".rebarrc", ".rebarrc"),
 		fileExists(root, "TODO.md", "TODO.md"),
-		fileExists(root, "AGENTS.md", "AGENTS.md"),
-		fileExists(root, ".rebarrc", ".rebarrc tier declaration"),
-		fileExists(root, ".rebar-version", ".rebar-version file"),
+	)
+
+	// Tier 2: team/shared
+	if tier >= 2 {
+		checks = append(checks,
+			fileExists(root, "QUICKCONTEXT.md", "QUICKCONTEXT.md"),
+			fileContains(root, "QUICKCONTEXT.md", "last-synced", "QUICKCONTEXT last-synced date"),
+			fileExists(root, "AGENTS.md", "AGENTS.md"),
+		)
 	}
+
+	// Tier 3: full discipline
+	if tier >= 3 {
+		checks = append(checks,
+			fileExists(root, "README.md", "README.md"),
+			fileContains(root, "README.md", "rebar v", "Rebar badge in README"),
+			fileExists(root, ".rebar-version", ".rebar-version"),
+		)
+	}
+
 	return auditResult{Section: "Structural Presence", Score: scoreChecks(checks), Weight: 15, Checks: checks}
 }
 
@@ -252,32 +294,37 @@ func auditContracts(root string) auditResult {
 }
 
 func auditEnforcement(root string) auditResult {
+	// All tiers: pre-commit hook (scripts run from framework, not project)
 	checks := []checkResult{
-		dirExists(root, "scripts", "scripts/ directory"),
 		hookInstalled(root),
-		fileExists(root, "scripts/refresh-context.sh", "refresh-context.sh"),
-	}
-
-	// Check for enforcement scripts
-	for _, script := range []string{"check-contract-refs.sh", "check-todos.sh"} {
-		checks = append(checks, fileExists(root, filepath.Join("scripts", script), script))
 	}
 
 	return auditResult{Section: "Enforcement & Scripts", Score: scoreChecks(checks), Weight: 15, Checks: checks}
 }
 
 func auditAgents(root string) auditResult {
-	checks := []checkResult{
-		dirExists(root, "agents", "agents/ directory"),
-		fileExists(root, "agents/subagent-guidelines.md", "subagent-guidelines.md"),
+	tier := readTier(root)
+	var checks []checkResult
+
+	// Tier 1: no agent requirements - skip section entirely
+	if tier < 2 {
+		return auditResult{Section: "Agent Coordination", Score: 0, Weight: 0, Checks: nil}
 	}
 
-	// Count agent roles
-	roles := countAgentRoles(root)
-	checks = append(checks, checkResult{
-		Name: fmt.Sprintf("Agent roles (%d found)", roles),
-		Pass: roles > 0,
-	})
+	// Tier 2: subagent-guidelines
+	checks = append(checks,
+		dirExists(root, "agents", "agents/"),
+		fileExists(root, "agents/subagent-guidelines.md", "subagent-guidelines.md"),
+	)
+
+	// Tier 3: role-based agents expected
+	if tier >= 3 {
+		roles := countAgentRoles(root)
+		checks = append(checks, checkResult{
+			Name: fmt.Sprintf("Agent roles (%d found)", roles),
+			Pass: roles > 0,
+		})
+	}
 
 	return auditResult{Section: "Agent Coordination", Score: scoreChecks(checks), Weight: 10, Checks: checks}
 }
@@ -487,6 +534,11 @@ func printAuditReport(root string, score float64, results []auditResult) {
 	fmt.Println()
 
 	for _, r := range results {
+		// Skip sections with weight 0 (tier-gated, not applicable)
+		if r.Weight == 0 {
+			continue
+		}
+
 		status := "PASS"
 		if r.Score < 5 {
 			status = "FAIL"
@@ -546,21 +598,6 @@ func applyFixes(root string) int {
 			os.Symlink("../../scripts/pre-commit.sh", hookPath)
 			fmt.Println("  ✓ Installed pre-commit hook")
 			fixed++
-		}
-	}
-
-	// refresh-context.sh
-	refreshPath := filepath.Join(root, "scripts", "refresh-context.sh")
-	if _, err := os.Stat(refreshPath); os.IsNotExist(err) {
-		rebarRoot := findRebarRoot()
-		if rebarRoot != "" {
-			src := filepath.Join(rebarRoot, "scripts", "refresh-context.sh")
-			if data, err := os.ReadFile(src); err == nil {
-				os.MkdirAll(filepath.Join(root, "scripts"), 0755)
-				os.WriteFile(refreshPath, data, 0755)
-				fmt.Println("  ✓ Copied refresh-context.sh")
-				fixed++
-			}
 		}
 	}
 

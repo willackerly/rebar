@@ -11,25 +11,37 @@ import (
 
 type Config struct {
 	RepoRoot          string
-	RebarDir          string // .rebar/
+	RebarDir          string // .rebar/ in project
+	RebarFrameworkDir string // framework install (versioned, e.g. ~/.rebar/versions/v3.1.0)
 	Tier              int    // 1, 2, or 3
 	Version           string // from .rebar-version
-	ScriptsDir        string // scripts/
-	AgentsDir         string // agents/
-	BinDir            string // bin/
+	ScriptsDir        string // framework scripts/ dir
+	AgentsDir         string // agents/ in project
+	BinDir            string // bin/ in framework
 	ContractNamespace string // e.g. github.com/willackerly/rebar; empty = legacy/unmigrated
 }
 
 // Load reads configuration from .rebarrc and .rebar-version, respecting
 // REBAR_TIER env override. Mirrors the logic in scripts/_rebar-config.sh.
 func Load(repoRoot string) (*Config, error) {
+	// Read version first to resolve framework dir
+	versionBytes, _ := os.ReadFile(filepath.Join(repoRoot, ".rebar-version"))
+	version := strings.TrimSpace(string(versionBytes))
+
+	frameworkDir, err := findRebarDir(version)
+	if err != nil {
+		return nil, fmt.Errorf("finding rebar framework: %w", err)
+	}
+
 	c := &Config{
-		RepoRoot:   repoRoot,
-		RebarDir:   filepath.Join(repoRoot, ".rebar"),
-		ScriptsDir: filepath.Join(repoRoot, "scripts"),
-		AgentsDir:  filepath.Join(repoRoot, "agents"),
-		BinDir:     filepath.Join(repoRoot, "bin"),
-		Tier:       3, // default: full enforcement
+		RepoRoot:          repoRoot,
+		RebarDir:          filepath.Join(repoRoot, ".rebar"),
+		RebarFrameworkDir: frameworkDir,
+		Version:           version,
+		ScriptsDir:        filepath.Join(frameworkDir, "scripts"),
+		AgentsDir:         filepath.Join(repoRoot, "agents"),
+		BinDir:            filepath.Join(frameworkDir, "bin"),
+		Tier:              3, // default: full enforcement
 	}
 
 	// REBAR_TIER env takes precedence
@@ -52,12 +64,6 @@ func Load(repoRoot string) (*Config, error) {
 		c.ContractNamespace = env
 	} else {
 		c.ContractNamespace = readRebarRCString(filepath.Join(repoRoot, ".rebarrc"), "contract_namespace")
-	}
-
-	// Read version
-	versionBytes, err := os.ReadFile(filepath.Join(repoRoot, ".rebar-version"))
-	if err == nil {
-		c.Version = strings.TrimSpace(string(versionBytes))
 	}
 
 	return c, nil
@@ -145,6 +151,47 @@ func readRebarRCString(path, key string) string {
 		}
 	}
 	return ""
+}
+
+// findRebarDir locates the rebar framework installation directory.
+// Precedence: REBAR_DIR env → ~/.rebar/versions/<version>/ → ~/.rebar/current/
+func findRebarDir(version string) (string, error) {
+	// 1. REBAR_DIR env (explicit override for testing/CI)
+	if env := os.Getenv("REBAR_DIR"); env != "" {
+		if _, err := os.Stat(env); err == nil {
+			return env, nil
+		}
+	}
+
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", fmt.Errorf("getting home dir: %w", err)
+	}
+
+	// 2. Versioned install (~/.rebar/versions/<version>/)
+	if version != "" {
+		versioned := filepath.Join(home, ".rebar", "versions", version)
+		if _, err := os.Stat(versioned); err == nil {
+			return versioned, nil
+		}
+	}
+
+	// 3. Current symlink (~/.rebar/current/)
+	current := filepath.Join(home, ".rebar", "current")
+	if target, err := os.Readlink(current); err == nil {
+		abs := filepath.Join(home, ".rebar", target)
+		if _, err := os.Stat(abs); err == nil {
+			return abs, nil
+		}
+	}
+
+	// 4. Legacy single install (~/.rebar/)
+	legacy := filepath.Join(home, ".rebar")
+	if _, err := os.Stat(filepath.Join(legacy, "bin", "rebar")); err == nil {
+		return legacy, nil
+	}
+
+	return "", fmt.Errorf("rebar framework not found — run setup-rebar.sh or set REBAR_DIR")
 }
 
 // EnsureRebarDir creates the .rebar/ directory structure.

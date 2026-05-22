@@ -120,11 +120,13 @@ func init() {
 	checkCmd.GroupID = "quality"
 	diffCmd.GroupID = "quality"
 	contractCmd.GroupID = "quality"
+	upgradeCmd.GroupID = "quality"
 	rootCmd.AddCommand(verifyCmd)
 	rootCmd.AddCommand(statusCmd)
 	rootCmd.AddCommand(checkCmd)
 	rootCmd.AddCommand(diffCmd)
 	rootCmd.AddCommand(contractCmd)
+	rootCmd.AddCommand(upgradeCmd)
 
 	// Signing & Keys
 	signCmd.GroupID = "keys"

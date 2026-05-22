@@ -132,17 +132,6 @@ build/
 	}
 	fmt.Println("  ✓ architecture/")
 
-	// scripts/
-	scriptsDir := filepath.Join(root, "scripts")
-	os.MkdirAll(scriptsDir, 0755)
-	if rebarRoot != "" {
-		src := filepath.Join(rebarRoot, "scripts", "refresh-context.sh")
-		if data, err := os.ReadFile(src); err == nil {
-			os.WriteFile(filepath.Join(scriptsDir, "refresh-context.sh"), data, 0755)
-		}
-	}
-	fmt.Println("  ✓ scripts/")
-
 	// Phase 3: LLM-generated content (if description provided)
 	if newDescription != "" {
 		fmt.Println("\n  Phase 3: AI-Generated Content (via Claude API)")
@@ -207,6 +196,12 @@ Be practical and specific. Don't over-engineer — this is a fresh project.`, na
 			}
 		}
 	}
+
+	// agents/subagent-guidelines.md
+	ensureSubagentGuidelines(root)
+
+	// .git/hooks/pre-commit
+	ensurePreCommitHook(root)
 
 	// Initial commit
 	fmt.Println("\n  Phase 4: Initial Commit")
