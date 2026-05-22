@@ -8,7 +8,7 @@ import (
 
 // Sync performs bidirectional synchronization between contracts and specs
 func Sync(opts SyncOptions) error {
-	fmt.Println("Synchronizing contracts <-> specs\n")
+	fmt.Println("Synchronizing contracts <-> specs")
 
 	// Load manifest
 	manifest, err := LoadManifest(filepath.Join(opts.RepoRoot, opts.OutDir))
@@ -43,7 +43,7 @@ func Sync(opts SyncOptions) error {
 		}
 
 		// Check if specs changed
-		specsChanged, changedPaths, err := HasSpecChanged(&mapping)
+		specsChanged, changedPaths, err := HasSpecChanged(opts.RepoRoot, &mapping)
 		if err != nil {
 			fmt.Printf("  ✗ %s: %v\n", mapping.Contract, err)
 			continue
@@ -67,11 +67,12 @@ func Sync(opts SyncOptions) error {
 			fmt.Printf("  → %s (contract updated, re-exporting)\n", mapping.Contract)
 			if !opts.DryRun {
 				// Re-export this contract
+				contractBasename := filepath.Base(mapping.Contract)
 				exportOpts := ExportOptions{
 					RepoRoot:    opts.RepoRoot,
 					ContractDir: opts.ContractDir,
 					OutDir:      opts.OutDir,
-					Patterns:    []string{mapping.Contract},
+					Patterns:    []string{contractBasename},
 					Force:       true,
 				}
 				if err := Export(exportOpts); err != nil {

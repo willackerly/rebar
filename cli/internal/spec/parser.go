@@ -154,10 +154,23 @@ func (c *Contract) ExtractMermaidDiagrams() []string {
 
 // ExtractGherkinScenarios extracts Gherkin from "Scenarios" or "Behavior" sections
 func (c *Contract) ExtractGherkinScenarios() string {
-	// Look for section with scenarios
+	// First pass: look for exact or high-priority matches
 	for name, content := range c.Sections {
 		lower := strings.ToLower(name)
-		if strings.Contains(lower, "scenario") || strings.Contains(lower, "behavior") || strings.Contains(lower, "test") {
+		if lower == "scenarios" || lower == "behavior" || lower == "test scenarios" {
+			// Check if it's already Gherkin-formatted
+			if strings.Contains(content, "Feature:") || strings.Contains(content, "Scenario:") {
+				return content
+			}
+			// Convert bullet points to Gherkin
+			return convertToGherkin(c.Name, content)
+		}
+	}
+
+	// Second pass: partial matches (but not "Testing")
+	for name, content := range c.Sections {
+		lower := strings.ToLower(name)
+		if (strings.Contains(lower, "scenario") || strings.Contains(lower, "behavior")) && lower != "testing" {
 			// Check if it's already Gherkin-formatted
 			if strings.Contains(content, "Feature:") || strings.Contains(content, "Scenario:") {
 				return content
@@ -208,7 +221,10 @@ func (c *Contract) ExtractJSONSchema() string {
 	for name, content := range c.Sections {
 		lower := strings.ToLower(name)
 		if strings.Contains(lower, "data") || strings.Contains(lower, "schema") || strings.Contains(lower, "model") {
-			return extractCodeFromMarkdown(content, "json", "jsonschema")
+			extracted := extractCodeFromMarkdown(content, "json", "jsonschema")
+			if extracted != "" && strings.Contains(extracted, "$schema") {
+				return extracted
+			}
 		}
 	}
 
@@ -228,7 +244,7 @@ func convertToGherkin(featureName, content string) string {
 	gherkin.WriteString(fmt.Sprintf("Feature: %s\n\n", featureName))
 
 	scanner := bufio.NewScanner(strings.NewReader(content))
-	scenarioNum := 1
+	inScenario := false
 
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
@@ -236,23 +252,42 @@ func convertToGherkin(featureName, content string) string {
 			continue
 		}
 
+		lower := strings.ToLower(line)
+
+		// Check if it's already a Gherkin step (Given/When/Then/And)
+		if strings.HasPrefix(lower, "given ") || strings.HasPrefix(lower, "when ") ||
+			strings.HasPrefix(lower, "then ") || strings.HasPrefix(lower, "and ") ||
+			strings.HasPrefix(lower, "but ") {
+			if !inScenario {
+				// Need a scenario wrapper
+				gherkin.WriteString("  Scenario: Default scenario\n")
+				inScenario = true
+			}
+			gherkin.WriteString(fmt.Sprintf("    %s\n", line))
+			continue
+		}
+
 		// Bullet points become Given/When/Then
 		if strings.HasPrefix(line, "- ") || strings.HasPrefix(line, "* ") {
+			if !inScenario {
+				gherkin.WriteString("  Scenario: Default scenario\n")
+				inScenario = true
+			}
 			step := strings.TrimPrefix(strings.TrimPrefix(line, "- "), "* ")
 
 			// Heuristic mapping
-			lower := strings.ToLower(step)
-			if strings.HasPrefix(lower, "given ") || strings.HasPrefix(lower, "when ") || strings.HasPrefix(lower, "then ") {
-				gherkin.WriteString(fmt.Sprintf("    %s\n", step))
-			} else if strings.Contains(lower, "should") || strings.Contains(lower, "must") {
+			lowerStep := strings.ToLower(step)
+			if strings.Contains(lowerStep, "should") || strings.Contains(lowerStep, "must") {
 				gherkin.WriteString(fmt.Sprintf("    Then %s\n", step))
+			} else if strings.Contains(lowerStep, "when") {
+				gherkin.WriteString(fmt.Sprintf("    When %s\n", step))
 			} else {
 				gherkin.WriteString(fmt.Sprintf("    Given %s\n", step))
 			}
 		} else if !strings.HasPrefix(line, "#") {
-			// New scenario
+			// New scenario title
 			gherkin.WriteString(fmt.Sprintf("  Scenario: %s\n", line))
-			scenarioNum++
+			inScenario = true
 		}
 	}
 

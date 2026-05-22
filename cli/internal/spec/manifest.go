@@ -119,11 +119,12 @@ func HasContractChanged(contractPath string, mapping *SpecMapping) (bool, error)
 }
 
 // HasSpecChanged checks if any exported spec checksum differs from manifest
-func HasSpecChanged(mapping *SpecMapping) (bool, []string, error) {
+func HasSpecChanged(repoRoot string, mapping *SpecMapping) (bool, []string, error) {
 	changed := []string{}
 
 	for _, exp := range mapping.Exports {
-		current, err := ComputeChecksum(exp.Path)
+		absPath := filepath.Join(repoRoot, exp.Path)
+		current, err := ComputeChecksum(absPath)
 		if os.IsNotExist(err) {
 			changed = append(changed, exp.Path)
 			continue
