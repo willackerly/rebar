@@ -44,7 +44,7 @@ func runCommit(cmd *cobra.Command, args []string) error {
 	fmt.Println("Running pre-commit checks...")
 	preCommitPath := filepath.Join(cfg.ScriptsDir, "pre-commit.sh")
 	if _, err := os.Stat(preCommitPath); err == nil {
-		exitCode, err := scripts.RunPassthrough(cfg.ScriptsDir, "pre-commit.sh")
+		exitCode, err := scripts.RunPassthrough(cfg.ScriptsDir, cfg.RepoRoot, "pre-commit.sh", scriptEnv())
 		if err != nil {
 			return fmt.Errorf("running pre-commit: %w", err)
 		}

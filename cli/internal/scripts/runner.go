@@ -17,20 +17,32 @@ type Result struct {
 	Duration time.Duration
 }
 
+func buildEnv(extra map[string]string) []string {
+	env := os.Environ()
+	for k, v := range extra {
+		if v != "" {
+			env = append(env, k+"="+v)
+		}
+	}
+	return env
+}
+
 // Run executes a bash script and captures its output.
-func Run(scriptsDir, scriptName string, args ...string) (*Result, error) {
+// repoRoot is the consumer repo directory used as the working directory.
+// env provides additional environment variables passed to the script.
+func Run(scriptsDir, repoRoot, scriptName string, env map[string]string, args ...string) (*Result, error) {
 	scriptPath := scriptsDir + "/" + scriptName
 	if _, err := os.Stat(scriptPath); err != nil {
 		return nil, fmt.Errorf("script not found: %s", scriptPath)
 	}
 
 	cmd := exec.Command("bash", append([]string{scriptPath}, args...)...)
-	cmd.Dir = scriptsDir + "/.." // run from repo root
+	cmd.Dir = repoRoot
 
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
-	cmd.Env = os.Environ()
+	cmd.Env = buildEnv(env)
 
 	start := time.Now()
 	err := cmd.Run()
@@ -55,18 +67,20 @@ func Run(scriptsDir, scriptName string, args ...string) (*Result, error) {
 }
 
 // RunPassthrough executes a script with stdout/stderr connected to the terminal.
-func RunPassthrough(scriptsDir, scriptName string, args ...string) (int, error) {
+// repoRoot is the consumer repo directory used as the working directory.
+// env provides additional environment variables passed to the script.
+func RunPassthrough(scriptsDir, repoRoot, scriptName string, env map[string]string, args ...string) (int, error) {
 	scriptPath := scriptsDir + "/" + scriptName
 	if _, err := os.Stat(scriptPath); err != nil {
 		return -1, fmt.Errorf("script not found: %s", scriptPath)
 	}
 
 	cmd := exec.Command("bash", append([]string{scriptPath}, args...)...)
-	cmd.Dir = scriptsDir + "/.."
+	cmd.Dir = repoRoot
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	cmd.Stdin = os.Stdin
-	cmd.Env = os.Environ()
+	cmd.Env = buildEnv(env)
 
 	err := cmd.Run()
 	if err != nil {

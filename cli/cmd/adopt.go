@@ -10,6 +10,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/willackerly/rebar/cli/internal/llm"
+	"github.com/willackerly/rebar/cli/internal/repo"
 )
 
 var _ = time.Now // ensure time is used
@@ -192,19 +193,9 @@ Only propose contracts for code that actually exists — don't invent components
 func gatherCodebaseSummary(root string) string {
 	var sb strings.Builder
 
-	// Find source files
-	exts := []string{"*.go", "*.ts", "*.tsx", "*.py", "*.rs", "*.js", "*.jsx"}
-	var sourceFiles []string
-	for _, ext := range exts {
-		cmd := exec.Command("find", root, "-name", ext, "-not", "-path", "*/node_modules/*", "-not", "-path", "*/.claude/*", "-not", "-path", "*/.git/*", "-not", "-path", "*/vendor/*")
-		out, _ := cmd.Output()
-		for _, f := range strings.Split(strings.TrimSpace(string(out)), "\n") {
-			if f != "" {
-				rel, _ := filepath.Rel(root, f)
-				sourceFiles = append(sourceFiles, rel)
-			}
-		}
-	}
+	// Find tracked source files
+	sourceFiles, _ := repo.TrackedFiles(root,
+		"*.go", "*.ts", "*.tsx", "*.py", "*.rs", "*.js", "*.jsx")
 
 	if len(sourceFiles) == 0 {
 		return ""
@@ -225,11 +216,11 @@ func gatherCodebaseSummary(root string) string {
 
 	// Show directory structure
 	sb.WriteString("\nDirectory structure:\n")
-	cmd := exec.Command("find", root, "-maxdepth", "2", "-type", "d",
+	dirCmd := exec.Command("find", root, "-maxdepth", "2", "-type", "d",
 		"-not", "-path", "*/node_modules/*", "-not", "-path", "*/.git/*",
 		"-not", "-path", "*/.claude/*", "-not", "-path", "*/vendor/*")
-	out, _ := cmd.Output()
-	for _, d := range strings.Split(strings.TrimSpace(string(out)), "\n") {
+	dirOut, _ := dirCmd.Output()
+	for _, d := range strings.Split(strings.TrimSpace(string(dirOut)), "\n") {
 		if d != "" {
 			rel, _ := filepath.Rel(root, d)
 			if rel != "" && rel != "." {

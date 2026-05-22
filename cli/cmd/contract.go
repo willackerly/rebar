@@ -25,7 +25,7 @@ var contractVerifyCmd = &cobra.Command{
 	Short: "Verify contract references and headers",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		fmt.Println("Checking contract references...")
-		exitCode, err := scripts.RunPassthrough(cfg.ScriptsDir, "check-contract-refs.sh")
+		exitCode, err := scripts.RunPassthrough(cfg.ScriptsDir, cfg.RepoRoot, "check-contract-refs.sh", scriptEnv())
 		if err != nil {
 			return err
 		}
@@ -34,7 +34,7 @@ var contractVerifyCmd = &cobra.Command{
 		}
 
 		fmt.Println("\nChecking contract headers...")
-		exitCode, err = scripts.RunPassthrough(cfg.ScriptsDir, "check-contract-headers.sh")
+		exitCode, err = scripts.RunPassthrough(cfg.ScriptsDir, cfg.RepoRoot, "check-contract-headers.sh", scriptEnv())
 		if err != nil {
 			return err
 		}

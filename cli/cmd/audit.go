@@ -3,7 +3,6 @@ package cmd
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"sort"
 	"strconv"
@@ -11,6 +10,7 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+	"github.com/willackerly/rebar/cli/internal/repo"
 )
 
 var (
@@ -444,12 +444,9 @@ func countGlob(pattern string) int {
 }
 
 func countContractHeaders(root string) int {
-	cmd := exec.Command("grep", "-rl", "CONTRACT:", "--include=*.go", "--include=*.ts", "--include=*.tsx", "--include=*.py", "--include=*.rs", "--include=*.js", root)
-	out, _ := cmd.Output()
-	if len(out) == 0 {
-		return 0
-	}
-	return len(strings.Split(strings.TrimSpace(string(out)), "\n"))
+	files, _ := repo.TrackedFilesGrep(root, `CONTRACT:`,
+		"*.go", "*.ts", "*.tsx", "*.py", "*.rs", "*.js")
+	return len(files)
 }
 
 func countAgentRoles(root string) int {
@@ -494,20 +491,10 @@ func extractDateFromFile(root, rel string) string {
 }
 
 func countSkippedTests(root string) int {
-	cmd := exec.Command("grep", "-rl", "-E", `\.skip\(|\.skip\b|xit\(|xdescribe\(|xtest\(`, "--include=*.test.*", "--include=*_test.*", "--include=*.spec.*", root)
-	out, _ := cmd.Output()
-	if len(out) == 0 {
-		return 0
-	}
-	lines := strings.Split(strings.TrimSpace(string(out)), "\n")
-	// Filter out node_modules and .claude
-	count := 0
-	for _, l := range lines {
-		if !strings.Contains(l, "node_modules") && !strings.Contains(l, ".claude/worktrees") {
-			count++
-		}
-	}
-	return count
+	files, _ := repo.TrackedFilesGrep(root,
+		`\.skip\(|\.skip\b|xit\(|xdescribe\(|xtest\(`,
+		"*_test.*", "*.test.*", "*.spec.*")
+	return len(files)
 }
 
 func scoreChecks(checks []checkResult) int {
