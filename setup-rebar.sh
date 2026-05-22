@@ -4,6 +4,9 @@
 # Installs rebar to ~/.rebar/versions/<version>/, creates a 'current'
 # symlink for PATH wiring, runs bin/install to add ASK + rebar CLIs.
 #
+# For release tags (vX.Y.Z): downloads prebuilt binaries from GitHub Releases
+# For branches: clones and builds from source
+#
 # Multiple rebar versions can coexist. Projects pin their version via
 # .rebar-version; the CLI auto-resolves the correct framework install.
 #
@@ -16,6 +19,7 @@
 set -euo pipefail
 
 REBAR_REPO="${REBAR_REPO:-https://github.com/willackerly/rebar.git}"
+REBAR_GITHUB="${REBAR_GITHUB:-ttschampel/rebar}"
 REBAR_REF="${1:-v3.0.1-alpha}"
 REBAR_BASE="${REBAR_BASE:-$HOME/.rebar}"
 ASK_SERVER="${ASK_SERVER:-}"
@@ -77,26 +81,111 @@ if ! command -v git >/dev/null 2>&1; then
   exit 1
 fi
 
+# Detect platform for binary downloads
+detect_platform() {
+  local os arch
+  case "$(uname -s)" in
+    Darwin) os="Darwin" ;;
+    Linux)  os="Linux" ;;
+    MINGW*|MSYS*|CYGWIN*) os="Windows" ;;
+    *) err "Unsupported OS: $(uname -s)"; exit 1 ;;
+  esac
+  case "$(uname -m)" in
+    x86_64|amd64) arch="x86_64" ;;
+    arm64|aarch64) arch="arm64" ;;
+    *) err "Unsupported arch: $(uname -m)"; exit 1 ;;
+  esac
+  echo "${os}_${arch}"
+}
+
+# Download and extract release binary
+download_release() {
+  local version="$1"
+  local platform
+  platform=$(detect_platform)
+  local archive="rebar_${version}_${platform}.tar.gz"
+  local url="https://github.com/${REBAR_GITHUB}/releases/download/${version}/${archive}"
+
+  log "Downloading release ${version} for ${platform}"
+  local tmpdir
+  tmpdir=$(mktemp -d)
+  trap 'rm -rf "$tmpdir"' EXIT
+
+  if command -v curl >/dev/null 2>&1; then
+    curl -fsSL "$url" -o "$tmpdir/$archive" || {
+      err "Failed to download $url"
+      err "Release may not exist. Use a branch name to build from source."
+      exit 1
+    }
+  elif command -v wget >/dev/null 2>&1; then
+    wget -q "$url" -O "$tmpdir/$archive" || {
+      err "Failed to download $url"
+      err "Release may not exist. Use a branch name to build from source."
+      exit 1
+    }
+  else
+    err "curl or wget required for release downloads"
+    exit 1
+  fi
+
+  log "Extracting to $REBAR_DIR"
+  mkdir -p "$REBAR_DIR"
+  tar -xzf "$tmpdir/$archive" -C "$REBAR_DIR"
+  chmod +x "$REBAR_DIR/rebar"
+
+  # Move binary to bin/ and create structure
+  mkdir -p "$REBAR_DIR/bin"
+  mv "$REBAR_DIR/rebar" "$REBAR_DIR/bin/rebar"
+}
+
+# Clone and build from source
+install_from_source() {
+  local ref="$1"
+  if [[ -d "$REBAR_DIR/.git" ]]; then
+    log "Updating $ref at $REBAR_DIR"
+    if ! git -C "$REBAR_DIR" diff --quiet || ! git -C "$REBAR_DIR" diff --cached --quiet; then
+      warn "Uncommitted changes in $REBAR_DIR — skipping update"
+    else
+      git -C "$REBAR_DIR" fetch --tags origin "$ref"
+      git -C "$REBAR_DIR" checkout "$ref"
+      git -C "$REBAR_DIR" pull --ff-only origin "$ref" || true
+    fi
+  elif [[ -e "$REBAR_DIR" ]]; then
+    err "$REBAR_DIR exists but is not a git checkout."
+    err "Remove it or choose a different version."
+    exit 1
+  else
+    log "Installing $REBAR_REPO ($ref) → $REBAR_DIR"
+    git clone --branch "$ref" --depth=1 "$REBAR_REPO" "$REBAR_DIR"
+  fi
+
+  # Build the binary
+  if ! command -v go >/dev/null 2>&1; then
+    err "go is required to build from source. Install it or use a release tag."
+    exit 1
+  fi
+
+  log "Building rebar CLI from source"
+  (cd "$REBAR_DIR/cli" && go build -ldflags "-X github.com/willackerly/rebar/cli/cmd.Version=$ref" -o ../bin/rebar)
+}
+
 # Versioned install directory
 REBAR_DIR="$REBAR_BASE/versions/$REBAR_REF"
 mkdir -p "$REBAR_BASE/versions"
 
-if [[ -d "$REBAR_DIR/.git" ]]; then
-  log "Updating $REBAR_REF at $REBAR_DIR"
-  if ! git -C "$REBAR_DIR" diff --quiet || ! git -C "$REBAR_DIR" diff --cached --quiet; then
-    warn "Uncommitted changes in $REBAR_DIR — skipping update"
+# Detect if this is a release tag or branch
+if [[ "$REBAR_REF" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?$ ]]; then
+  # Release tag: try to download prebuilt binary
+  log "Detected release tag: $REBAR_REF"
+  if [[ -e "$REBAR_DIR/bin/rebar" ]]; then
+    log "$REBAR_REF already installed at $REBAR_DIR"
   else
-    git -C "$REBAR_DIR" fetch --tags origin "$REBAR_REF"
-    git -C "$REBAR_DIR" checkout "$REBAR_REF"
-    git -C "$REBAR_DIR" pull --ff-only origin "$REBAR_REF" || true
+    download_release "$REBAR_REF"
   fi
-elif [[ -e "$REBAR_DIR" ]]; then
-  err "$REBAR_DIR exists but is not a git checkout."
-  err "Remove it or choose a different version."
-  exit 1
 else
-  log "Installing $REBAR_REPO ($REBAR_REF) → $REBAR_DIR"
-  git clone --branch "$REBAR_REF" --depth=1 "$REBAR_REPO" "$REBAR_DIR"
+  # Branch or non-standard ref: build from source
+  log "Detected branch/ref: $REBAR_REF (will build from source)"
+  install_from_source "$REBAR_REF"
 fi
 
 # Update 'current' symlink for PATH
