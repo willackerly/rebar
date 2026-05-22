@@ -105,6 +105,16 @@ func runAdopt(cmd *cobra.Command, args []string) error {
 		}
 	}
 
+	// agents/subagent-guidelines.md
+	if ensureSubagentGuidelines(root) {
+		fixed++
+	}
+
+	// .git/hooks/pre-commit
+	if ensurePreCommitHook(root) {
+		fixed++
+	}
+
 	if fixed == 0 {
 		fmt.Println("  (all scaffolding already in place)")
 	}
@@ -305,3 +315,4 @@ func writeMinimalClaude(root, name string) {
 
 	os.WriteFile(filepath.Join(root, "CLAUDE.md"), []byte(content), 0644)
 }
+
