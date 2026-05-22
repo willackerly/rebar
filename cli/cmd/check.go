@@ -27,7 +27,7 @@ func runCheck(cmd *cobra.Command, args []string) error {
 		scriptArgs = append(scriptArgs, "--strict")
 	}
 
-	exitCode, err := scripts.RunPassthrough(cfg.ScriptsDir, "ci-check.sh", scriptArgs...)
+	exitCode, err := scripts.RunPassthrough(cfg.ScriptsDir, cfg.RepoRoot, "ci-check.sh", scriptEnv(), scriptArgs...)
 	if err != nil {
 		return fmt.Errorf("running checks: %w", err)
 	}

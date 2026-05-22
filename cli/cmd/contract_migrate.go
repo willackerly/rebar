@@ -133,7 +133,7 @@ func runMigrateNamespace(cmd *cobra.Command, args []string) error {
 		}
 		// Regenerate registry so the ID column reflects the new namespace.
 		if _, err := os.Stat(filepath.Join(cfg.ScriptsDir, "compute-registry.sh")); err == nil {
-			_, _ = scripts.RunPassthrough(cfg.ScriptsDir, "compute-registry.sh")
+			_, _ = scripts.RunPassthrough(cfg.ScriptsDir, cfg.RepoRoot, "compute-registry.sh", scriptEnv())
 		}
 	}
 
@@ -197,49 +197,35 @@ func scanContractDir(repoRoot, ns string, report *migrationReport) error {
 	return nil
 }
 
-// scanSourceDirs walks the standard source directories with the same
-// extension and skip rules as scripts/check-contract-headers.sh.
+// scanSourceDirs finds tracked source files via git ls-files and rewrites
+// legacy CONTRACT: references. Uses git to scope to the consumer repo,
+// avoiding leaks into framework installs or untracked directories.
 func scanSourceDirs(repoRoot, ns string, report *migrationReport) error {
-	exts := map[string]bool{
-		".go": true, ".ts": true, ".tsx": true, ".js": true, ".jsx": true,
-		".py": true, ".rs": true,
+	files, err := repo.TrackedFiles(repoRoot,
+		"*.go", "*.ts", "*.tsx", "*.js", "*.jsx", "*.py", "*.rs")
+	if err != nil {
+		return nil
 	}
-	dirs := []string{"src", "internal", "cmd", "client", "packages", "lib", "app", "cli"}
 
-	for _, d := range dirs {
-		dir := filepath.Join(repoRoot, d)
-		info, err := os.Stat(dir)
-		if err != nil || !info.IsDir() {
+	skipSuffix := []string{
+		"_test.go", ".test.ts", ".test.tsx", ".test.js",
+		".spec.ts", ".spec.tsx", ".spec.js",
+		"_generated", ".gen.", ".pb.go", ".pb.ts",
+	}
+
+	for _, rel := range files {
+		name := filepath.Base(rel)
+		skip := false
+		for _, s := range skipSuffix {
+			if strings.Contains(name, s) {
+				skip = true
+				break
+			}
+		}
+		if skip {
 			continue
 		}
-		err = filepath.Walk(dir, func(path string, fi os.FileInfo, walkErr error) error {
-			if walkErr != nil {
-				return walkErr
-			}
-			if fi.IsDir() {
-				base := filepath.Base(path)
-				if base == "vendor" || base == "node_modules" || base == "dist" || base == "build" || base == ".git" {
-					return filepath.SkipDir
-				}
-				return nil
-			}
-			ext := filepath.Ext(path)
-			if !exts[ext] {
-				return nil
-			}
-			name := fi.Name()
-			// Skip tests + generated files.
-			if strings.HasSuffix(name, "_test.go") ||
-				strings.HasSuffix(name, ".test.ts") || strings.HasSuffix(name, ".test.tsx") ||
-				strings.HasSuffix(name, ".test.js") || strings.HasSuffix(name, ".spec.ts") ||
-				strings.HasSuffix(name, ".spec.tsx") || strings.HasSuffix(name, ".spec.js") ||
-				strings.Contains(name, "_generated") || strings.Contains(name, ".gen.") ||
-				strings.HasSuffix(name, ".pb.go") || strings.HasSuffix(name, ".pb.ts") {
-				return nil
-			}
-			return rewriteFile(path, ns, "source", report)
-		})
-		if err != nil {
+		if err := rewriteFile(filepath.Join(repoRoot, rel), ns, "source", report); err != nil {
 			return err
 		}
 	}

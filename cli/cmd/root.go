@@ -80,6 +80,16 @@ func Execute() error {
 	return rootCmd.Execute()
 }
 
+func scriptEnv() map[string]string {
+	if cfg == nil {
+		return nil
+	}
+	return map[string]string{
+		"REBAR_CONTRACT_NAMESPACE": cfg.ContractNamespace,
+		"REBAR_TIER":              fmt.Sprintf("%d", cfg.Tier),
+	}
+}
+
 func init() {
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "verbose output")
 	rootCmd.PersistentFlags().BoolVar(&jsonOut, "json", false, "machine-readable JSON output")
