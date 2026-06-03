@@ -26,3 +26,6 @@ bin/__pycache__/
 
 # Claude Code agent harness ephemeral worktrees
 .claude/worktrees/
+
+# Local agent tooling
+.codex/
