@@ -119,7 +119,7 @@ Exit codes: 0 success, 1 ask-level failure, 2 invocation error.
 
 - **Doc:** `bin/README.md` (full reference), `DESIGN.md` §10 (design rationale)
 - **Sister contract:** `CONTRACT:S3-MCP-SERVER.1.0` (the MCP bridge that wraps ASK)
-- **Sister contract:** `CONTRACT:S1-STEWARD.1.0` (Steward exposes itself via `ask steward`)
+- **Sister contract:** `CONTRACT:S1-STEWARD.2.0` (Steward exposes itself via `ask steward`)
 
 ## Future evolution
 

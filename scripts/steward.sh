@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # steward.sh — Automated project health scanner
-# CONTRACT:S1-STEWARD.1.0
+# CONTRACT:S1-STEWARD.2.0
 # rebar-scripts: 2026.03.20
 #
 # Usage:
@@ -128,7 +128,10 @@ scan_contract() {
   local impl_count=${#impl_files[@]}
   local test_count=${#test_files[@]}
 
-  # Lifecycle derivation
+  # Lifecycle derivation (COMPUTED from file presence — distinct from the
+  # DECLARED maturity vocabulary in contract headers). The top state is
+  # "impl-present", not "verified": impl + test files exist, but nothing
+  # here proves a test ever ran green (v3 rename, decision D4).
   local lifecycle="draft"
   if [ "$completeness" = "pass" ]; then
     if [ "$impl_count" -eq 0 ]; then
@@ -136,7 +139,7 @@ scan_contract() {
     elif [ "$test_count" -eq 0 ]; then
       lifecycle="testing"
     else
-      lifecycle="verified"
+      lifecycle="impl-present"
     fi
   fi
 
@@ -348,12 +351,12 @@ generate_action_items() {
 build_aggregate() {
   local contracts_json="$1"
 
-  local total draft active testing verified open_discoveries
+  local total draft active testing impl_present open_discoveries
   total="$(echo "$contracts_json" | jq 'length')"
   draft="$(echo "$contracts_json" | jq '[.[] | select(.lifecycle == "draft")] | length')"
   active="$(echo "$contracts_json" | jq '[.[] | select(.lifecycle == "active")] | length')"
   testing="$(echo "$contracts_json" | jq '[.[] | select(.lifecycle == "testing")] | length')"
-  verified="$(echo "$contracts_json" | jq '[.[] | select(.lifecycle == "verified")] | length')"
+  impl_present="$(echo "$contracts_json" | jq '[.[] | select(.lifecycle == "impl-present")] | length')"
   open_discoveries="$(echo "$contracts_json" | jq '[.[].discoveries[]] | length')"
 
   jq -n \
@@ -362,7 +365,7 @@ build_aggregate() {
     --argjson draft "$draft" \
     --argjson active "$active" \
     --argjson testing "$testing" \
-    --argjson verified "$verified" \
+    --argjson impl_present "$impl_present" \
     --argjson open_discoveries "$open_discoveries" \
     --argjson passing "$ENFORCEMENT_PASSING" \
     --argjson enf_total "$ENFORCEMENT_TOTAL" \
@@ -380,7 +383,7 @@ build_aggregate() {
           draft: $draft,
           active: $active,
           testing: $testing,
-          verified: $verified
+          impl_present: $impl_present
         },
         open_discoveries: $open_discoveries,
         enforcement: {
@@ -405,12 +408,12 @@ generate_markdown() {
   local report_json="$1"
   local output="$PROJECT_ROOT/STEWARD_REPORT.md"
 
-  local total draft active testing verified open_disc enf_pass enf_total
+  local total draft active testing impl_present open_disc enf_pass enf_total
   total="$(echo "$report_json" | jq '.summary.contracts.total')"
   draft="$(echo "$report_json" | jq '.summary.contracts.draft')"
   active="$(echo "$report_json" | jq '.summary.contracts.active')"
   testing="$(echo "$report_json" | jq '.summary.contracts.testing')"
-  verified="$(echo "$report_json" | jq '.summary.contracts.verified')"
+  impl_present="$(echo "$report_json" | jq '.summary.contracts.impl_present')"
   open_disc="$(echo "$report_json" | jq '.summary.open_discoveries')"
   enf_pass="$(echo "$report_json" | jq '.summary.enforcement.passing')"
   enf_total="$(echo "$report_json" | jq '.summary.enforcement.total')"
@@ -425,7 +428,7 @@ generate_markdown() {
     echo ""
     echo "| Metric | Value |"
     echo "|--------|-------|"
-    echo "| Contracts | $total total ($draft draft, $active active, $testing testing, $verified verified) |"
+    echo "| Contracts | $total total ($draft draft, $active active, $testing testing, $impl_present impl-present) |"
     echo "| Open Discoveries | $open_disc |"
     echo "| Enforcement | $enf_pass/$enf_total passing |"
     echo ""
@@ -604,16 +607,16 @@ main() {
       echo "$report" | jq .
       ;;
     --summary)
-      local total draft active testing verified open_disc enf_pass enf_total
+      local total draft active testing impl_present open_disc enf_pass enf_total
       total="$(echo "$report" | jq '.summary.contracts.total')"
       draft="$(echo "$report" | jq '.summary.contracts.draft')"
       active="$(echo "$report" | jq '.summary.contracts.active')"
       testing="$(echo "$report" | jq '.summary.contracts.testing')"
-      verified="$(echo "$report" | jq '.summary.contracts.verified')"
+      impl_present="$(echo "$report" | jq '.summary.contracts.impl_present')"
       open_disc="$(echo "$report" | jq '.summary.open_discoveries')"
       enf_pass="$(echo "$report" | jq '.summary.enforcement.passing')"
       enf_total="$(echo "$report" | jq '.summary.enforcement.total')"
-      echo "Steward: ${total} contracts (${draft}d/${active}a/${testing}t/${verified}v), ${open_disc} discoveries, ${enf_pass}/${enf_total} enforcement passing"
+      echo "Steward: ${total} contracts (${draft}d/${active}a/${testing}t/${impl_present}ip), ${open_disc} discoveries, ${enf_pass}/${enf_total} enforcement passing"
       ;;
     full|*)
       # Generate markdown report

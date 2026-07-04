@@ -59,7 +59,11 @@ Computed by the [Steward](../scripts/steward.sh), never declared manually:
 | **DRAFT** | Missing required sections (Interfaces, Behavioral, Errors, Tests, Implementing) |
 | **ACTIVE** | All sections present, no `CONTRACT:{id}` found in source |
 | **TESTING** | Implementing files exist, no test files found |
-| **VERIFIED** | Implementing files AND test files exist |
+| **IMPL-PRESENT** | Implementing files AND test files exist (nothing proves the tests ran green) |
+
+> Named `VERIFIED` through rebar v2.x; renamed in v3 (decision D4) because file
+> presence can't verify behavior. `verified` belongs exclusively to the
+> *declared* maturity vocabulary in contract `**Status:**` headers.
 
 ## Companion Files
 

@@ -164,7 +164,11 @@ derives status from what exists in the codebase:
 | **DRAFT** | Missing required sections | Contract is incomplete — needs architect attention |
 | **ACTIVE** | All sections present, no `CONTRACT:{id}` found in source | Spec is ready, awaiting implementation |
 | **TESTING** | Implementing files exist, no test files found | Code exists, needs contract tests |
-| **VERIFIED** | Implementing files AND test files exist | Contract is fully realized in code |
+| **IMPL-PRESENT** | Implementing files AND test files exist | Impl + tests exist on disk — nothing here proves the tests ran green |
+
+> Named `VERIFIED` through v2.x; renamed in v3 because file presence can't
+> verify behavior (decision D4). `verified` now belongs exclusively to the
+> *declared* maturity vocabulary in contract `**Status:**` headers.
 
 Required sections for spec gate: Interfaces, Behavioral Contracts, Error
 Contracts, Test Requirements, Implementing Files.
@@ -688,7 +692,7 @@ scripts/steward.sh --check C1  # single contract
 Per contract:
 - **Spec gate:** Are all required sections present? (Interfaces, Behavioral, Errors, Tests, Implementing)
 - **Impl gate:** Do any source files reference this contract? Are there test files?
-- **Lifecycle:** Derived from spec + impl gates (DRAFT → ACTIVE → TESTING → VERIFIED)
+- **Lifecycle:** Derived from spec + impl gates (DRAFT → ACTIVE → TESTING → IMPL-PRESENT)
 - **Discoveries:** Any BUG/DISCOVERY/DRIFT/DISPUTE entries in TODO.md for this contract?
 
 Globally:

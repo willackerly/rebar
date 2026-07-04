@@ -7,7 +7,7 @@
 
 | Metric | Value |
 |--------|-------|
-| Contracts | 0 total (0 draft, 0 active, 0 testing, 0 verified) |
+| Contracts | 0 total (0 draft, 0 active, 0 testing, 0 impl-present) |
 | Open Discoveries | 0 |
 | Enforcement | 0/0 passing |
 

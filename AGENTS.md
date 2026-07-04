@@ -63,7 +63,7 @@ The rebar source repo has contracts for its own load-bearing components:
 
 | Contract | Component | Source location |
 |----------|-----------|-----------------|
-| `CONTRACT:S1-STEWARD.1.0` | Quality scanner (steward.sh + companion infra) | `scripts/steward.sh`, `agents/steward/` |
+| `CONTRACT:S1-STEWARD.2.0` | Quality scanner (steward.sh + companion infra) | `scripts/steward.sh`, `agents/steward/` |
 | `CONTRACT:S2-ASK-CLI.1.0` | Persistent role-agent CLI | `bin/ask`, `bin/ask-server`, `bin/ask-agent-loop` |
 | `CONTRACT:S3-MCP-SERVER.1.0` | MCP bridge exposing ASK as Claude-Code-native tools | `bin/ask-mcp-server` |
 

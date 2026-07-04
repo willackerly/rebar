@@ -6,11 +6,23 @@
 
 <!-- VERSIONING:
      - When this contract is superseded, add: SUPERSEDED BY: CONTRACT-{ID}-{NAME}.{NEW}
+       and set its Status: to `superseded` (terminal — excluded from maturity weighting)
      - When this contract supersedes another, add: SUPERSEDES: CONTRACT-{ID}-{NAME}.{OLD}
 -->
 
 **Version:** {MAJOR}.{MINOR}
-**Status:** draft | active | deprecated
+**Status:** stub | draft | in-progress | active | verified
+<!-- DECLARED maturity — pick exactly one, honestly: nobody audits this line but
+     everybody trusts it, and `verified` means active + passing tests/scenarios
+     prove it (never assumed). Distinct from the Steward's COMPUTED lifecycle
+     (draft/active/testing/impl-present) — do not conflate the two. -->
+<!-- Vocabulary (canonical definition: conventions.md):
+     stub        — placeholder; structure exists, content is not real
+     draft       — real attempt, not yet reviewed/applied
+     in-progress — actively being built; expect churn
+     active      — in use; defines current behavior
+     verified    — active + has passing tests/scenarios proving it
+     Machine-greppable: grep -E '^\*\*Status:\*\*' architecture/CONTRACT-*.md -->
 **Owner:** [team or person responsible]
 **Type:** Service | Component | Interface | Protocol | Data Model | Operational | Integration Seam
 **Cross-repo Promotability:** Yes/No — if yes, name candidate adopting repos

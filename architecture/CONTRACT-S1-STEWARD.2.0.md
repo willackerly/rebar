@@ -1,13 +1,15 @@
-# CONTRACT-S1-STEWARD.1.0
+# CONTRACT-S1-STEWARD.2.0
 
-SUPERSEDED BY: CONTRACT-S1-STEWARD.2.0
+SUPERSEDES: CONTRACT-S1-STEWARD.1.0
 
-**Version:** 1.0
-**Status:** superseded
+**Version:** 2.0
+**Status:** active
 **Owner:** rebar maintainer
 **Type:** Service
 **Cross-repo Promotability:** Yes — every rebar-adopted repo ships its own steward
-**Source:** `practices/red-team-protocol.md` and `DESIGN.md` §9 (The Steward)
+**Source:** `practices/red-team-protocol.md`, `DESIGN.md` §9 (The Steward), and
+`feedback/2026-06-19-trustable-status-and-cross-repo-ask-to-cut-rederivation-loe.md` §1
+(the `verified` → `impl-present` rename, decision D4 in `docs/v3-beta-plan.md`)
 
 ## Why this exists
 
@@ -18,9 +20,14 @@ and verify enforcement coverage. The Steward is the mechanism that turns
 "contracts are the operating system" from a doctrine into a measurable thing
 on every CI run.
 
-If the Steward didn't exist, rebar would be just templates plus a methodology
-doc — there would be no force-function for "contract drift between
-declaration and reality" not to accumulate silently.
+Version 2.0 exists because 1.0's top lifecycle state lied. It was named
+`verified` but computed purely from **file presence** (spec sections + impl
+files + test files, none executed) — a tak-tdf session documented contracts
+reported `verified` whose load-bearing code did not even compile. 2.0 renames
+that computed state to **`impl-present`**, which claims exactly what the
+Steward can prove. The word `verified` now belongs exclusively to the
+*declared* maturity vocabulary (contract `**Status:**` headers), where it
+means "active + passing tests/scenarios prove it."
 
 ## Who needs this
 
@@ -34,6 +41,8 @@ declaration and reality" not to accumulate silently.
   first-class tool when a question lands on quality / health / drift
 - **`agents/englead/AGENT.md` and `agents/architect/AGENT.md`** — read the
   Steward report as their primary signal for routing follow-up work
+- **Anything parsing `steward-report.json` or per-contract state JSON** —
+  the 2.0 output schema is the breaking surface this version bump exists for
 
 ## Scenarios (illustrative)
 
@@ -46,13 +55,15 @@ JSON to `architecture/.state/`, and returns nonzero if the dev forgot to
 update `CONTRACT-REGISTRY.md`. The commit blocks until the developer
 regenerates the registry.
 
-### Scenario 2 — fleet audit
+### Scenario 2 — the honesty boundary (why 2.0 exists)
 
-A maintainer runs `rebar audit --all ~/dev`. Each adopted repo's
-`architecture/.state/steward-report.json` is consulted (or regenerated if
-missing). The aggregate scorecard ranks all 8 repos, surfaces the common
-failures (e.g., 4 of 8 missing METRICS files), and identifies which adopters
-need the most help.
+Maya, auditing a Tier-3 repo, sees a contract at lifecycle `impl-present`.
+She knows exactly what that claims: spec sections complete, implementing
+files and test files exist — and nothing more. Whether those tests ran green
+is answered by the *declared* `**Status:**` field on the contract (only a
+human/agent who watched them pass may write `verified` there). Under 1.0 she
+would have seen `verified` and either trusted a counterfeit or spent a
+30-agent fan-out re-deriving ground truth.
 
 ### Scenario 3 — role routing
 
@@ -87,11 +98,26 @@ ask steward json     # → commands/json.sh
 ask steward check C1 # → commands/check.sh C1
 ```
 
+Output schema (the breaking change vs 1.0):
+
+- Per-contract JSON `lifecycle` field values: `draft` | `active` | `testing`
+  | `impl-present` (was `verified`)
+- Aggregate `summary.contracts` object keys: `total`, `draft`, `active`,
+  `testing`, `impl_present` (was `verified`; underscore key matches the
+  file's snake_case JSON key style — the lifecycle *value* string keeps the
+  hyphen: `impl-present`)
+- `--summary` one-liner: `Steward: N contracts (Xd/Ya/Zt/Wip), ...`
+  (was `.../Wv`)
+- `STEWARD_REPORT.md` summary row and Contract Status table print
+  `impl-present` (was `verified`)
+
 ## Behavioral Contracts
 
 | Behavior | Specification |
 |----------|--------------|
-| Lifecycle computation | Status (DRAFT/ACTIVE/TESTING/VERIFIED) is **derived** from `CONTRACT:` ref counts + test counts, never declared |
+| Lifecycle computation | State (DRAFT/ACTIVE/TESTING/IMPL-PRESENT) is **derived** from `CONTRACT:` ref counts + test counts, never declared |
+| Lifecycle vocabulary | Top computed state is `impl-present` — impl + test files exist. The Steward MUST NOT emit `verified` as a lifecycle value; `verified` is reserved for the DECLARED maturity vocabulary in contract headers |
+| Computed vs declared | The Steward never reads or writes contract `**Status:**` (declared maturity) fields — that surface belongs to humans/agents and `check-compliance.sh` |
 | Spec gate | A contract is gated on presence of: Interfaces, Behavioral, Errors, Tests, Implementing sections |
 | State output | JSON written to `architecture/.state/<contract-id>.<version>.json` per contract + `steward-report.json` aggregate |
 | Markdown output | `STEWARD_REPORT.md` is auto-generated; gitignored (regenerated on every scan) |
@@ -119,56 +145,79 @@ ask steward check C1 # → commands/check.sh C1
 ## Cross-references
 
 - **Practices:** `practices/red-team-protocol.md` §Steward integration
-- **Doc:** `DESIGN.md` §9 (Steward), `scripts/README.md`
-- **Findings:** `feedback/2026-04-21-filedag-cross-ref-and-federation-coord.md` motivated the cross-doc consistency family
+- **Doc:** `DESIGN.md` §9 (Steward), `scripts/README.md`,
+  `conventions.md` §Lifecycle Status Definitions (computed)
+- **Findings:** `feedback/2026-04-21-filedag-cross-ref-and-federation-coord.md`
+  motivated the cross-doc consistency family;
+  `feedback/2026-06-19-trustable-status-and-cross-repo-ask-to-cut-rederivation-loe.md`
+  motivated the 2.0 rename (D4)
 
 ## Future evolution
 
 - **Provisional:** the JSON schema in `architecture/.state/` will get a
   formal versioned contract (likely `CONTRACT:I1-STEWARD-STATE.1.0`)
   once a 2nd consumer beyond `rebar audit` emerges.
+- **Planned tier above `impl-present`:** a behavioral proof state (working
+  name `exercised`) gated on a named milestone test that actually executed
+  green, recorded as a `proof:` field written by the test run, not by
+  file-grep. Deferred to v3.1-scale work (see the 2026-06-19 feedback,
+  suggestion 1).
 - **Major-bump trigger:** if the spec-gate sections change (e.g.,
-  Why/Who/Scenarios become required for spec-gate completeness).
+  Why/Who/Scenarios become required for spec-gate completeness), or if any
+  lifecycle value string changes again.
 
 ## Retirement / supersession plan
 
-Superseded by `CONTRACT-S1-STEWARD.2.0` (2026-07-04): the computed lifecycle
-state `verified` was renamed `impl-present` — a breaking output change
-(decision D4, `docs/v3-beta-plan.md`). See the 2.0 contract's Retirement /
-supersession plan for the migration criterion, deadline, and owner. This
-file is retained for the migration window only.
+- **Predecessor:** `CONTRACT-S1-STEWARD.1.0` — retirement criterion:
+  `grep -rn "CONTRACT:S1-STEWARD.1.0"` (excluding `architecture/` and the
+  1.0 contract file itself) returns zero, and no fleet repo's tooling still
+  parses a `verified` lifecycle value
+- **Migration deadline:** the `v3.0.0-beta` tag — rebar's own tree and
+  bootstrap templates must be fully migrated before the tag lands
+- **Migration owner:** rebar maintainer (Will Ackerly)
+
+Migration for downstream parsers:
+
+- `lifecycle == "verified"` → `lifecycle == "impl-present"`
+- `.summary.contracts.verified` → `.summary.contracts.impl_present`
+- `--summary` suffix `Nv` → `Nip`
 
 ## Implementing Files
 
-- `scripts/steward.sh` — main scanner (624 lines)
+- `scripts/steward.sh` — main scanner
 - `scripts/_rebar-config.sh` — tier resolution helper
 - `scripts/check-*.sh` — individual checks orchestrated by `ci-check.sh`
 - `scripts/ci-check.sh` — composite runner that invokes Steward + checks
 - `agents/steward/AGENT.md` — reader-role definition for ASK
 - `agents/steward/commands/*.sh` — ask-steward subcommand executables
+- `agents/architect/commands/default.sh` — parses `summary.contracts.impl_present`
 - `templates/project-bootstrap/scripts/steward.sh` — adopter copy (synced via `sync-bootstrap.sh`)
 
 ## Test Requirements
 
 - [ ] Bash 3.2 compatibility verified on stock macOS
 - [ ] Each `--<flag>` exits 0 on a clean repo, 1 on a repo with seeded drift
+- [ ] No output surface (JSON, markdown, one-liner) emits `verified` as a
+      computed lifecycle value
 - [ ] JSON output validates against the schema (when schema lands)
 - [ ] State files survive a full scan + partial `--check` cycle
 - [ ] Stale-detection threshold (>24h) fires correctly
 
 ## Cross-repo promotion notes
 
-- **Universal invariants:** lifecycle-computed-not-declared, JSON state
-  in `architecture/.state/`, exit code 0/1 semantics, role routing
+- **Universal invariants:** lifecycle-computed-not-declared, the
+  `impl-present` naming (adopters MUST NOT rename it back to `verified`),
+  JSON state in `architecture/.state/`, exit code 0/1 semantics, role routing
 - **Per-project customization:** the `check-*.sh` set each repo enables
   via `.rebarrc` flags; project-specific metrics in `METRICS` file
 - **Specialization-contract naming:** adopters don't typically write
   their own steward — they ship rebar's verbatim
-- **Candidate adopting repos:** all 8 already adopt this contract
-  implicitly; making it explicit is what this contract does
+- **Candidate adopting repos:** all 8 fleet repos; each picks up 2.0 by
+  re-syncing `scripts/steward.sh` from the bootstrap template
 
 ## Change History
 
 | Version | Date | Change | Migration |
 |---------|------|--------|-----------|
+| 2.0 | 2026-07-04 | Computed lifecycle `verified` renamed `impl-present` (D4); aggregate JSON key `summary.contracts.verified` → `impl_present`; `--summary` suffix `v` → `ip` | Update anything parsing steward output per the Retirement / supersession plan above |
 | 1.0 | 2026-04-25 | Initial contract — formalizing what already shipped | — |

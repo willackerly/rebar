@@ -10,6 +10,13 @@
 #   5. Badge tier matches .rebarrc tier
 #   6. AGENTS.md has required load-bearing sections (Tier 2+)
 #   7. AGENTS.md mentions ASK CLI (Tier 2+)
+#   8. Federation drift-check wired when CONSUMES.md declares dependencies
+#   9. Contract maturity — reads DECLARED `**Status:**` fields from
+#      architecture/CONTRACT-*.md and weights the badge (v3, Cluster 1):
+#        <33% stub-or-draft → tier stands as declared
+#        33–66%             → tier annotated "— IN PROGRESS" (advisory)
+#        >66%               → badge demoted one tier (compliance failure)
+#      Zero Status: fields anywhere → pre-v3 repo: no penalty, one advisory.
 #
 # Badge format (must be a blockquote, first line after # Title):
 #   > **rebar vX.Y.Z** | **Tier N: LEVEL**
@@ -232,6 +239,122 @@ if [ -f "$CONSUMES_FILE" ]; then
       echo "    rebar contract drift-check"
       echo "  Without this, consumed contracts can silently age out as upstream evolves (CHARTER §1.6)."
       errors=$((errors + 1))
+    fi
+  fi
+fi
+
+# ─── Check 9: Contract maturity (declared Status: fields) ────────────────
+#
+# v3 maturity honesty (docs/v3-beta-plan.md Cluster 1): contracts DECLARE
+# maturity in a `**Status:** <value>` header line — stub / draft /
+# in-progress / active / verified. This is the human/agent honesty marker,
+# distinct from the Steward's COMPUTED lifecycle
+# (draft/active/testing/impl-present), which this check never reads.
+# The badge is weighted by how much of the live contract set is still
+# stub-or-draft, so a tier can't sit on top of placeholder contracts.
+
+ARCH_DIR="$PROJECT_ROOT/architecture"
+
+if [ -d "$ARCH_DIR" ]; then
+  echo ""
+  echo "=== Contract maturity (declared Status:) ==="
+
+  status_total=0     # Status: fields found across all contract files
+  live_total=0       # live (non-superseded) contracts considered
+  live_declared=0    # live contracts with a recognized maturity value
+  stub_draft=0       # live contracts declared stub or draft
+  missing_status=""  # newline-joined names of live contracts without Status:
+
+  for contract in "$ARCH_DIR"/CONTRACT-*.md; do
+    [ -f "$contract" ] || continue
+    cbase="$(basename "$contract")"
+
+    # Skip templates, the generated registry, and companion files —
+    # same exclusions as compute-registry.sh.
+    case "$cbase" in
+      CONTRACT-TEMPLATE.md|CONTRACT-SEAM-TEMPLATE.md|CONTRACT-REGISTRY.md|CONTRACT-REGISTRY.template.md|CONTRACT-GAPS.md)
+        continue ;;
+      *.impl.md)
+        continue ;;
+    esac
+
+    cstatus="$(grep '^\*\*Status:\*\*' "$contract" 2>/dev/null | head -1 \
+      | sed 's/^\*\*Status:\*\*[[:space:]]*//' | tr -d '*' | tr -d '[:space:]' || true)"
+
+    if [ -n "$cstatus" ]; then
+      status_total=$((status_total + 1))
+    fi
+
+    # Terminal states are out of the live maturity mix — a superseded
+    # contract kept around for its migration window shouldn't drag (or
+    # inflate) the badge.
+    case "$cstatus" in
+      superseded|deprecated|retired) continue ;;
+    esac
+
+    live_total=$((live_total + 1))
+
+    case "$cstatus" in
+      "")
+        # Warned about later — only when the repo has *some* Status: fields
+        # (partially migrated). A pre-v3 repo gets one advisory, not N warns.
+        missing_status="${missing_status}${cbase}
+"
+        ;;
+      stub|draft)
+        live_declared=$((live_declared + 1))
+        stub_draft=$((stub_draft + 1))
+        ;;
+      in-progress|active|verified)
+        live_declared=$((live_declared + 1))
+        ;;
+      *)
+        echo "WARN: $cbase declares Status: '$cstatus' — not in the maturity vocabulary (stub|draft|in-progress|active|verified)"
+        ;;
+    esac
+  done
+
+  if [ "$status_total" -eq 0 ]; then
+    if [ "$live_total" -gt 0 ]; then
+      echo "ADVISORY: no contract declares a Status: field — treating as a pre-v3 repo (no maturity penalty)."
+      echo "  Add '**Status:** <stub|draft|in-progress|active|verified>' to each contract header"
+      echo "  (see architecture/CONTRACT-TEMPLATE.md) so the badge can reflect real maturity."
+    else
+      echo "OK: no contracts found — maturity weighting not applicable"
+    fi
+  elif [ -n "$missing_status" ]; then
+    # Partially migrated: some contracts declare Status:, these don't.
+    printf '%s' "$missing_status" | while IFS= read -r mname; do
+      echo "WARN: $mname has no Status: line — add one (see architecture/CONTRACT-TEMPLATE.md header)"
+    done
+  fi
+
+  if [ "$status_total" -gt 0 ] && [ "$live_declared" -eq 0 ]; then
+    echo "OK: no live contracts declare maturity (all terminal) — no maturity weighting"
+  elif [ "$live_declared" -gt 0 ]; then
+    pct=$((stub_draft * 100 / live_declared))
+    echo "OK: $live_declared live contract(s) declare maturity — $stub_draft stub-or-draft (${pct}%)"
+
+    if [[ "$declared_tier" =~ ^[123]$ ]]; then
+      if [ "$pct" -lt 33 ]; then
+        echo "OK: maturity supports the declared badge (Tier $declared_tier: $(tier_label "$declared_tier"))"
+      elif [ "$pct" -le 66 ]; then
+        echo "NOTE: ${pct}% of live contracts are stub-or-draft — badge reads as"
+        echo "  'Tier $declared_tier: $(tier_label "$declared_tier") — IN PROGRESS' until the set matures"
+      else
+        demoted_tier=$((declared_tier - 1))
+        echo "FAIL: ${pct}% of live contracts are stub-or-draft (>66%) — badge demoted one tier"
+        if [ "$demoted_tier" -ge 1 ]; then
+          echo "  Declared: Tier $declared_tier: $(tier_label "$declared_tier") — Effective: Tier $demoted_tier: $(tier_label "$demoted_tier")"
+        else
+          echo "  Declared: Tier $declared_tier: $(tier_label "$declared_tier") — Effective: below Tier 1 (adoption not yet real)"
+        fi
+        echo "  Reason: a tier claimed on top of a mostly stub/draft contract set overstates adoption."
+        echo "  Fix: mature the contracts (or lower the badge) until <=66% are stub-or-draft."
+        errors=$((errors + 1))
+      fi
+    else
+      echo "NOTE: no valid tier declared — maturity computed but badge weighting skipped"
     fi
   fi
 fi
