@@ -101,6 +101,33 @@ Your worktree is ephemeral. Uncommitted work = lost work. When done, run
 
 ---
 
+## Verify Before Relying (mandatory prompt clause)
+
+Orchestrator briefs are recall, not ground truth. Every fanout prompt
+MUST include this clause verbatim, and every subagent MUST honor it:
+
+> If you find that any specific claim in this brief doesn't match
+> what's in source (file paths, line numbers, function names, config
+> values), STOP, document the discrepancy, and choose the
+> higher-fidelity path. Don't sugarcoat the parent's recall as fact —
+> verify before relying.
+
+It cuts both ways. **Subagent reports of pre-existing state are claims,
+not facts.** Before the orchestrator builds on a report like "X already
+exists," "tests already pass," or "the config is already wired," it
+re-verifies against source. Work products are in the diff and speak for
+themselves; state reports are recall, and recall gets checked.
+
+Provenance: on dapple-sdk (2026-04-28), this one clause let three of
+nine fanned-out subagents catch real factual errors in their briefs —
+a hallucinated script path, unshipped speculation described as shipped
+— and deviate correctly instead of building on them. Without the
+clause, fanout multiplies the cost of every planning error; with it,
+fanout is self-correcting. Orchestrators: the full fanout shape,
+including when NOT to fan out, is in `agents/FANOUT_PATTERN.md`.
+
+---
+
 ## Results & Output
 
 - Write results to the location specified in your parameters.
