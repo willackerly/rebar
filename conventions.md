@@ -338,10 +338,12 @@ Parsers of record: `scripts/check-compliance.sh` (Check 9),
 - **Marking down is free; marking up is a claim.** Move an artifact to
   `verified` only when you can point at the passing test or scenario.
 - **Compliance weighting** (`scripts/check-compliance.sh`): <33% of
-  contracts stub-or-draft → tier badge as declared; 33–66% → badge
+  live contracts stub-or-draft → tier badge as declared; 33–66% → badge
   annotated "— IN PROGRESS"; >66% → badge demoted one tier with the
   reason printed. Repos with no `Status:` fields at all are treated as
-  pre-v3: no penalty, one advisory line.
+  pre-v3: no penalty, one advisory line. Once *any* contract declares,
+  undeclared and out-of-vocabulary live contracts count as
+  stub-or-draft — selective declaration cannot launder a badge.
 - The two vocabularies never mix: computed lifecycle
   (draft/active/testing/impl-present) comes from the Steward; declared
   maturity (stub/draft/in-progress/active/verified) comes from people

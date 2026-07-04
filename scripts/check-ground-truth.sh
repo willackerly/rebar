@@ -18,7 +18,10 @@ SCRIPT_DIR_GT="$(cd "$(dirname "$0")" && pwd)"
 [ -f "$SCRIPT_DIR_GT/_rebar-config.sh" ] && source "$SCRIPT_DIR_GT/_rebar-config.sh" && _rebar_skip 3 && exit 0
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+# METRICS or METRICS.md — the template ships .md and `rebar audit`
+# accepts both, so this checker must too.
 METRICS_FILE="$REPO_ROOT/METRICS"
+[ ! -f "$METRICS_FILE" ] && [ -f "$REPO_ROOT/METRICS.md" ] && METRICS_FILE="$REPO_ROOT/METRICS.md"
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'

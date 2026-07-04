@@ -94,7 +94,7 @@ with_status=0
 for f in "$ARCH_DIR"/CONTRACT-*.md; do
   [ -e "$f" ] || continue
   case "$f" in
-    *TEMPLATE*|*REGISTRY*) continue ;;
+    *TEMPLATE*|*REGISTRY*|*GAPS*|*.impl.md) continue ;;
   esac
   total_contracts=$((total_contracts + 1))
   status_val=$(grep -m1 -E '^\*{0,2}Status:' "$f" 2>/dev/null \
@@ -113,8 +113,11 @@ for f in "$ARCH_DIR"/CONTRACT-*.md; do
   esac
 done
 
-if [ "$with_status" -eq 0 ]; then
-  # Pre-v3 repos have contracts without Status: fields (or none at all).
+if [ "$total_contracts" -eq 0 ]; then
+  # A brand-new project isn't "pre-v3" — it just has no contracts yet.
+  echo "maturity: no contracts yet"
+elif [ "$with_status" -eq 0 ]; then
+  # Pre-v3 repos have contracts without Status: fields.
   echo "maturity: pre-v3 (no Status fields)"
 else
   parts=""

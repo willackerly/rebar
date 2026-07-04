@@ -53,7 +53,7 @@ echo ""
 
 if [ ! -f "$VERSION_FILE" ]; then
   echo "FAIL: .rebar-version file not found"
-  echo "  Create it with: echo 'v2.0.0' > .rebar-version"
+  echo "  Create it with: echo 'v3.0.0-beta' > .rebar-version"
   errors=$((errors + 1))
   declared_version=""
 else
@@ -75,7 +75,9 @@ if [ ! -f "$RC_FILE" ]; then
   errors=$((errors + 1))
   declared_tier=""
 else
-  declared_tier=$(grep '^tier' "$RC_FILE" 2>/dev/null | head -1 | sed 's/.*=[[:space:]]*//' | tr -d ' ')
+  # '|| true' — under errexit a .rebarrc with no tier line must reach the
+  # FAIL message below, not kill the script mid-pipeline with no diagnostic.
+  declared_tier=$(grep '^tier' "$RC_FILE" 2>/dev/null | head -1 | sed 's/.*=[[:space:]]*//' | tr -d ' ' || true)
   if [[ "$declared_tier" =~ ^[123]$ ]]; then
     echo "OK: .rebarrc tier = $declared_tier ($(tier_label "$declared_tier"))"
   else
@@ -96,7 +98,7 @@ else
   if [ -z "$badge_line" ]; then
     echo "FAIL: README.md has no rebar badge"
     echo "  Add this as the first line after your # Title:"
-    echo '  > **rebar v2.0.0** | **Tier 2: ADOPTED**'
+    echo '  > **rebar v3.0.0-beta** | **Tier 2: ADOPTED**'
     errors=$((errors + 1))
   else
     line_num=$(echo "$badge_line" | cut -d: -f1)
@@ -279,8 +281,12 @@ if [ -d "$ARCH_DIR" ]; then
         continue ;;
     esac
 
-    cstatus="$(grep '^\*\*Status:\*\*' "$contract" 2>/dev/null | head -1 \
-      | sed 's/^\*\*Status:\*\*[[:space:]]*//' | tr -d '*' | tr -d '[:space:]' || true)"
+    # Tolerant parse, identical to cold-start-checks.sh: bolded or bare
+    # 'Status:' line, first word, case-folded. The canonical form stays
+    # '**Status:** value' (conventions.md) but parsers of record must agree.
+    cstatus="$(grep -m1 -E '^\*{0,2}Status:' "$contract" 2>/dev/null \
+      | sed -e 's/^\*\*Status:\*\*//' -e 's/^Status://' \
+      | awk '{print $1}' | tr -d '*' | tr '[:upper:]' '[:lower:]' || true)"
 
     if [ -n "$cstatus" ]; then
       status_total=$((status_total + 1))
@@ -299,6 +305,8 @@ if [ -d "$ARCH_DIR" ]; then
       "")
         # Warned about later — only when the repo has *some* Status: fields
         # (partially migrated). A pre-v3 repo gets one advisory, not N warns.
+        # Once any contract declares, undeclared live contracts COUNT AS
+        # stub-or-draft: selective declaration must not bypass demotion.
         missing_status="${missing_status}${cbase}
 "
         ;;
@@ -310,7 +318,8 @@ if [ -d "$ARCH_DIR" ]; then
         live_declared=$((live_declared + 1))
         ;;
       *)
-        echo "WARN: $cbase declares Status: '$cstatus' — not in the maturity vocabulary (stub|draft|in-progress|active|verified)"
+        echo "WARN: $cbase declares Status: '$cstatus' — not in the maturity vocabulary (stub|draft|in-progress|active|verified); counted as stub-or-draft"
+        stub_draft=$((stub_draft + 1))
         ;;
     esac
   done
@@ -330,16 +339,25 @@ if [ -d "$ARCH_DIR" ]; then
     done
   fi
 
-  if [ "$status_total" -gt 0 ] && [ "$live_declared" -eq 0 ]; then
+  if [ "$status_total" -gt 0 ] && [ "$live_declared" -eq 0 ] && [ "$live_total" -eq 0 ]; then
     echo "OK: no live contracts declare maturity (all terminal) — no maturity weighting"
-  elif [ "$live_declared" -gt 0 ]; then
-    pct=$((stub_draft * 100 / live_declared))
-    echo "OK: $live_declared live contract(s) declare maturity — $stub_draft stub-or-draft (${pct}%)"
+  elif [ "$status_total" -gt 0 ] && [ "$live_total" -gt 0 ]; then
+    # Weight over ALL live contracts: undeclared ones already counted as
+    # stub-or-draft above (selective declaration must not launder a badge).
+    undeclared=$((live_total - live_declared))
+    if [ "$undeclared" -gt 0 ]; then
+      stub_draft=$((stub_draft + undeclared))
+    fi
+    pct_tenths=$((stub_draft * 1000 / live_total))
+    pct="$((pct_tenths / 10)).$((pct_tenths % 10))"
+    echo "OK: $live_declared of $live_total live contract(s) declare maturity — $stub_draft stub-or-draft-or-undeclared (${pct}%)"
 
     if [[ "$declared_tier" =~ ^[123]$ ]]; then
-      if [ "$pct" -lt 33 ]; then
+      # Product comparisons — integer division floor must not soften the
+      # documented thresholds (<33% ok, 33-66% annotate, >66% demote).
+      if [ $((stub_draft * 100)) -lt $((live_total * 33)) ]; then
         echo "OK: maturity supports the declared badge (Tier $declared_tier: $(tier_label "$declared_tier"))"
-      elif [ "$pct" -le 66 ]; then
+      elif [ $((stub_draft * 100)) -le $((live_total * 66)) ]; then
         echo "NOTE: ${pct}% of live contracts are stub-or-draft — badge reads as"
         echo "  'Tier $declared_tier: $(tier_label "$declared_tier") — IN PROGRESS' until the set matures"
       else
