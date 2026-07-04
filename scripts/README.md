@@ -54,6 +54,7 @@ Each script is standalone, runs in <5 seconds, and exits 0 (pass) or 1 (fail).
 | Script | Notes |
 |--------|-------|
 | `inbox-watch.sh` | Long-running peer-inbox watcher (runs until killed) — armed at coordination-seat cold start per `practices/session-lifecycle.md` step 4; NOT a 0/1 check, never wire into CI |
+| `rebar-doc.sh` | Resolver of record for `rebar:<kind>/<name>` refs (`conventions.md` §Cross-Repo References): local → `$REBAR_ROOT` → discovered checkout → upstream URL (exit 4). `--cat` streams the doc. Go twin: `rebar doc` |
 
 ## Installation
 

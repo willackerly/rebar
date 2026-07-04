@@ -41,6 +41,8 @@ judgment call made this session.
 | D7 | **Skills are pointers, not copies.** Every skill references its `practices/*.md`; paradigm content lives in exactly one place. | A second prose surface that drifts is the SessionStart-feedback disease with a new organ. |
 | D8 | **rebar does not grow its own `inbox/` in this release.** The peer-inbox convention entry documents *when* a repo should hold one (multi-repo coordination seats); rebar's intake remains `ask featurerequest` + feedback branches. | Scope discipline: rebar is not currently a coordination seat in a memo-exchanging cluster. Adding an empty inbox would be ceremony. |
 | D9 | **(post-review) Badge weighting counts undeclared live contracts as stub-or-draft once any contract declares.** Supersedes the build-time decision to weight only declared contracts. Same review pass also unified the two `Status:` parsers (bold/bare, case-folded) and moved thresholds to product comparisons. | Adversarial review reproduced badge-laundering by selective declaration, by unbolded/capitalized values, and an integer-floor gap at the >66% threshold — all defeating Cluster 1's purpose. Pre-v3 repos (zero declarations) keep the no-penalty advisory. |
+| D11 | **(Will, 2026-07-04) The beta merges to `main`; the version string, not the branch, carries the anneal state.** `main` tracks the v3 line at `v3.0.0-beta`; the `v2.0.0` tag remains the stable v2 point (a `v2.x` maintenance branch can be cut from it if ever needed). `v3.0.0` final is **earned by the graduation criteria below**, exactly as the beta tag was earned by its checklist. | Adoption and feedback are the goal, and main is where discovery happens. Parallel lines rot (the alpha sat unbuilt for two months while main moved); the resolvers' upstream URLs point at `blob/main/`; every consumer is a swarm repo with escape hatches. "Beta on main" is honest as long as the badge says beta. |
+| D10 | **(post-tag, Will 2026-07-04) Boundary-crossing artifacts reference rebar doctrine by abstract `rebar:<kind>/<name>` refs, not literal paths.** Convention in `conventions.md` §Cross-Repo References; resolvers of record `scripts/rebar-doc.sh` + `rebar doc` (resolution: local → `$REBAR_ROOT` → discovered checkout → upstream URL + ask-hint). Replaces the "(rebar checkout if not vendored)" prose qualifiers in the skills. | Literal paths in shipped artifacts dangle in adopter repos; prose qualifiers were a band-aid. An abstract name plus one documented resolution chain survives vendoring, checkouts, and upstream-only layouts. Literal paths stay correct for files that travel with the adopter set (`scripts/`). |
 
 ## Seven clusters
 
@@ -50,11 +52,11 @@ Maturity markers use the Cluster-1 vocabulary, applied to the cluster's
 | # | Cluster | Source | Maturity at beta start |
 |---|---------|--------|------------------------|
 | 1 | Maturity tagging + compliance honesty + steward rename | conversation 2026-04-29; `feedback/2026-06-19-trustable-status-and-cross-repo-ask-to-cut-rederivation-loe.md` §1 | draft |
-| 2 | SessionStart hook for cold-start enforcement | `feedback/2026-04-26-sessionstart-hook-cold-start-enforcement.md` | draft |
-| 3 | TEST_FIDELITY + UAKS tier + closed-loop demo gate | `feedback/2026-04-22-testing-rigor-six-moments.md`, `2026-04-27-e2e-test-bypass-closed-loop-verification-drift.md`, `2026-04-27-user-at-keyboard-story-tier.md` | draft |
-| 4 | agents/FANOUT_PATTERN.md | `feedback/2026-04-28-multi-subagent-fanout-playbook.md` | draft |
-| 5 | Contract discipline followups | `feedback/2026-04-24-contract-discipline-and-jtbd-framing.md` | draft |
-| 6 | Peer-inbox paradigm + watch | `practices/inbox-watch.md` (field-proven), `feedback/2026-07-04-inbox-watch-cold-start-hygiene-coordination-seats.md` | **verified** (tak cluster, 2026-07-02→04) |
+| 2 | SessionStart hook for cold-start enforcement | `feedback/processed/2026-04-26-sessionstart-hook-cold-start-enforcement.md` | draft |
+| 3 | TEST_FIDELITY + UAKS tier + closed-loop demo gate | `feedback/2026-04-22-testing-rigor-six-moments.md`, `feedback/processed/2026-04-27-e2e-test-bypass-closed-loop-verification-drift.md`, `feedback/processed/2026-04-27-user-at-keyboard-story-tier.md` | draft |
+| 4 | agents/FANOUT_PATTERN.md | `feedback/processed/2026-04-28-multi-subagent-fanout-playbook.md` | draft |
+| 5 | Contract discipline followups | `feedback/processed/2026-04-24-contract-discipline-and-jtbd-framing.md` | draft |
+| 6 | Peer-inbox paradigm + watch | `practices/inbox-watch.md` (field-proven), `feedback/processed/2026-07-04-inbox-watch-cold-start-hygiene-coordination-seats.md` | **verified** (tak cluster, 2026-07-02→04) |
 | 7 | Claude Skills packaging | conversation 2026-07-04 (Will) | stub |
 
 ### Cluster 1 — Maturity tagging + compliance honesty
@@ -147,7 +149,7 @@ Deliverables:
   repo-level `inbox/` peer mail — append-only, dated
   `YYYY-MM-DD-<from>-<slug>.md`, processed-on-read; explicitly
   disambiguated from the ASK runtime's `agents/<role>/inbox/` queues
-- `feedback/2026-07-04-inbox-watch-cold-start-hygiene-coordination-seats.md`
+- `feedback/processed/2026-07-04-inbox-watch-cold-start-hygiene-coordination-seats.md`
   dispositioned: accepted → implemented here
 
 ### Cluster 7 — Claude Skills packaging
@@ -198,6 +200,29 @@ index, `feedback/INVENTORY.md` + dispositions, `README.md`, `CHANGELOG.md`,
 - A clean `rebar new` produces a working `ask architect` state
 - New scripts pass functional tests (not just `bash -n`)
 - CHANGELOG entry + migration notes for upgraders
+
+## Graduation to v3.0.0 (annealing criteria)
+
+The beta anneals **in use, labeled** — on `main`, version string
+`v3.0.0-beta`, per-artifact `Status:` markers. It graduates to
+`v3.0.0` final when ALL of the following are observable (not vibes):
+
+1. **Two external swarm repos complete the migration** — `Status:`
+   declared on all live contracts, SessionStart hook installed and
+   emitting — and run **≥2 weeks** with no P0/P1 feedback filed against
+   a v3 feature.
+2. **A live coordination seat adopts the canonical
+   `scripts/inbox-watch.sh`** in real cross-repo traffic (tak cluster
+   is the natural first).
+3. **Every v3-feature feedback item filed during the window is
+   dispositioned** — implemented, watchlisted, or rejected; none
+   pending.
+4. **No swarm tooling still parses computed `verified`** — the steward
+   rename is verified downstream, not assumed.
+
+Then: version strings → `v3.0.0`, CHANGELOG entry, tag, announce via
+the outbox/inbox channels. Criteria may be amended here (with a
+decision-log entry), never silently skipped.
 
 ## What's deferred (unchanged rationale)
 

@@ -3,7 +3,7 @@
 # done work but ship a longer-fuse failure mode.
 #
 # Sources: rebar/feedback/2026-04-24-fidelity-decay-soft-hardening-patterns.md
-#          rebar/feedback/2026-04-27-e2e-test-bypass-closed-loop-verification-drift.md (P8)
+#          rebar/feedback/processed/2026-04-27-e2e-test-bypass-closed-loop-verification-drift.md (P8)
 #
 # An author cannot reliably self-audit hardening work because the author's
 # context (right now, with the test fresh) matches the consumer's context
@@ -223,7 +223,7 @@ echo "  <file>:<line>:<pattern-id>"
 echo "to .rebar/decay-patterns-allow.txt (one per line, # for comments)."
 echo ""
 echo "References: feedback/2026-04-24-fidelity-decay-soft-hardening-patterns.md"
-echo "            feedback/2026-04-27-e2e-test-bypass-closed-loop-verification-drift.md (P8)"
+echo "            feedback/processed/2026-04-27-e2e-test-bypass-closed-loop-verification-drift.md (P8)"
 echo "            practices/test-fidelity.md (fidelity ladder + gates)"
 
 if [ "$WARN_ONLY" -eq 1 ]; then

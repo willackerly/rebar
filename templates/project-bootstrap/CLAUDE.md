@@ -72,7 +72,9 @@ scripts/check-ground-truth.sh
 1. **Update QUICKCONTEXT.md** with current project state
 2. **Update TODO.md** — mark completed items, add newly discovered items
 3. **Clean up:** `git worktree prune`, commit any uncommitted work
-4. **Write a wrapup** — see `practices/session-lifecycle.md` for the template
+4. **Write a wrapup** — see `rebar:practice/session-lifecycle` for the template
+   (resolve: `scripts/rebar-doc.sh rebar:practice/session-lifecycle --cat`, or
+   `rebar doc` if the REBAR CLI is installed)
 5. **Verify:** does QUICKCONTEXT match `git log --oneline -10`?
 
 ### Adding a Feature

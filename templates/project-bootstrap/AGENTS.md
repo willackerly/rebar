@@ -89,8 +89,10 @@ ask steward summary  # Automated quality health check
 ### Parallel Agent Protocol
 
 When launching subagents for parallel work, every agent follows **The 10 Rules**
-in `agents/subagent-guidelines.md`. The orchestrator follows the pre-launch audit
-and merge strategy in `practices/multi-agent-orchestration.md`.
+in `rebar:agents/subagent-guidelines`. The orchestrator follows the pre-launch
+audit and merge strategy in `rebar:practice/multi-agent-orchestration`. Resolve
+any `rebar:` ref with `scripts/rebar-doc.sh <ref> --cat` (or `rebar doc <ref>`
+if the REBAR CLI is installed).
 
 **The 3 absolute invariants (never violated):**
 1. **Worktree isolation** for any agent writing code
@@ -148,7 +150,7 @@ deploy commands target production vs staging, which have this guard, and
 how to bypass for CI/CD pipelines (e.g., `DEPLOY_CONFIRMED=1`).
 
 For the full deployment-pattern catalog (origin allowlists, MIME types,
-build-time env vars, etc.), see `practices/deployment-patterns.md`.
+build-time env vars, etc.), see `rebar:practice/deployment-patterns`.
 
 ---
 
@@ -200,7 +202,7 @@ update is part of the same PR. "Test contract drift" is not a free pass.
 
 Mechanical commit-msg gates (`scripts/check-fix-commit.sh` for Gate G,
 `scripts/check-bypass-flags.sh` for Gate I) catch the related failure modes
-that ARE script-detectable. See `practices/regression-fix-protocol.md` for
+that ARE script-detectable. See `rebar:practice/regression-fix-protocol` for
 the full six-gate protocol.
 
 ### The Scout Rule: Zero Tolerance for Broken Tests (W1-4)
@@ -257,7 +259,7 @@ norm.
 Sessions have three stages. The Cold Start Quad covers START. Checkpoints
 and wrapup are equally important.
 
-**See `practices/session-lifecycle.md` for the full protocol.**
+**See `rebar:practice/session-lifecycle` for the full protocol.**
 
 ### Checkpoint (every 10 commits or 2 hours)
 - Update QUICKCONTEXT.md (at minimum: timestamp + what shipped)
@@ -268,7 +270,7 @@ and wrapup are equally important.
 - Update QUICKCONTEXT.md with current state (not aspirational)
 - Update TODO.md (check completed items, add discovered items)
 - Clean up worktrees: `git worktree list` → `git worktree prune`
-- Write a session wrapup (see template in `practices/session-lifecycle.md`)
+- Write a session wrapup (see template in `rebar:practice/session-lifecycle`)
 
 ---
 

@@ -22,7 +22,9 @@ Computed lifecycle (`draft`/`active`/`testing`/`impl-present`) is derived by
 the steward from file presence, while declared maturity
 (`stub`/`draft`/`in-progress`/`active`/`verified`) is an honest human/agent
 declaration of how real the artifact is. Canonical definitions:
-`conventions.md` (rebar checkout if this repo does not vendor it).
+`rebar:convention` (§Lifecycle Status Definitions, §Declared Maturity) —
+resolve with `scripts/rebar-doc.sh rebar:convention --cat` (or `rebar doc`
+if the CLI is installed).
 
 - **Computed** shows up in steward output: the `--summary` counts, the
   `STEWARD_REPORT.md` table, the `.state` JSON. `impl-present` means

@@ -5,9 +5,10 @@ description: Use during multi-repo coordination phases (release days, cross-repo
 
 # rebar-inbox-watch — arm the peer-inbox watcher
 
-Canonical practice: `practices/inbox-watch.md` (rebar checkout if not vendored
-here) — design choices, honest
-limitations, variations). This skill is the arming procedure only.
+Canonical practice: `rebar:practice/inbox-watch` (design choices, honest
+limitations, variations) — resolve with `scripts/rebar-doc.sh
+rebar:practice/inbox-watch --cat` (or `rebar doc` if the CLI is installed).
+This skill is the arming procedure only.
 
 ## Steps
 

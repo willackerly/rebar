@@ -24,7 +24,7 @@
 # Tier behavior: below Tier 2 = skip; Tier 2 = warn only (exit 0);
 # Tier 3 = blocking (exit 1 on collisions).
 #
-# Source: feedback/2026-04-24-contract-discipline-and-jtbd-framing.md
+# Source: feedback/processed/2026-04-24-contract-discipline-and-jtbd-framing.md
 #         ("I3 number collision" drift class)
 # See: practices/contract-supersession.md for versioning vs. renumbering
 #

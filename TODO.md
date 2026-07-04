@@ -9,16 +9,16 @@ This file holds short-horizon work that's actively in flight or imminent.
 
 ## P0 — In Flight
 
-- [ ] **Tag `v3.0.0-beta`** — all seven clusters + integration landed
-      2026-07-04; adversarial review is the last acceptance gate.
-      Plan + decision log: [`docs/v3-beta-plan.md`](docs/v3-beta-plan.md).
+- [x] ~~Tag `v3.0.0-beta`~~ — **tagged + pushed 2026-07-04** after
+      ci-check 15/15, audit 10.0/10, and the 71-agent adversarial
+      review's findings were fixed. Plan + decision log:
+      [`docs/v3-beta-plan.md`](docs/v3-beta-plan.md).
 
 ## P1 — Imminent
 
-- [ ] Offer the beta to the first federated adopters (TDFLite, filedag,
-      fontkit) — maturity tagging + SessionStart hook trial.
-- [ ] Post-tag: move implemented feedback files to `feedback/processed/`
-      and update the practice-doc links that point at them.
+- [ ] Track adopter-trial responses — offer memos deposited 2026-07-04
+      in TDFLite-main and tak-tdf inboxes; filedag/fontkit still need a
+      channel (no inbox/ on disk).
 - [ ] Triage `feedback/2026-07-02-reflexive-push-durability-rule.md`
       (steward unpushed-commit warning).
 - [ ] **Next big push: opportunistic auto-federation** — see
@@ -32,9 +32,12 @@ See `feedback/INVENTORY.md` §🧰 Maintainer Queue, plus:
 - Trustable-status items 2–4 (queryable ASK capability answers, PRODUCT
   traceability, semantic-consistency gate) —
   [`feedback/2026-06-19-trustable-status-and-cross-repo-ask-to-cut-rederivation-loe.md`](feedback/2026-06-19-trustable-status-and-cross-repo-ask-to-cut-rederivation-loe.md)
-- Ship `practices/` + `conventions.md` (or pointer stubs) in
-  `templates/project-bootstrap/` so skill references resolve in adopter
-  repos without the upstream checkout.
+- ~~Ship `practices/` + `conventions.md` in the bootstrap template~~ —
+  resolved differently 2026-07-04 (plan D10): shipped artifacts use
+  abstract `rebar:` refs resolved by `scripts/rebar-doc.sh` / `rebar
+  doc` (local → REBAR_ROOT → checkout → upstream URL). Vendoring is no
+  longer needed for reference integrity; revisit only if offline
+  adopters ask.
 
 ## Discoveries
 
@@ -49,6 +52,10 @@ _None currently._
 
 (Move items here when shipped. Trim to last ~10 to stay concise.)
 
+- ✓ 2026-07-04: `rebar:` abstract refs (D10) — resolvers + skills
+  rewrite + feedback moved to processed/; outreach memos deposited
+- ✓ 2026-07-04: v3.0.0-beta **tagged + pushed** after review fixes
+  (`53f5f1c`…`4b7dcbd`)
 - ✓ 2026-07-04: v3.0.0-beta clusters 1–7 + integration (9 commits,
   `6479b03`…`cf50022` + CLI script install `6e5b0c9`)
 - ✓ 2026-07-04: Alpha→beta hard move — consolidation merges + plan

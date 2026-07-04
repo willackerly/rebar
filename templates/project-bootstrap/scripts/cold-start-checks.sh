@@ -10,7 +10,7 @@
 # pass/fail line per check. All output is wrapped in
 # <rebar-cold-start>...</rebar-cold-start> so agents can treat it as
 # harness ground truth, not prose to interpret (REBAR-D in
-# feedback/2026-04-26-sessionstart-hook-cold-start-enforcement.md).
+# feedback/processed/2026-04-26-sessionstart-hook-cold-start-enforcement.md).
 #
 # Built for hook context: output stays small (~10 lines — failures are
 # summarized, not dumped; rerun the named script for full detail) and

@@ -179,14 +179,15 @@ re-request.
 
 The alpha→beta hard move consolidated five ripe feedback threads plus two
 new clusters onto the `v3.0.0-beta` trunk. Decision log:
-`docs/v3-beta-plan.md`. Source files stay in `feedback/` root (new
-practices link to them by path); they move to `processed/` after the tag.
+`docs/v3-beta-plan.md`. The fully-implemented source files moved to
+`processed/` on 2026-07-04, after the tag (referencing docs were updated
+to the new paths in the same pass).
 
 | Item | Disposition |
 |------|-------------|
 | SessionStart hook cold-start enforcement (`2026-04-26-sessionstart-hook-…`) | **Implemented** — Cluster 2: `scripts/cold-start-checks.sh`, `.claude/settings.json` hook (rebar + bootstrap template + `rebar init/new/adopt`), CLAUDE.md template reframed. REBAR-C landed as the conventions.md "Reaching the Agent" doctrine. |
-| Multi-subagent fanout playbook (`2026-04-28-multi-subagent-fanout-playbook.md`) | **Implemented** — Cluster 4: `agents/FANOUT_PATTERN.md` (REBAR-A/C/D/E) + `agents/subagent-guidelines.md` §Verify Before Relying (REBAR-B). |
-| Contract discipline + JTBD framing (`2026-04-24-contract-discipline-and-jtbd-framing.md`) | **Implemented** — Cluster 5: `practices/spike-first-contracts.md`, `practices/contract-supersession.md`, `scripts/check-jtbd-presence.sh`, `scripts/check-prefix-uniqueness.sh`. Item 1 (template sections) had shipped 2026-04-25; item 6 documented in the spike practice. |
+| Multi-subagent fanout playbook (`processed/2026-04-28-multi-subagent-fanout-playbook.md`) | **Implemented** — Cluster 4: `agents/FANOUT_PATTERN.md` (REBAR-A/C/D/E) + `agents/subagent-guidelines.md` §Verify Before Relying (REBAR-B). |
+| Contract discipline + JTBD framing (`processed/2026-04-24-contract-discipline-and-jtbd-framing.md`) | **Implemented** — Cluster 5: `practices/spike-first-contracts.md`, `practices/contract-supersession.md`, `scripts/check-jtbd-presence.sh`, `scripts/check-prefix-uniqueness.sh`. Item 1 (template sections) had shipped 2026-04-25; item 6 documented in the spike practice. |
 | Test-fidelity ladder + UAKS + closed-loop demo gate (`2026-04-22-testing-rigor-…` Moment 3, both `2026-04-27-…` files) | **Implemented** — Cluster 3: `practices/test-fidelity.md` + `check-decay-patterns.sh` P8-demo-bypass. Remaining 2026-04-22 watchlist rows (tag-to-CI, file-to-tier, negative-control, drift-modes, commit template) stay deferred below. |
 | Trustable status — item 1 (`2026-06-19-trustable-status-…`) | **Partially implemented** — Cluster 1: steward computed `verified` → `impl-present` (S1-STEWARD 2.0), declared-maturity `Status:` vocabulary + compliance weighting. Items 2–4 (queryable ASK capability answers, PRODUCT traceability, semantic-consistency gate) deferred to v3.1-scale work. |
 | Peer-inbox watch as cold-start hygiene (`2026-07-04-inbox-watch-…`) | **Implemented** — Cluster 6: `scripts/inbox-watch.sh`, `practices/inbox-watch.md` (canonical script), `practices/session-lifecycle.md` step 4, peer-inbox convention in conventions.md. |
@@ -349,7 +350,7 @@ feedback-driven Watchlist / Queued shape. Pick up between feedback waves.
 ### Triage backlog
 
 - [ ] **`feedback/2026-04-22-testing-rigor-six-moments.md` per-proposal disposition.** Watchlist has all six items; needs explicit "Queued / Defer / Reject" decisions. Proposal 5 has a working prototype lifted into `templates/scripts/check-tag-ci-coverage.mjs` (2026-04-25). Proposal 6 (security-test commit template) is still unassigned.
-- [ ] **`feedback/2026-04-24-contract-discipline-and-jtbd-framing.md` — full disposition.** Why/Who/Scenarios already shipped in `architecture/CONTRACT-TEMPLATE.md` (2026-04-25). Remaining proposals: spike-first practice doc, contract-supersession practice doc, JTBD-presence ci-check, prefix-number-uniqueness ci-check, cross-repo promotion checklist enforcement.
+- [ ] **`feedback/processed/2026-04-24-contract-discipline-and-jtbd-framing.md` — full disposition.** Why/Who/Scenarios already shipped in `architecture/CONTRACT-TEMPLATE.md` (2026-04-25). Remaining proposals: spike-first practice doc, contract-supersession practice doc, JTBD-presence ci-check, prefix-number-uniqueness ci-check, cross-repo promotion checklist enforcement.
 - [ ] **`feedback/2026-04-24-fidelity-decay-soft-hardening-patterns.md` — followups.** Grep-detectable patterns (P1, P4, P5, P7) shipped in `scripts/check-decay-patterns.sh` (2026-04-25). Semantic patterns (P2 inverted assertions, P6 hermeticity, P8 single-key gates) still need self-audit-prompt addition to AGENTS.template.md.
 
 ### Promotion candidate (opportunistic)
