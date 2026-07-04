@@ -7,6 +7,7 @@ Reference guides for specific workflows. AGENTS.md contains the mandatory founda
 | Practice | When to Read |
 |----------|-------------|
 | [Session Lifecycle](session-lifecycle.md) | Starting, checkpointing, or ending a session; marathon sessions |
+| [Peer-Inbox Watching](inbox-watch.md) | Coordination phases with federated peer repos exchanging inbox memos — live deposit notifications |
 | [Multi-Agent Orchestration](multi-agent-orchestration.md) | Planning fan-out, launching subagents, pre-launch audit |
 | [Worktree Collaboration](worktree-collaboration.md) | Coordinating parallel agents, merge strategy, conflict resolution |
 | [Red Team Protocol](red-team-protocol.md) | Running adversarial quality reviews before releases |
