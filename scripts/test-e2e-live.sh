@@ -106,7 +106,11 @@ fi
 # ─── Version triple-check ─────────────────────────────────────────────────
 section "Version triple-check"
 
-binary_version="$(rebar version 2>&1 | head -1 | awk '{print $NF}')"
+# Test the repo's own binary — a PATH rebar may be an older install (or
+# absent, in which case "command not found" parses to a bogus version).
+REBAR_BIN="$PROJECT_ROOT/bin/rebar"
+[ -x "$REBAR_BIN" ] || REBAR_BIN="$(command -v rebar || echo /nonexistent)"
+binary_version="$("$REBAR_BIN" version 2>&1 | head -1 | awk '{print $NF}')"
 file_version="$(cat "$PROJECT_ROOT/.rebar-version" 2>/dev/null || echo "unknown")"
 tag_version="$(git -C "$PROJECT_ROOT" tag --sort=-v:refname 2>/dev/null | head -1)"
 
