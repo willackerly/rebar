@@ -9,7 +9,7 @@
 ### Complete Project Template
 ```bash
 # From within the rebar checkout
-cp -r templates/project-bootstrap/* ../my-new-project/
+cp -r templates/project-bootstrap/. ../my-new-project/
 cd ../my-new-project
 
 # Install CLI tools and configure agents
@@ -70,7 +70,7 @@ cp architecture/CONTRACT-TEMPLATE.md architecture/CONTRACT-C1-MYSERVICE.1.0.md
 ### 🚀 **New Project (Recommended)**
 ```bash
 # From within rebar checkout
-cp -r templates/project-bootstrap/* ../my-project/
+cp -r templates/project-bootstrap/. ../my-project/
 cd ../my-project
 # Customize README.md, QUICKCONTEXT.md for your project
 # Start developing with contracts + agents

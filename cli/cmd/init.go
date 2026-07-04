@@ -299,7 +299,58 @@ _None currently._
 		created++
 	}
 
+	// .claude/ — SessionStart cold-start hook + rebar skills (v3).
+	// Copied from rebar's templates/project-bootstrap/.claude/ so the
+	// canonical content lives in one place; skipped silently when the
+	// rebar checkout can't be located (same contract as refresh-context).
+	if ensureClaudeAssets(root) {
+		created++
+	}
+
 	return created
+}
+
+// ensureClaudeAssets copies templates/project-bootstrap/.claude/ (settings.json
+// with the SessionStart hook, skills/*/SKILL.md) into the project. Existing
+// files are never overwritten.
+func ensureClaudeAssets(root string) bool {
+	rebarRoot := findRebarRoot()
+	if rebarRoot == "" {
+		return false
+	}
+	srcDir := filepath.Join(rebarRoot, "templates", "project-bootstrap", ".claude")
+	if _, err := os.Stat(srcDir); err != nil {
+		return false
+	}
+	dstDir := filepath.Join(root, ".claude")
+	copied := 0
+	filepath.Walk(srcDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil || info.IsDir() {
+			return nil
+		}
+		rel, relErr := filepath.Rel(srcDir, path)
+		if relErr != nil {
+			return nil
+		}
+		dst := filepath.Join(dstDir, rel)
+		if _, statErr := os.Stat(dst); statErr == nil {
+			return nil // never overwrite
+		}
+		data, readErr := os.ReadFile(path)
+		if readErr != nil {
+			return nil
+		}
+		os.MkdirAll(filepath.Dir(dst), 0755)
+		if os.WriteFile(dst, data, 0644) == nil {
+			copied++
+		}
+		return nil
+	})
+	if copied > 0 {
+		fmt.Printf("  Created .claude/ (%d files: SessionStart hook + rebar skills)\n", copied)
+		return true
+	}
+	return false
 }
 
 // ensureMCPConfig writes a project-local .mcp.json that registers the rebar

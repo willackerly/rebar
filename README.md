@@ -68,7 +68,7 @@ binaries built; everything else is opt-in.
 ```bash
 # Option A: Copy templates
 git clone https://github.com/willackerly/rebar.git && cd rebar
-cp -r templates/project-bootstrap/* ../my-project/ && cd ../my-project
+cp -r templates/project-bootstrap/. ../my-project/ && cd ../my-project
 
 # Option B: Use the CLI (builds v2 scaffolding automatically)
 cd my-project && ../rebar/bin/rebar init
@@ -319,7 +319,7 @@ rebar/
 │   CHANGELOG.md                 # Version history + migration notes
 │
 ├── templates/
-│   ├── project-bootstrap/       # `cp -r project-bootstrap/* ../my-project/` is one-shot
+│   ├── project-bootstrap/       # `cp -r project-bootstrap/. ../my-project/` is one-shot
 │   │   └── README.md, QUICKCONTEXT.md, TODO.md, AGENTS.md, CLAUDE.md, METRICS.md,
 │   │       architecture/, scripts/ (synced from /scripts/), .rebarrc
 │   ├── component-templates/     # Individual file templates for advanced use

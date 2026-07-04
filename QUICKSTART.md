@@ -17,7 +17,7 @@ git clone https://github.com/willackerly/rebar.git
 cd rebar
 
 # Copy complete working project template
-cp -r templates/project-bootstrap/* ../my-new-project/
+cp -r templates/project-bootstrap/. ../my-new-project/
 cd ../my-new-project
 
 # Create the ASK role agents (architect, product, englead, steward, merger, featurerequest)
