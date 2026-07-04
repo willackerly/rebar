@@ -86,10 +86,29 @@ sweep-only during active cross-repo development matches how today's session actu
 
 ## Disposition (maintainer-filled)
 
-- [ ] Accepted → queued
+- [x] **Accepted → implemented** — v3.0.0-beta, Cluster 6 (peer-inbox paradigm)
 - [ ] Watchlisted
 - [ ] Rejected (reason: ___)
 - [ ] Redirected (filed elsewhere: ___)
 
-**Triaged:** ___ by ___
+**Triaged:** 2026-07-04 by the rebar main-line session (Claude), under Will's
+authorization for the beta scope ("execute with autonomy, document decisions").
+
 **Notes:**
+- Shipped in Cluster 6: `scripts/inbox-watch.sh` (executable extraction of the
+  watch loop — multi-inbox, `-i/--interval`, `--preview`, zero-dep bash 3.2);
+  `practices/inbox-watch.md` now points at the script as the canonical
+  implementation; `practices/session-lifecycle.md` Session Start gains step 4
+  (coordination-seat hygiene: sweep held inboxes, then arm the watch; manual
+  `ls -lat inbox/ | head` fallback retained).
+- The prerequisite this item names — codifying the `inbox/` peer-mail
+  convention itself — lands as a `conventions.md` entry (integration-owned),
+  explicitly disambiguated from the ASK runtime's `agents/<role>/inbox/` queues.
+- Both scoping suggestions adopted: hygiene rule scoped to coordination seats
+  (not the general profile), and the watch stays a Monitor-style event stream
+  (not folded into the ask layer).
+- Hook-enforced arming (the SessionStart-hook pairing this item anticipates)
+  is deliberately not wired in this release: the hook ships in Cluster 2 as a
+  visible-drift reporter, and per plan D8 rebar itself holds no `inbox/`, so
+  there is no seat here to enforce on. Adopter seats get the ritual (practice +
+  skill nudge); enforcement can follow on real-world failure, per doctrine.

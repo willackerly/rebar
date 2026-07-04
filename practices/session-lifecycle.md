@@ -83,6 +83,40 @@ document. **File counts are necessary but not sufficient** — 116 test
 files with 63 failures looks identical to 116 test files with 0 failures
 in ground truth checks.
 
+### 4. Coordination Seats: Sweep Inboxes, Arm the Watch (conditional — 2 minutes)
+
+**Applies only when this repo holds a peer `inbox/`, or when this seat
+coordinates repos that do.** Skip otherwise.
+
+A coordination seat that cold-starts without this step goes deaf to peer
+mail: memos sit unread until someone happens to look, and peer repos block
+on replies that aren't coming.
+
+1. **Sweep held inboxes** for memos deposited while no session was
+   listening. Read or queue everything unprocessed — the sweep establishes
+   "all traffic through now is handled":
+
+   ```bash
+   ls -lat inbox/ | head        # manual fallback — works with zero tooling
+   ```
+
+2. **Arm the live watch** so deposits from here forward land in-session
+   as events:
+
+   ```bash
+   ./scripts/inbox-watch.sh inbox/     # coordinating several repos: list each dir
+   ```
+
+   Run it through the harness's persistent background-monitor facility
+   (Claude Code: the `Monitor` tool in persistent mode) so it survives
+   across turns until session end. Mechanism, design choices, and honest
+   limitations: `practices/inbox-watch.md`.
+
+Both halves are needed: the sweep bounds what the watch missed before it
+existed; the watch covers the session forward. If the monitor dies
+mid-session, re-arm it before trusting the silence — and the manual
+fallback (`ls -lat inbox/ | head`) stays valid regardless.
+
 ---
 
 ## Session Checkpoint

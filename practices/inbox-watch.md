@@ -17,6 +17,19 @@ A session-scoped background monitor that polls the inbox and emits one line per 
 emitted line lands in the agent's conversation as a notification — the agent gets pinged with the
 filename mid-task and can process the memo immediately.
 
+The canonical implementation is `scripts/inbox-watch.sh`: multi-inbox capable (dirs as args,
+default `./inbox`), `-i/--interval` poll cadence (default 30s), `--preview` for a first-line memo
+preview, and a once-only warning for inbox dirs that don't exist yet (it keeps watching and picks
+them up on creation). The coordination-seat cold-start ritual arms this script as a persistent
+monitor (see `session-lifecycle.md`, Session Start step 4).
+
+```bash
+./scripts/inbox-watch.sh inbox/                 # one repo's inbox
+./scripts/inbox-watch.sh -i 10 --preview a/inbox b/inbox   # several, prefixed
+```
+
+The loop it extracts is small enough to read in full — kept here as the illustration:
+
 ```bash
 cd <repo>/inbox
 prev=$(ls -1 | sort)
@@ -66,9 +79,11 @@ Any harness that turns a long-running command's stdout lines into agent notifica
 ## Variations
 
 - **Multi-inbox:** prefix the emitted line per directory and run one loop over several inboxes
-  (`for d in $DIRS; ...`) when a session coordinates more than one repo pair.
+  (`for d in $DIRS; ...`) when a session coordinates more than one repo pair. (In the script:
+  pass several dirs as args; emitted paths get the directory prefix automatically.)
 - **First-line preview:** append `&& head -1 "inbox/$new"` to the emit for a one-line memo preview
-  in the notification — useful when triaging which deposit to read first.
+  in the notification — useful when triaging which deposit to read first. (In the script:
+  `--preview`.)
 - **Tighter cadence:** drop to 5–10s only when a peer session is known to be mid-exchange with you
   (live back-and-forth); return to 30s after.
 
@@ -78,5 +93,5 @@ Any harness that turns a long-running command's stdout lines into agent notifica
   works with zero automation; the watcher only removes read latency. Nothing may *require* it.
 - **federation-outbox.md** — the outbox flush dispatches notifications to consumers; this practice
   is the receiving side's ear. Together they close the loop without any shared infrastructure.
-- **session-lifecycle.md** — arm during session start for coordination phases; it dies at session
-  end by design.
+- **session-lifecycle.md** — the coordination-seat cold-start ritual sweeps held inboxes, then
+  arms `scripts/inbox-watch.sh` as a persistent monitor; the watch dies at session end by design.
