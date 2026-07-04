@@ -6,6 +6,13 @@ All notable changes to rebar. Versioned with [semver](https://semver.org/).
 - **Major** — breaking changes to contract format, agent role structure, CLI interface, or enforcement script API
 - **Minor** — new agents, templates, practices, profiles, scripts
 - **Patch** — doc fixes, script bug fixes, template clarifications
+- **Pre-release suffixes (`-alpha`, `-beta`) are the annealing channel:**
+  work we believe in but that needs field time ships **on `main`,
+  honestly labeled** — the version string and per-artifact `Status:`
+  markers carry the anneal state, not branch topology (parallel lines
+  rot). Each pre-release label is earned by an explicit checklist and
+  graduates by explicit criteria recorded in its release plan doc —
+  never by the passage of time alone.
 
 ---
 
