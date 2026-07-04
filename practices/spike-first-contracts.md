@@ -2,7 +2,7 @@
 
 **Status:** field-proven pattern (filedag DP-A, 2026-04-24 — 8 contracts,
 3 parallel agents, ~1 day wall-clock, zero merge conflicts)
-**Source:** [`feedback/2026-04-24-contract-discipline-and-jtbd-framing.md`](../feedback/2026-04-24-contract-discipline-and-jtbd-framing.md) §D,
+**Source:** [`feedback/processed/2026-04-24-contract-discipline-and-jtbd-framing.md`](../feedback/processed/2026-04-24-contract-discipline-and-jtbd-framing.md) §D,
 [`feedback/2026-04-21-filedag-cross-ref-and-federation-coord.md`](../feedback/2026-04-21-filedag-cross-ref-and-federation-coord.md)
 
 When several upcoming phases of work will cross the same architectural

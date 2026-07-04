@@ -25,18 +25,22 @@ last-synced: 2026-07-04
 
 ## In Progress
 
-- **Beta tag pending** the acceptance checklist in
-  `docs/v3-beta-plan.md` §Acceptance (adversarial review is the last
-  gate before tagging)
+- **v3.0.0-beta is tagged and pushed** (2026-07-04, all acceptance
+  gates green incl. the adversarial review). Branch continues toward
+  v3.0.0 final: adopter-trial feedback is the next input.
+- **`rebar:` abstract refs live** — boundary-crossing artifacts
+  (skills, templates, memos) reference doctrine by name; resolvers
+  `scripts/rebar-doc.sh` + `rebar doc`.
 
 ## What's Next
 
-1. **Tag `v3.0.0-beta`** once the review pass is clean; push branch+tag.
-2. **First external adopters:** TDFLite, filedag, fontkit (already
-   federated — lowest-risk trial of maturity tagging + hook).
-3. **Post-tag housekeeping:** move implemented feedback files to
-   `feedback/processed/` (kept in root through the tag because new
-   practices link to them by path — update links when moving).
+1. ~~Tag~~ — **tagged + pushed 2026-07-04** (review-clean).
+2. **Adopter trials in flight:** offer memos deposited 2026-07-04 in
+   the TDFLite-main and tak-tdf inboxes; filedag/fontkit need a channel.
+3. ~~Post-tag housekeeping~~ — done 2026-07-04: six implemented
+   feedback files moved to `processed/`, links swept; boundary-crossing
+   artifacts now use `rebar:` refs (conventions §Cross-Repo References,
+   plan D10) resolved by `scripts/rebar-doc.sh` / `rebar doc`.
 4. **v3.1 direction:** auto-federation experiments
    (`feedback/2026-04-28-auto-federation-experiment.md`, 7 maintainer
    questions open) pairs with the inbox watch as its receiving-side ear;

@@ -103,10 +103,12 @@ func init() {
 	commitCmd.GroupID = "daily"
 	auditCmd.GroupID = "daily"
 	pushCmd.GroupID = "daily"
+	docCmd.GroupID = "daily"
 	rootCmd.AddCommand(contextCmd)
 	rootCmd.AddCommand(commitCmd)
 	rootCmd.AddCommand(auditCmd)
 	rootCmd.AddCommand(pushCmd)
+	rootCmd.AddCommand(docCmd)
 
 	// Agent Coordination
 	askCmd.GroupID = "agents"

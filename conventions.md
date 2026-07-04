@@ -389,9 +389,48 @@ strength, not habit:
 
 The failure mode this table prevents: writing "always do X on session
 start" into CLAUDE.md prose (advisory by construction, skipped in
-practice — `feedback/2026-04-26-sessionstart-hook-cold-start-enforcement.md`)
+practice — `feedback/processed/2026-04-26-sessionstart-hook-cold-start-enforcement.md`)
 when a hook could execute it, or duplicating a practice into a skill
 body where it drifts.
+
+## Cross-Repo References (`rebar:` refs)
+
+A literal repo-relative path (`practices/inbox-watch.md`) is correct
+**inside the rebar repo** — `check-doc-refs.sh` validates it. But
+artifacts that **ship across repo boundaries** (skills, bootstrap
+templates, peer-inbox memos, CONSUMES notes) must not carry literal
+paths to files that only exist upstream: in an adopter repo they
+dangle. Those artifacts use the abstract form instead:
+
+```
+rebar:<kind>/<name>
+```
+
+| Kind | Resolves to |
+|------|-------------|
+| `rebar:practice/<name>` | `practices/<name>.md` |
+| `rebar:script/<name>` | `scripts/<name>.sh` |
+| `rebar:agents/<name>` | `agents/<name>.md` |
+| `rebar:convention[/<section>]` | `conventions.md` (section is informational) |
+| `rebar:charter` | `CHARTER.md` |
+| `rebar:doc/<name>` | `<name>.md` at repo root, else `docs/<name>.md` |
+| `rebar:feedback/<name>` | `feedback/<name>.md`, else `feedback/processed/<name>.md` |
+
+**Resolution order** (implemented identically by both resolvers of
+record — `scripts/rebar-doc.sh` and `rebar doc`):
+
+1. the current repo (a vendored/synced copy)
+2. `$REBAR_ROOT`
+3. a discovered checkout: `~/.rebar`, `~/dev/rebar`, `~/src/rebar`,
+   `~/code/rebar`
+4. otherwise: print the canonical upstream URL
+   (`https://github.com/willackerly/rebar/blob/main/<path>`) and the
+   matching `ask rebar <role>` hint, exit 4
+
+**Rule of thumb for shipping artifacts:** literal path if the file
+travels with the adopter set (everything under `scripts/`); `rebar:`
+ref if it lives only upstream (`practices/`, `conventions.md`,
+`CHARTER.md`, `feedback/`, `agents/*.md` doctrine).
 
 ## Testing Conventions
 

@@ -1,7 +1,7 @@
 # Fanout Pattern — Parallel Subagents Without Merge Conflicts
 
 **Status:** active — load-bearing doctrine for multi-subagent fanout
-**Source:** [`feedback/2026-04-28-multi-subagent-fanout-playbook.md`](../feedback/2026-04-28-multi-subagent-fanout-playbook.md)
+**Source:** [`feedback/processed/2026-04-28-multi-subagent-fanout-playbook.md`](../feedback/processed/2026-04-28-multi-subagent-fanout-playbook.md)
 **Provenance:** dapple-sdk, 2026-04-28 — two fanout cycles in one ~16hr
 session, 9 fanned-out worktree branches, all merged with zero conflict
 resolution; ~12–16 hours of sequential work landed in ~6–8 hours at the
@@ -217,5 +217,5 @@ if you changed them at session start.
   — pre-launch audit, GC protection, health signals, recovery protocol
 - [`practices/worktree-collaboration.md`](../practices/worktree-collaboration.md)
   — conflict zones, merge ordering, cherry-pick resolution
-- [`feedback/2026-04-28-multi-subagent-fanout-playbook.md`](../feedback/2026-04-28-multi-subagent-fanout-playbook.md)
+- [`feedback/processed/2026-04-28-multi-subagent-fanout-playbook.md`](../feedback/processed/2026-04-28-multi-subagent-fanout-playbook.md)
   — the field report this doctrine distills

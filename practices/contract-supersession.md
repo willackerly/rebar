@@ -4,7 +4,7 @@
 across [`conventions.md`](../conventions.md) ("Modified Contract" checklist),
 [`architecture/README.md`](../architecture/README.md) (§Versioning), and the
 [CONTRACT-TEMPLATE.md](../architecture/CONTRACT-TEMPLATE.md) header comments
-**Source:** [`feedback/2026-04-24-contract-discipline-and-jtbd-framing.md`](../feedback/2026-04-24-contract-discipline-and-jtbd-framing.md) §C
+**Source:** [`feedback/processed/2026-04-24-contract-discipline-and-jtbd-framing.md`](../feedback/processed/2026-04-24-contract-discipline-and-jtbd-framing.md) §C
 (the retirement-lag drift class)
 
 A contract version is never edited into a new meaning — it is **superseded**

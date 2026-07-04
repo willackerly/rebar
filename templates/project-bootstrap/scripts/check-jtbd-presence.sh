@@ -23,7 +23,7 @@
 # Tier behavior: below Tier 2 = skip; Tier 2 = warn only (exit 0);
 # Tier 3 = blocking (exit 1 on missing sections).
 #
-# Source: feedback/2026-04-24-contract-discipline-and-jtbd-framing.md §E
+# Source: feedback/processed/2026-04-24-contract-discipline-and-jtbd-framing.md §E
 # See: practices/spike-first-contracts.md for the JTBD framing rationale
 #
 # Bash 3.2 compatible (macOS default).

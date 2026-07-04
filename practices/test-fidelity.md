@@ -3,9 +3,9 @@
 **Status:** draft
 **Sources:**
 `feedback/2026-04-22-testing-rigor-six-moments.md` (pdf-signer-web),
-`feedback/2026-04-27-e2e-test-bypass-closed-loop-verification-drift.md`
+`feedback/processed/2026-04-27-e2e-test-bypass-closed-loop-verification-drift.md`
 (filedag),
-`feedback/2026-04-27-user-at-keyboard-story-tier.md` (pdf-signer-web)
+`feedback/processed/2026-04-27-user-at-keyboard-story-tier.md` (pdf-signer-web)
 **Enforced by:** `scripts/check-decay-patterns.sh` (P2, P8) + reviewer
 discipline
 
@@ -300,7 +300,7 @@ Corollaries:
   inverted assertions, P8 demo/UAKS bypass ban)
 - [`feedback/2026-04-22-testing-rigor-six-moments.md`](../feedback/2026-04-22-testing-rigor-six-moments.md)
   — the six claim-vs-test asymmetries
-- [`feedback/2026-04-27-e2e-test-bypass-closed-loop-verification-drift.md`](../feedback/2026-04-27-e2e-test-bypass-closed-loop-verification-drift.md)
+- [`feedback/processed/2026-04-27-e2e-test-bypass-closed-loop-verification-drift.md`](../feedback/processed/2026-04-27-e2e-test-bypass-closed-loop-verification-drift.md)
   — the "8/8 green, login broken" incident + REBAR-A…H proposals
-- [`feedback/2026-04-27-user-at-keyboard-story-tier.md`](../feedback/2026-04-27-user-at-keyboard-story-tier.md)
+- [`feedback/processed/2026-04-27-user-at-keyboard-story-tier.md`](../feedback/processed/2026-04-27-user-at-keyboard-story-tier.md)
   — the UAKS tier origin + allowlist rationale

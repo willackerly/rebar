@@ -5,8 +5,10 @@ description: Use when you hit a gap, anti-pattern, bug, or missing guidance in r
 
 # rebar-feedback — file a feedback item correctly
 
-Canonical reference: `feedback/README.md` in the rebar repo (template,
-processing rules, disposition lifecycle). Reference it; do not restate it.
+Canonical reference: `rebar:feedback/README` (template, processing rules,
+disposition lifecycle) — resolve with `scripts/rebar-doc.sh
+rebar:feedback/README --cat` (or `rebar doc` if the CLI is installed).
+Reference it; do not restate it.
 
 ## First: where does this filing go?
 
@@ -20,10 +22,10 @@ processing rules, disposition lifecycle). Reference it; do not restate it.
 
 ## Steps (rebar repo)
 
-1. **Read `feedback/README.md`** and skim one recent `feedback/*.md` file for
-   the house voice before writing anything.
+1. **Read the canonical reference** (`rebar:feedback/README`, above) and skim
+   one recent `feedback/*.md` file for the house voice before writing anything.
 2. **Check the gate:** the situation must be real, not hypothetical — a
-   specific scenario you actually hit (rebar CHARTER §3, gate 3: concrete use
+   specific scenario you actually hit (`rebar:charter` §3, gate 3: concrete use
    case). "Would be cool if…" does not qualify; do not file.
 3. **Create the file:** `feedback/YYYY-MM-DD-<slug>.md` (today's date, short
    kebab-case slug).
@@ -35,4 +37,4 @@ processing rules, disposition lifecycle). Reference it; do not restate it.
 
 Do not edit `feedback/INVENTORY.md` or move files into `feedback/processed/`
 — triage and disposition are maintainer-owned (see "Processing Feedback" in
-the README).
+`rebar:feedback/README`).
