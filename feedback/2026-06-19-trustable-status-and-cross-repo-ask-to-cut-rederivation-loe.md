@@ -3,7 +3,7 @@
 **Date:** 2026-06-19
 **Source:** steward lifecycle/`verified` semantics; `ask <role>` MCP infrastructure; METRICS/ground-truth; cross-repo federation (`feedback/2026-04-28-cross-repo-contract-federation.md`)
 **Type:** improvement
-**Status:** proposed
+**Status:** partially implemented — item 1 shipped in v3.0.0-beta Cluster 1; items 2-4 deferred (feedback/INVENTORY.md)
 **Template impact:** `scripts/steward.sh` (lifecycle gating), `templates/` METRICS/ground-truth, `practices/multi-agent-orchestration.md`, the `ask`-role design, CONTRACT-TEMPLATE (machine-queryable capability/decision capture)
 **From:** tak-tdf architecture-lock session (Claude Code, willackerly)
 

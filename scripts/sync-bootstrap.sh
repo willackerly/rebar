@@ -2,7 +2,7 @@
 # sync-bootstrap.sh — Mirror /scripts/ into templates/project-bootstrap/scripts/.
 #
 # `templates/project-bootstrap/scripts/` exists so adopters can do
-# `cp -r templates/project-bootstrap/* ../my-project/` and end up with a
+# `cp -r templates/project-bootstrap/. ../my-project/` and end up with a
 # working project in one command. It is a literal copy of /scripts/, kept
 # in sync mechanically by this script + check-bootstrap-sync.sh.
 #

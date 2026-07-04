@@ -37,6 +37,8 @@ Each script is standalone, runs in <5 seconds, and exits 0 (pass) or 1 (fail).
 | `check-registry.sh` | Contract registry matches actual files |
 | `check-ground-truth.sh` | METRICS file matches codebase reality |
 | `check-decay-patterns.sh` | Soft-hardening anti-patterns in spec/test files |
+| `check-jtbd-presence.sh` | Latest-version contracts carry non-empty Why/Who/Scenarios sections |
+| `check-prefix-uniqueness.sh` | No prefix number (S1, I3, …) claimed by two different contract IDs |
 | `sync-bootstrap.sh --check` | `templates/project-bootstrap/scripts/` matches `/scripts/` |
 
 ## Composite Runners
@@ -45,6 +47,13 @@ Each script is standalone, runs in <5 seconds, and exits 0 (pass) or 1 (fail).
 |--------|-------------|
 | `ci-check.sh` | CI pipeline — runs all checks including steward |
 | `pre-commit.sh` | Git hook — fast checks (TODOs + contract refs) |
+| `cold-start-checks.sh` | Session start (via the `SessionStart` hook in `.claude/settings.json`) — enforcement quad + maturity counts, always exits 0, `<rebar-cold-start>` wrapped |
+
+## Session Utilities
+
+| Script | Notes |
+|--------|-------|
+| `inbox-watch.sh` | Long-running peer-inbox watcher (runs until killed) — armed at coordination-seat cold start per `practices/session-lifecycle.md` step 4; NOT a 0/1 check, never wire into CI |
 
 ## Installation
 
@@ -73,6 +82,8 @@ chmod +x scripts/*.sh
 | `SKIP_GROUND_TRUTH` | `0` | Skip ground truth check |
 | `SKIP_DOC_REFS` | `0` | Skip cross-doc reference check |
 | `SKIP_DECAY_PATTERNS` | `0` | Skip soft-hardening pattern check |
+| `SKIP_JTBD` | `0` | Skip JTBD-presence contract check |
+| `SKIP_PREFIX_UNIQUENESS` | `0` | Skip contract prefix-number uniqueness check |
 | `SKIP_BOOTSTRAP_SYNC` | `0` | Skip templates/scripts drift check (rebar-source-only) |
 | `SKIP_STEWARD` | `0` | Skip steward scan |
 
@@ -110,6 +121,6 @@ explicitly skips them.
 ## Source-of-truth structure
 
 `/scripts/` is canonical. `templates/project-bootstrap/scripts/` is mirrored
-from it by `sync-bootstrap.sh` so adopters running `cp -r templates/project-bootstrap/*`
+from it by `sync-bootstrap.sh` so adopters running `cp -r templates/project-bootstrap/.`
 get a working project in one command. Drift between the two trees is caught
 by `sync-bootstrap.sh --check` (wired into `ci-check.sh`).

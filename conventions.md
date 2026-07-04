@@ -212,6 +212,9 @@ When reviewing a PR that touches contracts:
 - [ ] Breaking changes documented in Change History
 - [ ] Contract tests updated to cover new behavior
 
+Full procedure, marker formats, and the retirement-deadline rubric:
+`practices/contract-supersession.md`.
+
 ### Implementation PR (references contract, doesn't change it)
 
 - [ ] File header declares correct `CONTRACT:` reference
@@ -271,7 +274,7 @@ Steward (`scripts/steward.sh`).
 
 Use `none` instead of a contract reference if no contract covers the behavior.
 
-### Lifecycle Status Definitions
+### Lifecycle Status Definitions (computed)
 
 Contract lifecycle is computed by the Steward, never declared manually:
 
@@ -280,12 +283,122 @@ Contract lifecycle is computed by the Steward, never declared manually:
 | **DRAFT** | Contract file exists but is missing required sections |
 | **ACTIVE** | All required sections present, no implementing files found |
 | **TESTING** | Has implementing files, but no test files found |
-| **VERIFIED** | Has implementing files AND test files |
+| **IMPL-PRESENT** | Has implementing files AND test files |
 
 Required sections for spec gate: Interfaces, Behavioral Contracts, Error Contracts,
 Test Requirements, Implementing Files.
 
+> **v3 rename:** this top state was called `VERIFIED` through v2.x. It is
+> computed from *file presence* — no test has necessarily executed — so the
+> old name overclaimed (`feedback/2026-06-19-trustable-status-…`). The word
+> `verified` now belongs exclusively to the *declared* maturity vocabulary
+> below, where it means "proven by passing tests/scenarios." Anything parsing
+> steward output must migrate `verified` → `impl-present`.
+
+## Declared Maturity (`Status:` field)
+
+Computed lifecycle answers "what files exist." Declared maturity answers
+"how much should you trust this artifact" — and only a human or agent who
+has looked can answer it. Every contract carries a `Status:` line in its
+header block; practice docs may carry one optionally:
+
+```
+**Status:** active
+```
+
+The vocabulary is fixed, small, and applied honestly:
+
+| Value | Meaning |
+|-------|---------|
+| **stub** | Placeholder; structure exists, content is not real |
+| **draft** | Real attempt, not yet reviewed/applied |
+| **in-progress** | Actively being built; expect churn |
+| **active** | In use; defines current behavior |
+| **verified** | Active + has passing tests/scenarios proving it |
+
+Rules:
+
+Terminal statuses close a contract out: `superseded` (set together with
+its `SUPERSEDED BY:` line), plus legacy `deprecated`/`retired`. Terminal
+contracts are excluded from maturity weighting — a superseded contract
+kept for its migration window neither drags nor inflates the badge.
+
+The canonical machine-greppable form is one header line per contract:
+
+```bash
+grep -E '^\*\*Status:\*\*' architecture/CONTRACT-*.md
+```
+
+Parsers of record: `scripts/check-compliance.sh` (Check 9),
+`scripts/compute-registry.sh`, `scripts/cold-start-checks.sh`.
+
+- **No auto-detection.** Markings are declarations of honesty, not
+  computations. Gates get added only when real-world failure shows the
+  honor system breaking.
+- **Marking down is free; marking up is a claim.** Move an artifact to
+  `verified` only when you can point at the passing test or scenario.
+- **Compliance weighting** (`scripts/check-compliance.sh`): <33% of
+  live contracts stub-or-draft → tier badge as declared; 33–66% → badge
+  annotated "— IN PROGRESS"; >66% → badge demoted one tier with the
+  reason printed. Repos with no `Status:` fields at all are treated as
+  pre-v3: no penalty, one advisory line. Once *any* contract declares,
+  undeclared and out-of-vocabulary live contracts count as
+  stub-or-draft — selective declaration cannot launder a badge.
+- The two vocabularies never mix: computed lifecycle
+  (draft/active/testing/impl-present) comes from the Steward; declared
+  maturity (stub/draft/in-progress/active/verified) comes from people
+  and agents. `verified` exists only on the declared side.
+
+## Peer-Inbox Convention (repo-level)
+
+Federated peer repos coordinate by depositing dated markdown memos into
+each other's top-level `inbox/` directories. Field-proven in the tak
+cluster (2026-07); mechanics and watcher in `practices/inbox-watch.md`.
+
+- **Append-only.** Peers deposit new files; nobody edits or deletes an
+  existing memo. This is what makes an inbox auditable and makes
+  filename-diff watching a complete signal.
+- **Naming:** `YYYY-MM-DD-<from>-<topic-slug>.md` — date, sending repo,
+  then the topic.
+- **Processed-on-read:** the receiving session reads, acts, and replies
+  by depositing into the *peer's* inbox. Memos stay in place as the
+  archive; state lives in the receiving repo's own docs, not in edits
+  to the memo.
+- **Who holds one:** repos actively exchanging cross-repo memos —
+  typically the members of a coordination cluster. A repo whose intake
+  is `ask` roles + feedback filings (rebar itself, for example) does not
+  need one. Coordination **seats** sweep every inbox they hold at
+  session start, then arm `scripts/inbox-watch.sh` as a persistent
+  monitor (see `practices/session-lifecycle.md`).
+- **Namespace note:** this is unrelated to the ASK runtime's
+  `agents/<role>/inbox/` message queues (gitignored, JSON, consumed by
+  `bin/ask`). A repo-level `inbox/` holds durable peer mail; an agent
+  inbox holds transient RPC. The overloaded word is historical — the
+  qualifier "peer inbox" vs "agent inbox" disambiguates in prose.
+
+## Reaching the Agent: Hook vs Skill vs Ask
+
+Three channels put rebar in front of a working agent. Pick by binding
+strength, not habit:
+
+| Channel | Binding | Use for |
+|---------|---------|---------|
+| **Hook** (`SessionStart` etc., settings.json) | Deterministic — harness executes it | Anything phrased "MUST run on event X." An instruction the harness executes is qualitatively stronger than one the agent must remember. |
+| **Skill** (`.claude/skills/*/SKILL.md`) | Discoverable — description loads into every session's context | Workflows and paradigms the agent should *reach for*: the cold-start ritual, filing feedback, arming the inbox watch. Skills are pointers to `practices/` — never a second copy of the doctrine. |
+| **Ask** (`bin/ask`, MCP roles) | On-demand — pull, synchronous, stateless | Questions with answers: design intent, capability queries, cross-repo decisions. |
+
+The failure mode this table prevents: writing "always do X on session
+start" into CLAUDE.md prose (advisory by construction, skipped in
+practice — `feedback/2026-04-26-sessionstart-hook-cold-start-enforcement.md`)
+when a hook could execute it, or duplicating a practice into a skill
+body where it drifts.
+
 ## Testing Conventions
+
+What a test *proves* (its fidelity rung), the UAKS tier, and the
+closed-loop demo gate live in `practices/test-fidelity.md` — including
+the `fidelity: <rung>` declaration format enforced by
+`scripts/check-decay-patterns.sh`.
 
 ### The Scout Rule
 

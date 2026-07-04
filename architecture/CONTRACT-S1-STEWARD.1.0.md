@@ -1,7 +1,9 @@
 # CONTRACT-S1-STEWARD.1.0
 
+SUPERSEDED BY: CONTRACT-S1-STEWARD.2.0
+
 **Version:** 1.0
-**Status:** active
+**Status:** superseded
 **Owner:** rebar maintainer
 **Type:** Service
 **Cross-repo Promotability:** Yes — every rebar-adopted repo ships its own steward
@@ -130,7 +132,11 @@ ask steward check C1 # → commands/check.sh C1
 
 ## Retirement / supersession plan
 
-This is the latest version. No predecessor.
+Superseded by `CONTRACT-S1-STEWARD.2.0` (2026-07-04): the computed lifecycle
+state `verified` was renamed `impl-present` — a breaking output change
+(decision D4, `docs/v3-beta-plan.md`). See the 2.0 contract's Retirement /
+supersession plan for the migration criterion, deadline, and owner. This
+file is retained for the migration window only.
 
 ## Implementing Files
 

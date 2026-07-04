@@ -1,8 +1,8 @@
 # rebar
 
-> **rebar v2.0.0** | **Tier 3: ENFORCED**
+> **rebar v3.0.0-beta** | **Tier 3: ENFORCED**
 
-[![rebar v2.0.0](https://img.shields.io/badge/rebar-v2.0.0-orange)](DESIGN.md)
+[![rebar v3.0.0-beta](https://img.shields.io/badge/rebar-v3.0.0--beta-orange)](DESIGN.md)
 [![Tier 3: Enforced](https://img.shields.io/badge/tier-3_enforced-brightgreen)](DESIGN.md)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
@@ -68,10 +68,14 @@ binaries built; everything else is opt-in.
 ```bash
 # Option A: Copy templates
 git clone https://github.com/willackerly/rebar.git && cd rebar
-cp -r templates/project-bootstrap/* ../my-project/ && cd ../my-project
+cp -r templates/project-bootstrap/. ../my-project/ && cd ../my-project
 
 # Option B: Use the CLI (builds v2 scaffolding automatically)
 cd my-project && ../rebar/bin/rebar init
+
+# Option C: One-line installer (clones rebar to ~/.rebar, wires PATH)
+curl -fsSL https://raw.githubusercontent.com/willackerly/rebar/v3.0.0-beta/setup-rebar.sh | bash
+# then: rebar new my-project -d "what it does"
 ```
 
 **What you get:** Contracts linked to code + agent coordination + immediate productivity boost
@@ -146,12 +150,14 @@ tests to write. No guessing. No assumptions.
 
 ```bash
 $ scripts/steward.sh --summary
-Steward: 12 contracts (0d/2a/3t/7v), 1 discovery, 6/6 enforcement passing
+Steward: 12 contracts (0d/2a/3t/7ip), 1 discovery, 6/6 enforcement passing
 ```
 
 The [Steward](#quality-infrastructure) scans your codebase and derives each
 contract's lifecycle from what actually exists — draft, active, testing, or
-verified. Status is computed from reality, never declared manually.
+impl-present. The computed lifecycle is never declared manually; the
+*declared* maturity `Status:` field (stub → verified) is its honesty-based
+counterpart — see `conventions.md` §Declared Maturity.
 
 ### 4. Agents query role-based experts
 
@@ -315,7 +321,7 @@ rebar/
 │   CHANGELOG.md                 # Version history + migration notes
 │
 ├── templates/
-│   ├── project-bootstrap/       # `cp -r project-bootstrap/* ../my-project/` is one-shot
+│   ├── project-bootstrap/       # `cp -r project-bootstrap/. ../my-project/` is one-shot
 │   │   └── README.md, QUICKCONTEXT.md, TODO.md, AGENTS.md, CLAUDE.md, METRICS.md,
 │   │       architecture/, scripts/ (synced from /scripts/), .rebarrc
 │   ├── component-templates/     # Individual file templates for advanced use

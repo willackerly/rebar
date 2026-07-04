@@ -186,7 +186,7 @@ func bootstrapV2Files(root string) int {
 	// .rebar-version
 	versionPath := filepath.Join(root, ".rebar-version")
 	if _, err := os.Stat(versionPath); os.IsNotExist(err) {
-		os.WriteFile(versionPath, []byte("v2.0.0\n"), 0644)
+		os.WriteFile(versionPath, []byte("v3.0.0-beta\n"), 0644)
 		fmt.Println("  Created .rebar-version")
 		created++
 	}
@@ -248,20 +248,38 @@ _None currently._
 		}
 	}
 
-	// scripts/refresh-context.sh
+	// scripts/ — the curated adopter set, mirrored from rebar's
+	// templates/project-bootstrap/scripts/ (identical to what the
+	// `cp -r templates/project-bootstrap/. <target>/` adoption path
+	// delivers; maintainer-only scripts are already excluded there).
+	// Never overwrites existing files.
 	scriptsDir := filepath.Join(root, "scripts")
-	refreshPath := filepath.Join(scriptsDir, "refresh-context.sh")
-	if _, err := os.Stat(refreshPath); os.IsNotExist(err) {
-		os.MkdirAll(scriptsDir, 0755)
-		// Find rebar's copy to use as source
-		rebarRoot := findRebarRoot()
-		if rebarRoot != "" {
-			src := filepath.Join(rebarRoot, "scripts", "refresh-context.sh")
-			if data, err := os.ReadFile(src); err == nil {
-				os.WriteFile(refreshPath, data, 0755)
-				fmt.Println("  Created scripts/refresh-context.sh")
-				created++
+	if rebarRoot := findRebarRoot(); rebarRoot == "" {
+		fmt.Println("  ⚠ Skipped scripts/ and .claude/ — rebar checkout not found (set REBAR_ROOT to your rebar clone)")
+	} else {
+		srcScripts := filepath.Join(rebarRoot, "templates", "project-bootstrap", "scripts")
+		copiedScripts := 0
+		if entries, err := os.ReadDir(srcScripts); err == nil {
+			for _, e := range entries {
+				if e.IsDir() {
+					continue
+				}
+				dst := filepath.Join(scriptsDir, e.Name())
+				if _, err := os.Stat(dst); err == nil {
+					continue
+				}
+				data, readErr := os.ReadFile(filepath.Join(srcScripts, e.Name()))
+				if readErr != nil {
+					continue
+				}
+				os.MkdirAll(scriptsDir, 0755)
+				os.WriteFile(dst, data, 0755)
+				copiedScripts++
 			}
+		}
+		if copiedScripts > 0 {
+			fmt.Printf("  Created scripts/ (%d scripts incl. cold-start-checks.sh, ci-check.sh, inbox-watch.sh)\n", copiedScripts)
+			created++
 		}
 	}
 
@@ -299,7 +317,66 @@ _None currently._
 		created++
 	}
 
+	// .claude/ — SessionStart cold-start hook + rebar skills (v3).
+	// Copied from rebar's templates/project-bootstrap/.claude/ so the
+	// canonical content lives in one place; skipped silently when the
+	// rebar checkout can't be located (same contract as refresh-context).
+	if ensureClaudeAssets(root) {
+		created++
+	}
+
 	return created
+}
+
+// ensureClaudeAssets copies templates/project-bootstrap/.claude/ (settings.json
+// with the SessionStart hook, skills/*/SKILL.md) into the project. Existing
+// files are never overwritten.
+func ensureClaudeAssets(root string) bool {
+	rebarRoot := findRebarRoot()
+	if rebarRoot == "" {
+		return false
+	}
+	srcDir := filepath.Join(rebarRoot, "templates", "project-bootstrap", ".claude")
+	if _, err := os.Stat(srcDir); err != nil {
+		return false
+	}
+	dstDir := filepath.Join(root, ".claude")
+	copied := 0
+	hookInstalled := false
+	filepath.Walk(srcDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil || info.IsDir() {
+			return nil
+		}
+		rel, relErr := filepath.Rel(srcDir, path)
+		if relErr != nil {
+			return nil
+		}
+		dst := filepath.Join(dstDir, rel)
+		if _, statErr := os.Stat(dst); statErr == nil {
+			return nil // never overwrite
+		}
+		data, readErr := os.ReadFile(path)
+		if readErr != nil {
+			return nil
+		}
+		os.MkdirAll(filepath.Dir(dst), 0755)
+		if os.WriteFile(dst, data, 0644) == nil {
+			copied++
+			if rel == "settings.json" {
+				hookInstalled = true
+			}
+		}
+		return nil
+	})
+	if copied > 0 {
+		if hookInstalled {
+			fmt.Printf("  Created .claude/ (%d files: SessionStart hook + rebar skills)\n", copied)
+		} else {
+			fmt.Printf("  Created .claude/skills (%d files; existing settings.json preserved — merge the SessionStart hook manually from templates/project-bootstrap/.claude/settings.json)\n", copied)
+		}
+		return true
+	}
+	return false
 }
 
 // ensureMCPConfig writes a project-local .mcp.json that registers the rebar
@@ -407,25 +484,50 @@ func ensureAgentsScaffolding(root string) bool {
 	return true
 }
 
-// findRebarRoot locates the rebar framework repo by checking common locations.
+// findRebarRoot locates the rebar framework repo. The marker is
+// templates/project-bootstrap/ — only the rebar SOURCE repo has it;
+// DESIGN.md + architecture/ alone also match rebar-adopted projects,
+// which made re-init in an adopted repo copy from itself (a no-op).
 func findRebarRoot() string {
-	// Check if we're inside the rebar repo
-	if _, err := os.Stat("DESIGN.md"); err == nil {
-		if _, err := os.Stat("architecture/CONTRACT-TEMPLATE.md"); err == nil {
-			cwd, _ := os.Getwd()
-			return cwd
+	isRebarSource := func(dir string) bool {
+		if dir == "" {
+			return false
+		}
+		_, err := os.Stat(filepath.Join(dir, "templates", "project-bootstrap", "scripts", "steward.sh"))
+		return err == nil
+	}
+
+	// Explicit override first
+	if env := os.Getenv("REBAR_ROOT"); isRebarSource(env) {
+		return env
+	}
+
+	// Relative to the running binary — covers the setup-rebar.sh install
+	// (~/.rebar/bin/rebar → ~/.rebar) and any checkout's bin/rebar.
+	if exe, err := os.Executable(); err == nil {
+		if resolved, err := filepath.EvalSymlinks(exe); err == nil {
+			exe = resolved
+		}
+		if root := filepath.Dir(filepath.Dir(exe)); isRebarSource(root) {
+			return root
 		}
 	}
 
-	// Check common locations
+	// Running from inside the rebar source repo itself
+	if cwd, err := os.Getwd(); err == nil && isRebarSource(cwd) {
+		return cwd
+	}
+
+	// Common locations
 	home, _ := os.UserHomeDir()
 	candidates := []string{
+		filepath.Join(home, ".rebar"),
 		filepath.Join(home, "dev", "rebar"),
 		filepath.Join(home, "src", "rebar"),
 		filepath.Join(home, "code", "rebar"),
 	}
 	for _, c := range candidates {
-		if _, err := os.Stat(filepath.Join(c, "DESIGN.md")); err == nil {
+		if isRebarSource(c) {
 			return c
 		}
 	}

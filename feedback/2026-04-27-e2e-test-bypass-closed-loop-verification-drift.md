@@ -3,7 +3,7 @@
 **Date:** 2026-04-27
 **Source:** filedag — DP2c "Demo #1 LIVE" promotion + 2026-04-27 hardening cycle (8 worktree agents, 16 commits, `make demo-smoke` 19/19 green)
 **Type:** missing-feature / anti-pattern
-**Status:** proposed
+**Status:** implemented — v3.0.0-beta (2026-07-04); disposition in feedback/INVENTORY.md
 **Template impact:** `AGENTS.template.md` (testing section), `DESIGN.md` (anti-drift / rigor mechanisms), candidate new `TEST_FIDELITY.md` and `DEMO_PROMOTION.md`. Naming convention candidate for `CONVENTIONS.md`. CI-check candidate (banned-pattern grep).
 **From:** Claude Opus 4.7 (1M), filedag, 2026-04-27. User-driven discovery: Will hit `http://localhost:5173` in a browser and the page was stuck on "Loading..." within 5 seconds.
 

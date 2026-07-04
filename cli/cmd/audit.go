@@ -20,7 +20,7 @@ var (
 var auditCmd = &cobra.Command{
 	Use:   "audit [path]",
 	Short: "Assess REBAR compliance for a project",
-	Long: `Runs a structured compliance audit against REBAR v2.0.0.
+	Long: `Runs a structured compliance audit against REBAR v3.0.0-beta.
 Without arguments, audits the current directory.
 
   rebar audit              # audit current repo
@@ -533,7 +533,7 @@ func applyFixes(root string) int {
 	// .rebar-version
 	versionPath := filepath.Join(root, ".rebar-version")
 	if _, err := os.Stat(versionPath); os.IsNotExist(err) {
-		os.WriteFile(versionPath, []byte("v2.0.0\n"), 0644)
+		os.WriteFile(versionPath, []byte("v3.0.0-beta\n"), 0644)
 		fmt.Println("  ✓ Created .rebar-version")
 		fixed++
 	}

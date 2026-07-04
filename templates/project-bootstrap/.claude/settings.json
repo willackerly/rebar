@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|clear",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if [ -x \"$CLAUDE_PROJECT_DIR/scripts/cold-start-checks.sh\" ]; then \"$CLAUDE_PROJECT_DIR\"/scripts/cold-start-checks.sh; else printf '<rebar-cold-start>\\ncold-start-checks.sh not installed — copy rebar templates/project-bootstrap/scripts/ into scripts/\\n</rebar-cold-start>\\n'; fi",
+            "timeout": 30
+          }
+        ]
+      }
+    ]
+  }
+}

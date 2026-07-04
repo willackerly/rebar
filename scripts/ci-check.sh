@@ -13,6 +13,8 @@
 #   SKIP_TODOS=1             — skip TODO tracking check
 #   SKIP_FRESHNESS=1         — skip freshness check
 #   SKIP_REGISTRY=1          — skip registry consistency check
+#   SKIP_JTBD=1             — skip JTBD-presence contract check
+#   SKIP_PREFIX_UNIQUENESS=1 — skip contract prefix-number uniqueness check
 #   SKIP_GROUND_TRUTH=1     — skip ground truth metric verification
 #   SKIP_COMPLIANCE=1       — skip rebar compliance check
 #   SKIP_STEWARD=1          — skip steward health scan
@@ -73,6 +75,8 @@ run_check "Doc References"      SKIP_DOC_REFS         "$SCRIPT_DIR/check-doc-ref
 run_check "TODO Tracking"       SKIP_TODOS            "$SCRIPT_DIR/check-todos.sh"
 run_check "Doc Freshness"       SKIP_FRESHNESS        "$SCRIPT_DIR/check-freshness.sh"
 run_check "Registry Consistency" SKIP_REGISTRY         "$SCRIPT_DIR/compute-registry.sh" --check
+run_check "JTBD Presence"       SKIP_JTBD             "$SCRIPT_DIR/check-jtbd-presence.sh"
+run_check "Prefix Uniqueness"   SKIP_PREFIX_UNIQUENESS "$SCRIPT_DIR/check-prefix-uniqueness.sh"
 run_check "Ground Truth"        SKIP_GROUND_TRUTH     "$SCRIPT_DIR/check-ground-truth.sh"
 run_check "Rebar Compliance"    SKIP_COMPLIANCE       "$SCRIPT_DIR/check-compliance.sh"
 run_check "Decay Patterns"      SKIP_DECAY_PATTERNS   "$SCRIPT_DIR/check-decay-patterns.sh"

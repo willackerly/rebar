@@ -60,5 +60,5 @@ fi
 total=$(jq -r '.summary.contracts.total' "$REPORT")
 draft=$(jq -r '.summary.contracts.draft' "$REPORT")
 active=$(jq -r '.summary.contracts.active' "$REPORT")
-verified=$(jq -r '.summary.contracts.verified' "$REPORT")
-echo "Contracts: $total total, $draft draft, $active active, $verified verified"
+impl_present=$(jq -r '.summary.contracts.impl_present' "$REPORT")
+echo "Contracts: $total total, $draft draft, $active active, $impl_present impl-present"

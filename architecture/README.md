@@ -68,7 +68,12 @@ Computed by the [Steward](../scripts/steward.sh), never declared manually:
 | **DRAFT** | Missing required sections (Interfaces, Behavioral, Errors, Tests, Implementing) |
 | **ACTIVE** | All sections present, no `CONTRACT:{id}` found in source |
 | **TESTING** | Implementing files exist, no test files found |
-| **VERIFIED** | Implementing files AND test files exist |
+| **IMPL-PRESENT** | Implementing files AND test files exist |
+
+> **v3 rename:** this top state was `VERIFIED` through v2.x — computed from
+> file presence, no test necessarily executed, so the old name overclaimed.
+> `verified` now belongs exclusively to the *declared* maturity vocabulary
+> (`conventions.md` §Declared Maturity). Parsers: `verified` → `impl-present`.
 
 ## Companion Files
 

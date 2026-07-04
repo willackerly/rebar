@@ -3,7 +3,7 @@
 **Date:** 2026-04-24
 **Source:** `templates/CONTRACT-TEMPLATE.md`; `profiles/*/ci-check.sh`; `practices/contract-system.md`
 **Type:** improvement
-**Status:** proposed
+**Status:** implemented — v3.0.0-beta (2026-07-04); disposition in feedback/INVENTORY.md
 **Template impact:**
 - `templates/CONTRACT-TEMPLATE.md` — add Why/Who/Scenarios/Cross-references/Future-evolution/Retirement sections as required
 - `practices/contract-system.md` — codify the "spike-first contracts" pattern proven in filedag's DP-A

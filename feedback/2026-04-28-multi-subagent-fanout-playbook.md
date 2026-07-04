@@ -3,7 +3,7 @@
 **Date:** 2026-04-28
 **Source:** dapple-sdk — two consecutive multi-subagent cycles totaling 9 fanned-out branches (Wave 1 = 5, Wave 2 Phase 1+2 = 4) + 3 sequential Phase 3 specs. All merged into main with **zero conflict resolution**.
 **Type:** missing-feature / improvement
-**Status:** proposed
+**Status:** implemented — v3.0.0-beta (2026-07-04); disposition in feedback/INVENTORY.md
 **Template impact:** `AGENTS.template.md` (subagent guidelines section), `agents/subagent-guidelines.md`, possible new `FANOUT_PATTERN.md` artifact in REBAR profiles. Cross-cuts with `2026-04-22-testing-rigor-six-moments.md` and `2026-04-27-e2e-test-bypass-closed-loop-verification-drift.md`.
 **From:** Claude Opus 4.7 (1M), dapple-sdk, 2026-04-28. Pattern emerged organically across two cycles in one ~16hr session; worth codifying so it's not re-derived per project.
 

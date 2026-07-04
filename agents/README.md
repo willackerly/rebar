@@ -12,7 +12,7 @@ See the [root README](../README.md) for how agents fit into the overall system.
 | **An answer to a question** | Role-based agent (`ask <role>`) | `ask architect "should this contract handle encryption?"` |
 | **A focused task done** | Subagent template (`agents/subagent-prompts/*.md`) | Code review, security scan, contract audit |
 | **Cross-cutting decision** | A sequence of role calls | `ask architect` → `ask product` → `ask englead` |
-| **Parallel work distribution** | Subagent templates fanned out across worktrees | See `practices/multi-agent-orchestration.md` |
+| **Parallel work distribution** | Subagent templates fanned out across worktrees | See `agents/FANOUT_PATTERN.md` + `practices/multi-agent-orchestration.md` |
 
 **Rule of thumb:** Questions accumulate knowledge in a persistent ASK
 session (10 questions cost 1× context). Subagent templates execute
@@ -41,6 +41,7 @@ across sessions.
 agents/
   README.md                    # this file
   subagent-guidelines.md       # shared behavioral rules all subagents follow
+  FANOUT_PATTERN.md            # fanout doctrine — worktrees, allowlists, parent-owned sweep
   subagent-prompts-index.md    # catalog of available templates
   subagent-prompts/            # one .md per template
     code-review.md             # multi-dimension code review

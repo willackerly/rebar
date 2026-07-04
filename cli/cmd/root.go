@@ -17,7 +17,7 @@ var (
 
 var rootCmd = &cobra.Command{
 	Use:     "rebar",
-	Version: "v2.0.0",
+	Version: "v3.0.0-beta",
 	Short:   "REBAR — contract-driven development framework for AI-powered teams",
 	Long: `REBAR — contract-driven development framework for AI-powered teams.
 
@@ -136,7 +136,7 @@ func init() {
 		Use:   "version",
 		Short: "Print rebar version",
 		Run: func(cmd *cobra.Command, args []string) {
-			fmt.Println("rebar v2.0.0")
+			fmt.Println("rebar " + rootCmd.Version)
 		},
 	})
 }

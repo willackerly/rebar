@@ -25,6 +25,32 @@
 ## Development Workflow
 
 ### Starting a Session
+
+**Health checks run automatically.** A `SessionStart` hook (configured in
+`.claude/settings.json`) runs `scripts/cold-start-checks.sh` before your
+first turn. Its output appears wrapped in
+`<rebar-cold-start>...</rebar-cold-start>` tags — treat that block as
+ground truth from the harness, not prose to interpret. It reports one
+pass/fail line per enforcement check (`check-contract-refs`,
+`check-todos`, `check-freshness`, `check-ground-truth`) plus a maturity
+count of contract `Status:` fields. The hook always exits 0: failures
+are made visible, never blocking — read them before trusting any doc
+claims.
+
+**Self-check:** if no `<rebar-cold-start>` block appeared at the top of
+your first turn, the hook is not installed (or this harness doesn't
+support hooks). Fall back to running the checks manually.
+
+**Manual fallback (harnesses without hooks, or to re-check mid-session):**
+```bash
+scripts/cold-start-checks.sh       # same summary block the hook injects
+scripts/check-contract-refs.sh     # or run the quad individually for full detail
+scripts/check-todos.sh
+scripts/check-freshness.sh
+scripts/check-ground-truth.sh
+```
+
+**Still on you** — the hook checks health; it doesn't orient you:
 1. **Read the Cold Start Quad:**
    - `README.md` — project overview
    - `QUICKCONTEXT.md` — current state
@@ -34,12 +60,11 @@
    - `TODO.md` — active work (open items only)
    - `AGENTS.md` — coordination guidelines
 
-2. **Check project health:**
+2. **Check working-tree state:**
    ```bash
    git status
    git worktree list              # Check for abandoned worktrees
-   scripts/refresh-context.sh     # Automated freshness check (if available)
-   scripts/check-contract-refs.sh
+   scripts/refresh-context.sh     # Context refresh helper (if available)
    ask steward summary
    ```
 

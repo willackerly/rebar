@@ -9,6 +9,74 @@ All notable changes to rebar. Versioned with [semver](https://semver.org/).
 
 ---
 
+## v3.0.0-beta (2026-07-04)
+
+Seven clusters consolidated onto one trunk — the alpha→beta hard move.
+Decision log: `docs/v3-beta-plan.md`. The `v3.0.0-alpha`/`v3.0.1-alpha`
+branches are **retired** (kept on origin for provenance; all their
+content is on this line).
+
+### Breaking (migration notes for upgraders)
+
+1. **Steward's computed top lifecycle state renamed `verified` →
+   `impl-present`** (S1-STEWARD 2.0). Anything parsing steward output
+   must migrate: JSON `summary.contracts.verified` →
+   `summary.contracts.impl_present`; report row and `--summary` suffix
+   (`Xv` → `Xip`) likewise. Rationale: computed-from-file-presence
+   "verified" overclaimed (`feedback/2026-06-19-trustable-status-…`).
+2. **Contracts carry a declared-maturity `Status:` header** —
+   `stub | draft | in-progress | active | verified` (canonical
+   definitions: `conventions.md` §Declared Maturity). The old
+   `draft | active | deprecated` template vocabulary is replaced;
+   `superseded`/`deprecated`/`retired` are terminal and excluded from
+   weighting. `check-compliance.sh` Check 9 weights the tier badge:
+   <33% stub-or-draft → as declared; 33–66% → "— IN PROGRESS"
+   annotation; >66% → demoted one tier (exit 1). **Repos with no
+   `Status:` fields are treated as pre-v3: advisory only, no penalty** —
+   upgrade by adding one line per contract, honestly.
+3. **SessionStart hook expectation.** `.claude/settings.json` runs
+   `scripts/cold-start-checks.sh` on session start (guarded — prints an
+   install pointer if the script is absent). `rebar init/new/adopt` now
+   install the hook, the four skills, and the core scripts.
+   Adopting by copy: use `cp -r templates/project-bootstrap/. <target>/`
+   — the old `/*` glob silently dropped `.claude/`.
+4. **`ci-check.sh` gained two unconditionally-registered checks**
+   (`check-jtbd-presence.sh`, `check-prefix-uniqueness.sh`) and
+   `check-decay-patterns.sh` gained the P8 demo-bypass pattern — Tier-3
+   repos that were green on v2 can newly fail. Escape hatches while you
+   migrate: `SKIP_JTBD=1`, `SKIP_PREFIX_UNIQUENESS=1`; P8 findings mean
+   a demo/UAKS spec is faking user actions — fix the spec.
+
+### Added
+
+- **Peer-inbox paradigm** (field-verified, tak cluster 2026-07): repo-level
+  `inbox/` convention in `conventions.md`, `scripts/inbox-watch.sh`
+  persistent watcher, coordination-seat cold-start hygiene
+  (`practices/session-lifecycle.md` step 4, `practices/inbox-watch.md`)
+- **Claude Skills packaging**: `rebar-coldstart`, `rebar-feedback`,
+  `rebar-audit`, `rebar-inbox-watch` in `.claude/skills/` + bootstrap
+  template — skills are pointers to practices, never copies
+- **`scripts/cold-start-checks.sh`**: enforcement quad + maturity counts,
+  `<rebar-cold-start>` wrapped, always exits 0
+- **`practices/test-fidelity.md`**: five-rung fidelity ladder, UAKS tier,
+  closed-loop demo gate; `check-decay-patterns.sh` P8-demo-bypass
+- **`agents/FANOUT_PATTERN.md`** + `subagent-guidelines.md` §Verify
+  Before Relying
+- **`practices/spike-first-contracts.md`**, **`practices/contract-supersession.md`**,
+  **`scripts/check-jtbd-presence.sh`**, **`scripts/check-prefix-uniqueness.sh`**
+  (both checks wired into `ci-check.sh` — now 15 checks)
+- **conventions.md**: Declared Maturity, Peer-Inbox Convention, and
+  "Reaching the Agent: Hook vs Skill vs Ask" doctrine
+
+### Changed
+
+- `conventions.md` computed-lifecycle table: `VERIFIED` → `IMPL-PRESENT`
+  with rename note
+- `installer`: thin curl|bash shim over the canonical CLI (carried from
+  the alpha line, #2)
+
+---
+
 ## v2.0.1 (2026-04-26)
 
 ### Fixed

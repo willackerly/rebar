@@ -5,10 +5,12 @@
 #   2 = Adopted  — + headers, freshness, registry, compliance (small team)
 #   3 = Enforced — + ground truth, strict steward (department / production)
 
+tier = 1
+# (legacy alias, kept for older scripts that read REBAR_TIER)
 REBAR_TIER=1
 
 # Version compatibility
-REBAR_VERSION=1.2.0
+REBAR_VERSION=3.0.0-beta
 
 # Optional: Override specific check behaviors
 # REBAR_SKIP_CHECKS="check-freshness"

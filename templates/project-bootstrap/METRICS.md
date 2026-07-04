@@ -1,7 +1,7 @@
 # Project Metrics
 
 <!-- FRESHNESS: Update this date every time you modify this file -->
-<!-- freshness: 2026-03-21 -->
+<!-- freshness: 2026-07-04 -->
 
 **Ground truth metrics for automated verification.**
 

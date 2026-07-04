@@ -2,16 +2,20 @@
 # check-decay-patterns.sh — Flag soft-hardening patterns that look like
 # done work but ship a longer-fuse failure mode.
 #
-# Source: rebar/feedback/2026-04-24-fidelity-decay-soft-hardening-patterns.md
+# Sources: rebar/feedback/2026-04-24-fidelity-decay-soft-hardening-patterns.md
+#          rebar/feedback/2026-04-27-e2e-test-bypass-closed-loop-verification-drift.md (P8)
 #
 # An author cannot reliably self-audit hardening work because the author's
 # context (right now, with the test fresh) matches the consumer's context
 # (six months from now, scanning a dashboard). This script applies external
 # state — a structural lens — at commit time.
 #
-# Eight named patterns from the feedback. The grep-detectable subset is
-# implemented; the semantic ones (hermeticity, env-name plausibility) are
-# left for the author's self-audit prompt linked from AGENTS.template.md.
+# Eight named patterns from the fidelity-decay feedback. The grep-detectable
+# subset is implemented; the semantic ones (hermeticity, env-name
+# plausibility) are left for the author's self-audit prompt linked from
+# AGENTS.template.md. P8 (demo-spec bypass) is the banned-pattern gate from
+# the e2e-bypass feedback: demo-claiming and uaks-declared specs must drive
+# the surface a user touches (see practices/test-fidelity.md, Gate 2).
 #
 # Modes:
 #   ./scripts/check-decay-patterns.sh              # scan staged files
@@ -167,6 +171,38 @@ scan "P7-plausible-env-name" \
   "${SCAN_FILES[@]}"
 
 # -------------------------------------------------------------------------
+# Pattern 8 — Demo/UAKS spec bypass (silenced failure by state injection)
+# Demo-claiming specs (demo-*.spec.*, ui-demo-*.spec.*) and specs declaring
+# `fidelity: uaks` must drive the surface a user touches. Auth/state
+# injection, network mocks, or API-direct user actions in those files make
+# a green run a costume, not evidence — the login page can be frozen while
+# the suite reports 8/8. Doctrine: practices/test-fidelity.md (Gate 2).
+# -------------------------------------------------------------------------
+declare -a DEMO_FILES=()
+for f in "${SCAN_FILES[@]+"${SCAN_FILES[@]}"}"; do
+  case "$f" in
+    *.config.*|.github/workflows/*) continue ;;
+  esac
+  demo_base="${f##*/}"
+  case "$demo_base" in
+    demo-*|ui-demo-*|*uaks*|*user-at-keyboard*)
+      DEMO_FILES+=("$f") ;;
+    *)
+      # A `fidelity: uaks` declaration opts the file in wherever it lives.
+      if grep -qE '(//|#|--)[[:space:]]*fidelity:[[:space:]]*uaks' "$f" 2>/dev/null; then
+        DEMO_FILES+=("$f")
+      fi
+      ;;
+  esac
+done
+if [ ${#DEMO_FILES[@]} -gt 0 ]; then
+  scan "P8-demo-bypass" \
+    '(loginAs[[:space:]]*\(|installSessionCookie|userManager\.storeUser|sessionStorage\.setItem|localStorage\.setItem|addInitScript|addCookies[[:space:]]*\(|page\.route[[:space:]]*\(|route\.fulfill|page\.evaluate|request\.(post|get|put|delete)[[:space:]]*\()' \
+    "Pattern 8 (demo-spec bypass): a demo-claiming or uaks-declared spec must use only what a user at a keyboard could do — no state injection, no network mocks, no API-direct user actions. Move the shortcut to a lower-fidelity spec (and name the helper STUB_/INJECT_/BYPASS_), or drop the demo claim. See practices/test-fidelity.md." \
+    "${DEMO_FILES[@]}"
+fi
+
+# -------------------------------------------------------------------------
 # Report
 # -------------------------------------------------------------------------
 count="$(wc -l < "$findings_tmp" | tr -d ' ')"
@@ -186,7 +222,9 @@ echo "If a finding is intentional + reviewed, allowlist by adding"
 echo "  <file>:<line>:<pattern-id>"
 echo "to .rebar/decay-patterns-allow.txt (one per line, # for comments)."
 echo ""
-echo "Reference: feedback/2026-04-24-fidelity-decay-soft-hardening-patterns.md"
+echo "References: feedback/2026-04-24-fidelity-decay-soft-hardening-patterns.md"
+echo "            feedback/2026-04-27-e2e-test-bypass-closed-loop-verification-drift.md (P8)"
+echo "            practices/test-fidelity.md (fidelity ladder + gates)"
 
 if [ "$WARN_ONLY" -eq 1 ]; then
   exit 0
