@@ -163,7 +163,7 @@ The 3 universal gates (G, I, L) are queued as Wave 3 above. The remaining 3 are 
 | **Tag-to-CI coverage check** — every `@<tag>` in spec files must have a path to CI or be allowlisted with a reason | 1 (measured pain) | Dapple SafeSign 2026-04-22 | S | **Prototype attached** in source project: `scripts/check-tag-ci-coverage.mjs` + allowlist JSON, battle-tested (surfaced 35 pre-existing orphan tags on first run). Caught the specific failure where `@security-audit` ran nowhere in CI. Lift directly into `templates/scripts/` if useful. |
 | File-to-tier matrix (path → required tier must pass before commit) | 1 (measured pain) | Dapple SafeSign 2026-04-22 | S | Prevents the "web vitest green = committable" failure mode when editing files that only a slow tier exercises. Related to existing Wave 1 zero-tolerance testing doctrine but adds a *which tier must run* dimension. |
 | Negative-control mandate for detection tests (stage the violation, prove the detector fires) | 1 (measured pain) | Dapple SafeSign 2026-04-22 | XS | Script-enforceable: spec-file linter greps for `.not.toContain / toBeNull / toEqual([])` patterns and requires a sibling `negative control` describe. Catches tautological tests that pass on a clean environment. |
-| Test Fidelity Ladder — formalize `fidelity: tautology / surrogate / real-flow / mutation-proof` declaration in spec headers | 1 (measured pain) | Dapple SafeSign 2026-04-22 | S | References existing Fidelity Ladder concept; adds machine-checkable comment requirement. For `surrogate` decls, verify a matching `real-flow` test covering the same claim exists. |
+| ~~Test Fidelity Ladder — formalize `fidelity:` declaration in spec headers~~ | ~~1~~ | ~~Dapple SafeSign 2026-04-22~~ | ~~S~~ | **IMPLEMENTED 2026-07-04** — v3.0.0-beta Cluster 3: `practices/test-fidelity.md` defines the five-rung ladder + declaration format; `check-decay-patterns.sh` P8 enforces it in demo/UAKS specs. Moved to Implemented below. |
 | Drift-mode taxonomy for differential tests (enumerate `DriftModes: covered` / `NOT covered`) | 1 | Dapple SafeSign 2026-04-22 | XS | Convention + optional linter. Forces comparison-test authors to think through what their regex/fingerprint actually proves vs. misses. |
 | Security-test commit-message template (required fields: Claim / Fidelity / Drift modes NOT covered / Negative control / CI job) | 1 | Dapple SafeSign 2026-04-22 | XS | `commit-msg` hook. Forces honesty at commit time when the claim is security-critical. Lowest priority of the six. |
 
@@ -174,6 +174,24 @@ The 3 universal gates (G, I, L) are queued as Wave 3 above. The remaining 3 are 
 These items were substantially addressed by commits in the last cycle.
 Listed so future feedback on the same topic can see prior work and not
 re-request.
+
+### v3.0.0-beta — seven clusters (2026-07-04)
+
+The alpha→beta hard move consolidated five ripe feedback threads plus two
+new clusters onto the `v3.0.0-beta` trunk. Decision log:
+`docs/v3-beta-plan.md`. Source files stay in `feedback/` root (new
+practices link to them by path); they move to `processed/` after the tag.
+
+| Item | Disposition |
+|------|-------------|
+| SessionStart hook cold-start enforcement (`2026-04-26-sessionstart-hook-…`) | **Implemented** — Cluster 2: `scripts/cold-start-checks.sh`, `.claude/settings.json` hook (rebar + bootstrap template + `rebar init/new/adopt`), CLAUDE.md template reframed. REBAR-C landed as the conventions.md "Reaching the Agent" doctrine. |
+| Multi-subagent fanout playbook (`2026-04-28-multi-subagent-fanout-playbook.md`) | **Implemented** — Cluster 4: `agents/FANOUT_PATTERN.md` (REBAR-A/C/D/E) + `agents/subagent-guidelines.md` §Verify Before Relying (REBAR-B). |
+| Contract discipline + JTBD framing (`2026-04-24-contract-discipline-and-jtbd-framing.md`) | **Implemented** — Cluster 5: `practices/spike-first-contracts.md`, `practices/contract-supersession.md`, `scripts/check-jtbd-presence.sh`, `scripts/check-prefix-uniqueness.sh`. Item 1 (template sections) had shipped 2026-04-25; item 6 documented in the spike practice. |
+| Test-fidelity ladder + UAKS + closed-loop demo gate (`2026-04-22-testing-rigor-…` Moment 3, both `2026-04-27-…` files) | **Implemented** — Cluster 3: `practices/test-fidelity.md` + `check-decay-patterns.sh` P8-demo-bypass. Remaining 2026-04-22 watchlist rows (tag-to-CI, file-to-tier, negative-control, drift-modes, commit template) stay deferred below. |
+| Trustable status — item 1 (`2026-06-19-trustable-status-…`) | **Partially implemented** — Cluster 1: steward computed `verified` → `impl-present` (S1-STEWARD 2.0), declared-maturity `Status:` vocabulary + compliance weighting. Items 2–4 (queryable ASK capability answers, PRODUCT traceability, semantic-consistency gate) deferred to v3.1-scale work. |
+| Peer-inbox watch as cold-start hygiene (`2026-07-04-inbox-watch-…`) | **Implemented** — Cluster 6: `scripts/inbox-watch.sh`, `practices/inbox-watch.md` (canonical script), `practices/session-lifecycle.md` step 4, peer-inbox convention in conventions.md. |
+| Claude Skills packaging (conversation 2026-07-04, Will) | **Implemented** — Cluster 7: four thin skills in `.claude/skills/` + bootstrap template; hook/skill/ask doctrine in conventions.md. |
+| Reflexive-push durability rule (`2026-07-02-reflexive-push-durability-rule.md`) | **Filed, awaiting triage** — merged from its feedback branch onto the beta trunk; steward unpushed-commit warning not yet implemented. |
 
 ### Cross-Repo Contract Federation — CHARTER amendments (2026-04-28 eve)
 
