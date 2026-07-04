@@ -17,7 +17,7 @@ var (
 
 var rootCmd = &cobra.Command{
 	Use:     "rebar",
-	Version: "v3.0.1-alpha",
+	Version: "v3.0.0-beta",
 	Short:   "REBAR — contract-driven development framework for AI-powered teams",
 	Long: `REBAR — contract-driven development framework for AI-powered teams.
 

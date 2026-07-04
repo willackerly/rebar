@@ -1,8 +1,8 @@
 # rebar
 
-> **rebar v2.0.0** | **Tier 3: ENFORCED**
+> **rebar v3.0.0-beta** | **Tier 3: ENFORCED**
 
-[![rebar v2.0.0](https://img.shields.io/badge/rebar-v2.0.0-orange)](DESIGN.md)
+[![rebar v3.0.0-beta](https://img.shields.io/badge/rebar-v3.0.0--beta-orange)](DESIGN.md)
 [![Tier 3: Enforced](https://img.shields.io/badge/tier-3_enforced-brightgreen)](DESIGN.md)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
@@ -74,7 +74,7 @@ cp -r templates/project-bootstrap/. ../my-project/ && cd ../my-project
 cd my-project && ../rebar/bin/rebar init
 
 # Option C: One-line installer (clones rebar to ~/.rebar, wires PATH)
-curl -fsSL https://raw.githubusercontent.com/willackerly/rebar/v3.0.1-alpha/setup-rebar.sh | bash
+curl -fsSL https://raw.githubusercontent.com/willackerly/rebar/v3.0.0-beta/setup-rebar.sh | bash
 # then: rebar new my-project -d "what it does"
 ```
 

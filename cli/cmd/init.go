@@ -186,7 +186,7 @@ func bootstrapV2Files(root string) int {
 	// .rebar-version
 	versionPath := filepath.Join(root, ".rebar-version")
 	if _, err := os.Stat(versionPath); os.IsNotExist(err) {
-		os.WriteFile(versionPath, []byte("v2.0.0\n"), 0644)
+		os.WriteFile(versionPath, []byte("v3.0.0-beta\n"), 0644)
 		fmt.Println("  Created .rebar-version")
 		created++
 	}
