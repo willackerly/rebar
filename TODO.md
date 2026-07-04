@@ -1,6 +1,6 @@
 # TODO — rebar
 
-**Last synced:** 2026-04-28
+**Last synced:** 2026-04-29
 
 The canonical, vote-shaped backlog lives in [`feedback/INVENTORY.md`](feedback/INVENTORY.md).
 This file holds short-horizon work that's actively in flight or imminent.
@@ -9,9 +9,13 @@ This file holds short-horizon work that's actively in flight or imminent.
 
 ## P0 — In Flight
 
-- [ ] **Max-compliance dogfooding** — add structural files rebar lacked for
-      itself (AGENTS.md ✓, QUICKCONTEXT.md ✓, TODO.md ✓, METRICS, .rebar-version ✓,
-      3 component contracts, pre-commit hook). Target: `rebar audit` 9-10/10.
+- [ ] **v3.0.0-alpha branch** (cut 2026-04-29) — five-cluster scope bundling
+      maturity tagging (headline), SessionStart hook, TEST_FIDELITY+UAKS+
+      closed-loop demo gate, FANOUT_PATTERN, contract discipline followups.
+      Tag after Cluster 4. **Active state-of-work lives on the branch:**
+      `git checkout v3.0.0-alpha && cat docs/v3-alpha-plan.md`.
+- [x] ~~Max-compliance dogfooding~~ — shipped 2026-04-25 (rebar audit at
+      9-10/10 with S1/S2/S3 contracts + pre-commit hook installed).
 
 ## P1 — Imminent
 
