@@ -58,10 +58,11 @@ if [ ! -f "$VERSION_FILE" ]; then
   declared_version=""
 else
   declared_version=$(cat "$VERSION_FILE" | tr -d '[:space:]')
-  if [[ "$declared_version" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+  # Semver with optional pre-release suffix (v3.0.0-beta, v3.1.0-rc.1)
+  if [[ "$declared_version" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$ ]]; then
     echo "OK: .rebar-version = $declared_version"
   else
-    echo "FAIL: .rebar-version contains '$declared_version' — expected format: vX.Y.Z"
+    echo "FAIL: .rebar-version contains '$declared_version' — expected format: vX.Y.Z or vX.Y.Z-prerelease"
     errors=$((errors + 1))
   fi
 fi
@@ -101,11 +102,11 @@ else
     line_num=$(echo "$badge_line" | cut -d: -f1)
     line_content=$(echo "$badge_line" | cut -d: -f2-)
 
-    # Validate format: > **rebar vX.Y.Z** | **Tier N: LEVEL**
-    if [[ "$line_content" =~ \*\*rebar\ (v[0-9]+\.[0-9]+\.[0-9]+)\*\*.*\*\*Tier\ ([0-9]+):\ ([A-Z]+)\*\* ]]; then
+    # Validate format: > **rebar vX.Y.Z[-prerelease]** | **Tier N: LEVEL**
+    if [[ "$line_content" =~ \*\*rebar\ (v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?)\*\*.*\*\*Tier\ ([0-9]+):\ ([A-Z]+)\*\* ]]; then
       badge_version="${BASH_REMATCH[1]}"
-      badge_tier="${BASH_REMATCH[2]}"
-      badge_level="${BASH_REMATCH[3]}"
+      badge_tier="${BASH_REMATCH[3]}"
+      badge_level="${BASH_REMATCH[4]}"
 
       echo "OK: README.md badge found on line $line_num"
       echo "    Version: $badge_version | Tier: $badge_tier ($badge_level)"
