@@ -248,21 +248,39 @@ _None currently._
 		}
 	}
 
-	// scripts/refresh-context.sh
+	// scripts/ — context helper + the cold-start enforcement quad the
+	// SessionStart hook runs (v3). Copied from rebar's canonical /scripts/;
+	// _rebar-config.sh rides along (freshness + ground-truth source it).
 	scriptsDir := filepath.Join(root, "scripts")
-	refreshPath := filepath.Join(scriptsDir, "refresh-context.sh")
-	if _, err := os.Stat(refreshPath); os.IsNotExist(err) {
-		os.MkdirAll(scriptsDir, 0755)
-		// Find rebar's copy to use as source
-		rebarRoot := findRebarRoot()
-		if rebarRoot != "" {
-			src := filepath.Join(rebarRoot, "scripts", "refresh-context.sh")
-			if data, err := os.ReadFile(src); err == nil {
-				os.WriteFile(refreshPath, data, 0755)
-				fmt.Println("  Created scripts/refresh-context.sh")
-				created++
-			}
+	coreScripts := []string{
+		"refresh-context.sh",
+		"_rebar-config.sh",
+		"check-contract-refs.sh",
+		"check-todos.sh",
+		"check-freshness.sh",
+		"check-ground-truth.sh",
+		"cold-start-checks.sh",
+	}
+	copiedScripts := 0
+	for _, name := range coreScripts {
+		dst := filepath.Join(scriptsDir, name)
+		if _, err := os.Stat(dst); err == nil {
+			continue
 		}
+		rebarRoot := findRebarRoot()
+		if rebarRoot == "" {
+			break
+		}
+		src := filepath.Join(rebarRoot, "scripts", name)
+		if data, err := os.ReadFile(src); err == nil {
+			os.MkdirAll(scriptsDir, 0755)
+			os.WriteFile(dst, data, 0755)
+			copiedScripts++
+		}
+	}
+	if copiedScripts > 0 {
+		fmt.Printf("  Created scripts/ (%d core scripts incl. cold-start-checks.sh)\n", copiedScripts)
+		created++
 	}
 
 	// architecture/ directory
