@@ -248,39 +248,39 @@ _None currently._
 		}
 	}
 
-	// scripts/ — context helper + the cold-start enforcement quad the
-	// SessionStart hook runs (v3). Copied from rebar's canonical /scripts/;
-	// _rebar-config.sh rides along (freshness + ground-truth source it).
+	// scripts/ — the curated adopter set, mirrored from rebar's
+	// templates/project-bootstrap/scripts/ (identical to what the
+	// `cp -r templates/project-bootstrap/. <target>/` adoption path
+	// delivers; maintainer-only scripts are already excluded there).
+	// Never overwrites existing files.
 	scriptsDir := filepath.Join(root, "scripts")
-	coreScripts := []string{
-		"refresh-context.sh",
-		"_rebar-config.sh",
-		"check-contract-refs.sh",
-		"check-todos.sh",
-		"check-freshness.sh",
-		"check-ground-truth.sh",
-		"cold-start-checks.sh",
-	}
-	copiedScripts := 0
-	for _, name := range coreScripts {
-		dst := filepath.Join(scriptsDir, name)
-		if _, err := os.Stat(dst); err == nil {
-			continue
+	if rebarRoot := findRebarRoot(); rebarRoot == "" {
+		fmt.Println("  ⚠ Skipped scripts/ and .claude/ — rebar checkout not found (set REBAR_ROOT to your rebar clone)")
+	} else {
+		srcScripts := filepath.Join(rebarRoot, "templates", "project-bootstrap", "scripts")
+		copiedScripts := 0
+		if entries, err := os.ReadDir(srcScripts); err == nil {
+			for _, e := range entries {
+				if e.IsDir() {
+					continue
+				}
+				dst := filepath.Join(scriptsDir, e.Name())
+				if _, err := os.Stat(dst); err == nil {
+					continue
+				}
+				data, readErr := os.ReadFile(filepath.Join(srcScripts, e.Name()))
+				if readErr != nil {
+					continue
+				}
+				os.MkdirAll(scriptsDir, 0755)
+				os.WriteFile(dst, data, 0755)
+				copiedScripts++
+			}
 		}
-		rebarRoot := findRebarRoot()
-		if rebarRoot == "" {
-			break
+		if copiedScripts > 0 {
+			fmt.Printf("  Created scripts/ (%d scripts incl. cold-start-checks.sh, ci-check.sh, inbox-watch.sh)\n", copiedScripts)
+			created++
 		}
-		src := filepath.Join(rebarRoot, "scripts", name)
-		if data, err := os.ReadFile(src); err == nil {
-			os.MkdirAll(scriptsDir, 0755)
-			os.WriteFile(dst, data, 0755)
-			copiedScripts++
-		}
-	}
-	if copiedScripts > 0 {
-		fmt.Printf("  Created scripts/ (%d core scripts incl. cold-start-checks.sh)\n", copiedScripts)
-		created++
 	}
 
 	// architecture/ directory
@@ -342,6 +342,7 @@ func ensureClaudeAssets(root string) bool {
 	}
 	dstDir := filepath.Join(root, ".claude")
 	copied := 0
+	hookInstalled := false
 	filepath.Walk(srcDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil || info.IsDir() {
 			return nil
@@ -361,11 +362,18 @@ func ensureClaudeAssets(root string) bool {
 		os.MkdirAll(filepath.Dir(dst), 0755)
 		if os.WriteFile(dst, data, 0644) == nil {
 			copied++
+			if rel == "settings.json" {
+				hookInstalled = true
+			}
 		}
 		return nil
 	})
 	if copied > 0 {
-		fmt.Printf("  Created .claude/ (%d files: SessionStart hook + rebar skills)\n", copied)
+		if hookInstalled {
+			fmt.Printf("  Created .claude/ (%d files: SessionStart hook + rebar skills)\n", copied)
+		} else {
+			fmt.Printf("  Created .claude/skills (%d files; existing settings.json preserved — merge the SessionStart hook manually from templates/project-bootstrap/.claude/settings.json)\n", copied)
+		}
 		return true
 	}
 	return false
@@ -476,25 +484,50 @@ func ensureAgentsScaffolding(root string) bool {
 	return true
 }
 
-// findRebarRoot locates the rebar framework repo by checking common locations.
+// findRebarRoot locates the rebar framework repo. The marker is
+// templates/project-bootstrap/ — only the rebar SOURCE repo has it;
+// DESIGN.md + architecture/ alone also match rebar-adopted projects,
+// which made re-init in an adopted repo copy from itself (a no-op).
 func findRebarRoot() string {
-	// Check if we're inside the rebar repo
-	if _, err := os.Stat("DESIGN.md"); err == nil {
-		if _, err := os.Stat("architecture/CONTRACT-TEMPLATE.md"); err == nil {
-			cwd, _ := os.Getwd()
-			return cwd
+	isRebarSource := func(dir string) bool {
+		if dir == "" {
+			return false
+		}
+		_, err := os.Stat(filepath.Join(dir, "templates", "project-bootstrap", "scripts", "steward.sh"))
+		return err == nil
+	}
+
+	// Explicit override first
+	if env := os.Getenv("REBAR_ROOT"); isRebarSource(env) {
+		return env
+	}
+
+	// Relative to the running binary — covers the setup-rebar.sh install
+	// (~/.rebar/bin/rebar → ~/.rebar) and any checkout's bin/rebar.
+	if exe, err := os.Executable(); err == nil {
+		if resolved, err := filepath.EvalSymlinks(exe); err == nil {
+			exe = resolved
+		}
+		if root := filepath.Dir(filepath.Dir(exe)); isRebarSource(root) {
+			return root
 		}
 	}
 
-	// Check common locations
+	// Running from inside the rebar source repo itself
+	if cwd, err := os.Getwd(); err == nil && isRebarSource(cwd) {
+		return cwd
+	}
+
+	// Common locations
 	home, _ := os.UserHomeDir()
 	candidates := []string{
+		filepath.Join(home, ".rebar"),
 		filepath.Join(home, "dev", "rebar"),
 		filepath.Join(home, "src", "rebar"),
 		filepath.Join(home, "code", "rebar"),
 	}
 	for _, c := range candidates {
-		if _, err := os.Stat(filepath.Join(c, "DESIGN.md")); err == nil {
+		if isRebarSource(c) {
 			return c
 		}
 	}

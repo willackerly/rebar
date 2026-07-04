@@ -55,7 +55,7 @@ func runAdopt(cmd *cobra.Command, args []string) error {
 	}
 
 	name := filepath.Base(root)
-	fmt.Printf("\n  Adopting REBAR v2.0.0 for: %s\n\n", name)
+	fmt.Printf("\n  Adopting REBAR v3.0.0-beta for: %s\n\n", name)
 
 	// Phase 1: Assess current state
 	fmt.Println("  Phase 1: Assessment")
@@ -94,10 +94,15 @@ func runAdopt(cmd *cobra.Command, args []string) error {
 	readmePath := filepath.Join(root, "README.md")
 	if data, err := os.ReadFile(readmePath); err == nil {
 		if !strings.Contains(string(data), "rebar v") {
-			// Insert badge after first line
+			// Insert badge after first line — full '**Tier N: LEVEL**'
+			// form; check-compliance.sh rejects a badge without ': LEVEL'.
+			tierLevel := map[int]string{1: "PARTIAL", 2: "ADOPTED", 3: "ENFORCED"}[adoptTier]
+			if tierLevel == "" {
+				tierLevel = "PARTIAL"
+			}
 			lines := strings.SplitN(string(data), "\n", 2)
 			if len(lines) == 2 {
-				badged := lines[0] + "\n\n> **rebar v2.0.0** | **Tier " + fmt.Sprintf("%d", adoptTier) + "**\n" + lines[1]
+				badged := lines[0] + "\n\n> **rebar v3.0.0-beta** | **Tier " + fmt.Sprintf("%d: %s", adoptTier, tierLevel) + "**\n" + lines[1]
 				os.WriteFile(readmePath, []byte(badged), 0644)
 				fmt.Println("  ✓ Added rebar badge to README.md")
 				fixed++
