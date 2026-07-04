@@ -150,12 +150,14 @@ tests to write. No guessing. No assumptions.
 
 ```bash
 $ scripts/steward.sh --summary
-Steward: 12 contracts (0d/2a/3t/7v), 1 discovery, 6/6 enforcement passing
+Steward: 12 contracts (0d/2a/3t/7ip), 1 discovery, 6/6 enforcement passing
 ```
 
 The [Steward](#quality-infrastructure) scans your codebase and derives each
 contract's lifecycle from what actually exists — draft, active, testing, or
-verified. Status is computed from reality, never declared manually.
+impl-present. The computed lifecycle is never declared manually; the
+*declared* maturity `Status:` field (stub → verified) is its honesty-based
+counterpart — see `conventions.md` §Declared Maturity.
 
 ### 4. Agents query role-based experts
 

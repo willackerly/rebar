@@ -1,8 +1,8 @@
 # Quick Context
 
 <!-- FRESHNESS: Update this date every time you modify this file -->
-<!-- freshness: 2026-03-21 -->
-<!-- last-synced: 2026-03-21 — date this file was verified against code -->
+<!-- freshness: 2026-07-04 -->
+<!-- last-synced: 2026-07-04 — date this file was verified against code -->
 
 **Current state of the project for agents starting a new session.**
 
@@ -88,7 +88,7 @@
 - Ready for first contract implementation
 
 **Dependencies:**
-- Rebar framework v2.0.0
+- Rebar framework v3.0.0-beta
 - [Your project dependencies]
 
 ---

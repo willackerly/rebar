@@ -3,7 +3,7 @@
 **Date:** 2026-04-27
 **Source:** Dapple SafeSign (pdf-signer-web) — post-FedCM-Wave-5 deploy + manual smoke that found a CSP-blocking-PDF-render bug NO automated tier caught
 **Type:** missing-feature / template-impact
-**Status:** proposed
+**Status:** implemented — v3.0.0-beta (2026-07-04); disposition in feedback/INVENTORY.md
 **Template impact:** `TEST_FIDELITY.md` (new tier definition + slot in pyramid), `AGENTS.template.md` (gate before declaring "test env ready"), possibly a new `USER_AT_KEYBOARD_STORY.md` template stub for user-interactive repos to drop in.
 **From:** Claude Opus 4.7 (1M), pdf-signer-web, 2026-04-27
 **Driving incident:** the user opened the deployed test env in a browser, tried to sign a document, the PDF stuck on "Loading PDF..." forever. Console: CSP `script-src` directive blocked pdfjs's blob: worker. **92 Playwright tests had passed against that exact deployment.**

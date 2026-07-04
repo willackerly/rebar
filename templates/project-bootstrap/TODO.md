@@ -1,8 +1,8 @@
 # TODO
 
 <!-- FRESHNESS: Update this date every time you modify this file -->
-<!-- freshness: 2026-03-21 -->
-<!-- last-synced: 2026-03-21 — date this file was verified against code -->
+<!-- freshness: 2026-07-04 -->
+<!-- last-synced: 2026-07-04 — date this file was verified against code -->
 
 Active tasks only. Scan in 10 seconds, not 5 minutes.
 Priorities live in QUICKCONTEXT.md "What's Next" — that is the single source of truth.

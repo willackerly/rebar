@@ -1,6 +1,6 @@
 # AGENTS.md — working on rebar itself
 
-> **rebar v2.0.0** | **Tier 3: ENFORCED** — this repo dogfoods its own methodology.
+> **rebar v3.0.0-beta** | **Tier 3: ENFORCED** — this repo dogfoods its own methodology.
 
 ## Read Before Coding
 

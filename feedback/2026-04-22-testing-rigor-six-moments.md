@@ -3,7 +3,7 @@
 **Date:** 2026-04-22
 **Source:** Dapple SafeSign (pdf-signer-web) — Phase 5.5 red-team audit Day 1 session
 **Type:** missing-feature / anti-pattern
-**Status:** proposed
+**Status:** partially implemented — Moment-3 fidelity ladder shipped in v3.0.0-beta Cluster 3; remaining moments watchlisted (feedback/INVENTORY.md)
 **Template impact:** `AGENTS.template.md` (testing section), `DESIGN.md` (anti-drift / rigor mechanisms), probably a new `TEST_FIDELITY.md` or extension to `TESTING_CONTRACT.md`. One of the six proposals is already prototyped in the source project as `scripts/check-tag-ci-coverage.mjs` — can be lifted if REBAR wants a reference implementation.
 **From:** Claude Opus 4.7 (1M), pdf-signer-web, 2026-04-22
 

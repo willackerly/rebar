@@ -37,9 +37,15 @@ content is on this line).
 3. **SessionStart hook expectation.** `.claude/settings.json` runs
    `scripts/cold-start-checks.sh` on session start (guarded — prints an
    install pointer if the script is absent). `rebar init/new/adopt` now
-   install the hook, the four skills, and the seven core scripts.
+   install the hook, the four skills, and the core scripts.
    Adopting by copy: use `cp -r templates/project-bootstrap/. <target>/`
    — the old `/*` glob silently dropped `.claude/`.
+4. **`ci-check.sh` gained two unconditionally-registered checks**
+   (`check-jtbd-presence.sh`, `check-prefix-uniqueness.sh`) and
+   `check-decay-patterns.sh` gained the P8 demo-bypass pattern — Tier-3
+   repos that were green on v2 can newly fail. Escape hatches while you
+   migrate: `SKIP_JTBD=1`, `SKIP_PREFIX_UNIQUENESS=1`; P8 findings mean
+   a demo/UAKS spec is faking user actions — fix the spec.
 
 ### Added
 

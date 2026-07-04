@@ -3,7 +3,7 @@
 **Date:** 2026-04-26
 **Source:** dapple-sdk — cold-start review session. CLAUDE.md "Starting a Session" section instructs the agent to run a battery of `scripts/check-*.sh` (contract refs, todos, freshness, ground-truth) on every session start.
 **Type:** anti-pattern / missing-feature
-**Status:** proposed
+**Status:** implemented — v3.0.0-beta (2026-07-04); disposition in feedback/INVENTORY.md
 **Template impact:** `CLAUDE.template.md` (Starting a Session section), `AGENTS.template.md`, REBAR profile templates that ship `scripts/check-*.sh`. Probable new artifact: `settings.template.json` with a `SessionStart` hook block.
 **From:** Claude Opus 4.7 (1M), dapple-sdk, 2026-04-26. User-driven discovery: Will asked the agent to verify the cold-start quad against repo state. The agent caught real staleness (toy-app→hello-human rename residue across 9+ files, MIGRATION.md sync commands pointing at pre-monorepo paths, "this session" markers in TODO.md that no longer resolve) — but skipped the four enforcement scripts CLAUDE.md explicitly tells the agent to run on every cold start. When asked why, the agent admitted it had narrowed the task to "read the docs and check assumptions" and treated the script list as advisory rather than load-bearing.
 

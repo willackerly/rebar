@@ -86,7 +86,11 @@ marker has a cost, so old versions get marked.
      form is `grep -rn "CONTRACT:{ID}.{OLD}"` returns zero
    - **Migration deadline:** a concrete date or a named phase boundary
    - **Migration owner:** who is on the hook for the cutover
-4. **Mark the old file** with the `SUPERSEDED BY:` comment.
+4. **Mark the old file** with the `SUPERSEDED BY:` comment **and flip its
+   declared maturity to `**Status:** superseded`** — the two travel
+   together (`conventions.md` §Declared Maturity). The Status flip is what
+   removes the old version from `check-compliance.sh`'s badge weighting;
+   the comment alone exempts it only from the JTBD gate.
 5. **Migrate implementing-file headers.** Run
    `grep -rn "CONTRACT:{ID}.{OLD}"` across source (excluding
    `.claude/worktrees/`, `node_modules/`, `vendor/`, `.git/` — see the

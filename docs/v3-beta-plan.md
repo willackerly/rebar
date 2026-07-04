@@ -40,6 +40,7 @@ judgment call made this session.
 | D6 | **QUICKCONTEXT merge conflict (main vs alpha) resolved by taking the alpha side.** | The file is fully rewritten for the beta before tag; resolving content by hand twice would be waste. |
 | D7 | **Skills are pointers, not copies.** Every skill references its `practices/*.md`; paradigm content lives in exactly one place. | A second prose surface that drifts is the SessionStart-feedback disease with a new organ. |
 | D8 | **rebar does not grow its own `inbox/` in this release.** The peer-inbox convention entry documents *when* a repo should hold one (multi-repo coordination seats); rebar's intake remains `ask featurerequest` + feedback branches. | Scope discipline: rebar is not currently a coordination seat in a memo-exchanging cluster. Adding an empty inbox would be ceremony. |
+| D9 | **(post-review) Badge weighting counts undeclared live contracts as stub-or-draft once any contract declares.** Supersedes the build-time decision to weight only declared contracts. Same review pass also unified the two `Status:` parsers (bold/bare, case-folded) and moved thresholds to product comparisons. | Adversarial review reproduced badge-laundering by selective declaration, by unbolded/capitalized values, and an integer-floor gap at the >66% threshold — all defeating Cluster 1's purpose. Pre-v3 repos (zero declarations) keep the no-penalty advisory. |
 
 ## Seven clusters
 

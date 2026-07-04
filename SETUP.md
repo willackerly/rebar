@@ -115,7 +115,7 @@ The universal first-read. Every agent, every session, no exceptions.
 
 1. **Rebar badge** — First line after `# Title` MUST be the rebar badge:
    ```markdown
-   > **rebar v2.0.0** | **Tier 2: ADOPTED**
+   > **rebar v3.0.0-beta** | **Tier 2: ADOPTED**
    ```
    This is validated by `scripts/check-compliance.sh`. Update version when you
    upgrade rebar. Update tier when you change `.rebarrc`.

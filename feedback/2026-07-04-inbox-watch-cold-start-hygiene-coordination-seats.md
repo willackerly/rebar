@@ -3,7 +3,7 @@
 **Date:** 2026-07-04
 **Source:** tak-tdf multi-repo coordination session (side channel), relayed by Will to the rebar main line for durable filing. The coordinating session cannot file rebar feedback itself.
 **Type:** missing-hygiene-rule / convention-not-enforcement
-**Status:** proposed
+**Status:** implemented — v3.0.0-beta (2026-07-04); disposition in feedback/INVENTORY.md
 **Template impact:** cold-start ritual sections in `QUICKCONTEXT`/`CLAUDE.template.md` for coordination-seat repos; probable interaction with `feedback/2026-04-26-sessionstart-hook-cold-start-enforcement.md` (settings.template.json hook block); possibly a new documented convention for the `inbox/` peer-mail pattern, which rebar does not codify anywhere today.
 **From:** tak-tdf coordinator seat (Claude Code), 2026-07-04, during active three-way cross-repo development with go-tak-server and TDFLite-tak.
 
