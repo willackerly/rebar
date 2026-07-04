@@ -5,7 +5,8 @@ description: Use at the start of every session in a REBAR-managed repo, before t
 
 # rebar-coldstart — the session-start ritual
 
-Canonical practice: `practices/session-lifecycle.md` (Session Start section).
+Canonical practice: `practices/session-lifecycle.md` (Session Start section) —
+in the rebar repo or your rebar checkout if this repo does not vendor practices/.
 This skill is a pointer to the ritual, not a replacement for the practice doc.
 
 ## Steps

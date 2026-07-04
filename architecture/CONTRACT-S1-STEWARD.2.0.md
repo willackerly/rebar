@@ -121,19 +121,17 @@ Output schema (the breaking change vs 1.0):
 | Spec gate | A contract is gated on presence of: Interfaces, Behavioral, Errors, Tests, Implementing sections |
 | State output | JSON written to `architecture/.state/<contract-id>.<version>.json` per contract + `steward-report.json` aggregate |
 | Markdown output | `STEWARD_REPORT.md` is auto-generated; gitignored (regenerated on every scan) |
-| Stale detection | If `steward-report.json` is >24h old, `ask steward` warns and suggests re-running the scanner |
 | Per-role routing | DRAFT contracts → architect, TESTING gaps → englead, DISCOVERY entries → product |
-| Exit code | 0 = clean, 1 = enforcement failures detected |
+| Exit code | A completed scan exits 0 regardless of findings — the scan is a reporter, not a gate. Gating belongs to `ci-check.sh`, which runs the enforcement scripts individually. Non-zero exits are reserved for invocation errors (unknown `--check` ID → 1, missing `jq` → 2) |
 | Bash version | Compatible with bash 3.2 (macOS default) — no `local -n` namerefs |
 
 ## Error Contracts
 
 | Error | When | Behavior |
 |-------|------|----------|
-| `architecture/` missing | No contracts directory | Exit 1 with message naming `rebar init` as the fix |
+| `architecture/` missing | No contracts directory | Scan runs against zero contracts and exits 0 (creates `architecture/.state/` as a side effect) — an empty repo is not an error to the reporter |
 | `jq` not installed | JSON processing required | Exit 2 with brew/apt install instructions |
-| Single-contract `--check` for unknown ID | `--check C99` where no such contract | Exit 1 with list of valid IDs |
-| Stale state without refresh | `--summary` against >24h-old report | Run silently; the staleness is reported in the summary text itself |
+| Single-contract `--check` for unknown ID | `--check C99` where no such contract | Exit 1 with `Contract not found` + the list of valid IDs |
 
 ## Dependencies
 
@@ -162,6 +160,10 @@ Output schema (the breaking change vs 1.0):
   green, recorded as a `proof:` field written by the test run, not by
   file-grep. Deferred to v3.1-scale work (see the 2026-06-19 feedback,
   suggestion 1).
+- **Planned stale detection:** `ask steward` warning when
+  `steward-report.json` is >24h old. Not implemented in any ask-steward
+  command today — listed here so nobody reads it back into the
+  behavioral table before it exists.
 - **Major-bump trigger:** if the spec-gate sections change (e.g.,
   Why/Who/Scenarios become required for spec-gate completeness), or if any
   lifecycle value string changes again.
@@ -196,18 +198,19 @@ Migration for downstream parsers:
 ## Test Requirements
 
 - [ ] Bash 3.2 compatibility verified on stock macOS
-- [ ] Each `--<flag>` exits 0 on a clean repo, 1 on a repo with seeded drift
+- [ ] Completed scans exit 0 with seeded drift present (reporter, not
+      gate); `--check <unknown-id>` exits 1 and lists valid IDs
 - [ ] No output surface (JSON, markdown, one-liner) emits `verified` as a
       computed lifecycle value
 - [ ] JSON output validates against the schema (when schema lands)
 - [ ] State files survive a full scan + partial `--check` cycle
-- [ ] Stale-detection threshold (>24h) fires correctly
 
 ## Cross-repo promotion notes
 
 - **Universal invariants:** lifecycle-computed-not-declared, the
   `impl-present` naming (adopters MUST NOT rename it back to `verified`),
-  JSON state in `architecture/.state/`, exit code 0/1 semantics, role routing
+  JSON state in `architecture/.state/`, scan-exits-0 reporter semantics,
+  role routing
 - **Per-project customization:** the `check-*.sh` set each repo enables
   via `.rebarrc` flags; project-specific metrics in `METRICS` file
 - **Specialization-contract naming:** adopters don't typically write

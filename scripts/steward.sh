@@ -566,6 +566,10 @@ main() {
     contract_file="$(ls "$ARCH_DIR"/CONTRACT-"${check_id}"*.md 2>/dev/null | head -1 || true)"
     if [ -z "$contract_file" ]; then
       echo "Contract not found: $check_id" >&2
+      echo "Valid IDs:" >&2
+      ls "$ARCH_DIR"/CONTRACT-*.md 2>/dev/null \
+        | sed -e 's|.*/CONTRACT-||' -e 's|\.[0-9][0-9.]*\.md$||' \
+        | grep -v -E 'TEMPLATE|REGISTRY|GAPS|\.impl$' | sort -u | sed 's/^/  /' >&2
       exit 1
     fi
     scan_contract "$contract_file"

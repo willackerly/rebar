@@ -5,7 +5,8 @@ description: Use during multi-repo coordination phases (release days, cross-repo
 
 # rebar-inbox-watch — arm the peer-inbox watcher
 
-Canonical practice: `practices/inbox-watch.md` (design choices, honest
+Canonical practice: `practices/inbox-watch.md` (rebar checkout if not vendored
+here) — design choices, honest
 limitations, variations). This skill is the arming procedure only.
 
 ## Steps
