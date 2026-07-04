@@ -87,7 +87,7 @@ touch "$PROJECT/architecture/.state/.gitkeep"
 cp "$BOOTSTRAP/.rebarrc"     "$PROJECT/.rebarrc"  2>/dev/null || true
 
 # Version tracking (so you know which rebar you adopted)
-echo "v2.0.0" > "$PROJECT/.rebar-version"
+echo "v3.0.0-beta" > "$PROJECT/.rebar-version"
 
 mkdir -p "$PROJECT/.github"
 cp .github/pull_request_template.md "$PROJECT/.github/" 2>/dev/null || true

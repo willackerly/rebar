@@ -225,6 +225,9 @@ npx playwright test          # Expected: 2 known failures (see below)
 - [ ] TODO.md updated (completed items checked, new items added)
 - [ ] `git worktree list` — clean up abandoned worktrees
 - [ ] `git status` — commit or stash any uncommitted changes
+- [ ] `git push` — reflexive: origin is the record; an origin behind
+      the laptop is a status surface lying to everyone but one machine
+      (the cold-start block warns on unpushed commits)
 - [ ] Wrapup written to `docs/session-wrapups/` or saved to memory
 - [ ] Test suite state documented (what passes, what fails, why)
 

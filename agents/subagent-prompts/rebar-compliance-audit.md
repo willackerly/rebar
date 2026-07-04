@@ -1,6 +1,6 @@
 # Template: REBAR Compliance Audit
 
-> Assess a project's compliance with REBAR v2.0.0. Produces a structured
+> Assess a project's compliance with REBAR (v3 line). Produces a structured
 > report covering structural presence, content accuracy, session lifecycle,
 > agent coordination, and enforcement maturity. Writes a
 > REBAR-COMPLIANCE-ASSESSMENT.md to the project root.
@@ -24,7 +24,7 @@
 
 ## Task
 
-You are auditing `PROJECT_ROOT` for compliance with REBAR v2.0.0.
+You are auditing `PROJECT_ROOT` for compliance with REBAR (v3 line).
 
 Examine the project systematically through each section below. For each
 check, record PASS, PARTIAL, FAIL, or N/A with a brief explanation.
@@ -54,6 +54,7 @@ placeholder text):
 | Source files have `CONTRACT:` headers | `grep -rn "CONTRACT:" --include="*.go" --include="*.ts" --include="*.py" src/ internal/ packages/ lib/ 2>/dev/null \| head -5` |
 | Contract references point to valid files | For each `CONTRACT:X` in code, check `architecture/CONTRACT-X*.md` exists |
 | Seam contracts exist (if multi-language) | `ls architecture/CONTRACT-SEAM-*.md 2>/dev/null` |
+| **(v3)** Contracts declare maturity `Status:` honestly | `grep -E '^\*{0,2}Status:' architecture/CONTRACT-*.md` — vocabulary + badge weighting per `rebar:convention` §Declared Maturity; pre-v3 repos (zero fields) are advisory-only, never penalized |
 
 ### Section 3: Enforcement & Scripts
 
@@ -80,7 +81,7 @@ placeholder text):
 | `agents/subagent-prompts-index.md` exists | Lists all templates |
 | ASK CLI configured | `ls bin/ask` or reference in AGENTS.md |
 
-### Section 5: Session Lifecycle (v2.0.0)
+### Section 5: Session Lifecycle
 
 | Check | How to Verify |
 |-------|---------------|
@@ -121,7 +122,7 @@ Write `REBAR-COMPLIANCE-ASSESSMENT.md` to the project root:
 
 **Project:** {project name}
 **Date:** {YYYY-MM-DD}
-**REBAR Version:** v2.0.0
+**REBAR Version:** (from .rebar-version)
 **Declared Tier:** {from .rebarrc or "none"}
 **Assessed By:** Claude (automated audit)
 

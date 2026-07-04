@@ -71,7 +71,11 @@ scripts/check-ground-truth.sh
 ### Ending a Session
 1. **Update QUICKCONTEXT.md** with current project state
 2. **Update TODO.md** — mark completed items, add newly discovered items
-3. **Clean up:** `git worktree prune`, commit any uncommitted work
+3. **Clean up:** `git worktree prune`, commit any uncommitted work,
+   **then push** — `git push` is part of the commit ritual, not a
+   separate decision; durability lives at origin, not on this disk
+   (rebar:feedback/2026-07-02-reflexive-push-durability-rule). The
+   cold-start block warns next session if you forget.
 4. **Write a wrapup** — see `rebar:practice/session-lifecycle` for the template
    (resolve: `scripts/rebar-doc.sh rebar:practice/session-lifecycle --cat`, or
    `rebar doc` if the REBAR CLI is installed)

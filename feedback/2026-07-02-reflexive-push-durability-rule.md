@@ -3,7 +3,7 @@
 **Date:** 2026-07-02
 **Source:** tak-tdf integration-arc kickoff session — cold-start review found 19 unpushed commits on `main`
 **Type:** improvement
-**Status:** proposed
+**Status:** implemented — v3 line, 2026-07-04 (items 1+3: cold-start unpushed warning + session-end push ritual; item 2 steward-surface variant deferred, see INVENTORY)
 **Template impact:** `templates/` CLAUDE.md + AGENTS.md ("Ending a Session" checklist), steward health surface (`ask steward summary` / refresh-context freshness check)
 **From:** tak-tdf coordination session (Claude Code, willackerly)
 

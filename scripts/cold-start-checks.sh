@@ -135,6 +135,20 @@ else
   echo "maturity: $parts ($with_status of $total_contracts contracts declare Status)"
 fi
 
+# Reflexive-push durability (rebar:feedback/2026-07-02-reflexive-push-
+# durability-rule): an origin behind the laptop is a status surface lying
+# to every consumer that isn't this machine. Silent when no upstream is
+# configured (fresh projects) — nagging there would be noise, not signal.
+if git -C "$PROJECT_ROOT" rev-parse --abbrev-ref '@{u}' >/dev/null 2>&1; then
+  unpushed=$(git -C "$PROJECT_ROOT" rev-list --count '@{u}..HEAD' 2>/dev/null || echo 0)
+  cur_branch=$(git -C "$PROJECT_ROOT" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "?")
+  if [ "$unpushed" -gt 5 ]; then
+    echo "[WARN] $unpushed unpushed commit(s) on $cur_branch — push now; durability lives at origin, not on this disk"
+  elif [ "$unpushed" -gt 0 ]; then
+    echo "unpushed: $unpushed commit(s) on $cur_branch — push when settled (reflexive-push rule)"
+  fi
+fi
+
 elapsed=$(( $(date +%s) - START_EPOCH ))
 if [ "$fail_count" -gt 0 ]; then
   echo "$fail_count of $run_count checks failing (${elapsed}s) — rerun the named scripts/*.sh for full output."

@@ -297,7 +297,7 @@ later. See `feedback/2026-04-21-...`, `2026-04-22-...`, and
 Every rebar repo declares its version and tier at the top of README.md:
 
 ```markdown
-> **rebar v2.0.0** | **Tier 2: ADOPTED**
+> **rebar v3.0.0-beta** | **Tier 2: ADOPTED**
 ```
 
 This is validated by `scripts/check-compliance.sh` and the Steward. It tells
