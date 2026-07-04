@@ -1,16 +1,16 @@
 # QUICKCONTEXT — rebar (main)
 
-last-synced: 2026-04-29
+last-synced: 2026-07-04
 **Branch:** main
 **Tier:** 3 (ENFORCED) — rebar dogfoods its own methodology
-**In-flight branch:** `v3.0.0-alpha` — see "Active Branches" below
+**In-flight branch:** `v3.0.0-beta` (tagged 2026-07-04) — see "Active Branches" below
 
 ---
 
 ## Current State
 
-- **rebar v2.0.0** released (tag `v2.0.0`); **v3.0.0-alpha** branch
-  cut 2026-04-29 for the next major bump
+- **rebar v2.0.0** released (tag `v2.0.0`); **v3.0.0-beta built and
+  tagged 2026-07-04** on the `v3.0.0-beta` branch (alpha line retired)
 - **8 rebar-adopted repos** in the MCP swarm: rebar, TALOS, blindpipe,
   filedag, fontkit, office180, pdf-signer-web, TDFLite
 - **37 ASK agents** discoverable via the rebar-ask MCP server
@@ -26,12 +26,12 @@ last-synced: 2026-04-29
 | Branch | Purpose | Where to look |
 |--------|---------|---------------|
 | `main` | v2.x stable, federated, dogfooded at Tier 3 | this file |
-| `v3.0.0-alpha` | major bump bundling 5 ripe concepts | `git checkout v3.0.0-alpha && cat docs/v3-alpha-plan.md` |
+| `v3.0.0-beta` | v3 built + tagged 2026-07-04 (7 clusters; alpha line retired) | `git checkout v3.0.0-beta && cat docs/v3-beta-plan.md` |
 
-The alpha is in flight. Five clusters: maturity tagging (headline) +
-SessionStart hook + TEST_FIDELITY/UAKS + FANOUT_PATTERN + contract
-discipline. Tag after Cluster 4. See `docs/v3-alpha-plan.md` on the
-alpha branch for the canonical state-of-work.
+The beta is BUILT and TAGGED (v3.0.0-beta, 2026-07-04): seven clusters
+including the peer-inbox paradigm and Claude Skills packaging, verified
+by a 71-agent adversarial review. The v3.0.0-alpha/v3.0.1-alpha branches
+are retired. See `docs/v3-beta-plan.md` on the beta branch.
 
 ## Recent Ship (2026-04-28 → 2026-04-29)
 
@@ -55,33 +55,33 @@ alpha branch for the canonical state-of-work.
 
 ## In Progress
 
-- **v3.0.0-alpha branch** (cut 2026-04-29) — five-cluster scope
-  bundling the headline maturity-tagging feature with SessionStart
-  hook, TEST_FIDELITY+UAKS, FANOUT_PATTERN, and contract discipline
-  followups. See branch's QUICKCONTEXT + `docs/v3-alpha-plan.md`.
+- **v3.0.0-beta tagged** — next: offer the beta to the first federated
+  adopters (TDFLite, filedag, fontkit) and, when validated, merge the
+  beta branch into main as the v3.0.0 release.
 
 ## What's Next
 
-1. **Resume on alpha branch:** `git checkout v3.0.0-alpha`, start
-   Cluster 1 (maturity tagging).
+1. **Work happens on the beta branch:** `git checkout v3.0.0-beta &&
+   cat QUICKCONTEXT.md` — main stays the v2.x stable line until the
+   beta merges.
 2. Other active feedback awaiting triage on main:
    - `feedback/2026-04-21-filedag-cross-ref-and-federation-coord.md`
    - `feedback/2026-04-22-testing-rigor-six-moments.md` (multi-proposal
      disposition pending)
    - `feedback/2026-04-24-contract-discipline-and-jtbd-framing.md`
-     (becomes alpha Cluster 5)
+     (implemented in v3.0.0-beta Cluster 5)
    - `feedback/2026-04-24-fidelity-decay-soft-hardening-patterns.md`
      (semantic patterns still need self-audit-prompt addition)
 3. Auto-federation experiments queued — `feedback/2026-04-28-auto-
    federation-experiment.md` has 7 maintainer-decision questions
-   pending. v3.0.x or v3.1 push after alpha tag.
+   pending. Pairs with the beta's `scripts/inbox-watch.sh` for v3.1.
 
 ## Known issues / non-blockers
 
 - Auto-federation experiments are research-only until the 7 open
   questions are answered (test partner repo, bot identity, fatigue
   thresholds, etc.).
-- v3-alpha breaks compliance scoring for adopters with all-stub
+- v3-beta compliance weighting demotes badges for adopters with all-stub
   contracts (intentional — that's the point of the maturity tagging
   feature).
 
@@ -89,23 +89,23 @@ alpha branch for the canonical state-of-work.
 
 ```bash
 git log --oneline -10                     # what's actually on main
-git branch -a                             # see v3.0.0-alpha + remotes
+git branch -a                             # see v3.0.0-beta + remotes
 rebar audit                               # 9-10/10 expected on main
 rebar audit --all ~/dev                   # cross-repo health
 scripts/ci-check.sh                       # 13/13 expected
-git checkout v3.0.0-alpha && cat docs/v3-alpha-plan.md  # alpha plan
+git checkout v3.0.0-beta && cat docs/v3-beta-plan.md  # beta plan + decision log
 ```
 
-## Cross-device handoff (2026-04-29)
+## Cross-device handoff (2026-07-04)
 
-Both `main` and `v3.0.0-alpha` are pushed to `origin` so the work can
-resume on a different device. To resume:
+Both `main` and `v3.0.0-beta` (branch + tag) are pushed to `origin`. To
+resume:
 
 ```bash
 git fetch origin
-git checkout v3.0.0-alpha             # for alpha work
-cat QUICKCONTEXT.md                   # alpha-specific state
-cat docs/v3-alpha-plan.md             # canonical task list
+git checkout v3.0.0-beta              # for v3 work
+cat QUICKCONTEXT.md                   # beta-specific state
+cat docs/v3-beta-plan.md              # canonical plan + decision log
 
 # OR
 git checkout main                     # for v2.x stable work
