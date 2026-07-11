@@ -5,7 +5,7 @@
 **Source:** `feedback/2026-04-28-cross-repo-contract-federation.md`
 **Implemented:** 5-commit landing, 2026-04-28 eve
 
-This document codifies the **four principles** that govern every
+This document codifies the **five principles** that govern every
 federation feature in rebar. Future PRs that add federation tooling
 must cite which principle they're advancing (or contesting). New
 contributors should read this before proposing federation changes.
@@ -233,6 +233,59 @@ this kind of surface, the implementation is wrong.
 
 ---
 
+## Principle 5 — A held inbox is a watched inbox
+
+A repo that holds a peer `inbox/` **arms the canonical watcher on it at
+session start**. Deposited memos are a live channel, not an archive: an
+unwatched inbox silently converts every peer's same-day ask into a
+some-day ask, and the sender has no way to tell the difference.
+
+Ratified by the owner 2026-07-11, generalizing the field SOP of
+2026-07-06 (go-tak-server ↔ tak-tdf ↔ TDFLite-tak coordination).
+
+### The rules
+
+1. **Same script everywhere.** The watcher is `scripts/inbox-watch.sh`
+   (shipped in the project bootstrap; upstream `rebar:script/inbox-watch`).
+   Repos do not write their own variants — one implementation, pointed
+   at each repo's own `inbox/`, is what keeps the emitted
+   `NEW INBOX DEPOSIT:` lines a uniform signal every seat understands.
+2. **Own inbox only.** A seat watches the inbox(es) it *holds* — never a
+   peer's. Watching a peer's inbox self-echoes your own outbound
+   deposits and splits provenance (SOP 2026-07-06). Your outbound memos
+   are covered by the *peer's* watcher; symmetry is the point.
+3. **Check for stale watchers before arming.** A watcher that outlives
+   its session gives double coverage and split provenance. The script
+   warns at arm time if another instance is running; kill stale ones
+   first.
+4. **Sweep, then watch.** The watch only covers deposits from arm time
+   forward; the cold-start sweep (`ls -lat inbox/ | head`) bounds what
+   arrived while no one was listening (`practices/session-lifecycle.md`
+   step 4).
+
+### Why it is a principle and not just a practice
+
+Principles 1–4 keep the federation honest about *coupling and
+automation*; Principle 5 keeps it honest about *latency*. Append-only
+memos (the Peer-Inbox Convention) are the federation's only tasking
+channel — the discipline works with zero automation, but only if
+arrival is *heard*. The watcher is the smallest possible mechanism that
+makes the channel live: session-scoped, zero dependencies, poll-based,
+fail-safe to the manual sweep. It deliberately stops short of a daemon
+(CHARTER §2.8): if no session is seated in a repo, its memos wait — a
+coordinator who needs an answer must ensure a seat exists, not assume
+one.
+
+### Consistent with Principle 4
+
+The watcher is best-effort automation: it *tries* to remove read
+latency; nothing may *require* it. If the monitor dies, the manual
+fallback (`ls -lat inbox/ | head`) is always valid — and a seat that
+cannot arm a watcher is degraded, not broken. Silence from a dead
+watcher is the false-confidence trap: re-arm before trusting it.
+
+---
+
 ## How to use this doc when proposing federation features
 
 When you (or an agent) propose adding to the federation surface, walk
@@ -247,8 +300,12 @@ through these checks:
    CONSUMES.md presence
 4. **Does it automate without surfacing?** (Principle 4) — add the
    visibility surface before shipping the automation
+5. **Does it add a coordination channel nobody is listening to?**
+   (Principle 5) — if it deposits into an inbox, the receiving repo
+   must hold and watch that inbox; if it expects a reply, name the
+   seat that will hear it
 
-If the proposal survives all four, it fits the doctrine. If not, the
+If the proposal survives all five, it fits the doctrine. If not, the
 right path is usually a smaller, more honest version of the proposal.
 
 ---

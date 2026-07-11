@@ -104,13 +104,16 @@ on replies that aren't coming.
    as events:
 
    ```bash
-   ./scripts/inbox-watch.sh inbox/     # coordinating several repos: list each dir
+   ./scripts/inbox-watch.sh inbox/     # several HELD inboxes: list each dir (own inboxes only — never a peer's)
    ```
 
    Run it through the harness's persistent background-monitor facility
    (Claude Code: the `Monitor` tool in persistent mode) so it survives
-   across turns until session end. Mechanism, design choices, and honest
-   limitations: `practices/inbox-watch.md`.
+   across turns until session end. The script warns at arm time if a
+   stale watcher from an earlier session is still running — kill it
+   first (double coverage splits provenance). Mechanism, design
+   choices, and honest limitations: `practices/inbox-watch.md`;
+   doctrine: `practices/federation.md` Principle 5.
 
 Both halves are needed: the sweep bounds what the watch missed before it
 existed; the watch covers the session forward. If the monitor dies

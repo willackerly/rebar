@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # inbox-watch.sh — Live watch on peer inbox/ dirs; one line per new deposit.
-# rebar-scripts: 2026.07.04
+# rebar-scripts: 2026.07.11
 #
-# Canonical implementation of practices/inbox-watch.md. Polls one or more
+# Canonical implementation of practices/inbox-watch.md and federation
+# Principle 5 ("a held inbox is a watched inbox"). Polls one or more
 # inbox directories and emits
 #
 #   NEW INBOX DEPOSIT: <path>
@@ -11,6 +12,14 @@
 # files are never reported (the arming snapshot is the baseline). With more
 # than one watched directory, the path is prefixed with the directory the
 # deposit landed in.
+#
+# SOP (2026-07-06, ratified as Principle 5 2026-07-11):
+#   - Watch YOUR OWN inbox only — watching a peer's inbox self-echoes
+#     your own outbound deposits. Multi-dir mode is for seats that hold
+#     several repos' own inboxes, never for peer surveillance.
+#   - One watcher per inbox — the script warns at arm time if another
+#     inbox-watch instance is already running (stale watchers from
+#     earlier sessions cause double coverage and split provenance).
 #
 # Runs until killed — arm it as a persistent background monitor at session
 # start (coordination-seat cold start; see practices/session-lifecycle.md).
@@ -94,6 +103,31 @@ MULTI=0
 if [ "${#DIRS[@]}" -gt 1 ]; then
   MULTI=1
 fi
+
+# --- Principle 5 arm-time checks (warn, never block) -----------------------
+
+# Stale-watcher check: another running inbox-watch means double coverage
+# and split provenance. Warn with PIDs so the operator can kill them.
+# (Excludes this process and its parent — the launching shell's command
+# line usually contains the script name and would false-positive.)
+OTHER_WATCHERS="$(pgrep -f 'inbox-watch\.sh' 2>/dev/null | grep -v "^$$\$" | grep -v "^$PPID\$" | tr '\n' ' ')"
+if [ -n "${OTHER_WATCHERS// /}" ]; then
+  echo "inbox-watch: WARN — other inbox-watch instance(s) already running (PIDs: ${OTHER_WATCHERS}). Stale watchers from earlier sessions cause double coverage; kill them before trusting this one (Principle 5 / SOP 2026-07-06)." >&2
+fi
+
+# Own-inbox scope check: a watched dir outside the current working tree is
+# usually a peer's inbox — self-echo territory. Heuristic, so warn only.
+for dir in "${DIRS[@]}"; do
+  abs="$(cd "$dir" 2>/dev/null && pwd || echo "$dir")"
+  case "$abs" in
+    "$PWD"|"$PWD"/*) : ;;
+    *)
+      echo "inbox-watch: WARN — $dir resolves outside the current repo ($PWD). Watch your OWN inbox only; a peer's inbox self-echoes your outbound deposits (Principle 5 / SOP 2026-07-06). Proceeding — make sure this is a seat you hold." >&2
+      ;;
+  esac
+done
+
+# ---------------------------------------------------------------------------
 
 STATE_DIR="$(mktemp -d)"
 SLEEP_PID=""

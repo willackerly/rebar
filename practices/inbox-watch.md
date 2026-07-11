@@ -2,6 +2,8 @@
 
 > Practice status: proven in the field (go-tak-server ↔ tak-tdf ↔ TDFLite-tak, 2026-07-02 —
 > same-day memo turnaround across three repos during a coordination-heavy release day).
+> **Elevated to doctrine 2026-07-11:** `practices/federation.md` Principle 5 — a held inbox
+> is a watched inbox, same canonical script fleet-wide, own inbox only.
 
 ## The problem
 
@@ -76,11 +78,22 @@ Any harness that turns a long-running command's stdout lines into agent notifica
   are not covered — that's the peer's watcher's job. (Symmetry is the point: each repo watches its
   own inbox.)
 
+## Scope SOP — own inbox only (2026-07-06, ratified into Principle 5)
+
+Watch the inbox(es) **you hold** — never a peer's. A watcher pointed at a peer's inbox
+self-echoes every memo you deposit there (your own outbound mail comes back as a "new
+deposit"), and two seats watching one inbox split provenance over who processed what.
+Multi-inbox mode exists for seats that hold several repos' **own** inboxes — never for
+peer surveillance. Before arming, check for watchers left over from earlier sessions
+(the script warns with PIDs at arm time; kill stale ones first). Your outbound memos
+sitting in a peer's inbox are the *peer's* watcher's job — symmetry is the point.
+
 ## Variations
 
-- **Multi-inbox:** prefix the emitted line per directory and run one loop over several inboxes
-  (`for d in $DIRS; ...`) when a session coordinates more than one repo pair. (In the script:
-  pass several dirs as args; emitted paths get the directory prefix automatically.)
+- **Multi-inbox:** prefix the emitted line per directory and run one loop over several
+  **held** inboxes (`for d in $DIRS; ...`) when one seat coordinates several repos. (In the
+  script: pass several dirs as args; emitted paths get the directory prefix automatically.
+  Own inboxes only — see the Scope SOP above.)
 - **First-line preview:** append `&& head -1 "inbox/$new"` to the emit for a one-line memo preview
   in the notification — useful when triaging which deposit to read first. (In the script:
   `--preview`.)

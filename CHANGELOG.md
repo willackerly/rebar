@@ -16,6 +16,31 @@ All notable changes to rebar. Versioned with [semver](https://semver.org/).
 
 ---
 
+## Unreleased
+
+### Added
+
+- **Federation Principle 5 — "a held inbox is a watched inbox"**
+  (`practices/federation.md`; owner-ratified 2026-07-11). Every repo
+  holding a peer `inbox/` arms the **same canonical watcher**
+  (`scripts/inbox-watch.sh`) on its **own** inbox at session start; no
+  per-repo watcher variants. Generalizes the 2026-07-06 field SOP
+  (own-inbox-only, stale-watcher check) from
+  `feedback/2026-07-06-inbox-watch-self-echo-scope-to-own-inbox.md`.
+- `scripts/inbox-watch.sh`: arm-time Principle-5 checks — warns when
+  another inbox-watch instance is already running (stale-watcher /
+  double-coverage guard, parent-PID false-positive filtered) and when a
+  watched directory resolves outside the current repo (own-inbox-only
+  guard). Warn-only; never blocks. Template copy synced byte-identical
+  (`templates/project-bootstrap/scripts/inbox-watch.sh`).
+- Project bootstrap now ships a top-level `inbox/` (with a one-line
+  README) so adopter repos are born holding a peer inbox.
+- Peer-Inbox Convention (`conventions.md`): Principle-5 bullet and an
+  optional `reply-by:` frontmatter field (courtesy deadline signal for
+  coordination seats; absence means human-ish timescales).
+- `practices/inbox-watch.md`: Scope SOP section (own inbox only, stale
+  watchers); `practices/session-lifecycle.md` step 4 aligned.
+
 ## v3.0.0-beta (2026-07-04)
 
 Seven clusters consolidated onto one trunk — the alpha→beta hard move.

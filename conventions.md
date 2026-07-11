@@ -370,6 +370,18 @@ cluster (2026-07); mechanics and watcher in `practices/inbox-watch.md`.
   need one. Coordination **seats** sweep every inbox they hold at
   session start, then arm `scripts/inbox-watch.sh` as a persistent
   monitor (see `practices/session-lifecycle.md`).
+- **A held inbox is a watched inbox** (federation Principle 5, ratified
+  2026-07-11): every repo that holds a peer inbox arms the **same
+  canonical watcher** — `scripts/inbox-watch.sh`, shipped in the
+  project bootstrap — pointed at its **own** `inbox/`, at session
+  start. Own inbox only (a peer's inbox self-echoes your outbound
+  deposits — SOP 2026-07-06); check for stale watchers before arming
+  (the script warns). No repo writes its own watcher variant.
+- **`reply-by:` (optional frontmatter):** a memo that needs a timely
+  answer may carry `reply-by: <ISO datetime>` as a courtesy signal.
+  Coordination seats may alarm on breach; absence means "human-ish
+  timescales." This is coordinator policy, not doctrine — a memo
+  without it is never wrong.
 - **Namespace note:** this is unrelated to the ASK runtime's
   `agents/<role>/inbox/` message queues (gitignored, JSON, consumed by
   `bin/ask`). A repo-level `inbox/` holds durable peer mail; an agent
