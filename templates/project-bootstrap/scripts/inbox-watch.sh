@@ -17,9 +17,12 @@
 #   - Watch YOUR OWN inbox only — watching a peer's inbox self-echoes
 #     your own outbound deposits. Multi-dir mode is for seats that hold
 #     several repos' own inboxes, never for peer surveillance.
-#   - One watcher per inbox — the script warns at arm time if another
-#     inbox-watch instance is already running (stale watchers from
-#     earlier sessions cause double coverage and split provenance).
+#   - One watcher per inbox — each watcher drops a PID lock
+#     (.inbox-watch.lock, a hidden dotfile) in the inbox and warns at arm
+#     time ONLY if another LIVE watcher already holds the SAME inbox (double
+#     coverage / split provenance). A stale lock from a crashed watcher is
+#     reclaimed silently. (This replaced a process-global check that
+#     false-positived on every sibling seat in a multi-seat single machine.)
 #
 # Runs until killed — arm it as a persistent background monitor at session
 # start (coordination-seat cold start; see practices/session-lifecycle.md).
@@ -106,25 +109,47 @@ fi
 
 # --- Principle 5 arm-time checks (warn, never block) -----------------------
 
-# Stale-watcher check: another running inbox-watch means double coverage
-# and split provenance. Warn with PIDs so the operator can kill them.
-# (Excludes this process and its parent — the launching shell's command
-# line usually contains the script name and would false-positive.)
-OTHER_WATCHERS="$(pgrep -f 'inbox-watch\.sh' 2>/dev/null | grep -v "^$$\$" | grep -v "^$PPID\$" | tr '\n' ' ')"
-if [ -n "${OTHER_WATCHERS// /}" ]; then
-  echo "inbox-watch: WARN — other inbox-watch instance(s) already running (PIDs: ${OTHER_WATCHERS}). Stale watchers from earlier sessions cause double coverage; kill them before trusting this one (Principle 5 / SOP 2026-07-06)." >&2
-fi
+# Per-dir arm-time checks: own-inbox scope + a per-inbox lock.
+#
+# The real double-coverage hazard is TWO watchers on the SAME inbox (split
+# provenance), NOT two unrelated watchers on one host. A process-global
+# `pgrep inbox-watch` warns on every legitimate sibling seat in a
+# single-machine, multi-seat setup — a cry-wolf that trains operators to
+# ignore the warning (go-tak-server / _atlas, 2026-07-11). Instead each
+# watcher drops a PID lock in its inbox and we warn only when another LIVE
+# process already holds the lock on the same dir. The lock file is a dotfile,
+# so `ls -1` (no -a) never lists it — it can't leak into the watch or ledger.
+LOCK_NAME=".inbox-watch.lock"
+LOCKS=()
+lock_holder() { head -n 1 "$1" 2>/dev/null | tr -dc '0-9'; }
 
-# Own-inbox scope check: a watched dir outside the current working tree is
-# usually a peer's inbox — self-echo territory. Heuristic, so warn only.
 for dir in "${DIRS[@]}"; do
   abs="$(cd "$dir" 2>/dev/null && pwd || echo "$dir")"
+
+  # Own-inbox scope check: a watched dir outside the current working tree is
+  # usually a peer's inbox — self-echo territory. Heuristic, so warn only.
   case "$abs" in
     "$PWD"|"$PWD"/*) : ;;
     *)
       echo "inbox-watch: WARN — $dir resolves outside the current repo ($PWD). Watch your OWN inbox only; a peer's inbox self-echoes your outbound deposits (Principle 5 / SOP 2026-07-06). Proceeding — make sure this is a seat you hold." >&2
       ;;
   esac
+
+  # Per-inbox lock. Only a dir that exists can hold a file; a not-yet-created
+  # dir is watched best-effort without a lock.
+  [ -d "$dir" ] || continue
+  lock="$abs/$LOCK_NAME"
+  if [ -f "$lock" ]; then
+    holder="$(lock_holder "$lock")"
+    if [ -n "$holder" ] && [ "$holder" != "$$" ] && kill -0 "$holder" 2>/dev/null; then
+      echo "inbox-watch: WARN — a live watcher (PID $holder) already holds $dir (its $LOCK_NAME). Two watchers on one inbox = double coverage / split provenance; kill PID $holder or point this watcher elsewhere (Principle 5)." >&2
+      continue   # never steal a live holder's lock
+    fi
+    # else: stale lock (dead or non-numeric holder) — reclaimed silently below.
+  fi
+  if printf '%s\n' "$$" > "$lock" 2>/dev/null; then
+    LOCKS[${#LOCKS[@]}]="$lock"
+  fi
 done
 
 # ---------------------------------------------------------------------------
@@ -135,6 +160,14 @@ cleanup() {
   if [ -n "$SLEEP_PID" ]; then
     kill "$SLEEP_PID" 2>/dev/null
   fi
+  # Release only the locks we still hold — a reclaiming successor may already
+  # own one (don't delete its lock). ${arr[@]+...} is the set-u-safe empty-array
+  # form for bash 3.2.
+  for lk in ${LOCKS[@]+"${LOCKS[@]}"}; do
+    if [ -f "$lk" ] && [ "$(lock_holder "$lk")" = "$$" ]; then
+      rm -f "$lk"
+    fi
+  done
   rm -rf "$STATE_DIR"
 }
 trap cleanup EXIT

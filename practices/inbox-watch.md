@@ -84,9 +84,12 @@ Watch the inbox(es) **you hold** — never a peer's. A watcher pointed at a peer
 self-echoes every memo you deposit there (your own outbound mail comes back as a "new
 deposit"), and two seats watching one inbox split provenance over who processed what.
 Multi-inbox mode exists for seats that hold several repos' **own** inboxes — never for
-peer surveillance. Before arming, check for watchers left over from earlier sessions
-(the script warns with PIDs at arm time; kill stale ones first). Your outbound memos
-sitting in a peer's inbox are the *peer's* watcher's job — symmetry is the point.
+peer surveillance. Each watcher drops a PID lock (`.inbox-watch.lock`, a hidden dotfile)
+in its inbox and warns at arm time only if another **live** watcher already holds the
+**same** inbox — so a genuine double-watch is caught, while legitimate sibling seats each
+watching their own inbox on one machine no longer cry wolf. A stale lock from a crashed
+watcher is reclaimed silently. Your outbound memos sitting in a peer's inbox are the
+*peer's* watcher's job — symmetry is the point.
 
 ## Variations
 

@@ -12,6 +12,9 @@ shared/messages/events.jsonl
 .rebar/salt
 .rebar/keys/
 
+# inbox-watch per-inbox lock (federation Principle 5)
+**/.inbox-watch.lock
+
 # Generated outputs (Steward writes these on every scan)
 STEWARD_REPORT.md
 architecture/.state/*.json

@@ -27,11 +27,16 @@ All notable changes to rebar. Versioned with [semver](https://semver.org/).
   per-repo watcher variants. Generalizes the 2026-07-06 field SOP
   (own-inbox-only, stale-watcher check) from
   `feedback/2026-07-06-inbox-watch-self-echo-scope-to-own-inbox.md`.
-- `scripts/inbox-watch.sh`: arm-time Principle-5 checks — warns when
-  another inbox-watch instance is already running (stale-watcher /
-  double-coverage guard, parent-PID false-positive filtered) and when a
-  watched directory resolves outside the current repo (own-inbox-only
-  guard). Warn-only; never blocks. Template copy synced byte-identical
+- `scripts/inbox-watch.sh`: arm-time Principle-5 checks — a **per-inbox PID
+  lock** (`.inbox-watch.lock`, a hidden dotfile invisible to the watch) that
+  warns only when another **live** watcher already holds the **same** inbox
+  (real double-coverage), and reclaims a crashed watcher's stale lock silently;
+  plus an own-inbox scope warning when a watched dir resolves outside the
+  current repo. Warn-only; never blocks. The lock replaced an earlier
+  process-global `pgrep inbox-watch` check that false-positived on every
+  legitimate sibling seat in a single-machine, multi-seat setup (go-tak-server
+  / _atlas, 2026-07-11) — cry-wolf that defeats the warning's purpose. Lock is
+  git-ignored (bootstrap + rebar). Template copy synced byte-identical
   (`templates/project-bootstrap/scripts/inbox-watch.sh`).
 - Project bootstrap now ships a top-level `inbox/` (with a one-line
   README) so adopter repos are born holding a peer inbox.
@@ -78,6 +83,10 @@ All notable changes to rebar. Versioned with [semver](https://semver.org/).
   under C), then asserts a full lifecycle — armed baseline silent, one emit per
   genuine deposit, silent through a transient remove/restore — emits **exactly**
   the genuine deposits. Confirmed to fail against both pre-fix revisions.
+- `scripts/tests/inbox-watch-lock.test.sh`: regression guard for the per-inbox
+  lock — asserts the lock is written with the watcher's PID and hidden from
+  `ls -1`, a second watcher on the same inbox warns and does not steal it, a
+  clean exit releases it, and a stale (dead-PID) lock is reclaimed silently.
 
 ## v3.0.0-beta (2026-07-04)
 
