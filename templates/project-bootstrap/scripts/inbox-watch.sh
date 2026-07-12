@@ -174,8 +174,13 @@ while true; do
     snap="$STATE_DIR/snap.$i"
     cur="$STATE_DIR/cur.$i"
     list_dir "$dir" > "$cur"
-    # comm -13: lines only in the current listing = new deposits.
-    comm -13 "$snap" "$cur" | while IFS= read -r name; do
+    # comm -13: lines only in the current listing = new deposits. Pin the
+    # merge walk to C collation: comm assumes its inputs are sorted in the
+    # CURRENT locale, but list_dir and the union below both sort under
+    # LC_ALL=C. Without this pin, comm compares C-sorted files using locale
+    # collation and mis-reports a stable subset every poll (go-tak-server
+    # FRICTION #2, 2026-07-11). Every sort/merge on these files is C-collated.
+    LC_ALL=C comm -13 "$snap" "$cur" | while IFS= read -r name; do
       [ -n "$name" ] || continue
       if [ "$MULTI" -eq 1 ]; then
         path="$dir/$name"
@@ -200,7 +205,13 @@ while true; do
     # the whole backlog re-emitted on the next poll — go-tak-server, 2026-07-11.)
     # Trade-off: a deleted-then-recreated same-name file won't re-notify. That
     # is correct for the inbox convention (dated, unique, append-only names).
-    sort -u "$snap" "$cur" -o "$snap"
+    # LC_ALL=C is REQUIRED, not cosmetic: list_dir emits C-collated listings,
+    # so the ledger must stay C-collated or comm (above) merge-walks two
+    # differently-ordered files and re-emits a stable subset every poll. A
+    # plain `sort -u` here re-collates under the default locale and reintroduces
+    # exactly that (go-tak-server FRICTION #2, 2026-07-11 — worse than the bug
+    # this block fixed, because it fires every poll, not just on git ops).
+    LC_ALL=C sort -u "$snap" "$cur" -o "$snap"
     rm -f "$cur"
     i=$((i + 1))
   done

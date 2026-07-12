@@ -58,6 +58,26 @@ All notable changes to rebar. Versioned with [semver](https://semver.org/).
   Trade-off (correct for the inbox convention): a deleted-then-recreated
   same-name file will not re-notify; inbox names are dated, unique, append-only.
   Template copy synced byte-identical.
+- `scripts/inbox-watch.sh`: **collation follow-up to the ledger fix — phantom
+  re-emit every poll under a non-C locale.** The first ledger fix unioned with a
+  bare `sort -u`, which re-collates under the ambient locale, while `list_dir`
+  emits `LC_ALL=C`-sorted listings. With mixed-case filenames (the memo norm),
+  the ledger and the current listing then sorted differently and `comm` merge-
+  walked two mis-ordered files, reporting a stable subset as new **every poll,
+  permanently** — worse than the git-op bug it replaced. Now `LC_ALL=C` is
+  pinned on both the union sort and the `comm` walk, so every sort/merge over
+  these files shares the one C collation. Field-reported same day by the
+  go-tak-server stress rig; the earlier regression test missed it because its
+  fixtures were lowercase-only (identical under C and locale collation).
+
+### Added
+
+- `scripts/tests/inbox-watch.test.sh`: regression guard for both inbox-watch
+  bugs above. Uses mixed-case, digit-heavy fixtures and forces a divergent
+  UTF-8 locale (skips loudly if none is installed, rather than passing falsely
+  under C), then asserts a full lifecycle — armed baseline silent, one emit per
+  genuine deposit, silent through a transient remove/restore — emits **exactly**
+  the genuine deposits. Confirmed to fail against both pre-fix revisions.
 
 ## v3.0.0-beta (2026-07-04)
 
