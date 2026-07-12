@@ -147,7 +147,9 @@ list_dir() {
   ls -1 "$1" 2>/dev/null | LC_ALL=C sort
 }
 
-# Baseline snapshots: everything present at arm time is old news.
+# Seed the seen-ledger: everything present at arm time is old news. From here
+# the ledger only grows (union each poll), so it is a permanent per-filename
+# record of what has been reported, not a rolling snapshot of the last listing.
 i=0
 for dir in "${DIRS[@]}"; do
   if [ ! -d "$dir" ]; then
@@ -189,7 +191,17 @@ while true; do
       fi
       echo "$line"
     done
-    mv "$cur" "$snap"
+    # Union cur INTO the seen-ledger, never replace it. A filename, once seen,
+    # stays seen for the life of the watcher. This is what makes a re-emit
+    # impossible when a git operation (merge/checkout/stash) transiently
+    # removes-and-restores tracked inbox files: the restored names are already
+    # in the ledger, so they don't re-diff as new. (A plain `mv cur snap` keyed
+    # the baseline to the LAST listing, so a transient empty dir reset it and
+    # the whole backlog re-emitted on the next poll — go-tak-server, 2026-07-11.)
+    # Trade-off: a deleted-then-recreated same-name file won't re-notify. That
+    # is correct for the inbox convention (dated, unique, append-only names).
+    sort -u "$snap" "$cur" -o "$snap"
+    rm -f "$cur"
     i=$((i + 1))
   done
 done

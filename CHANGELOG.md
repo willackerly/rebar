@@ -41,6 +41,24 @@ All notable changes to rebar. Versioned with [semver](https://semver.org/).
 - `practices/inbox-watch.md`: Scope SOP section (own inbox only, stale
   watchers); `practices/session-lifecycle.md` step 4 aligned.
 
+### Fixed
+
+- `scripts/inbox-watch.sh`: **full-backlog re-emit on inbox git operations.**
+  The per-poll baseline update replaced the seen-set with the current listing
+  (`mv cur snap`), so a git op (merge/checkout/stash) that transiently
+  removes-and-restores tracked inbox files reset the baseline to the empty/
+  partial mid-operation state — and the whole backlog then re-diffed as new on
+  the next poll. Now the seen-set is an **append-only ledger** (`sort -u` union
+  each poll): a filename, once reported, stays reported for the watcher's life,
+  so transient disappearance-and-return cannot re-notify. Field-reported by the
+  go-tak-server seat (2026-07-11, one 8-file burst); reproduced and regression-
+  tested (old logic emits the backlog, new logic emits only genuine deposits).
+  Matters under Principle 5: a fleet-wide re-emit would train every seat to skim
+  NEW-deposit events — the exact reflex the principle exists to prevent.
+  Trade-off (correct for the inbox convention): a deleted-then-recreated
+  same-name file will not re-notify; inbox names are dated, unique, append-only.
+  Template copy synced byte-identical.
+
 ## v3.0.0-beta (2026-07-04)
 
 Seven clusters consolidated onto one trunk — the alpha→beta hard move.
