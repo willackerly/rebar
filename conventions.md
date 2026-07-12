@@ -375,8 +375,13 @@ cluster (2026-07); mechanics and watcher in `practices/inbox-watch.md`.
   canonical watcher** — `scripts/inbox-watch.sh`, shipped in the
   project bootstrap — pointed at its **own** `inbox/`, at session
   start. Own inbox only (a peer's inbox self-echoes your outbound
-  deposits — SOP 2026-07-06); check for stale watchers before arming
-  (the script warns). No repo writes its own watcher variant.
+  deposits — SOP 2026-07-06). The watcher drops a hidden
+  `.inbox-watch.lock` PID file in the inbox and warns only on a genuine
+  same-inbox double-watch; **gitignore that lock**
+  (`**/.inbox-watch.lock`) on any repo whose `inbox/` is git-tracked —
+  it is ephemeral per-watcher state, never coordination ledger, and a
+  stray `git add -A` would otherwise stage a PID file (the bootstrap
+  inbox ships the ignore). No repo writes its own watcher variant.
 - **`reply-by:` (optional frontmatter):** a memo that needs a timely
   answer may carry `reply-by: <ISO datetime>` as a courtesy signal.
   Coordination seats may alarm on breach; absence means "human-ish

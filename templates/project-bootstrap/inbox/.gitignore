@@ -1,0 +1,5 @@
+# Runtime PID lock written by scripts/inbox-watch.sh (federation Principle 5).
+# It is ephemeral per-watcher state, never part of the coordination ledger —
+# do not commit it. Co-located here so it travels with the inbox even if the
+# repo root .gitignore is missing the pattern.
+.inbox-watch.lock
