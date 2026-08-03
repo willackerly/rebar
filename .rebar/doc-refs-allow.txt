@@ -1,0 +1,6 @@
+# Illustrative paths in documentation examples, not real references.
+# The markdown-embed example `![](x.pptv.svg)` resolves relative to each
+# referring file, so one entry per directory that carries the example.
+practices/x.pptv.svg
+feedback/x.pptv.svg
+inbox/x.pptv.svg
