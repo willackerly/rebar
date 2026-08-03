@@ -1,5 +1,16 @@
 # Feedback: `check-freshness.sh` parses one marker vocabulary; QUICKCONTEXT uses the other and is invisible to it
 
+**DISPOSITION 2026-08-02 — IMPLEMENTED.** `check-freshness.sh` now parses both
+`freshness:` and `last-synced:` (freshness wins when both are present), reports the
+marker that matched in the STALE line, and prints the honest denominator — how many
+`.md` files carry no currency marker at all, so "checked 2 docs" can no longer read as
+"the repo is fresh." rebar's own QUICKCONTEXT went from invisible to checked. Verified
+with a `last-synced:`-only probe doc: flagged at 92 days, labeled with the right marker.
+Bootstrap copy synced. The `expires`-inversion and frozen-artifact items remain open as
+adjacent directions, not part of this fix.
+
+---
+
 **Date:** 2026-08-02
 **Source:** rebar self-audit, triggered by the sch-repos AMENDMENT memo of 2026-08-02
 **Type:** bug (v3.0.0 scope — `check-freshness.sh` is a shipped v3 mechanism)

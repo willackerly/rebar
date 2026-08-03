@@ -1,5 +1,17 @@
 # Check 9 maturity weighting degenerates at exactly one live contract — honest downgrade jumps straight to FAIL + demotion (from sch-repos, 2026-08-02)
 
+**DISPOSITION 2026-08-02 — IMPLEMENTED as filed.** Check 9 now guards the demotion arm
+at `live_total -lt 2`, printing an advisory NOTE instead of weighting a badge on a
+population where the percentage can only be 0% or 100%. Threshold is `-lt 2` per the
+filing's own reasoning: n=1 is precisely the degenerate case, and from n=2 the NOTE band
+is reachable. 100%-stub still fails at every n>=2, so anti-laundering is intact. The
+gaming residual (delete contracts to drop under the threshold) is accepted for the
+reasons given — self-defeating, visible in the diff, and the resulting state is what the
+advisory already prints. Excellent filing: the arithmetic table made this a
+ten-minute fix.
+
+---
+
 **Script:** `scripts/check-compliance.sh` — Check 9, declared-maturity badge
 weighting (v3.0.0-beta, Cluster 1).
 

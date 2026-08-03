@@ -233,15 +233,39 @@ this kind of surface, the implementation is wrong.
 
 ---
 
-## Principle 5 — A held inbox is a watched inbox
+## Principle 5 — Hold ⇒ sweep. Live traffic ⇒ watch.
 
-A repo that holds a peer `inbox/` **arms the canonical watcher on it at
-session start**. Deposited memos are a live channel, not an archive: an
-unwatched inbox silently converts every peer's same-day ask into a
-some-day ask, and the sender has no way to tell the difference.
+A repo that holds a peer `inbox/` **sweeps it at session start**. A repo
+carrying live cross-repo traffic additionally **arms the canonical watcher
+on it**. Deposited memos are a live channel, not an archive: an unwatched
+inbox silently converts every peer's same-day ask into a some-day ask, and
+the sender has no way to tell the difference.
 
 Ratified by the owner 2026-07-11, generalizing the field SOP of
 2026-07-06 (go-tak-server ↔ tak-tdf ↔ TDFLite-tak coordination).
+
+**Amended 2026-08-02** when inbox-by-default was accepted (sch-repos
+PROPOSAL). The original read "a held inbox is a watched inbox," which was
+right while inboxes were held only by active coordination clusters. Once
+*every* repo holds one — because a dependency is a coordination seat — that
+phrasing would conscript every silent upstream into arming a persistent
+monitor for a channel receiving a handful of memos a year. That is the
+ceremony objection from decision D8, and it is earned. Splitting the two
+costs keeps inbox-by-default affordable: **holding** is a directory,
+**sweeping** is one `ls`, and **arming** is reserved for seats with traffic
+to justify it.
+
+**Own outbound mail is suppressed by sender.** The inbox protocol requires
+banking the outbound copy of each memo in your own `inbox/` — both halves of
+a conversation in one committed directory, since half a conversation cannot
+carry provenance. Combined with watching your own inbox, that means every
+memo you *send* fires your own watcher. Observed 2026-08-02 in rebar's first
+end-to-end session with the protocol: four outbound memos, four
+notifications, zero inbound mail. The watcher now skips deposits whose
+`<sender>` filename segment matches `--self` (default: the repo directory
+name). Suppressed files still enter the seen-ledger, so changing `--self`
+later cannot replay them as a backlog burst. Regression:
+`scripts/tests/inbox-watch-self-echo.test.sh`.
 
 ### The rules
 

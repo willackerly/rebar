@@ -1,5 +1,17 @@
 # Feedback: banking the outbound copy in your own `inbox/` self-echoes through the Principle-5 watcher
 
+**DISPOSITION 2026-08-02 — IMPLEMENTED as the sender-aware option.** `inbox-watch.sh`
+gained `--self` (default: repo directory name; `--self ''` disables), skipping deposits
+whose `<sender>` filename segment is your own. Suppression applies to the NOTIFICATION
+only — files still enter the seen-ledger, so changing `--self` later cannot replay them
+as a backlog burst. Arm-time line states whether suppression is on, so silence from a
+healthy watcher never looks like a dead one. Regression:
+`scripts/tests/inbox-watch-self-echo.test.sh` (4 invariants). Pre/post demonstrated
+against the pre-fix binary: 2 events before, 1 after. Principle 5 and the Peer-Inbox
+Convention updated. The `outbox/` alternative was declined for the reason filed.
+
+---
+
 **Date:** 2026-08-02
 **Source:** rebar seat, first live session using `practices/inbox-protocol.md` + an armed watcher
 **Type:** bug (interaction between two shipped mechanisms)

@@ -49,6 +49,10 @@ set -uo pipefail
 
 INTERVAL=30
 PREVIEW=0
+# Own-sender suppression (see the emit loop). Defaults to the repo directory
+# name, which is the sender token this repo's own memos carry. --self ''
+# disables suppression entirely.
+SELF="$(basename "$(cd "$(dirname "$0")/.." && pwd)")"
 DIRS=()
 
 while [ $# -gt 0 ]; do
@@ -63,6 +67,15 @@ while [ $# -gt 0 ]; do
       ;;
     --interval=*) INTERVAL="${1#--interval=}" ;;
     --preview) PREVIEW=1 ;;
+    --self)
+      shift
+      if [ $# -eq 0 ]; then
+        echo "inbox-watch: --self needs a value (use --self '' to disable)" >&2
+        exit 2
+      fi
+      SELF="$1"
+      ;;
+    --self=*) SELF="${1#--self=}" ;;
     -h|--help)
       sed -n '2,/^$/p' "$0" | sed 's/^# \{0,1\}//'
       exit 0
@@ -192,7 +205,11 @@ for dir in "${DIRS[@]}"; do
   i=$((i + 1))
 done
 
-echo "inbox-watch: armed — watching ${DIRS[*]} every ${INTERVAL}s (pre-existing files not reported)" >&2
+if [ -n "$SELF" ]; then
+  echo "inbox-watch: armed — watching ${DIRS[*]} every ${INTERVAL}s (pre-existing files not reported; own-sender deposits suppressed: $SELF)" >&2
+else
+  echo "inbox-watch: armed — watching ${DIRS[*]} every ${INTERVAL}s (pre-existing files not reported; own-sender suppression OFF)" >&2
+fi
 
 while true; do
   # Background sleep + wait keeps the loop responsive to signals: a kill
@@ -219,6 +236,26 @@ while true; do
         path="$dir/$name"
       else
         path="$name"
+      fi
+      # Suppress your OWN outbound mail. The inbox protocol says to bank the
+      # outbound copy in your own inbox/ (both halves of a conversation in one
+      # committed directory); Principle 5 says to watch your own inbox. Doing
+      # both means every memo you SEND arrives as a notification that you
+      # RECEIVED something — one false event per reply, and replies usually
+      # outnumber the memos prompting them. That trains seats to skim
+      # NEW-deposit events, which is the failure a noisy watcher causes and
+      # the reason the re-emit bug was treated as urgent in July.
+      #
+      # The naming grammar makes this mechanical: the second segment of
+      # YYYY-MM-DD-<sender>-<TYPE>-<description>.md is normatively the sender.
+      # Suppress the NOTIFICATION only — the file still enters the seen-ledger
+      # below, so changing --self later can never cause a retroactive backlog
+      # re-emit. See feedback/2026-08-02-outbound-banking-self-echoes-*.md
+      if [ -n "$SELF" ]; then
+        sender="$(printf '%s' "$name" | sed -E 's/^[0-9]{4}-[0-9]{2}-[0-9]{2}-//; s/-.*$//')"
+        if [ "$sender" = "$SELF" ]; then
+          continue
+        fi
       fi
       line="NEW INBOX DEPOSIT: $path"
       if [ "$PREVIEW" -eq 1 ] && [ -f "$dir/$name" ]; then

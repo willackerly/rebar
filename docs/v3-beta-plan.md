@@ -224,6 +224,18 @@ Then: version strings → `v3.0.0`, CHANGELOG entry, tag, announce via
 the outbox/inbox channels. Criteria may be amended here (with a
 decision-log entry), never silently skipped.
 
+### Scoreboard — updated 2026-08-02 (`v3.0.0-beta.2`)
+
+| # | Criterion | State |
+|---|---|---|
+| 1 | Two migrated repos, ≥2 wks clean | **count met** — `office180`, `go-tak-server` (both `v3.0.0-beta`, `Status:` declared, SessionStart hook emitting). **Clean clock restarted 2026-08-02**: three P1/P2 v3-feature defects were filed and fixed that day. Earliest satisfaction ≈ **2026-08-16**. |
+| 2 | Live seat on canonical `inbox-watch.sh` | **MET 2026-08-02** — rebar armed the canonical watcher on its own `inbox/` during real cross-repo traffic and it delivered a genuine inbound (TDFLite ANSWER) plus surfaced a live defect in the protocol/watcher seam. |
+| 3 | Every v3-feature feedback item dispositioned | **MET 2026-08-02** — all five items filed in the window are implemented and moved to `feedback/processed/`: freshness two-vocabulary, Check-9 degenerate population, canonical `Status:` grep divergence, watcher self-echo, and CONSUMES fenced-example miscount (found while verifying the Check-9 fix). Pre-v3 items in `feedback/` are out of scope for this criterion (it reads "filed during the window"). |
+| 4 | No swarm tooling parses computed `verified` | **MET 2026-08-02, verified by reading** — every repo on v3 (`rebar`, `office180`, `go-tak-server`) emits `lifecycle="impl-present"` and contains **zero** `lifecycle == "verified"` comparisons. `TDFLite`, `tak-tdf`, and `dapple-sdk` do still emit *and* parse `verified`, but all three are `v2.0.0` running the v2 steward: emitter and parser agree inside each repo, so no cross-vocabulary mismatch exists. The hazard this criterion guards — a v3 steward emitting `impl-present` while a consumer greps `verified`, silently reading zero — occurs nowhere. **Migration note:** the rename is a required step whenever those three move to v3; it is a migration checklist item, not a v3 defect. |
+
+**Standing: 3 of 4 met.** Criterion 1's two-week clean clock is the only
+remaining gate. No criterion has been amended or waived.
+
 ## What's deferred (unchanged rationale)
 
 | Item | Source | Why deferred |

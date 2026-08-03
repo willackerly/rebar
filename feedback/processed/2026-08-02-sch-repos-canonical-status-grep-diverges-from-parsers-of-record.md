@@ -1,5 +1,18 @@
 # The published canonical `Status:` grep does not match the parsers of record (from sch-repos, 2026-08-02)
 
+**DISPOSITION 2026-08-02 — IMPLEMENTED, options 1 + 3-partial.** `conventions.md` now
+publishes the *matching* regex `^\*{0,2}Status:` alongside the *authoring* form
+`**Status:** value`, with an explicit instruction that the two must change in the same
+commit. Beyond the filing: the parser was also fixed rather than merely documented — the
+strip is now a single asterisk-tolerant `s/^\*{0,2}Status:\*{0,2}//`, so `*Status:* active`
+parses to `active` instead of being mangled into a stub-or-draft penalty. Verified across
+all three asterisk forms. The `*)` arm now also prints the raw source line, since naming
+the mangled value gave an author nothing to act on. Option 2 (emit the regex from tooling)
+is the durable fix and stays open — the shared-string discipline is documented, not yet
+mechanized.
+
+---
+
 **Docs:** `conventions.md` — "Declared Maturity (`Status:` field)", the
 machine-greppable form (~line 329).
 **Scripts:** `scripts/check-compliance.sh` (Check 9), `scripts/cold-start-checks.sh`.

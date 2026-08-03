@@ -210,7 +210,19 @@ if [ -f "$CONSUMES_FILE" ]; then
   echo "=== Federation (CONSUMES.md present) ==="
 
   # Has at least one real entry (## owner/contract.version section)?
-  consumes_entries=$(grep -cE '^## [A-Za-z0-9_-]+/[A-Za-z0-9_.-]+$' "$CONSUMES_FILE" 2>/dev/null | tr -d '[:space:]' || echo 0)
+  # Count REAL declarations only — a fenced code block documenting the format
+  # is not a dependency. The bootstrap's own CONSUMES.md carries five worked
+  # examples inside a ```markdown fence; a line-anchored grep counted all five,
+  # so every freshly-bootstrapped project failed this check out of the box
+  # ("declares dependencies but drift-check is not wired") without ever having
+  # declared anything. sch-repos named this class exactly, in another context,
+  # the same day: an anchored regex cannot distinguish a real declaration from
+  # a document quoting one. Toggling on ``` fences is the cheap correct fix.
+  consumes_entries=$(awk '
+    /^```/ { fence = !fence; next }
+    !fence && /^## [A-Za-z0-9_-]+\/[A-Za-z0-9_.-]+$/ { n++ }
+    END { print n + 0 }
+  ' "$CONSUMES_FILE" 2>/dev/null | tr -d '[:space:]' || echo 0)
   if [ "${consumes_entries:-0}" = "0" ]; then
     echo "OK: CONSUMES.md present but no entries declared (federation opt-in not yet active)"
   else
@@ -283,9 +295,20 @@ if [ -d "$ARCH_DIR" ]; then
 
     # Tolerant parse, identical to cold-start-checks.sh: bolded or bare
     # 'Status:' line, first word, case-folded. The canonical form stays
-    # '**Status:** value' (conventions.md) but parsers of record must agree.
-    cstatus="$(grep -m1 -E '^\*{0,2}Status:' "$contract" 2>/dev/null \
-      | sed -e 's/^\*\*Status:\*\*//' -e 's/^Status://' \
+    # '**Status:** value' (conventions.md) but parsers of record must agree —
+    # and conventions.md now publishes THIS regex verbatim so prose cannot
+    # drift from the parser again.
+    #
+    # The strip is a single asterisk-tolerant expression rather than two
+    # fixed alternatives. The old chain matched '^\*{0,2}Status:' but only
+    # stripped the two-asterisk and bare forms, so '*Status:* active' fell
+    # through with its marker intact, awk yielded '*Status:*', and the value
+    # landed on the '*)' arm — silently counted as stub-or-draft. A
+    # formatting slip became a badge penalty explained only by a WARN.
+    # See feedback/2026-08-02-sch-repos-canonical-status-grep-*.md
+    cstatus_raw="$(grep -m1 -E '^\*{0,2}Status:' "$contract" 2>/dev/null || true)"
+    cstatus="$(printf '%s' "$cstatus_raw" \
+      | sed -E 's/^\*{0,2}Status:\*{0,2}//' \
       | awk '{print $1}' | tr -d '*' | tr '[:upper:]' '[:lower:]' || true)"
 
     if [ -n "$cstatus" ]; then
@@ -318,7 +341,11 @@ if [ -d "$ARCH_DIR" ]; then
         live_declared=$((live_declared + 1))
         ;;
       *)
+        # Report the RAW line, not just the parsed token. For a near-miss
+        # format the parsed value is mangled, and a WARN naming the mangled
+        # value is not actionable — the author cannot see what to change.
         echo "WARN: $cbase declares Status: '$cstatus' — not in the maturity vocabulary (stub|draft|in-progress|active|verified); counted as stub-or-draft"
+        echo "  source line: $(printf '%s' "$cstatus_raw" | head -c 120)"
         stub_draft=$((stub_draft + 1))
         ;;
     esac
@@ -355,7 +382,28 @@ if [ -d "$ARCH_DIR" ]; then
     if [[ "$declared_tier" =~ ^[123]$ ]]; then
       # Product comparisons — integer division floor must not soften the
       # documented thresholds (<33% ok, 33-66% annotate, >66% demote).
-      if [ $((stub_draft * 100)) -lt $((live_total * 33)) ]; then
+      #
+      # DEGENERATE POPULATION GUARD (sch-repos, 2026-08-02). At live_total=1
+      # a percentage quantizes to exactly 0% or 100%: the middle NOTE band is
+      # mathematically unreachable, so the only honest downgrade available to
+      # a one-contract repo jumps straight from OK to FAIL + tier demotion.
+      # That made dishonesty the green path — declaring your single contract
+      # `draft` (the honest value while it drifts from its implementation)
+      # failed CI, while leaving it `active` passed. Exactly the inversion v3
+      # exists to remove, and it lands on new/small adopters — the on-ramp.
+      #
+      # Threshold is -lt 2 because n=1 is precisely the degenerate case; from
+      # n=2 the NOTE band is reachable and the formula behaves as documented.
+      # 100%-stub still fails at every n>=2, so anti-laundering is intact.
+      # Gameable in principle by deleting contracts to drop under it — but
+      # shrinking your governance surface to dodge a badge is self-defeating,
+      # visible in the diff, and leaves the repo in the state the advisory
+      # already prints.
+      # See feedback/2026-08-02-sch-repos-check-compliance-maturity-*.md
+      if [ "$live_total" -lt 2 ]; then
+        echo "NOTE: only $live_total live contract(s) — maturity is advisory at this population"
+        echo "  (a percentage over n=1 quantizes to 0% or 100%; badge not weighted)"
+      elif [ $((stub_draft * 100)) -lt $((live_total * 33)) ]; then
         echo "OK: maturity supports the declared badge (Tier $declared_tier: $(tier_label "$declared_tier"))"
       elif [ $((stub_draft * 100)) -le $((live_total * 66)) ]; then
         echo "NOTE: ${pct}% of live contracts are stub-or-draft — badge reads as"

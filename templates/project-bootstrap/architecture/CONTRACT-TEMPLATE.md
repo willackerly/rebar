@@ -22,7 +22,9 @@
      in-progress — actively being built; expect churn
      active      — in use; defines current behavior
      verified    — active + has passing tests/scenarios proving it
-     Machine-greppable: grep -E '^\*\*Status:\*\*' architecture/CONTRACT-*.md -->
+     Authoring form: '**Status:** value' (bolded).
+     Machine-greppable: grep -E '^\*{0,2}Status:' architecture/CONTRACT-*.md
+     — matches the parsers of record; keep the two in sync. -->
 **Owner:** [team or person responsible]
 **Type:** Service | Component | Interface | Protocol | Data Model | Operational | Integration Seam
 **Cross-repo Promotability:** Yes/No — if yes, name candidate adopting repos

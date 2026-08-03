@@ -395,11 +395,27 @@ its `SUPERSEDED BY:` line), plus legacy `deprecated`/`retired`. Terminal
 contracts are excluded from maturity weighting — a superseded contract
 kept for its migration window neither drags nor inflates the badge.
 
-The canonical machine-greppable form is one header line per contract:
+The canonical **authoring** form is `**Status:** value` — bolded, one header
+line per contract. Write that.
+
+The canonical **matching** form is deliberately looser, and this is the regex
+the parsers of record actually use. Use it when auditing, so your answer and
+CI's answer are the same answer:
 
 ```bash
-grep -E '^\*\*Status:\*\*' architecture/CONTRACT-*.md
+grep -E '^\*{0,2}Status:' architecture/CONTRACT-*.md
 ```
+
+**These must stay one string.** Publishing the strict `^\*\*Status:\*\*` while
+the parsers accepted `^\*{0,2}Status:` meant a contract written `Status: active`
+was counted by CI but invisible to the documented command — a silent divergence
+in both directions (sch-repos, 2026-08-02). If you change one, change the other
+in the same commit; the "one documented grep finds every declaration" property
+is what external tools and downstream repos rely on.
+
+A near-miss format such as `*Status:* active` (one asterisk) is now parsed
+correctly rather than being mangled and silently weighted as stub-or-draft. It
+is still not the authoring form — write the bolded version.
 
 Parsers of record: `scripts/check-compliance.sh` (Check 9),
 `scripts/compute-registry.sh`, `scripts/cold-start-checks.sh`.
@@ -453,18 +469,61 @@ cluster (2026-07); mechanics and watcher in `practices/inbox-watch.md`.
   by depositing into the *peer's* inbox. Memos stay in place as the
   archive; state lives in the receiving repo's own docs, not in edits
   to the memo.
-- **Who holds one:** repos actively exchanging cross-repo memos —
-  typically the members of a coordination cluster. A repo whose intake
-  is `ask` roles + feedback filings (rebar itself, for example) does not
-  need one. Coordination **seats** sweep every inbox they hold at
-  session start, then arm `scripts/inbox-watch.sh` as a persistent
-  monitor (see `practices/session-lifecycle.md`).
-- **A held inbox is a watched inbox** (federation Principle 5, ratified
-  2026-07-11): every repo that holds a peer inbox arms the **same
-  canonical watcher** — `scripts/inbox-watch.sh`, shipped in the
-  project bootstrap — pointed at its **own** `inbox/`, at session
-  start. Own inbox only (a peer's inbox self-echoes your outbound
-  deposits — SOP 2026-07-06). The watcher drops a hidden
+- **Who holds one: every repo, by default.** An inbox is an *inbound*
+  channel, so whether you need one is decided by whether anyone may need
+  to reach **you** — not by whether you currently send memos. **A
+  dependency is a coordination seat:** any repo another repo builds on
+  must be reachable, or its consumers have nowhere to file drift,
+  breakage, or a superseded claim. The bootstrap ships one for this
+  reason. Opting out is a deliberate act for a genuinely terminal repo
+  (no consumers, no dependents), and should be recorded, not assumed.
+
+  The old rule gated the inbox on *outbound* behaviour, which inverted
+  the need: a repo that actively exchanges memos is already reachable —
+  it has channels and correspondents. A **silent upstream dependency**
+  has none of that, and is exactly where a breaking change or a retracted
+  claim does the most damage. Field case (sch-repos, 2026-08-02): SCH
+  owns BCH/fuzzy-extractor science that `dapple-sdk` and `insurance-demo`
+  built on; SCH's security claim was later retracted; SCH was the only
+  one of the three repos **without** an inbox. The rule worked exactly as
+  written and produced the wrong outcome.
+
+- **The dependency graph decides, not memory.** If any repo declares
+  `CONSUMES: X`, then **X holds an inbox**. `CONSUMES.md` says who you
+  depend on; `inbox/` is how the people who depend on *you* reach back.
+  That makes the requirement mechanical rather than a judgement call, and
+  checkable — a check can warn when a declared upstream has no inbox.
+
+- **Advertise it, or it is not a channel.** An inbox nobody knows about
+  is ceremony. Every adopter's README/AGENTS.md should name the inbox
+  path and the memo naming convention so a consuming agent or human can
+  find the door without reading rebar's docs. Recommended: a short
+  root-level **`INBOX.md`** — naming grammar, type table, labels, and the
+  peer map — pointing at `practices/inbox-protocol.md` for the reasoning.
+  Keep the root copy short and local; the reasoning stays portable in
+  `practices/`. A practice guide is read when someone goes looking for
+  it; a cold-starting agent reads what is at the root, and for a repo
+  with peers, coordination is load-bearing from the session's first
+  minute.
+
+- **Holding and arming are different costs.** Coordination **seats**
+  sweep every inbox they hold at session start, then arm
+  `scripts/inbox-watch.sh` as a persistent monitor (see
+  `practices/session-lifecycle.md`). A quiet upstream sweeps at session
+  start and need not arm anything. Inbox-by-default plus mandatory
+  arming would conscript every silent dependency into watching a channel
+  that receives four memos a year — which is the ceremony objection
+  (decision D8), earned. **Hold ⇒ sweep. Live traffic ⇒ watch.**
+- **A live inbox is a watched inbox** (federation Principle 5, ratified
+  2026-07-11; amended 2026-08-02 for inbox-by-default): every repo
+  carrying live cross-repo traffic arms the **same canonical watcher** —
+  `scripts/inbox-watch.sh`, shipped in the project bootstrap — pointed at
+  its **own** `inbox/`, at session start. Own inbox only (a peer's inbox
+  self-echoes your outbound deposits — SOP 2026-07-06). **Your own
+  outbound mail is suppressed by sender**: banking the outbound copy in
+  your own inbox is required for provenance, so without the suppression
+  every memo you send fires your own watcher (`--self`, defaulting to the
+  repo directory name; `--self ''` disables). The watcher drops a hidden
   `.inbox-watch.lock` PID file in the inbox and warns only on a genuine
   same-inbox double-watch; **gitignore that lock**
   (`**/.inbox-watch.lock`) on any repo whose `inbox/` is git-tracked —
