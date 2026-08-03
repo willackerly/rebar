@@ -40,24 +40,49 @@ architecture/
 ## Naming Convention
 
 ```
-CONTRACT-{ID}-{NAME}.{MAJOR}.{MINOR}.md
+CONTRACT-{NAME}.{MAJOR}.{MINOR}.md
 ```
 
-| Prefix | Meaning | Example |
-|--------|---------|---------|
-| `S` | Service | `S1-AUTH`, `S4-STORAGE` |
-| `C` | Component | `C1-BLOBSTORE`, `C2-RELAY` |
-| `I` | Interface | `I1-SESSION`, `I2-KEY-EXCHANGE` |
-| `P` | Protocol | `P1-WIRE-FORMAT`, `P2-SIGNALING` |
-| `D` | Data Model | `D1-USER-SCHEMA`, `D2-RECEIPT` (frozen schemas + canonicalization) |
-| `O` | Operational | `O1-PIPELINE-DAEMON`, `O2-API-GATEWAY` (SLOs, startup/shutdown, health) |
-| `T` | Integration Seam | `T1-WIRE-CODEC`, `T2-TDFBOT-API` (cross-language type/error mappings) |
+**The full descriptive name is the key. Do not prefix it.**
 
-See [DESIGN.md §Contract System](../DESIGN.md#contract-system) for when to
-reach for each prefix. The `D`, `O`, and `T` prefixes were promoted to
-the canonical taxonomy after filedag's 2026-04-24 architectural-spike
-retrospective demonstrated they partition cleanly under real
-production pressure.
+```text
+CONTRACT-AUTH.1.0.md            →  ID: AUTH
+CONTRACT-BLOBSTORE.2.1.md       →  ID: BLOBSTORE
+CONTRACT-KEY-EXCHANGE.1.0.md    →  ID: KEY-EXCHANGE
+CONTRACT-WIRE-FORMAT.1.0.md     →  ID: WIRE-FORMAT
+```
+
+Earlier versions encoded a type letter and a sequence number in the ID
+(`S1-AUTH`, `C1-BLOBSTORE`, `I2-KEY-EXCHANGE`). **Both halves are retired for new
+contracts** — see [conventions.md §Contract Naming](../conventions.md#contract-naming)
+for the full rationale and the no-migration rule.
+
+The short version: the **number** was pure bookkeeping that collided on merge and
+broke every reference when resolved, and the **letter** duplicated information the
+contract already declares in its own `**Type:**` field. Two places to state the
+same fact is how they drift apart.
+
+The type taxonomy itself is unchanged and still meaningful — it just lives in the
+`Type:` field rather than in the filename:
+
+| `Type:` value | Covers |
+|---------------|--------|
+| Service | A deployable, independently-operated unit |
+| Component | An internal module with a defined interface |
+| Interface | A boundary contract between components |
+| Protocol | A wire or message format |
+| Data Model | Frozen schemas + canonicalization rules |
+| Operational | SLOs, startup/shutdown, health |
+| Integration Seam | Cross-language type/error mappings |
+
+See [DESIGN.md §Contract System](../DESIGN.md#contract-system) for when to reach
+for each type. Data Model, Operational, and Integration Seam were promoted to the
+canonical taxonomy after filedag's 2026-04-24 architectural-spike retrospective
+demonstrated they partition cleanly under real production pressure.
+
+**Existing numbered contracts stay as they are.** Renaming them breaks references
+for no functional gain — the exact cost that made numbering painful. Rebar's own
+`S1-STEWARD`, `S2-ASK-CLI`, and `S3-MCP-SERVER` keep their names permanently.
 
 ## Contract Lifecycle
 

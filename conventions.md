@@ -27,11 +27,11 @@ Branches reference the contract they're working on:
 
 | Type | When | Example |
 |------|------|---------|
-| `contract/` | Creating or modifying a contract | `contract/C1-BLOBSTORE-2.0` |
-| `impl/` | Implementing a contract | `impl/C1-BLOBSTORE-retry-logic` |
-| `fix/` | Fixing a bug within contract bounds | `fix/C2-RELAY-session-timeout` |
-| `feat/` | New feature within existing contract | `feat/S4-STORAGE-list-pagination` |
-| `refactor/` | Refactoring (no contract change) | `refactor/C1-BLOBSTORE-cleanup` |
+| `contract/` | Creating or modifying a contract | `contract/BLOBSTORE-2.0` |
+| `impl/` | Implementing a contract | `impl/BLOBSTORE-retry-logic` |
+| `fix/` | Fixing a bug within contract bounds | `fix/RELAY-session-timeout` |
+| `feat/` | New feature within existing contract | `feat/STORAGE-list-pagination` |
+| `refactor/` | Refactoring (no contract change) | `refactor/BLOBSTORE-cleanup` |
 
 For work that spans multiple contracts or isn't contract-specific:
 
@@ -56,31 +56,31 @@ CONTRACT: <full-id>
 **Examples:**
 
 ```
-feat(C1-BLOBSTORE): add retry logic for transient storage failures
+feat(BLOBSTORE): add retry logic for transient storage failures
 
 Blob uploads occasionally fail with 503 during peak traffic.
 Add exponential backoff with 3 retries.
 
-CONTRACT: C1-BLOBSTORE.2.1
+CONTRACT: BLOBSTORE.2.1
 ```
 
 ```
-fix(S2-API-GATEWAY): validate auth token expiry before forwarding
+fix(API-GATEWAY): validate auth token expiry before forwarding
 
 Expired tokens were being forwarded to downstream services,
 causing cascading 401 errors.
 
-CONTRACT: S2-API-GATEWAY.1.0
+CONTRACT: API-GATEWAY.1.0
 ```
 
 ```
-contract(C3-CRYPTO-BRIDGE): bump to 2.0 — add key rotation interface
+contract(CRYPTO-BRIDGE): bump to 2.0 — add key rotation interface
 
 BREAKING: New required method `RotateKey()` on CryptoBridge interface.
 All implementations must add this method.
 
-CONTRACT: C3-CRYPTO-BRIDGE.2.0
-SUPERSEDES: C3-CRYPTO-BRIDGE.1.0
+CONTRACT: CRYPTO-BRIDGE.2.0
+SUPERSEDES: CRYPTO-BRIDGE.1.0
 ```
 
 ### Commit Types
@@ -96,6 +96,78 @@ SUPERSEDES: C3-CRYPTO-BRIDGE.1.0
 | `build` | Build/CI changes | No contract change |
 | `chore` | Maintenance | No contract change |
 
+## Contract Naming
+
+**The full descriptive name is the key.** A contract file is
+`CONTRACT-<NAME>.<MAJOR>.<MINOR>.md`; its ID is `<NAME>`.
+
+```text
+architecture/CONTRACT-BLOBSTORE.2.1.md        →  ID: BLOBSTORE
+architecture/CONTRACT-CRYPTO-BRIDGE.1.0.md    →  ID: CRYPTO-BRIDGE
+architecture/CONTRACT-PPTV-SOURCE.1.1.md      →  ID: PPTV-SOURCE
+```
+
+### Prefix numbers are optional legacy — do not use them for new contracts
+
+Earlier rebar versions showed IDs with a prefix number (`C1-BLOBSTORE`,
+`S3-MCP-SERVER`, `I7-SCANNER`). **That requirement is relaxed.** The number was
+never load-bearing and it cost real work:
+
+- **Merge collisions.** Two branches each add "the next contract," both pick
+  `C9`, and the conflict is invisible until merge. Nothing about the work
+  actually conflicted — only the bookkeeping did.
+- **Renumbering breaks references.** Resolving a collision means editing every
+  `CONTRACT:` header in source, every companion file, every commit-message
+  trailer, and the registry. A rename is a breaking change to a namespace that
+  had no reason to be scarce.
+- **The number is meaningless across repos.** Under federation,
+  `office180/C4-PPTV-SOURCE` and `rebar/C4-…` share a digit and nothing else.
+  `CONSUMES.md` pins `<owner_repo>/<contract_id>`, so the discriminating part is
+  already the name.
+- **Numbers do not sort into meaning.** `C7` does not tell a reader whether it is
+  older, lower-level, or more important than `C3`. The name does the work the
+  number was pretending to do.
+
+A descriptive name is unique *because it describes something*. That uniqueness
+survives branching, merging, and federation for free. A number is unique only by
+bookkeeping, and the bookkeeping is what failed.
+
+### This is a relaxation, not a migration
+
+**Existing numbered contracts are valid and should stay as they are.** Renaming
+`C1-BLOBSTORE` to `BLOBSTORE` incurs exactly the broken-reference cost that makes
+renumbering painful — the same wound, self-inflicted for tidiness. Rules:
+
+- **Never renumber.** If two contracts collide on a prefix, rename the *newer*
+  one to drop its prefix entirely rather than renumbering it.
+- **Never mass-rename** an existing numbered set.
+- **New contracts skip the prefix.** That is the whole change.
+- Mixed repos are expected and fine. A repo may hold `C1-BLOBSTORE` and
+  `CRYPTO-BRIDGE` indefinitely.
+
+### The tooling already accepts unnumbered IDs
+
+This was verified against rebar's own scripts on 2026-08-02 by adding an
+unnumbered probe contract and running the enforcement chain:
+
+| Check | Behavior with an unnumbered ID |
+|---|---|
+| `compute-registry.sh` | indexes it normally (`NAMING-PROBE \| 1.0 \| stub`) |
+| `check-contract-refs.sh` | `CONTRACT:NAMING-PROBE.1.0` resolves; a missing target is still reported BROKEN |
+| `check-prefix-uniqueness.sh` | skips it by design — it only compares IDs whose first segment is `letters+digits` |
+| `check-registry.sh` | passes |
+
+So no script changes are required to adopt this. `check-prefix-uniqueness.sh`
+remains useful for repos that still carry a numbered set; it becomes a no-op as
+those sets age out.
+
+### Reserved-name guidance
+
+Contract file names that collide with rebar's own scaffolding are excluded from
+the registry: `CONTRACT-TEMPLATE`, `CONTRACT-SEAM-TEMPLATE`, `CONTRACT-REGISTRY`,
+`CONTRACT-REGISTRY.template`, `CONTRACT-GAPS`. Do not name a real contract
+`TEMPLATE`, `REGISTRY`, or `GAPS`.
+
 ## Source File Headers
 
 Every source file declares its contract in the first 15 lines:
@@ -107,7 +179,7 @@ The file directly implements the contract's interface:
 ```go
 // Package blobstore implements encrypted blob storage.
 //
-// CONTRACT:C1-BLOBSTORE.2.1
+// CONTRACT:BLOBSTORE.2.1
 package blobstore
 ```
 
@@ -115,7 +187,7 @@ package blobstore
 /**
  * CryptoBridge — client-side AES-256-GCM encryption at the gateway boundary.
  *
- * @contract CONTRACT:C3-CRYPTO-BRIDGE.1.0
+ * @contract CONTRACT:CRYPTO-BRIDGE.1.0
  */
 export class CryptoBridge {
 ```
@@ -124,7 +196,7 @@ export class CryptoBridge {
 """
 Key exchange primitives for P2P session setup.
 
-CONTRACT:I2-KEY-EXCHANGE.1.0
+CONTRACT:KEY-EXCHANGE.1.0
 """
 ```
 
@@ -136,7 +208,7 @@ interface:
 ```go
 // Package httputil provides HTTP middleware for the API gateway.
 //
-// Architecture: CONTRACT:S2-API-GATEWAY.1.0
+// Architecture: CONTRACT:API-GATEWAY.1.0
 package httputil
 ```
 
@@ -178,8 +250,8 @@ Rare, but some files bridge two contracts:
 ```go
 // Package bridge connects the blob store to the relay.
 //
-// CONTRACT:C1-BLOBSTORE.2.1
-// CONTRACT:C2-RELAY.1.0
+// CONTRACT:BLOBSTORE.2.1
+// CONTRACT:RELAY.1.0
 package bridge
 ```
 
@@ -232,7 +304,7 @@ content supports the contract but doesn't define behavior.
 ### Naming Convention
 
 ```
-CONTRACT-{ID}-{NAME}.impl.md
+CONTRACT-{NAME}.impl.md
 ```
 
 The companion filename has NO version number. One companion per contract ID,
@@ -240,8 +312,8 @@ regardless of how many versions exist. When a contract is bumped from 1.0 to
 2.0, the same companion file serves both — update it to reflect the new version.
 
 **Examples:**
-- `architecture/CONTRACT-C1-BLOBSTORE.impl.md` — companion for C1-BLOBSTORE
-- `architecture/CONTRACT-S2-API-GATEWAY.impl.md` — companion for S2-API-GATEWAY
+- `architecture/CONTRACT-BLOBSTORE.impl.md` — companion for BLOBSTORE
+- `architecture/CONTRACT-API-GATEWAY.impl.md` — companion for API-GATEWAY
 
 ### Rules
 
@@ -249,7 +321,7 @@ regardless of how many versions exist. When a contract is bumped from 1.0 to
 - Companions are optional — only create when there's tribal knowledge to capture
 - Never put behavioral specifications in companions — those belong in the contract
 - Companions should reference the contract they support: start with
-  `Companion for: CONTRACT-{ID}-{NAME}`
+  `Companion for: CONTRACT-{NAME}`
 
 ## Discovery Tracking
 
@@ -358,8 +430,25 @@ cluster (2026-07); mechanics and watcher in `practices/inbox-watch.md`.
 - **Append-only.** Peers deposit new files; nobody edits or deletes an
   existing memo. This is what makes an inbox auditable and makes
   filename-diff watching a complete signal.
-- **Naming:** `YYYY-MM-DD-<from>-<topic-slug>.md` — date, sending repo,
-  then the topic.
+- **Naming:** `YYYY-MM-DD-<sender>-<TYPE>-<kebab-case-description>.md` — date,
+  sending repo, memo type, then a deliberately long description. `<sender>` is
+  always the originating seat, never the recipient; the directory already says
+  who received it. The date is the sender's **local deposit date, never UTC** —
+  agents read timestamps out of tooling that reports UTC (`gh` API `created_at`,
+  CI run times), and west of Greenwich that silently dates a memo tomorrow,
+  breaking the arrival-order sort this grammar exists for.
+  Types: `ASK` · `ANSWER` · `FINDING` · `CORRECTION` · `RECEIPT` · `ACK` ·
+  `FYI` · `DIRECTION` · `HANDOFF` · `FREEZE`. Full vocabulary and memo shape:
+  [`practices/inbox-protocol.md`](practices/inbox-protocol.md).
+  Descriptions are long on purpose — `ls inbox/` should read as a changelog of
+  the conversation, reconstructable without opening a file. The `TYPE` segment
+  earns its place by making `FREEZE` and `CORRECTION` visible *before* anything
+  is opened, which is exactly when triage value is highest.
+  (Superseded 2026-08-02: the older `YYYY-MM-DD-<from>-<topic-slug>.md` form
+  omitted the type. Existing memos are **not** renamed — deposited filenames are
+  cited in `Answers:` headers, commit messages, and decision logs, so the
+  append-only rule covers names as much as bodies. Get the name right on the way
+  out; live with it afterwards.)
 - **Processed-on-read:** the receiving session reads, acts, and replies
   by depositing into the *peer's* inbox. Memos stay in place as the
   archive; state lives in the receiving repo's own docs, not in edits

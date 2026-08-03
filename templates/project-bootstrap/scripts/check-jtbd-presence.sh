@@ -136,7 +136,7 @@ while IFS= read -r base; do
 
   # Skip superseded contracts — only the live version carries the burden.
   # Matches the marker format from CONTRACT-TEMPLATE.md:
-  #   SUPERSEDED BY: CONTRACT-{ID}-{NAME}.{NEW}
+  #   SUPERSEDED BY: CONTRACT-{NAME}.{NEW}
   if grep -q 'SUPERSEDED BY:' "$file" 2>/dev/null; then
     skipped_superseded=$((skipped_superseded + 1))
     continue

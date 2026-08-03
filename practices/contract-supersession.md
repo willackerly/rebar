@@ -27,7 +27,7 @@ From [`architecture/README.md`](../architecture/README.md):
 | New contract | New ID + 1.0 | **Plan mode** |
 
 Any version bump — minor or major — is a supersession: a new file
-`CONTRACT-{ID}-{NAME}.{NEW}.md` is created and the old file stays on disk,
+`CONTRACT-{NAME}.{NEW}.md` is created and the old file stays on disk,
 marked. Two things are **not** supersession:
 
 - **Companion-file edits.** Tribal knowledge changes freely with no bump
@@ -46,13 +46,13 @@ where it belongs, and makes the state greppable without tooling.
 In the **old** file, immediately below the H1 title:
 
 ```markdown
-<!-- SUPERSEDED BY: CONTRACT-{ID}-{NAME}.{NEW} -->
+<!-- SUPERSEDED BY: CONTRACT-{NAME}.{NEW} -->
 ```
 
 In the **new** file's header block:
 
 ```markdown
-SUPERSEDES: CONTRACT-{ID}-{NAME}.{OLD}
+SUPERSEDES: CONTRACT-{NAME}.{OLD}
 ```
 
 And in the commit message, per [`conventions.md`](../conventions.md) commit
@@ -138,7 +138,7 @@ what distinguish "migrating" from "rotting."
 
 ## When to companion-file
 
-Every contract MAY have one companion: `CONTRACT-{ID}-{NAME}.impl.md` — no
+Every contract MAY have one companion: `CONTRACT-{NAME}.impl.md` — no
 version in the filename, one per contract ID across all versions
 (see [`conventions.md`](../conventions.md) §Companion Files). Use it during
 supersession for:

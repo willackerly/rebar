@@ -120,7 +120,7 @@ Contracts reference their source features: "Implements: `product/features/encryp
 ### Naming Convention
 
 ```
-CONTRACT-{ID}-{NAME}.{MAJOR}.{MINOR}.md
+CONTRACT-{NAME}.{MAJOR}.{MINOR}.md
 ```
 
 | Component | Meaning | Example |

@@ -8,6 +8,28 @@
 
 **The dual-purpose foundation for AI-powered development teams.**
 
+> ### ⚠️ Contract names are NOT numbered
+>
+> **The full descriptive name is the key.** Write `CONTRACT-BLOBSTORE.2.1.md`
+> and `CONTRACT:BLOBSTORE.2.1` — not `CONTRACT-C1-BLOBSTORE.2.1.md`.
+>
+> Prefix numbers (`C1`, `S3`, `I7`) are **optional legacy** and actively
+> discouraged for anything new. They caused real, repeated pain: two branches
+> both claim `C9` and collide on merge; renumbering to resolve it breaks every
+> `CONTRACT:` reference in source; and the number means nothing across repos
+> (`office180/C4` and `rebar/C4` are unrelated). A name is unique because it
+> *describes* something — that uniqueness survives merges, branches, and
+> federation. A number is unique only by bookkeeping, and the bookkeeping fails.
+>
+> **This is a relaxation, not a migration.** Existing numbered contracts stay
+> exactly as they are — renaming them costs the same broken references that
+> renumbering does. Never renumber; never mass-rename. New contracts simply
+> skip the prefix.
+>
+> Rebar's tooling has never required the number: registry generation, ref
+> resolution, and prefix-uniqueness all accept unnumbered IDs today
+> ([verified](conventions.md#contract-naming)). Only the docs asked for it.
+
 Rebar is **two things in one**:
 
 ## 1. Information Organization Model
@@ -116,13 +138,13 @@ curl -fsSL https://raw.githubusercontent.com/willackerly/rebar/v3.0.0-beta/setup
 ### 1. Every source file declares its contract
 
 ```go
-// CONTRACT:C1-BLOBSTORE.2.1
+// CONTRACT:BLOBSTORE.2.1
 package blobstore
 ```
 
 ```bash
 # Find all code implementing a contract
-grep -rn "CONTRACT:C1-BLOBSTORE" src/
+grep -rn "CONTRACT:BLOBSTORE" src/
 
 # Find what contract a file implements
 head -5 internal/blobstore/store.go
@@ -131,7 +153,7 @@ head -5 internal/blobstore/store.go
 ### 2. Contracts define behavior, not just interfaces
 
 ```markdown
-# architecture/CONTRACT-C1-BLOBSTORE.2.1.md
+# architecture/CONTRACT-BLOBSTORE.2.1.md
 
 ## Behavioral Contracts
 

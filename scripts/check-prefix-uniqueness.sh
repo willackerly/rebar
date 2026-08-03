@@ -1,8 +1,16 @@
 #!/usr/bin/env bash
 # check-prefix-uniqueness.sh — Fail on duplicate contract prefix numbers
-# rebar-scripts: 2026.07.04
+# rebar-scripts: 2026.08.02
 #
 # Usage: ./scripts/check-prefix-uniqueness.sh
+#
+# LEGACY-ONLY as of 2026-08-02. Prefix numbers are no longer part of the
+# contract naming convention — the full descriptive name is the key (see
+# conventions.md "Contract Naming"). Unnumbered IDs are skipped entirely, so
+# this check quietly becomes a no-op as a repo's numbered set ages out. It is
+# retained because repos mid-transition still hold numbered contracts, and a
+# collision between two of THOSE is still a real defect. Do not read a passing
+# result as "numbering is required."
 #
 # Parses the "Contract Files" list in architecture/CONTRACT-REGISTRY.md and
 # fails when one prefix number (S1, I3, ...) is claimed by two DIFFERENT

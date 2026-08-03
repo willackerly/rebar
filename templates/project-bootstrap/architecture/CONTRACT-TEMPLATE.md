@@ -1,13 +1,13 @@
-# CONTRACT-{ID}-{NAME}.{MAJOR}.{MINOR}
+# CONTRACT-{NAME}.{MAJOR}.{MINOR}
 
 <!-- Copy this file to create a new contract.
      Replace all {placeholders} with actual values.
      Remove these HTML comments when done. -->
 
 <!-- VERSIONING:
-     - When this contract is superseded, add: SUPERSEDED BY: CONTRACT-{ID}-{NAME}.{NEW}
+     - When this contract is superseded, add: SUPERSEDED BY: CONTRACT-{NAME}.{NEW}
        and set its Status: to `superseded` (terminal — excluded from maturity weighting)
-     - When this contract supersedes another, add: SUPERSEDES: CONTRACT-{ID}-{NAME}.{OLD}
+     - When this contract supersedes another, add: SUPERSEDES: CONTRACT-{NAME}.{OLD}
 -->
 
 **Version:** {MAJOR}.{MINOR}
@@ -148,7 +148,7 @@ type BlobStore interface {
 
 <!-- List all files that implement this contract.
      Keep updated — or regenerate with:
-     grep -rn "CONTRACT:{ID}-{NAME}" src/ internal/ client/
+     grep -rn "CONTRACT:{NAME}" src/ internal/ client/
 -->
 
 - `internal/blobstore/file.go` — file-backed implementation
@@ -190,7 +190,7 @@ type BlobStore interface {
 
 ## Companion File
 
-<!-- Every contract MAY have a companion file: `CONTRACT-{ID}-{NAME}.impl.md`
+<!-- Every contract MAY have a companion file: `CONTRACT-{NAME}.impl.md`
      (no version number in the companion filename).
 
      The companion holds tribal knowledge that supports the contract but doesn't

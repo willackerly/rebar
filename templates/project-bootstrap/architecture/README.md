@@ -40,7 +40,7 @@ architecture/
 ## Naming Convention
 
 ```
-CONTRACT-{ID}-{NAME}.{MAJOR}.{MINOR}.md
+CONTRACT-{NAME}.{MAJOR}.{MINOR}.md
 ```
 
 | Prefix | Meaning | Example |
