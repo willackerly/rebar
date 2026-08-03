@@ -40,6 +40,20 @@ agent recovered a two-day negotiation — offer, withdrawal, correction, resolut
 Good: `2026-08-03-nanotdf2-CORRECTION-our-closure-number-was-wrong-by-2x-here-is-the-real-inventory.md`
 Bad: `2026-08-03-nanotdf2-update.md`
 
+**The date is the sender's LOCAL deposit date — never UTC.** This looks like
+pedantry and is not: agents routinely read timestamps from tooling that reports
+UTC (`gh` API `created_at`, CI run times), and for a machine west of Greenwich
+those cross midnight hours before the local date changes. The first field case
+produced exactly this — memos named `2026-08-03-…` deposited on the evening of
+the 2nd, spotted by the receiving seat. The changelog property in the paragraph
+above depends on filename dates sorting as **arrival order**; a UTC date silently
+breaks that for part of every day.
+
+**Do not rename a memo after depositing it** to correct the date. Filenames are
+cited — in decision logs, in replies' `Answers:` headers, in commit messages —
+and a rename breaks those references to fix a cosmetic error. Get it right on the
+way out; live with it afterwards.
+
 ## 2. The type vocabulary
 
 The type tells the reader what they are obliged to do.

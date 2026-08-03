@@ -19,5 +19,6 @@ Reference guides for specific workflows. AGENTS.md contains the mandatory founda
 | [Worktree Collaboration](worktree-collaboration.md) | Coordinating parallel agents, merge strategy, conflict resolution |
 | [Red Team Protocol](red-team-protocol.md) | Running adversarial quality reviews before releases |
 | [Visual Fidelity](visual-fidelity.md) | Projects that produce visual output (renderers, PDF, images) |
+| [Diagram and Document Assets](diagram-and-document-assets.md) | A figure outgrows an ASCII fence; a deliverable must open in Word or PowerPoint |
 | [E2E Testing](e2e-testing.md) | Setting up or debugging E2E test infrastructure |
 | [Deployment Patterns](deployment-patterns.md) | Deploying to production, debugging deploy failures |
