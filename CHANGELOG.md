@@ -18,8 +18,58 @@ All notable changes to rebar. Versioned with [semver](https://semver.org/).
 
 ## Unreleased
 
+_Nothing yet._
+
+---
+
+## v3.0.0-beta.2 — 2026-08-02
+
+Second annealing increment on the v3 line. **Not** graduation to `v3.0.0` —
+scored against the four criteria in `docs/v3-beta-plan.md` §Graduation on
+2026-08-02: criterion 2 met (a live seat armed the canonical watcher in real
+cross-repo traffic and caught a genuine inbound); criterion 1 met on repo count
+(`office180`, `go-tak-server`) but its clean window reset the same day; criterion
+3 not met (three v3-feature defects filed 2026-08-02); criterion 4 unverified. No
+criterion was amended or skipped — per D1, the tag is earned, not declared.
+
+### Changed
+
+- **Contract prefix numbering retired — the full descriptive name is the key.**
+  `CONTRACT-BLOBSTORE.2.1.md`, not `CONTRACT-C1-BLOBSTORE.2.1.md`. The number was
+  bookkeeping that collided on merge and broke every `CONTRACT:` reference when
+  resolved; the type letter duplicated the contract's own `Type:` field. Verified
+  by probe that the tooling never required either — `compute-registry.sh`,
+  `check-contract-refs.sh`, `check-prefix-uniqueness.sh`, and `check-registry.sh`
+  all accept unnumbered IDs unchanged. **Relaxation, not migration:** existing
+  numbered contracts stay, never renumber, never mass-rename. Promoted to a
+  top-level README callout. (`README.md`, `conventions.md` §Contract Naming,
+  `architecture/README.md`, `CONTRACT-TEMPLATE.md`, `DESIGN.md`,
+  `practices/contract-supersession.md`, bootstrap copies.)
+- **Peer-inbox memo grammar reconciled** to the TYPE-bearing form
+  (`YYYY-MM-DD-<sender>-<TYPE>-<description>.md`) that
+  `practices/inbox-protocol.md` and the user-level skill already taught;
+  `conventions.md` had diverged. The date is now normatively the sender's
+  **local** deposit date — agents read UTC out of tooling, which west of
+  Greenwich silently dates a memo tomorrow and breaks the arrival-order sort.
+  Deposited memos are never renamed.
+- `check-prefix-uniqueness.sh` marked **LEGACY-ONLY** in both copies. Behavior
+  unchanged — a collision between two still-numbered contracts is still a real
+  defect — but a passing result must not be read as "numbering is required."
+
 ### Added
 
+- **`practices/inbox-protocol.md`** — the memo grammar itself: naming, the ten
+  memo types, `[M]/[V]/[S]/[R]/[U]` confidence labels, crossed-memo handling, and
+  the memo-vs-synchronous-ask rule. Distilled from the TDFLite ↔ nanotdf2
+  exchange; complements `inbox-watch.md` (how you learn a memo arrived) and
+  `federation.md` (the principles). Recommends a short root `INBOX.md` per repo,
+  since coordination is load-bearing from a session's first minute.
+- **`practices/diagram-and-document-assets.md`** — rebar's first diagram
+  convention. A standalone `.pptv.svg` atom is the default when a figure outgrows
+  an ASCII fence; markdown + `md2docx` when a document must open in Word. Adopted
+  from `office180-md-office-converter` and pinned to `0.1.0-alpha.4`; the alpha
+  pin is bounded because an atom degrades to a plain renderable SVG if the tooling
+  disappears. Verified end to end before adoption.
 - **Federation Principle 5 — "a held inbox is a watched inbox"**
   (`practices/federation.md`; owner-ratified 2026-07-11). Every repo
   holding a peer `inbox/` arms the **same canonical watcher**

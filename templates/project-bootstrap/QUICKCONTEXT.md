@@ -88,7 +88,7 @@
 - Ready for first contract implementation
 
 **Dependencies:**
-- Rebar framework v3.0.0-beta
+- Rebar framework v3.0.0-beta.2
 - [Your project dependencies]
 
 ---

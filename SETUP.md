@@ -87,7 +87,7 @@ touch "$PROJECT/architecture/.state/.gitkeep"
 cp "$BOOTSTRAP/.rebarrc"     "$PROJECT/.rebarrc"  2>/dev/null || true
 
 # Version tracking (so you know which rebar you adopted)
-echo "v3.0.0-beta" > "$PROJECT/.rebar-version"
+echo "v3.0.0-beta.2" > "$PROJECT/.rebar-version"
 
 mkdir -p "$PROJECT/.github"
 cp .github/pull_request_template.md "$PROJECT/.github/" 2>/dev/null || true
@@ -115,7 +115,7 @@ The universal first-read. Every agent, every session, no exceptions.
 
 1. **Rebar badge** — First line after `# Title` MUST be the rebar badge:
    ```markdown
-   > **rebar v3.0.0-beta** | **Tier 2: ADOPTED**
+   > **rebar v3.0.0-beta.2** | **Tier 2: ADOPTED**
    ```
    This is validated by `scripts/check-compliance.sh`. Update version when you
    upgrade rebar. Update tier when you change `.rebarrc`.
