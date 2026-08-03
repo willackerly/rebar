@@ -8,6 +8,7 @@ Reference guides for specific workflows. AGENTS.md contains the mandatory founda
 |----------|-------------|
 | [Session Lifecycle](session-lifecycle.md) | Starting, checkpointing, or ending a session; marathon sessions |
 | [Peer-Inbox Watching](inbox-watch.md) | Coordination phases with federated peer repos exchanging inbox memos — live deposit notifications |
+| [Inbox Protocol](inbox-protocol.md) | Writing the memos themselves — naming grammar, type vocabulary, confidence labels, crossed-memo handling; when a memo beats a synchronous ask |
 | [Federation](federation.md) | Owning or consuming contracts across repos; the four principles |
 | [Federation Outbox](federation-outbox.md) | Notifying consumers when owned contracts change |
 | [Test Fidelity](test-fidelity.md) | Judging what a test actually proves; UAKS tier; closed-loop demo gate |
