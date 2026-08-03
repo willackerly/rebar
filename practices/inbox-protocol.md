@@ -180,6 +180,27 @@ bearing, and unattributable — and the next agent relitigates it.
 1. `inbox/` exists and is committed (see the Peer-Inbox Convention).
 2. `inbox/README.md` states the naming grammar, the type table, and the labels —
    so a memo moves between repos unchanged.
-3. The watcher is armed at session start (`inbox-watch.md`).
-4. Outbound copies are banked alongside inbound.
-5. The first memo of any thread carries §0 and a state table.
+3. **The protocol is surfaced at the repo ROOT**, not only here. See §9.
+4. The watcher is armed at session start (`inbox-watch.md`).
+5. Outbound copies are banked alongside inbound.
+6. The first memo of any thread carries §0 and a state table.
+
+## 9. Keep it at the root — cold-start reads root, not `practices/`
+
+**Recommended convention:** every repo holding an inbox carries a short root-level
+`INBOX.md` — the naming grammar, the type table, the labels, and who the peers
+are — pointing here for the doctrine.
+
+The argument is about *when* the doc is read. A practice guide is read when
+someone goes looking for it; a cold-starting agent reads what is at the root and
+what the root docs point to. Coordination is not a specialised topic you consult
+occasionally — for a repo with peers it is load-bearing from the first minute of a
+session, on the same tier as the build command and the test command. Filing it
+only under `practices/` puts it a level below where it is actually needed, and the
+cost of getting it wrong is asymmetric: a memo written in the wrong shape, or an
+inbox that goes unwatched for a day, is a coordination failure the other seat
+absorbs.
+
+Keep the root copy **short and local** — conventions plus the peer map, not the
+reasoning. The reasoning lives here and stays portable across adopters; the root
+file tells this repo's next agent what to do in ninety seconds.
