@@ -25,6 +25,17 @@ This file holds short-horizon work that's actively in flight or imminent.
       EXIT traps and explicit kills, so the leak path is not obvious —
       needs a real look, not a guess. A leaked poller is cheap to ignore
       and exactly the kind of thing that erodes trust in the watcher.
+- [ ] **A harness-backed watcher does not outlive its task.** Observed
+      2026-08-12: `scripts/inbox-watch.sh` armed as a background task was
+      reaped when the harness marked the task complete — it released its
+      lock and exited 0, cleanly and **silently**. Between the arm and the
+      notification, the inbox was unwatched while everything reported
+      healthy. Workaround in use: `nohup … & disown`. This is the
+      strongest field evidence yet for `_atlas`'s 3.1 argument that
+      **pull-with-memory beats push** — `rebar inbox --sweep` at session
+      start cannot die quietly, whereas a background monitor can, and
+      silence from a dead monitor is indistinguishable from silence from a
+      quiet inbox. Feeds `practices/inbox-watch.md` as a named limitation.
 - [ ] **Report two watcher hygiene findings to peers** (both verified by
       `lsof` on 2026-08-12, neither rebar's to fix):
       - `TDFLite` has **two** live watchers on one inbox (armed 08-02 and
