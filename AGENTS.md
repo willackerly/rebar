@@ -10,8 +10,15 @@
 3. `TODO.md` — task list + pointer to INVENTORY.md (canonical planning surface)
 4. `AGENTS.md` (this file) — norms, contracts, collaboration
 
+Then, before your first substantive action:
+5. `.claude-memory-commits/working-agreements/` — how this maintainer wants an
+   agent to operate here. Six short files; read all of them. They are the
+   collaboration contract, not architecture, and they are checked in precisely
+   so they survive a machine move, a tool change, or a different agent.
+
 **Reference:**
 - `DESIGN.md` — the philosophy (contracts are the operating system)
+- `.claude-memory-commits/environment/` — MCP/ASK debugging gotchas, indexed by symptom
 - `architecture/CONTRACT-REGISTRY.md` — contract index
 - `architecture/CONTRACT-*.md` — current contracts (S1-STEWARD, S2-ASK-CLI, S3-MCP-SERVER)
 - `practices/` — orchestration, session lifecycle, red team, fidelity, e2e

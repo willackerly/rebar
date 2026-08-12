@@ -29,6 +29,25 @@ remain in `feedback/` root until implementation lands, then move to processed/.
 _Wave 1, Wave 2, and Wave 3 all implemented 2026-04-25 — see Implemented
 section below._ Queue is empty pending the next batch of triaged feedback.
 
+### 2026-08-02 window — all five implemented same-day
+
+Filed and closed during the v3 beta annealing window; all moved to
+`feedback/processed/`. Together these cleared graduation criterion 3.
+
+| Item | Source | Disposition |
+|------|--------|-------------|
+| `check-freshness.sh` parses one of two currency vocabularies — QUICKCONTEXT invisible to it for 29 days | rebar | **implemented** — both `freshness:` and `last-synced:` parsed; honest denominator now printed |
+| Check 9 maturity weighting degenerates at exactly one live contract | sch-repos | **implemented as filed** — demotion arm guarded at `live_total < 2`; anti-laundering intact from n=2 |
+| Published canonical `Status:` grep diverges from the parsers of record | sch-repos | **implemented, and went further** — parser fixed too, so `*Status:* active` no longer mangles into a stub-or-draft penalty. Option 2 (emit the regex from tooling) remains open |
+| Banking the outbound memo copy self-echoes through the Principle-5 watcher | rebar | **implemented** — `--self` sender suppression + 4-invariant regression |
+| Check 8 counts fenced `CONSUMES.md` examples as real declarations — every new project failed compliance out of the box | rebar | **implemented** — fence-aware counting. Found while verifying the Check 9 fix; sch-repos had named this exact class the same day |
+
+**Pattern worth keeping:** three of the five were *smallest-input* bugs —
+correct arithmetic that breaks at n=1, or a regex that cannot tell a
+declaration from a document quoting one. They all landed on the adoption
+on-ramp rather than on established repos, which is the population least
+able to diagnose them and most likely to conclude the framework is broken.
+
 ### Wave 2.5 — MCP activation (COMPLETED 2026-04-20)
 
 Turning a latent MCP server into a discoverable first-class tool for

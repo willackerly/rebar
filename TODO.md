@@ -1,6 +1,6 @@
 # TODO — rebar
 
-**Last synced:** 2026-07-04
+**Last synced:** 2026-08-12
 
 The canonical, vote-shaped backlog lives in [`feedback/INVENTORY.md`](feedback/INVENTORY.md).
 This file holds short-horizon work that's actively in flight or imminent.
@@ -9,24 +9,58 @@ This file holds short-horizon work that's actively in flight or imminent.
 
 ## P0 — In Flight
 
-- [x] ~~Tag `v3.0.0-beta`~~ — **tagged + pushed 2026-07-04** after
-      ci-check 15/15, audit 10.0/10, and the 71-agent adversarial
-      review's findings were fixed. Plan + decision log:
-      [`docs/v3-beta-plan.md`](docs/v3-beta-plan.md).
+- [ ] **Hold the clean window to 2026-08-16, then graduate to `v3.0.0`.**
+      This is the last open graduation gate (criterion 1). It requires no
+      work — only that nothing breaks. **Do not land v3 features in this
+      window:** a new P0/P1 against a v3 feature restarts the two-week
+      clock, which is exactly what happened on 2026-08-02. Non-v3 work,
+      adopter support, and peer mail are safe.
+      Scoreboard: [`docs/v3-beta-plan.md`](docs/v3-beta-plan.md) §Graduation.
 
 ## P1 — Imminent
 
-- [ ] Track adopter-trial responses — offer memos deposited 2026-07-04
-      in TDFLite-main and tak-tdf inboxes; filedag/fontkit still need a
-      channel (no inbox/ on disk).
+- [ ] **Leaked test watcher.** A test-spawned `inbox-watch.sh` ran for
+      **10 days** against a deleted `/var/folders/...` temp dir (found and
+      killed 2026-08-12). Both `scripts/tests/inbox-watch*.test.sh` have
+      EXIT traps and explicit kills, so the leak path is not obvious —
+      needs a real look, not a guess. A leaked poller is cheap to ignore
+      and exactly the kind of thing that erodes trust in the watcher.
+- [ ] **Report two watcher hygiene findings to peers** (both verified by
+      `lsof` on 2026-08-12, neither rebar's to fix):
+      - `TDFLite` has **two** live watchers on one inbox (armed 08-02 and
+        08-04) — the split-provenance case Principle 5 warns about.
+      - `pdf-signer-web` watches `vendor/dapple/inbox` — watching a
+        vendored peer's inbox is the self-echo case (SOP 2026-07-06).
 - [ ] Triage `feedback/2026-07-02-reflexive-push-durability-rule.md`
       (steward unpushed-commit warning).
-- [ ] **Next big push: opportunistic auto-federation** — see
-      [`feedback/2026-04-28-auto-federation-experiment.md`](feedback/2026-04-28-auto-federation-experiment.md).
-      7 maintainer-decision questions open. Pairs with
-      `scripts/inbox-watch.sh` as the receiving-side ear.
 
 ## P2 — Maintainer Queue
+
+**Needs Will specifically** (agent cannot decide these):
+- [ ] **`rebar inbox` vs `ask inbox`** — the rebar seat ruled `rebar
+      inbox`, because `conventions.md` already flags the peer-inbox /
+      agent-inbox overload as historical and `ask inbox` reintroduces it
+      at the CLI. This **contradicts Will's stated instinct**, so it needs
+      his sign-off before `_atlas` builds slice 2.
+- [ ] **rebar's own `CONSUMES.md`** — declaring the office180 PPTV pin
+      would be rebar's first consumed contract and inverts the usual
+      owner→consumer direction. Also note: an entry trips compliance
+      Check 8 unless `drift-check` is wired into CI first.
+- [ ] **`sch-repos` is not a git repository** — two rebar memos sit there
+      with no provenance or durability.
+
+**v3.1 candidates** (staged, not started):
+- [ ] `rebar watch` as a shipped command (`_atlas` slice 1) — kills the
+      copy-distribution hazard measured 2026-07-30 (11 copies of
+      `inbox-watch.sh` on one machine, 2 versions, one carrying a fixed
+      bug). Pure lift; the vendored script becomes a shim.
+- [ ] `rebar inbox` pull-with-memory + `rebar_inbox_check` MCP tool
+      (`_atlas` slices 2–3) — gated on the naming decision above.
+- [ ] Emit the canonical `Status:` regex from tooling (sch-repos option 2)
+      so prose cannot drift from the parser again. Documented today,
+      not mechanized.
+- [ ] Auto-federation experiments — 7 maintainer questions open,
+      research-only until answered.
 
 See `feedback/INVENTORY.md` §🧰 Maintainer Queue, plus:
 - Trustable-status items 2–4 (queryable ASK capability answers, PRODUCT
@@ -35,9 +69,7 @@ See `feedback/INVENTORY.md` §🧰 Maintainer Queue, plus:
 - ~~Ship `practices/` + `conventions.md` in the bootstrap template~~ —
   resolved differently 2026-07-04 (plan D10): shipped artifacts use
   abstract `rebar:` refs resolved by `scripts/rebar-doc.sh` / `rebar
-  doc` (local → REBAR_ROOT → checkout → upstream URL). Vendoring is no
-  longer needed for reference integrity; revisit only if offline
-  adopters ask.
+  doc`. Vendoring is no longer needed for reference integrity.
 
 ## Discoveries
 
@@ -52,6 +84,17 @@ _None currently._
 
 (Move items here when shipped. Trim to last ~10 to stay concise.)
 
+- ✓ 2026-08-02: **`v3.0.0-beta.2` tagged + pushed** — contract prefix
+  numbering retired (full name is the key), `practices/inbox-protocol.md`
+  and `practices/diagram-and-document-assets.md` added
+- ✓ 2026-08-02: **Graduation criteria 3 + 4 cleared** — five v3-feature
+  defects fixed in one pass (freshness two-vocabulary, Check-9 degenerate
+  population, `Status:` grep divergence, watcher self-echo, CONSUMES
+  fenced-example miscount). A fresh bootstrap project failed compliance
+  **twice** before that commit; it now reports OK.
+- ✓ 2026-08-02: Inbox doctrine ratified — inbox-by-default,
+  `CONSUMES ⇒ upstream holds an inbox`, root `INBOX.md`, and Principle 5
+  restated as *hold ⇒ sweep; live traffic ⇒ watch*
 - ✓ 2026-07-04: `rebar:` abstract refs (D10) — resolvers + skills
   rewrite + feedback moved to processed/; outreach memos deposited
 - ✓ 2026-07-04: v3.0.0-beta **tagged + pushed** after review fixes
