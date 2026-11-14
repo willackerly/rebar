@@ -12,6 +12,40 @@ parts to adopt.
 - Claude Code (or another AI coding agent that reads markdown context files)
 - 30 minutes for initial setup
 - `jq` (for steward quality scanning — `brew install jq` / `apt install jq`)
+- The rebar install — see [Install rebar](#install-rebar)
+
+## Install rebar
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/willackerly/rebar/main/setup-rebar.sh | bash
+```
+
+That installs the latest release (pre-releases included) and puts
+`~/.rebar/current/bin` (`rebar`, `ask`, `ask-mcp-server`) on your PATH via your
+shell RC. Variants:
+
+| Command | Installs |
+|---------|----------|
+| `… \| bash -s -- v3.0.0-beta.4` | that release |
+| `… \| bash -s -- main` | a branch, built from source; `rebar version` says `main@<sha>` |
+| `… \| bash -s -- v3.1.0 --no-switch` | side by side, without changing the active version |
+| `… \| bash -s -- v3.1.0 --source` | from source even if a prebuilt download exists |
+
+Each version is a complete rebar tree in `~/.rebar/versions/<version>/`;
+`~/.rebar/current` is a symlink to the active one, so switching never edits
+your RC again (`ln -sfn versions/<version> ~/.rebar/current` switches by
+hand; `rm -rf ~/.rebar/versions/<version>` removes one). Releases with
+prebuilt assets download as a tarball verified against the release's SHA-256
+checksums (a mismatch aborts); releases without assets, branches and commits
+build from source, which needs `git` and Go.
+
+**Upgrading from a `~/.rebar` clone** (what the installer made before versioned installs): the
+installer leaves the clone as it is — not moved, not updated — and adds
+`versions/` and `current` inside it (git-excluded). The new PATH entry comes
+later in your RC, so it wins; `.mcp.json` files and `REBAR_ROOT` that point at
+the clone keep working until you re-run `rebar init` or change them. If
+`REBAR_ROOT` is set, the CLI runs that tree's scripts, not
+`~/.rebar/current`'s; unset it to use the installed version.
 
 ## Step 1: Pick Your Profiles
 
@@ -208,8 +242,8 @@ grep -q 'echo "' scripts/check-ground-truth.sh && echo "Ground truth: metrics de
 ## Step 4b: Initialize Integrity Tracking
 
 ```bash
-# Build and install the rebar CLI (requires Go 1.22+)
-cd cli && go build -o ../bin/rebar . && cd ..
+# rebar is on your PATH after `Install rebar` above. Working from a rebar
+# checkout instead? Build it there (requires Go): cd cli && go build -o ../bin/rebar .
 
 # Initialize integrity system
 rebar init
