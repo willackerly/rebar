@@ -67,12 +67,13 @@ for contract in "$ARCH_DIR"/CONTRACT-*.md; do
   # Extract contract ID from filename (e.g., CONTRACT-C1-BLOBSTORE.2.1.md → C1-BLOBSTORE.2.1)
   id=$(basename "$contract" .md | sed 's/^CONTRACT-//')
 
-  # Search for references in source code
-  ref_count=$(grep -rn "CONTRACT:${id}" \
+  # Search for references in source code. No match is the case this loop
+  # exists to report, so neither grep may end the script under pipefail.
+  ref_count=$( { grep -rn "CONTRACT:${id}" \
     --include="*.go" --include="*.ts" --include="*.tsx" --include="*.js" --include="*.jsx" \
     --include="*.py" --include="*.rs" --include="*.mjs" --include="*.cjs" \
-    . 2>/dev/null \
-    | grep -v "node_modules\|vendor\|dist\|\.git\|${ARCH_DIR%/}/" \
+    . 2>/dev/null || true; } \
+    | { grep -v "node_modules\|vendor\|dist\|\.git\|${ARCH_DIR%/}/" || true; } \
     | wc -l | tr -d ' ')
 
   if [ "$ref_count" -eq 0 ]; then
