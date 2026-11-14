@@ -15,17 +15,14 @@
 # Override the binary under test with INBOX_WATCH_BIN.
 set -uo pipefail
 
-HERE="$(cd "$(dirname "$0")" && pwd)"
-WATCH="${INBOX_WATCH_BIN:-$HERE/../inbox-watch.sh}"
+. "$(dirname "$0")/lib.sh"
+WATCH="${INBOX_WATCH_BIN:-$REBAR_SCRIPTS/inbox-watch.sh}"
 LOCK=".inbox-watch.lock"
-
-fail() { echo "FAIL: $*" >&2; exit 1; }
 [ -f "$WATCH" ] || fail "watcher not found at $WATCH"
 
-TMP="$(mktemp -d)"
+rebar_tmpdir inbox-watch-lock
 PIDS=""
-cleanup() { for p in $PIDS; do kill "$p" 2>/dev/null; done; rm -rf "$TMP"; }
-trap cleanup EXIT
+rebar_on_exit 'for p in $PIDS; do kill "$p"; done'
 mkdir -p "$TMP/inbox"
 INBOX="$TMP/inbox"
 

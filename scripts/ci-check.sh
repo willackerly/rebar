@@ -21,6 +21,7 @@
 #   SKIP_DOC_REFS=1         — skip cross-doc reference check
 #   SKIP_DECAY_PATTERNS=1   — skip soft-hardening decay pattern check
 #   SKIP_BOOTSTRAP_SYNC=1   — skip the thin templates/project-bootstrap/scripts check
+#   SKIP_SCRIPT_TESTS=1     — skip scripts/tests/*.test.sh (rebar source repo only)
 #   SKIP_FIX_COMMIT=1       — skip Gate G (HEAD's fix:/regression: must have Reproduced on:)
 #   SKIP_BYPASS_FLAGS=1     — skip Gate I (HEAD's bypass mentions must have Bypass tickets:)
 #
@@ -92,6 +93,7 @@ run_check "Ground Truth"        SKIP_GROUND_TRUTH     check-ground-truth.sh
 run_check "Rebar Compliance"    SKIP_COMPLIANCE       check-compliance.sh
 run_check "Decay Patterns"      SKIP_DECAY_PATTERNS   check-decay-patterns.sh
 run_check "Bootstrap Sync"      SKIP_BOOTSTRAP_SYNC   sync-bootstrap.sh --check
+run_check "Script Tests"        SKIP_SCRIPT_TESTS     tests/run.sh
 run_check "Fix Commit Gate"     SKIP_FIX_COMMIT       check-fix-commit.sh
 run_check "Bypass Flags Gate"   SKIP_BYPASS_FLAGS     check-bypass-flags.sh
 run_check "Steward"             SKIP_STEWARD          steward.sh

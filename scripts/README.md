@@ -86,6 +86,7 @@ chmod +x scripts/*.sh
 | `SKIP_JTBD` | `0` | Skip JTBD-presence contract check |
 | `SKIP_PREFIX_UNIQUENESS` | `0` | Skip contract prefix-number uniqueness check |
 | `SKIP_BOOTSTRAP_SYNC` | `0` | Skip templates/scripts drift check (rebar-source-only) |
+| `SKIP_SCRIPT_TESTS` | `0` | Skip the shell regression tests, `scripts/tests/run.sh` (rebar-source-only) |
 | `SKIP_STEWARD` | `0` | Skip steward scan |
 
 ## Automation Hierarchy

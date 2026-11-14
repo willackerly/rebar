@@ -4,13 +4,13 @@ import (
 	"bytes"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/spf13/cobra"
 	"github.com/willackerly/rebar/cli/internal/config"
+	"github.com/willackerly/rebar/cli/internal/testutil"
 )
 
 // setupTestRepo creates a temporary git repo with the Cold Start Quad
@@ -20,54 +20,30 @@ func setupTestRepo(t *testing.T, extraFiles map[string]string) string {
 	dir := t.TempDir()
 
 	// Initialize git repo
-	run(t, dir, "git", "init")
-	run(t, dir, "git", "config", "user.email", "test@test.com")
-	run(t, dir, "git", "config", "user.name", "Test")
+	testutil.Git(t, dir, "init")
 
 	// Create Cold Start Quad
-	writeFile(t, dir, "README.md", "# Test Project\nThis is a test project.\n")
-	writeFile(t, dir, "QUICKCONTEXT.md", `# Quick Context
+	testutil.WriteFile(t, dir, "README.md", "# Test Project\nThis is a test project.\n")
+	testutil.WriteFile(t, dir, "QUICKCONTEXT.md", `# Quick Context
 <!-- freshness: 2026-03-30 -->
 <!-- last-synced: 2026-03-30 -->
 
 ## What's Next
 1. Build the thing
 `)
-	writeFile(t, dir, "TODO.md", "# TODO\n\n- [ ] First task\n")
-	writeFile(t, dir, "AGENTS.md", "# Agent Guidelines\n\nHow we work.\n")
+	testutil.WriteFile(t, dir, "TODO.md", "# TODO\n\n- [ ] First task\n")
+	testutil.WriteFile(t, dir, "AGENTS.md", "# Agent Guidelines\n\nHow we work.\n")
 
 	// Create extra files
 	for path, content := range extraFiles {
-		writeFile(t, dir, path, content)
+		testutil.WriteFile(t, dir, path, content)
 	}
 
 	// Initial commit so git operations work
-	run(t, dir, "git", "add", "-A")
-	run(t, dir, "git", "commit", "-m", "initial")
+	testutil.Git(t, dir, "add", "-A")
+	testutil.Git(t, dir, "commit", "-m", "initial")
 
 	return dir
-}
-
-func writeFile(t *testing.T, dir, relPath, content string) {
-	t.Helper()
-	fullPath := filepath.Join(dir, relPath)
-	if err := os.MkdirAll(filepath.Dir(fullPath), 0755); err != nil {
-		t.Fatalf("mkdir %s: %v", filepath.Dir(fullPath), err)
-	}
-	if err := os.WriteFile(fullPath, []byte(content), 0644); err != nil {
-		t.Fatalf("write %s: %v", relPath, err)
-	}
-}
-
-func run(t *testing.T, dir string, name string, args ...string) string {
-	t.Helper()
-	cmd := exec.Command(name, args...)
-	cmd.Dir = dir
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("%s %s failed: %v\n%s", name, strings.Join(args, " "), err, string(out))
-	}
-	return strings.TrimSpace(string(out))
 }
 
 // --- Tests for roleFiles mapping ---
@@ -322,12 +298,10 @@ func TestContextProductIncludesPersonasAndFeatures(t *testing.T) {
 func TestContextMissingFilesSkippedGracefully(t *testing.T) {
 	// Create a minimal repo with only README — other Cold Start Quad files missing
 	dir := t.TempDir()
-	run(t, dir, "git", "init")
-	run(t, dir, "git", "config", "user.email", "test@test.com")
-	run(t, dir, "git", "config", "user.name", "Test")
-	writeFile(t, dir, "README.md", "# Just README\n")
-	run(t, dir, "git", "add", "-A")
-	run(t, dir, "git", "commit", "-m", "init")
+	testutil.Git(t, dir, "init")
+	testutil.WriteFile(t, dir, "README.md", "# Just README\n")
+	testutil.Git(t, dir, "add", "-A")
+	testutil.Git(t, dir, "commit", "-m", "init")
 	setupCfg(dir)
 
 	output := captureOutput(t, func() error {

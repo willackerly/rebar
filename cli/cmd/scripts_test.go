@@ -4,23 +4,15 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
-)
 
-func writeScript(t *testing.T, path, body string) {
-	t.Helper()
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(path, []byte(body), 0o755); err != nil {
-		t.Fatal(err)
-	}
-}
+	"github.com/willackerly/rebar/cli/internal/testutil"
+)
 
 func TestResolveScript(t *testing.T) {
 	project := t.TempDir()
 	install := t.TempDir()
-	writeScript(t, filepath.Join(install, "scripts", "ci-check.sh"), "#!/usr/bin/env bash\n")
-	writeScript(t, filepath.Join(install, "scripts", "steward.sh"), "#!/usr/bin/env bash\n")
+	testutil.WriteExecutable(t, install, "scripts/ci-check.sh", "#!/usr/bin/env bash\n")
+	testutil.WriteExecutable(t, install, "scripts/steward.sh", "#!/usr/bin/env bash\n")
 
 	// No project copy: the install's script runs.
 	got, ok := resolveScript(project, install, "ci-check.sh")
@@ -29,7 +21,7 @@ func TestResolveScript(t *testing.T) {
 	}
 
 	// A thin wrapper is skipped, or `rebar check` would call itself.
-	writeScript(t, filepath.Join(project, "scripts", "ci-check.sh"),
+	testutil.WriteExecutable(t, project, "scripts/ci-check.sh",
 		"#!/usr/bin/env bash\n# rebar-thin-wrapper\nexec rebar check \"$@\"\n")
 	got, _ = resolveScript(project, install, "ci-check")
 	if got.Path != filepath.Join(install, "scripts", "ci-check.sh") {
@@ -37,7 +29,7 @@ func TestResolveScript(t *testing.T) {
 	}
 
 	// A full legacy copy wins and is flagged.
-	writeScript(t, filepath.Join(project, "scripts", "steward.sh"), "#!/usr/bin/env bash\necho custom\n")
+	testutil.WriteExecutable(t, project, "scripts/steward.sh", "#!/usr/bin/env bash\necho custom\n")
 	got, _ = resolveScript(project, install, "steward")
 	if got.Path != filepath.Join(project, "scripts", "steward.sh") || !got.Legacy {
 		t.Fatalf("legacy copy: got %+v", got)
@@ -61,7 +53,7 @@ func TestResolveScript(t *testing.T) {
 func TestIsThinWrapperNeedsOwnLine(t *testing.T) {
 	dir := t.TempDir()
 	quoted := filepath.Join(dir, "quoted.sh")
-	writeScript(t, quoted, "#!/usr/bin/env bash\ngrep -q '# rebar-thin-wrapper' \"$f\"\n")
+	testutil.WriteExecutable(t, filepath.Dir(quoted), filepath.Base(quoted), "#!/usr/bin/env bash\ngrep -q '# rebar-thin-wrapper' \"$f\"\n")
 	if isThinWrapper(quoted) {
 		t.Fatal("a script that mentions the marker is not a thin wrapper")
 	}
@@ -72,7 +64,7 @@ func TestIsRebarSourceDir(t *testing.T) {
 	if isRebarSourceDir(dir) {
 		t.Fatal("empty dir matched")
 	}
-	writeScript(t, filepath.Join(dir, "scripts", "steward.sh"), "")
+	testutil.WriteExecutable(t, dir, "scripts/steward.sh", "")
 	if isRebarSourceDir(dir) {
 		t.Fatal("an adopter with scripts/steward.sh but no templates/ matched")
 	}

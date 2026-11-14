@@ -25,10 +25,8 @@
 # test discriminates against a pre-fix copy).
 set -uo pipefail
 
-HERE="$(cd "$(dirname "$0")" && pwd)"
-WATCH="${INBOX_WATCH_BIN:-$HERE/../inbox-watch.sh}"
-
-fail() { echo "FAIL: $*" >&2; exit 1; }
+. "$(dirname "$0")/lib.sh"
+WATCH="${INBOX_WATCH_BIN:-$REBAR_SCRIPTS/inbox-watch.sh}"
 [ -f "$WATCH" ] || fail "watcher not found at $WATCH"
 
 # --- pick a UTF-8 locale whose collation diverges from C -------------------
@@ -47,10 +45,9 @@ if [ -z "$DIVERGENT" ]; then
   exit 0
 fi
 
-TMP="$(mktemp -d)"
+rebar_tmpdir inbox-watch
 W=""
-cleanup() { [ -n "$W" ] && kill "$W" 2>/dev/null; rm -rf "$TMP"; }
-trap cleanup EXIT
+rebar_on_exit '[ -n "$W" ] && kill "$W"'
 mkdir -p "$TMP/inbox"
 
 # Mixed-case, digit-heavy fixtures — the collation hazard zone.

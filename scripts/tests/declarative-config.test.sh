@@ -17,14 +17,9 @@
 
 set -uo pipefail
 
-HERE="$(cd "$(dirname "$0")" && pwd)"
-SRC="${REBAR_SCRIPTS_DIR:-$HERE/..}"
-TMP="$(mktemp -d "${TMPDIR:-/tmp}/rebar-declarative.XXXXXX")"
-trap 'rm -rf "$TMP"' EXIT
-
-fail() { echo "FAIL: $*"; exit 1; }
-ok() { echo "ok $*"; }
-g() { git -c user.name=t -c user.email=t@example.com -c commit.gpgsign=false "$@"; }
+. "$(dirname "$0")/lib.sh"
+SRC="$REBAR_SCRIPTS"
+rebar_tmpdir declarative
 
 # The project has no scripts/ at all: everything runs from $SRC.
 P="$TMP/project"

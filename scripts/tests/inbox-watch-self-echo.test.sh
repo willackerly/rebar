@@ -31,15 +31,11 @@
 
 set -uo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-BIN="${INBOX_WATCH_BIN:-$SCRIPT_DIR/../inbox-watch.sh}"
+. "$(dirname "$0")/lib.sh"
+BIN="${INBOX_WATCH_BIN:-$REBAR_SCRIPTS/inbox-watch.sh}"
 
-TMP="$(mktemp -d)"
-cleanup() {
-  [ -n "${WATCH_PID:-}" ] && kill "$WATCH_PID" 2>/dev/null
-  rm -rf "$TMP"
-}
-trap cleanup EXIT
+rebar_tmpdir inbox-watch-self-echo
+rebar_on_exit '[ -n "${WATCH_PID:-}" ] && kill "$WATCH_PID"'
 
 INBOX="$TMP/inbox"
 OUT="$TMP/out.log"

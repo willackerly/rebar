@@ -1,34 +1,24 @@
 package integrity
 
 import (
-	"os"
 	"path/filepath"
 	"sort"
 	"testing"
-)
 
-func touch(t *testing.T, root, rel, body string) {
-	t.Helper()
-	p := filepath.Join(root, rel)
-	if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(p, []byte(body), 0o644); err != nil {
-		t.Fatal(err)
-	}
-}
+	"github.com/willackerly/rebar/cli/internal/testutil"
+)
 
 // The contracts category follows .rebarrc contracts_dir; architecture/ may
 // then hold unrelated docs, including a stray CONTRACT-*.md, which is not
 // protected as a contract.
 func TestScanProtectedFilesHonorsContractsDir(t *testing.T) {
 	root := t.TempDir()
-	touch(t, root, ".rebarrc", "tier = 3\ncontracts_dir = specs   # contracts\n")
-	touch(t, root, "specs/CONTRACT-S1-FOO.1.0.md", "# S1\n")
-	touch(t, root, "specs/CONTRACT-TEMPLATE.md", "# template\n")
-	touch(t, root, "specs/CONTRACT-S1-FOO.1.0.impl.md", "# impl\n")
-	touch(t, root, "architecture/CONTRACT-S9-OLD.1.0.md", "# stray\n")
-	touch(t, root, "architecture/overview.md", "# notes\n")
+	testutil.WriteFile(t, root, ".rebarrc", "tier = 3\ncontracts_dir = specs   # contracts\n")
+	testutil.WriteFile(t, root, "specs/CONTRACT-S1-FOO.1.0.md", "# S1\n")
+	testutil.WriteFile(t, root, "specs/CONTRACT-TEMPLATE.md", "# template\n")
+	testutil.WriteFile(t, root, "specs/CONTRACT-S1-FOO.1.0.impl.md", "# impl\n")
+	testutil.WriteFile(t, root, "architecture/CONTRACT-S9-OLD.1.0.md", "# stray\n")
+	testutil.WriteFile(t, root, "architecture/overview.md", "# notes\n")
 
 	got, err := ScanProtectedFiles(root)
 	if err != nil {
@@ -44,8 +34,8 @@ func TestScanProtectedFilesHonorsContractsDir(t *testing.T) {
 
 func TestScanProtectedFilesDefaultContractsDir(t *testing.T) {
 	root := t.TempDir()
-	touch(t, root, ".rebarrc", "tier = 3\n")
-	touch(t, root, "architecture/CONTRACT-S1-FOO.1.0.md", "# S1\n")
+	testutil.WriteFile(t, root, ".rebarrc", "tier = 3\n")
+	testutil.WriteFile(t, root, "architecture/CONTRACT-S1-FOO.1.0.md", "# S1\n")
 
 	got, err := ScanProtectedFiles(root)
 	if err != nil {

@@ -19,16 +19,10 @@
 
 set -uo pipefail
 
-HERE="$(cd "$(dirname "$0")" && pwd)"
-SRC="${REBAR_SCRIPTS_DIR:-$HERE/..}"
-TMP="$(mktemp -d "${TMPDIR:-/tmp}/rebar-contracts-dir.XXXXXX")"
-trap 'rm -rf "$TMP"' EXIT
-
-fail() { echo "FAIL: $*"; exit 1; }
-ok() { echo "ok $*"; }
-g() { git -c user.name=t -c user.email=t@example.com -c commit.gpgsign=false "$@"; }
-# Run a script from $SRC against the project, the way `rebar check` does.
-run() { local s="$1"; shift; ( cd "$P" && REBAR_PROJECT_ROOT="$P" "$SRC/$s" "$@" ) 2>&1; }
+. "$(dirname "$0")/lib.sh"
+SRC="$REBAR_SCRIPTS"
+rebar_tmpdir contracts-dir
+run() { run_in "$P" "$@"; }
 
 P="$TMP/project"
 mkdir -p "$P/specs" "$P/architecture" "$P/src"
