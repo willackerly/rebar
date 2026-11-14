@@ -39,6 +39,12 @@ func runStatus(cmd *cobra.Command, args []string) error {
 	// Tier
 	tierLabels := map[int]string{1: "Partial", 2: "Adopted", 3: "Enforced"}
 	fmt.Printf("  Tier:        %d (%s)\n", cfg.Tier, tierLabels[cfg.Tier])
+	if len(cfg.ChecksEnable) > 0 {
+		fmt.Printf("  Enabled:     %s (checks_enable: run at any tier)\n", strings.Join(cfg.ChecksEnable, " "))
+		if unknown := config.UnknownChecks(cfg.ChecksEnable); len(unknown) > 0 {
+			fmt.Printf("  WARN:        checks_enable names unknown check(s): %s (ignored)\n", strings.Join(unknown, " "))
+		}
+	}
 
 	if cfg.Version != "" {
 		fmt.Printf("  Version:     %s\n", cfg.Version)

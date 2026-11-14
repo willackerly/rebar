@@ -131,17 +131,7 @@ func collectRepos(dir, prefix string, depth int, scores *[]repoScore) {
 		if _, err := os.Stat(filepath.Join(path, ".git")); err == nil {
 			// Git repo: audit it.
 			score, _ := auditRepo(path)
-			tier := "none"
-			if data, err := os.ReadFile(filepath.Join(path, ".rebarrc")); err == nil {
-				for _, line := range strings.Split(string(data), "\n") {
-					if strings.Contains(line, "tier") {
-						parts := strings.SplitN(line, "=", 2)
-						if len(parts) == 2 {
-							tier = strings.TrimSpace(parts[1])
-						}
-					}
-				}
-			}
+			tier := auditTier(path)
 			*scores = append(*scores, repoScore{Name: displayName, Path: path, Score: score, Tier: tier})
 		} else if depth > 1 {
 			// Not a repo — descend one more level to find nested repos
@@ -570,4 +560,22 @@ func applyFixes(root string) int {
 	}
 
 	return fixed
+}
+
+// auditTier is the tier column of `rebar audit --all` for the repo at path:
+// the .rebarrc tier ("none" without one), plus the checks force-enabled by
+// checks_enable, e.g. "1 +check-ground-truth".
+func auditTier(path string) string {
+	tier := config.RCValue(path, "tier")
+	if tier == "" {
+		tier = config.RCValue(path, "rebar_tier")
+	}
+	if tier == "" {
+		return "none"
+	}
+	// Each repo's own setting; REBAR_CHECKS_ENABLE would apply to all of them.
+	for _, name := range strings.Fields(config.RCValue(path, "checks_enable")) {
+		tier += " +" + strings.TrimSuffix(name, ".sh")
+	}
+	return tier
 }

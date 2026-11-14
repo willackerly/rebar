@@ -188,7 +188,9 @@ Known differences an adopter may hit when switching to `rebar check`:
 1. **Tier gates apply.** The install's check-ground-truth is Tier 3 only,
    contract headers / registry / jtbd Tier 2+. virtru-analyze is `tier = 1`
    but runs ground truth and registry through its own `rebar-ci.sh`, whose
-   copies have no gate; under the install they would SKIP. (Open question 1.)
+   copies have no gate; under the install ground truth would SKIP (the
+   registry check turned out to run at every tier). Answered by
+   `checks_enable` (open question 1).
 2. **More checks.** `rebar check` runs the full 15-check suite; analyze's CI
    runs 5. At tier 1 analyze fails doc-refs (10 untracked link targets) and
    compliance (README badge says v2.0.0) — real findings, but new ones.
@@ -251,7 +253,8 @@ Known differences an adopter may hit when switching to `rebar check`:
 
 ```
 # REBAR Configuration
-tier = 1                      # see open question 1; the acceptance run used 3
+tier = 1
+checks_enable = check-ground-truth compute-registry   # see open question 1
 registry_impl_counts = false
 registry_scope_prefixes = SDK- MCP-
 registry_purpose_heading = Purpose|Why this exists
@@ -339,3 +342,18 @@ Answered 2026-11-14:
   STALE once after upgrading; regenerate, or set
   `registry_purpose_style = bytes` to keep the old output.
 - **Q6 — namespace work stays with #8**, rebased on this branch.
+- **Q1 — yes, implemented:** `checks_enable = <names>` in `.rebarrc` (env
+  `REBAR_CHECKS_ENABLE`) runs the named checks regardless of the tier, each
+  as it would run at tier 3 (a named jtbd or prefix check blocks). Names are
+  the check script basenames without `.sh` (`check-ground-truth`,
+  `compute-registry`, ...), the same names as `rebar run`; an unknown name
+  prints one warning per run and is ignored, never failing the run. Honored
+  by `_rebar_skip` / `_rebar_check_tier` in `_rebar-config.sh` (so by every
+  gated script and by `rebar check`, `--pre-commit`, `--cold-start`,
+  `rebar run`, `rebar contract verify`), shown by `rebar status` and
+  `rebar audit --all`. Measured while building it: the registry check
+  (`compute-registry.sh --check`) has no tier gate, contrary to the tier
+  docs, so analyze only needed ground truth enabled; the docs now say so.
+  virtru-analyze: `tier = 1` + `checks_enable = check-ground-truth
+  compute-registry` with the legacy copies deleted runs all 13 metrics and
+  the registry check, and fails on a raised floor or an edited registry.

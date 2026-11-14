@@ -22,7 +22,7 @@ set -euo pipefail
 
 # Tier gate: ground truth is Tier 3 only (skip for Tier 1-2)
 SCRIPT_DIR_GT="$(cd "$(dirname "$0")" && pwd)"
-[ -f "$SCRIPT_DIR_GT/_rebar-config.sh" ] && source "$SCRIPT_DIR_GT/_rebar-config.sh" && _rebar_skip 3 && exit 0
+[ -f "$SCRIPT_DIR_GT/_rebar-config.sh" ] && source "$SCRIPT_DIR_GT/_rebar-config.sh" && _rebar_skip 3 check-ground-truth && exit 0
 
 REPO_ROOT="${REBAR_PROJECT_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}"
 # METRICS or METRICS.md — the template ships .md and `rebar audit`

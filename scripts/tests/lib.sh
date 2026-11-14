@@ -17,6 +17,10 @@
 # Bash 3.2 compatible.
 
 REBAR_TESTS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Tests set tiers and checks in their fixtures' .rebarrc; don't let a caller's
+# settings leak in (ci-check.sh exports _REBAR_CHECKS_VALIDATED, which would
+# silence the checks_enable warnings under test).
+unset REBAR_TIER REBAR_CHECKS_ENABLE _REBAR_CHECKS_VALIDATED
 REBAR_SCRIPTS="${REBAR_SCRIPTS_DIR:-$REBAR_TESTS_DIR/..}"
 
 fail() { echo "FAIL: $*" >&2; exit 1; }

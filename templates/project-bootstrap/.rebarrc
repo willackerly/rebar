@@ -2,12 +2,18 @@
 #
 # Tier controls which checks are enforced:
 #   1 = Partial  — contract refs + TODOs only (solo dev / early adoption)
-#   2 = Adopted  — + headers, freshness, registry, compliance (small team)
+#   2 = Adopted  — + headers, freshness, compliance (small team)
 #   3 = Enforced — + ground truth, strict steward (department / production)
+# The registry check runs at every tier.
 
 tier = 1
 # (legacy alias, kept for older scripts that read REBAR_TIER)
 REBAR_TIER=1
+
+# Run named checks even below their tier, each as it would run at tier 3.
+# Names are the check scripts without .sh; unknown names are warned about
+# and ignored. Env override: REBAR_CHECKS_ENABLE.
+# checks_enable = check-ground-truth check-contract-headers
 
 # Version compatibility
 REBAR_VERSION=3.0.0-beta

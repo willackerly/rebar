@@ -46,8 +46,8 @@ CONTRACTS_DIR=architecture
 TIER=3
 if [ -f "$SCRIPT_DIR/_rebar-config.sh" ]; then
   source "$SCRIPT_DIR/_rebar-config.sh"
-  _rebar_skip 2 && exit 0
-  TIER="$(_rebar_tier)"
+  _rebar_skip 2 check-jtbd-presence && exit 0
+  TIER="$(_rebar_check_tier check-jtbd-presence)"
   CONTRACTS_DIR=$(_rebar_contracts_dir)
 fi
 ARCH_DIR="$PROJECT_ROOT/$CONTRACTS_DIR"

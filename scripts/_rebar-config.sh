@@ -7,7 +7,9 @@
 #
 # Provides:
 #   _rebar_tier    — returns the configured enforcement tier (1, 2, or 3)
-#   _rebar_skip    — returns 0 (should run) or 1 (should skip) for a minimum tier
+#   _rebar_skip    — returns 0 (skip) or 1 (run) for a minimum tier and check
+#   _rebar_check_tier — the tier a check runs at (3 when checks_enable names it)
+#   _rebar_checks_enable — the checks .rebarrc checks_enable force-enables
 #   _rebar_config  — reads a .rebarrc key (env override, then .rebarrc, then default)
 #   _rebar_project_root — the repo the scripts check (REBAR_PROJECT_ROOT or ../)
 #   _rebar_script  — path of a helper script, preferring the project's own copy
@@ -15,10 +17,17 @@
 #
 # Tier definitions:
 #   1 = Partial  — contract-refs + TODOs only (minimum viable)
-#   2 = Adopted  — + contract-headers, freshness, registry
-#   3 = Enforced — + ground-truth, strict steward (full enforcement)
+#   2 = Adopted  — + contract-headers, freshness, jtbd/prefix (advisory),
+#                    compliance's AGENTS.md sections
+#   3 = Enforced — + ground-truth; jtbd/prefix block (full enforcement)
+# The registry check (compute-registry.sh --check) runs at every tier.
 #
 # Configuration priority: REBAR_TIER env var > .rebarrc file > default (3)
+#
+# .rebarrc `checks_enable` (env REBAR_CHECKS_ENABLE) force-enables named checks
+# below their tier: a space-separated list of check script basenames without
+# .sh (`checks_enable = check-ground-truth check-jtbd-presence`). A named check
+# runs as it would at tier 3. Unknown names are warned about and ignored.
 
 # The repo these scripts check. REBAR_PROJECT_ROOT lets the scripts/ of a
 # rebar install check another repo (`rebar check` sets it); otherwise it is
@@ -74,15 +83,68 @@ _rebar_tier() {
   echo "3"
 }
 
-# Check if a script should run based on its minimum required tier
-# Usage: _rebar_skip 2 && exit 0   # skip if tier < 2
+# Checks `checks_enable` may name: the script basenames (without .sh) of every
+# check the suites run. Mirrored by config.KnownChecks in the Go CLI.
+_REBAR_KNOWN_CHECKS="check-bypass-flags check-compliance check-contract-headers check-contract-refs check-decay-patterns check-doc-refs check-fix-commit check-freshness check-ground-truth check-jtbd-presence check-prefix-uniqueness check-todos compute-registry steward sync-bootstrap"
+
+# The checks .rebarrc `checks_enable` (env REBAR_CHECKS_ENABLE) force-enables,
+# one per line, with any .sh suffix dropped. Unknown names are left in; see
+# _rebar_checks_enable_warn.
+_rebar_checks_enable() {
+  local raw name
+  local -a names=()
+  raw=$(_rebar_config checks_enable REBAR_CHECKS_ENABLE "")
+  read -r -a names <<<"$raw"
+  for name in ${names[@]+"${names[@]}"}; do
+    echo "${name%.sh}"
+  done
+}
+
+# Warn on stderr about checks_enable names that are not checks, once per run:
+# the first caller exports _REBAR_CHECKS_VALIDATED so the scripts it starts
+# stay quiet. Unknown names never fail a run (they are ignored).
+_rebar_checks_enable_warn() {
+  [ -n "${_REBAR_CHECKS_VALIDATED:-}" ] && return 0
+  export _REBAR_CHECKS_VALIDATED=1
+  local name
+  while IFS= read -r name; do
+    [ -z "$name" ] && continue
+    case " $_REBAR_KNOWN_CHECKS " in
+      *" $name "*) ;;
+      *) echo "rebar: WARN: checks_enable names unknown check '$name' (ignored; use a check script name without .sh, e.g. check-ground-truth)" >&2 ;;
+    esac
+  done <<<"$(_rebar_checks_enable)"
+}
+
+# The tier check <name> runs at: 3 when checks_enable names it, otherwise the
+# configured tier.
+_rebar_check_tier() {
+  local check="${1%.sh}" name
+  while IFS= read -r name; do
+    if [ -n "$name" ] && [ "$name" = "$check" ]; then
+      echo 3
+      return
+    fi
+  done <<<"$(_rebar_checks_enable)"
+  _rebar_tier
+}
+
+# Check if a script should run based on its minimum required tier.
+# Usage: _rebar_skip 2 check-freshness && exit 0   # skip if tier < 2
+# A check named in checks_enable runs at any tier. Without a check name the
+# caller's script name is used.
 _rebar_skip() {
-  local min_tier="$1"
+  local min_tier="$1" check="${2:-$(basename "$0" .sh)}"
   local current_tier
+  _rebar_checks_enable_warn
   current_tier=$(_rebar_tier)
 
   if [ "$current_tier" -lt "$min_tier" ]; then
-    echo "SKIP: tier $current_tier < required tier $min_tier (set REBAR_TIER or .rebarrc to change)"
+    if [ "$(_rebar_check_tier "$check")" -ge "$min_tier" ]; then
+      echo "NOTE: tier $current_tier < required tier $min_tier; running $check because .rebarrc checks_enable names it"
+      return 1  # false = should run
+    fi
+    echo "SKIP: tier $current_tier < required tier $min_tier (set REBAR_TIER or .rebarrc to change, or name it in checks_enable)"
     return 0  # true = should skip
   fi
   return 1  # false = should run

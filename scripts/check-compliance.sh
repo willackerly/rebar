@@ -151,7 +151,7 @@ fi
 # Source tier config if available
 if [ -f "$SCRIPT_DIR/_rebar-config.sh" ]; then
   source "$SCRIPT_DIR/_rebar-config.sh"
-  current_tier=$(_rebar_tier)
+  current_tier=$(_rebar_check_tier check-compliance)
 else
   current_tier="${declared_tier:-3}"
 fi

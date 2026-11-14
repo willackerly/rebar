@@ -89,6 +89,37 @@ chmod +x scripts/*.sh
 | `SKIP_SCRIPT_TESTS` | `0` | Skip the shell regression tests, `scripts/tests/run.sh` (rebar-source-only) |
 | `SKIP_STEWARD` | `0` | Skip steward scan |
 
+### Tiers and `checks_enable` (`.rebarrc`)
+
+`tier` (env `REBAR_TIER`, default 3) gates these checks; every other check
+runs at every tier, including the registry check (`compute-registry.sh --check`).
+
+| Check | Below its tier | From its tier |
+|-------|----------------|---------------|
+| `check-contract-headers` | tier 1: SKIP | tier 2+ |
+| `check-freshness` | tier 1: SKIP | tier 2+ |
+| `check-jtbd-presence` | tier 1: SKIP | tier 2: advisory, tier 3: blocking |
+| `check-prefix-uniqueness` | tier 1: SKIP | tier 2: advisory, tier 3: blocking |
+| `check-ground-truth` | tiers 1-2: SKIP | tier 3 |
+| `check-compliance` | tier 1: AGENTS.md sections not checked | tier 2+ |
+
+`checks_enable` (env `REBAR_CHECKS_ENABLE`) runs named checks regardless of the
+tier, each as it would run at tier 3 (so a named jtbd or prefix check blocks):
+
+```
+tier = 1
+checks_enable = check-ground-truth check-contract-headers
+```
+
+Names are the check script basenames without `.sh`, as in `rebar run <name>`:
+`check-bypass-flags check-compliance check-contract-headers check-contract-refs
+check-decay-patterns check-doc-refs check-fix-commit check-freshness
+check-ground-truth check-jtbd-presence check-prefix-uniqueness check-todos
+compute-registry steward sync-bootstrap`. Naming an ungated check is allowed and
+changes nothing. An unknown name prints one `rebar: WARN:` line on stderr per run
+and is ignored; it never fails the run. `rebar status` lists the enabled checks;
+`rebar audit --all` shows them in the tier column. Unset, tiers behave as before.
+
 ## Automation Hierarchy
 
 ```

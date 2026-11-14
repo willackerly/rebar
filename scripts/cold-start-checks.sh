@@ -42,6 +42,8 @@ if ! cd "$PROJECT_ROOT" 2>/dev/null; then
 fi
 
 echo "rebar cold-start health — advisory (this hook always exits 0)"
+# Unknown .rebarrc checks_enable names are reported once here, not per check.
+if type _rebar_checks_enable_warn >/dev/null 2>&1; then _rebar_checks_enable_warn 2>&1; fi
 
 fail_count=0
 run_count=0

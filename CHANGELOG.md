@@ -38,6 +38,13 @@ All notable changes to rebar. Versioned with [semver](https://semver.org/).
   could split a multibyte character. **Upgrade note:** a registry generated
   with the old cut reports STALE once; regenerate it, or set
   `registry_purpose_style = bytes` to keep the old output.
+- **`checks_enable`** (`.rebarrc`, env `REBAR_CHECKS_ENABLE`) runs named
+  checks regardless of the tier, each as it would run at tier 3:
+  `tier = 1` + `checks_enable = check-ground-truth` runs ground truth.
+  Names are check script basenames without `.sh`; an unknown name warns
+  once per run and is ignored. `rebar status` and `rebar audit --all` show
+  the enabled checks. Unset, nothing changes. The registry check was never
+  tier-gated (docs said tier 2+); they now say it runs at every tier.
 
 ---
 

@@ -14,7 +14,7 @@ set -euo pipefail
 
 # Tier gate: freshness checks are Tier 2+ (skip for Tier 1 / partial adoption)
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-[ -f "$SCRIPT_DIR/_rebar-config.sh" ] && source "$SCRIPT_DIR/_rebar-config.sh" && _rebar_skip 2 && exit 0
+[ -f "$SCRIPT_DIR/_rebar-config.sh" ] && source "$SCRIPT_DIR/_rebar-config.sh" && _rebar_skip 2 check-freshness && exit 0
 
 MAX_AGE_DAYS="${1:-}"
 if [ -z "$MAX_AGE_DAYS" ] && type _rebar_config >/dev/null 2>&1; then

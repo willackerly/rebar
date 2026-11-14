@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 )
@@ -21,6 +22,9 @@ type Config struct {
 	// the steward's .state/), relative to RepoRoot. It names the contracts
 	// location only: some repos keep other design docs in architecture/.
 	ContractsDir string
+	// ChecksEnable lists the checks .rebarrc checks_enable force-enables
+	// below their tier (see ChecksEnableFor).
+	ChecksEnable []string
 }
 
 // DefaultContractsDir is where contracts live unless .rebarrc says otherwise.
@@ -38,6 +42,7 @@ func Load(repoRoot string) (*Config, error) {
 		Tier:       3, // default: full enforcement
 	}
 	c.ContractsDir = ContractsDirFor(repoRoot)
+	c.ChecksEnable = ChecksEnableFor(repoRoot)
 
 	// REBAR_TIER env takes precedence
 	if env := os.Getenv("REBAR_TIER"); env != "" {
@@ -171,4 +176,52 @@ func RCValue(repoRoot, key string) string {
 		return strings.TrimSpace(v)
 	}
 	return ""
+}
+
+// KnownChecks are the names checks_enable accepts: the script basenames
+// (without .sh) of every check the suites run. Mirrors _REBAR_KNOWN_CHECKS in
+// scripts/_rebar-config.sh.
+var KnownChecks = []string{
+	"check-bypass-flags", "check-compliance", "check-contract-headers",
+	"check-contract-refs", "check-decay-patterns", "check-doc-refs",
+	"check-fix-commit", "check-freshness", "check-ground-truth",
+	"check-jtbd-presence", "check-prefix-uniqueness", "check-todos",
+	"compute-registry", "steward", "sync-bootstrap",
+}
+
+// ChecksEnableFor returns the checks the repo at repoRoot force-enables below
+// their tier: env REBAR_CHECKS_ENABLE, else .rebarrc checks_enable, split on
+// whitespace with any .sh suffix dropped. Unknown names are kept (see
+// UnknownChecks); the scripts warn about and ignore them. Mirrors
+// _rebar_checks_enable in scripts/_rebar-config.sh.
+func ChecksEnableFor(repoRoot string) []string {
+	raw := os.Getenv("REBAR_CHECKS_ENABLE")
+	if raw == "" {
+		raw = RCValue(repoRoot, "checks_enable")
+	}
+	var names []string
+	for _, f := range strings.Fields(raw) {
+		names = append(names, strings.TrimSuffix(f, ".sh"))
+	}
+	return names
+}
+
+// UnknownChecks returns the names that are not in KnownChecks.
+func UnknownChecks(names []string) []string {
+	var unknown []string
+	for _, n := range names {
+		if !slices.Contains(KnownChecks, n) {
+			unknown = append(unknown, n)
+		}
+	}
+	return unknown
+}
+
+// CheckTier is the tier check name runs at: 3 when checks_enable names it,
+// otherwise the configured tier. Mirrors _rebar_check_tier.
+func (c *Config) CheckTier(name string) int {
+	if slices.Contains(c.ChecksEnable, strings.TrimSuffix(name, ".sh")) {
+		return 3
+	}
+	return c.Tier
 }
