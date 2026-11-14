@@ -27,7 +27,12 @@ Accepted items with decision made, pending implementation. Source files
 remain in `feedback/` root until implementation lands, then move to processed/.
 
 _Wave 1, Wave 2, and Wave 3 all implemented 2026-04-25 — see Implemented
-section below._ Queue is empty pending the next batch of triaged feedback.
+section below._
+
+| Item | Decision | Source |
+|------|----------|--------|
+| Flip `registry_impl_counts` default to `false` | 3.1 (stays `true` on 3.0) | `feedback/2026-11-14-busy-repo-merge-conflicts.md` Q1 |
+| Count implementing files over tracked files only (`git grep`) | Follow-up PR | `feedback/2026-11-14-busy-repo-merge-conflicts.md` Q2 |
 
 ### 2026-08-02 window — all five implemented same-day
 
