@@ -18,7 +18,7 @@
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+PROJECT_ROOT="${REBAR_PROJECT_ROOT:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 SRC="$PROJECT_ROOT/scripts"
 DST="$PROJECT_ROOT/templates/project-bootstrap/scripts"
 
@@ -33,11 +33,6 @@ case "${1:-}" in
   *) echo "sync-bootstrap: unknown arg '$1'" >&2; exit 2 ;;
 esac
 
-if [ ! -d "$SRC" ]; then
-  echo "sync-bootstrap: $SRC missing" >&2
-  exit 2
-fi
-
 # This script is only meaningful inside the rebar source repo, which has a
 # `templates/project-bootstrap/` to mirror /scripts/ into. Adopting projects
 # don't have that directory and shouldn't fail their ci-check on its absence.
@@ -49,6 +44,11 @@ if [ ! -d "$PROJECT_ROOT/templates/project-bootstrap" ]; then
     echo "sync-bootstrap: SKIP — not in rebar source repo (no templates/project-bootstrap/)"
   fi
   exit 0
+fi
+
+if [ ! -d "$SRC" ]; then
+  echo "sync-bootstrap: $SRC missing" >&2
+  exit 2
 fi
 
 mkdir -p "$DST"

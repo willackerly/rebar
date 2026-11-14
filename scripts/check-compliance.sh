@@ -29,7 +29,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+PROJECT_ROOT="${REBAR_PROJECT_ROOT:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 README="$PROJECT_ROOT/README.md"
 AGENTS="$PROJECT_ROOT/AGENTS.md"
 VERSION_FILE="$PROJECT_ROOT/.rebar-version"

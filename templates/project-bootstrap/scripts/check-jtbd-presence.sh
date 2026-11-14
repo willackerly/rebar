@@ -39,7 +39,7 @@ if [ "${SKIP_JTBD:-0}" = "1" ]; then
 fi
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+PROJECT_ROOT="${REBAR_PROJECT_ROOT:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 ARCH_DIR="$PROJECT_ROOT/architecture"
 
 # Tier gate: JTBD presence is Tier 2+ (warning) and blocks at Tier 3

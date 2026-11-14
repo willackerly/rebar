@@ -24,8 +24,11 @@
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+PROJECT_ROOT="${REBAR_PROJECT_ROOT:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 ARCH_DIR="architecture"
+# shellcheck source=scripts/_rebar-config.sh
+source "$SCRIPT_DIR/_rebar-config.sh" 2>/dev/null || true
+type _rebar_script >/dev/null 2>&1 || _rebar_script() { echo "$SCRIPT_DIR/$1"; }
 ESC=$(printf '\033')
 START_EPOCH=$(date +%s)
 
@@ -55,8 +58,9 @@ summarize() {
 }
 
 run_check() {
-  local name="$1" script="scripts/${1}.sh"
+  local name="$1" script
   local output status summary label
+  script="$(_rebar_script "${1}.sh" 2>/dev/null)"
   if [ ! -f "$script" ]; then
     echo "[MISS] $name — $script not installed"
     return

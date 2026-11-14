@@ -18,9 +18,12 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+PROJECT_ROOT="${REBAR_PROJECT_ROOT:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 STATE_DIR="$PROJECT_ROOT/architecture/.state"
 ARCH_DIR="$PROJECT_ROOT/architecture"
+# shellcheck source=scripts/_rebar-config.sh
+source "$SCRIPT_DIR/_rebar-config.sh" 2>/dev/null || true
+type _rebar_script >/dev/null 2>&1 || _rebar_script() { echo "$SCRIPT_DIR/$1"; }
 
 # Ensure state directory exists
 mkdir -p "$STATE_DIR"
@@ -245,7 +248,8 @@ run_enforcement() {
     if [ "$script" != "$script_with_args" ]; then
       args="${script_with_args#* }"
     fi
-    local script_path="$SCRIPT_DIR/$script"
+    local script_path
+    script_path="$(_rebar_script "$script" 2>/dev/null)"
     total=$((total + 1))
 
     local result="skip"

@@ -30,7 +30,7 @@ set -euo pipefail
 export LC_ALL=C
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+PROJECT_ROOT="${REBAR_PROJECT_ROOT:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 ARCH_DIR="$PROJECT_ROOT/architecture"
 REGISTRY="$ARCH_DIR/CONTRACT-REGISTRY.md"
 MODE="${1:-generate}"

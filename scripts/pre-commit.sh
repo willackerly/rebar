@@ -12,6 +12,8 @@
 # This runs only the fast checks suitable for pre-commit (<5s total).
 # The full suite (including freshness, registry) runs in CI via ci-check.sh.
 #
+# REBAR_PROJECT_ROOT=<dir> checks <dir> instead (`rebar check --pre-commit`).
+#
 # Skip with: git commit --no-verify (use sparingly)
 
 set -uo pipefail
@@ -29,24 +31,34 @@ else
   exit 0
 fi
 
+# shellcheck source=scripts/_rebar-config.sh
+source "$BASE/_rebar-config.sh" 2>/dev/null || true
+type _rebar_script >/dev/null 2>&1 || _rebar_script() { echo "$BASE/$1"; }
+if [ -n "${REBAR_PROJECT_ROOT:-}" ]; then
+  cd "$REBAR_PROJECT_ROOT" || exit 1
+fi
+
 failed=0
 
 echo "Pre-commit: checking TODO tracking..."
-if [ -x "$BASE/check-todos.sh" ]; then
-  "$BASE/check-todos.sh" || failed=$((failed + 1))
+check_todos="$(_rebar_script check-todos.sh)"
+if [ -x "$check_todos" ]; then
+  "$check_todos" || failed=$((failed + 1))
 fi
 
 echo ""
 echo "Pre-commit: checking contract references..."
-if [ -x "$BASE/check-contract-refs.sh" ]; then
-  "$BASE/check-contract-refs.sh" || failed=$((failed + 1))
+check_contract_refs="$(_rebar_script check-contract-refs.sh)"
+if [ -x "$check_contract_refs" ]; then
+  "$check_contract_refs" || failed=$((failed + 1))
 fi
 
 # Optional: verify numeric claims haven't drifted (fast — just find/grep/wc)
-if [ -x "$BASE/check-ground-truth.sh" ]; then
+check_ground_truth="$(_rebar_script check-ground-truth.sh)"
+if [ -x "$check_ground_truth" ]; then
   echo ""
   echo "Pre-commit: checking ground truth metrics..."
-  "$BASE/check-ground-truth.sh" || failed=$((failed + 1))
+  "$check_ground_truth" || failed=$((failed + 1))
 fi
 
 if [ "$failed" -gt 0 ]; then

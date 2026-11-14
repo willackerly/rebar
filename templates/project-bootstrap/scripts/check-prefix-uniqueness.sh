@@ -49,7 +49,7 @@ if [ "${SKIP_PREFIX_UNIQUENESS:-0}" = "1" ]; then
 fi
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+PROJECT_ROOT="${REBAR_PROJECT_ROOT:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 REGISTRY="$PROJECT_ROOT/architecture/CONTRACT-REGISTRY.md"
 
 # Tier gate: prefix uniqueness is Tier 2+ (warning) and blocks at Tier 3
