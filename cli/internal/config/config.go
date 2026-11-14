@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -224,4 +225,51 @@ func (c *Config) CheckTier(name string) int {
 		return 3
 	}
 	return c.Tier
+}
+
+// contractNamespaceRE is the character set a contract namespace may use
+// (e.g. github.com/org/repo). Mirrors _rebar_contract_namespace.
+var contractNamespaceRE = regexp.MustCompile(`^[A-Za-z0-9._/-]+$`)
+
+// qualifiedRefRE splits a namespace-qualified reference body
+// (<namespace>:<ID>.<major>...) into namespace and the rest.
+var qualifiedRefRE = regexp.MustCompile(`^([A-Za-z0-9._/-]+):([A-Za-z0-9][A-Za-z0-9_-]*\.[0-9].*)$`)
+
+// ContractNamespace returns the contract namespace of the repo at repoRoot:
+// env REBAR_CONTRACT_NAMESPACE, then .rebarrc contract_namespace, "" if
+// unset or invalid. With a namespace, a reference to one of this repo's
+// contracts may carry it (CONTRACT + ":" + namespace + ":" + ID.version);
+// references qualified with another namespace belong to other repos.
+// Mirrors _rebar_contract_namespace in scripts/_rebar-config.sh.
+func ContractNamespace(repoRoot string) string {
+	ns := os.Getenv("REBAR_CONTRACT_NAMESPACE")
+	if ns == "" {
+		ns = RCValue(repoRoot, "contract_namespace")
+	}
+	ns = strings.TrimSuffix(strings.TrimSpace(ns), "/")
+	if ns != "" && !contractNamespaceRE.MatchString(ns) {
+		fmt.Fprintf(os.Stderr, "rebar: ignoring contract_namespace %q (allowed: letters, digits, . _ / -)\n", ns)
+		return ""
+	}
+	return ns
+}
+
+// LocalContractRef interprets ref, the text after a "CONTRACT:" marker, for
+// a repo whose namespace is namespace. It returns the unqualified reference
+// (ID.version...) and true when ref points at this repo's contracts, or
+// false when it is qualified with another repo's namespace. With no
+// namespace configured every ref is returned unchanged, as before
+// namespaces existed.
+func LocalContractRef(ref, namespace string) (string, bool) {
+	if namespace == "" {
+		return ref, true
+	}
+	m := qualifiedRefRE.FindStringSubmatch(ref)
+	if m == nil {
+		return ref, true
+	}
+	if m[1] != namespace {
+		return "", false
+	}
+	return m[2], true
 }

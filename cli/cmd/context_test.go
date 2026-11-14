@@ -503,3 +503,43 @@ func captureOutput(t *testing.T, fn func() error) string {
 
 	return buf.String()
 }
+
+// findBranchContracts maps header references to contract globs; with a
+// contract namespace, this repo's qualified references resolve like short
+// ones and other repos' references are skipped.
+func TestFindBranchContractsNamespace(t *testing.T) {
+	marker := "CONTRACT" + ":" // split so rebar's own ref scan skips it
+	files := map[string]string{
+		"src/a.go": "package src\n",
+		"src/b.go": "package src\n",
+		"src/c.go": "package src\n",
+	}
+	cases := []struct {
+		name, rc string
+		want     []string
+	}{
+		{"unset", "tier = 1\n", []string{
+			"architecture/CONTRACT-AUTH*.md",
+			"architecture/CONTRACT-github*.md", // qualified refs are not understood without a namespace
+		}},
+		{"namespace", "tier = 1\ncontract_namespace = github.com/org/repo\n", []string{
+			"architecture/CONTRACT-AUTH*.md",
+			"architecture/CONTRACT-BLOB*.md",
+		}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv("REBAR_CONTRACT_NAMESPACE", "")
+			files[".rebarrc"] = tc.rc
+			repoDir := setupTestRepo(t, files)
+			setupCfg(repoDir)
+			testutil.WriteFile(t, repoDir, "src/a.go", "// "+marker+"AUTH.1.0\npackage src\n")
+			testutil.WriteFile(t, repoDir, "src/b.go", "// "+marker+"github.com/org/repo:BLOB.2.0\npackage src\n")
+			testutil.WriteFile(t, repoDir, "src/c.go", "// "+marker+"github.com/org/other:KEYS.1.0\npackage src\n")
+			got := findBranchContracts()
+			if strings.Join(got, ",") != strings.Join(tc.want, ",") {
+				t.Fatalf("findBranchContracts = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}

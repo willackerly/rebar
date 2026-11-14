@@ -20,10 +20,12 @@
 set -euo pipefail
 
 CONTRACTS_DIR=architecture
+REF_ERE='CONTRACT:'   # with contract_namespace: CONTRACT:(<namespace>:)?
 if [ -f "$(dirname "$0")/_rebar-config.sh" ]; then
   # shellcheck source=scripts/_rebar-config.sh
   source "$(dirname "$0")/_rebar-config.sh"
   CONTRACTS_DIR=$(_rebar_contracts_dir)
+  REF_ERE=$(_rebar_contract_ref_ere)
 fi
 ARCH_DIR="${1:-$CONTRACTS_DIR}"
 REGISTRY="${ARCH_DIR}/CONTRACT-REGISTRY.md"
@@ -69,7 +71,7 @@ for contract in "$ARCH_DIR"/CONTRACT-*.md; do
 
   # Search for references in source code. No match is the case this loop
   # exists to report, so neither grep may end the script under pipefail.
-  ref_count=$( { grep -rn "CONTRACT:${id}" \
+  ref_count=$( { grep -rEn "${REF_ERE}${id}" \
     --include="*.go" --include="*.ts" --include="*.tsx" --include="*.js" --include="*.jsx" \
     --include="*.py" --include="*.rs" --include="*.mjs" --include="*.cjs" \
     . 2>/dev/null || true; } \

@@ -8,6 +8,8 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+
+	"github.com/willackerly/rebar/cli/internal/config"
 )
 
 var contextCmd = &cobra.Command{
@@ -178,6 +180,7 @@ func findBranchContracts() []string {
 		return nil
 	}
 
+	namespace := config.ContractNamespace(cfg.RepoRoot)
 	contracts := map[string]bool{}
 	for _, file := range strings.Split(diff, "\n") {
 		file = strings.TrimSpace(file)
@@ -204,7 +207,16 @@ func findBranchContracts() []string {
 				// The literal CONTRACT prefix is intentionally elided in this
 				// comment so check-contract-refs.sh doesn't false-positive on it.
 				ref = strings.TrimPrefix(ref, "CONTRACT:")
-				ref = strings.Fields(ref)[0]
+				fields := strings.Fields(ref)
+				if len(fields) == 0 {
+					continue
+				}
+				// A reference qualified with another repo's contract
+				// namespace has no contract file here.
+				ref, ok := config.LocalContractRef(fields[0], namespace)
+				if !ok {
+					continue
+				}
 				// Convert to glob pattern
 				pattern := fmt.Sprintf("architecture/CONTRACT-%s*.md", strings.Split(ref, ".")[0])
 				contracts[pattern] = true

@@ -41,6 +41,7 @@ PURPOSE_HEADING=""
 PURPOSE_STYLE=ellipsis
 IMPL_GLOBS="*.go *.ts *.tsx *.js *.py *.rs *.java *.rb *.jsx *.sh bin/"
 EXCLUDE_DIRS="node_modules vendor dist"
+REF_ERE='CONTRACT:'   # with contract_namespace: CONTRACT:(<namespace>:)?
 if [ -f "$SCRIPT_DIR/_rebar-config.sh" ]; then
   # shellcheck source=scripts/_rebar-config.sh
   source "$SCRIPT_DIR/_rebar-config.sh"
@@ -51,6 +52,7 @@ if [ -f "$SCRIPT_DIR/_rebar-config.sh" ]; then
   IMPL_GLOBS=$(_rebar_config registry_impl_globs _REBAR_NO_ENV "$IMPL_GLOBS")
   EXCLUDE_DIRS=$(_rebar_config registry_exclude_dirs _REBAR_NO_ENV "$EXCLUDE_DIRS")
   CONTRACTS_DIR=$(_rebar_contracts_dir)
+  REF_ERE=$(_rebar_contract_ref_ere)
 fi
 ARCH_DIR="$PROJECT_ROOT/$CONTRACTS_DIR"
 REGISTRY="$ARCH_DIR/CONTRACT-REGISTRY.md"
@@ -202,11 +204,13 @@ search_source() {
   fi
 }
 
-# Count implementing files for a contract, deduplicated by path.
+# Count implementing files for a contract, deduplicated by path. With a
+# contract namespace, CONTRACT:<namespace>:<id> counts too; references
+# qualified with another repo's namespace do not.
 count_implementations() {
   local id="$1"
   set +o pipefail
-  search_source -l "CONTRACT:${id}" | sort -u | wc -l | tr -d ' '
+  search_source -El "${REF_ERE}${id}" | sort -u | wc -l | tr -d ' '
   set -o pipefail
 }
 
@@ -347,8 +351,8 @@ generate_health() {
   local shadows_tmp
   shadows_tmp="$(mktemp)"
   set +o pipefail
-  search_source -Eho 'CONTRACT:[A-Za-z0-9_-]+\.[0-9]+\.[0-9]+' \
-    | sed -E 's/^CONTRACT://; s/\.[0-9]+\.[0-9]+$//' \
+  search_source -Eho "${REF_ERE}"'[A-Za-z0-9_-]+\.[0-9]+\.[0-9]+' \
+    | sed -E "s#^${REF_ERE}##"'; s/\.[0-9]+\.[0-9]+$//' \
     | sort -u > "$shadows_tmp"
   set -o pipefail
 

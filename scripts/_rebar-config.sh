@@ -180,6 +180,39 @@ _rebar_contracts_dir() {
   echo "${dir:-architecture}"
 }
 
+# This repo's contract namespace: .rebarrc `contract_namespace` (env
+# REBAR_CONTRACT_NAMESPACE), "" when unset. With a namespace, a reference to
+# one of this repo's contracts may be written CONTRACT:<namespace>:<ID>.<v>
+# as well as CONTRACT:<ID>.<v>; a reference qualified with any other
+# namespace points at another repo and is not checked here. Allowed
+# characters: letters, digits, . _ / - (e.g. github.com/org/repo); anything
+# else is ignored with a warning, so a typo cannot widen the patterns.
+# Mirrors config.ContractNamespace in cli/internal/config/config.go.
+_rebar_contract_namespace() {
+  local ns
+  ns=$(_rebar_config contract_namespace REBAR_CONTRACT_NAMESPACE "")
+  ns="${ns%/}"
+  if [ -n "$ns" ] && ! [[ "$ns" =~ ^[A-Za-z0-9._/-]+$ ]]; then
+    echo "rebar: ignoring contract_namespace '$ns' (allowed: letters, digits, . _ / -)" >&2
+    ns=""
+  fi
+  echo "$ns"
+}
+
+# ERE matching the start of a reference to one of this repo's contracts:
+# `CONTRACT:` without a namespace, `CONTRACT:(<namespace>:)?` with one.
+# Append the ID (and version) pattern; use with grep -E / sed -E.
+_rebar_contract_ref_ere() {
+  local ns
+  ns=$(_rebar_contract_namespace)
+  if [ -z "$ns" ]; then
+    echo 'CONTRACT:'
+  else
+    # `.` is the only ERE metacharacter the allowed set can contain.
+    echo "CONTRACT:(${ns//./\\.}:)?"
+  fi
+}
+
 # Read the rebar-scripts version from a script file
 _rebar_script_version() {
   local file="$1"
