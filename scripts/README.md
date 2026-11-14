@@ -39,7 +39,7 @@ Each script is standalone, runs in <5 seconds, and exits 0 (pass) or 1 (fail).
 | `check-decay-patterns.sh` | Soft-hardening anti-patterns in spec/test files |
 | `check-jtbd-presence.sh` | Latest-version contracts carry non-empty Why/Who/Scenarios sections |
 | `check-prefix-uniqueness.sh` | No prefix number (S1, I3, …) claimed by two different contract IDs |
-| `sync-bootstrap.sh --check` | `templates/project-bootstrap/scripts/` holds only thin entry points |
+| `sync-bootstrap.sh --check` | `templates/project-bootstrap/scripts/` holds only thin entry points; the template's `CONTRACT-TEMPLATE.md` matches `architecture/` |
 
 ## Composite Runners
 
