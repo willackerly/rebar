@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+	"github.com/willackerly/rebar/cli/internal/config"
 	"github.com/willackerly/rebar/cli/internal/llm"
 )
 
@@ -120,8 +121,9 @@ build/
 	writeMinimalClaude(root, name)
 	fmt.Println("  ✓ CLAUDE.md")
 
-	// architecture/
-	archDir := filepath.Join(root, "architecture")
+	// contracts directory (architecture/ by default)
+	contractsDir := config.ContractsDirFor(root)
+	archDir := filepath.Join(root, contractsDir)
 	os.MkdirAll(archDir, 0755)
 	rebarRoot := findRebarRoot()
 	if rebarRoot != "" {
@@ -130,15 +132,19 @@ build/
 			os.WriteFile(filepath.Join(archDir, "CONTRACT-TEMPLATE.md"), data, 0644)
 		}
 	}
-	fmt.Println("  ✓ architecture/")
+	fmt.Printf("  ✓ %s/\n", contractsDir)
 
-	// scripts/
+	// scripts/ — the thin entry points; every check runs from the rebar install.
 	scriptsDir := filepath.Join(root, "scripts")
 	os.MkdirAll(scriptsDir, 0755)
 	if rebarRoot != "" {
-		src := filepath.Join(rebarRoot, "scripts", "refresh-context.sh")
-		if data, err := os.ReadFile(src); err == nil {
-			os.WriteFile(filepath.Join(scriptsDir, "refresh-context.sh"), data, 0755)
+		srcDir := filepath.Join(rebarRoot, "templates", "project-bootstrap", "scripts")
+		if entries, err := os.ReadDir(srcDir); err == nil {
+			for _, e := range entries {
+				if data, err := os.ReadFile(filepath.Join(srcDir, e.Name())); err == nil && !e.IsDir() {
+					os.WriteFile(filepath.Join(scriptsDir, e.Name()), data, 0755)
+				}
+			}
 		}
 	}
 	fmt.Println("  ✓ scripts/")
@@ -203,7 +209,7 @@ Be practical and specific. Don't over-engineer — this is a fresh project.`, na
 					fmt.Printf("    %s\n", line)
 				}
 				fmt.Println()
-				fmt.Println("  Create these using: architecture/CONTRACT-TEMPLATE.md")
+				fmt.Printf("  Create these using: %s/CONTRACT-TEMPLATE.md\n", contractsDir)
 			}
 		}
 	}

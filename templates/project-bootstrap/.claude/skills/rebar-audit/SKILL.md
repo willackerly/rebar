@@ -11,9 +11,9 @@ description: Use when asked about a rebar repo's health, compliance, tier, or co
    (rebar itself expects 9–10/10).
 2. **`scripts/ci-check.sh`** — the full enforcement-script suite; the exit
    code is the verdict, the output names each failing check.
-3. **`scripts/steward.sh --summary`** — one-liner: contract counts by
+3. **`rebar run steward --summary`** — one-liner: contract counts by
    computed lifecycle, open discoveries, enforcement passing. A full
-   `scripts/steward.sh` run writes `STEWARD_REPORT.md` +
+   `rebar run steward` run writes `STEWARD_REPORT.md` +
    `architecture/.state/steward-report.json`.
 
 ## The two vocabularies (do not conflate)
@@ -23,15 +23,14 @@ the steward from file presence, while declared maturity
 (`stub`/`draft`/`in-progress`/`active`/`verified`) is an honest human/agent
 declaration of how real the artifact is. Canonical definitions:
 `rebar:convention` (§Lifecycle Status Definitions, §Declared Maturity) —
-resolve with `scripts/rebar-doc.sh rebar:convention --cat` (or `rebar doc`
-if the CLI is installed).
+resolve with `rebar doc rebar:convention --cat`.
 
 - **Computed** shows up in steward output: the `--summary` counts, the
   `STEWARD_REPORT.md` table, the `.state` JSON. `impl-present` means
   implementation files exist — it does NOT mean proven.
 - **Declared** shows up as `Status:` lines in artifact headers
   (`architecture/CONTRACT-*.md`) and is weighted into the compliance badge
-  by `scripts/check-compliance.sh`. Only this vocabulary may say `verified`
+  by `rebar run check-compliance`. Only this vocabulary may say `verified`
   (active + passing tests/scenarios proving it).
 
 Report what the surfaces actually printed, not what you expected.

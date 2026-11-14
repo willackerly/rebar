@@ -7,15 +7,58 @@
 #
 # Provides:
 #   _rebar_tier    — returns the configured enforcement tier (1, 2, or 3)
-#   _rebar_skip    — returns 0 (should run) or 1 (should skip) for a minimum tier
+#   _rebar_skip    — returns 0 (skip) or 1 (run) for a minimum tier and check
+#   _rebar_check_tier — the tier a check runs at (3 when checks_enable names it)
+#   _rebar_checks_enable — the checks .rebarrc checks_enable force-enables
 #   _rebar_config  — reads a .rebarrc key (env override, then .rebarrc, then default)
+#   _rebar_project_root — the repo the scripts check (REBAR_PROJECT_ROOT or ../)
+#   _rebar_script  — path of a helper script, preferring the project's own copy
+#   _rebar_contracts_dir — where the contracts live (.rebarrc contracts_dir)
 #
 # Tier definitions:
 #   1 = Partial  — contract-refs + TODOs only (minimum viable)
-#   2 = Adopted  — + contract-headers, freshness, registry
-#   3 = Enforced — + ground-truth, strict steward (full enforcement)
+#   2 = Adopted  — + contract-headers, freshness, jtbd/prefix (advisory),
+#                    compliance's AGENTS.md sections
+#   3 = Enforced — + ground-truth; jtbd/prefix block (full enforcement)
+# The registry check (compute-registry.sh --check) runs at every tier.
 #
 # Configuration priority: REBAR_TIER env var > .rebarrc file > default (3)
+#
+# .rebarrc `checks_enable` (env REBAR_CHECKS_ENABLE) force-enables named checks
+# below their tier: a space-separated list of check script basenames without
+# .sh (`checks_enable = check-ground-truth check-jtbd-presence`). A named check
+# runs as it would at tier 3. Unknown names are warned about and ignored.
+
+# The repo these scripts check. REBAR_PROJECT_ROOT lets the scripts/ of a
+# rebar install check another repo (`rebar check` sets it); otherwise it is
+# the parent of the scripts/ directory.
+_rebar_project_root() {
+  if [ -n "${REBAR_PROJECT_ROOT:-}" ]; then
+    echo "$REBAR_PROJECT_ROOT"
+    return
+  fi
+  (cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+}
+
+# Path of helper script <name> to run. A rebar install checking another repo
+# still runs that repo's own scripts/<name> if it has one, so adopters with
+# customized copies keep working while they move the customization into
+# .rebarrc; each such use prints a deprecation notice on stderr. Files marked
+# `# rebar-thin-wrapper` are entry points, not checks, and are never picked.
+_rebar_script() {
+  local name="$1" script_dir root local_copy
+  script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+  root="$(_rebar_project_root)"
+  local_copy="$root/scripts/$name"
+  if [ -f "$local_copy" ] \
+    && [ "$(cd "$root/scripts" && pwd -P)" != "$script_dir" ] \
+    && ! grep -q '^# rebar-thin-wrapper' "$local_copy" 2>/dev/null; then
+    echo "rebar: running project copy scripts/$name (deprecated: move its settings to .rebarrc and delete it)" >&2
+    echo "$local_copy"
+    return
+  fi
+  echo "$script_dir/$name"
+}
 
 _rebar_tier() {
   # 1. Environment variable (highest priority)
@@ -25,12 +68,8 @@ _rebar_tier() {
   fi
 
   # 2. .rebarrc file (project-level config)
-  local script_dir
-  script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-  local project_root
-  project_root="$(cd "$script_dir/.." && pwd)"
-
-  local rc_file="$project_root/.rebarrc"
+  local rc_file
+  rc_file="$(_rebar_project_root)/.rebarrc"
   if [ -f "$rc_file" ]; then
     local tier
     tier=$(grep '^tier' "$rc_file" 2>/dev/null | head -1 | sed 's/.*=[[:space:]]*//' | tr -d ' ')
@@ -44,15 +83,68 @@ _rebar_tier() {
   echo "3"
 }
 
-# Check if a script should run based on its minimum required tier
-# Usage: _rebar_skip 2 && exit 0   # skip if tier < 2
+# Checks `checks_enable` may name: the script basenames (without .sh) of every
+# check the suites run. Mirrored by config.KnownChecks in the Go CLI.
+_REBAR_KNOWN_CHECKS="check-bypass-flags check-compliance check-contract-headers check-contract-refs check-decay-patterns check-doc-refs check-fix-commit check-freshness check-ground-truth check-jtbd-presence check-prefix-uniqueness check-todos compute-registry steward sync-bootstrap"
+
+# The checks .rebarrc `checks_enable` (env REBAR_CHECKS_ENABLE) force-enables,
+# one per line, with any .sh suffix dropped. Unknown names are left in; see
+# _rebar_checks_enable_warn.
+_rebar_checks_enable() {
+  local raw name
+  local -a names=()
+  raw=$(_rebar_config checks_enable REBAR_CHECKS_ENABLE "")
+  read -r -a names <<<"$raw"
+  for name in ${names[@]+"${names[@]}"}; do
+    echo "${name%.sh}"
+  done
+}
+
+# Warn on stderr about checks_enable names that are not checks, once per run:
+# the first caller exports _REBAR_CHECKS_VALIDATED so the scripts it starts
+# stay quiet. Unknown names never fail a run (they are ignored).
+_rebar_checks_enable_warn() {
+  [ -n "${_REBAR_CHECKS_VALIDATED:-}" ] && return 0
+  export _REBAR_CHECKS_VALIDATED=1
+  local name
+  while IFS= read -r name; do
+    [ -z "$name" ] && continue
+    case " $_REBAR_KNOWN_CHECKS " in
+      *" $name "*) ;;
+      *) echo "rebar: WARN: checks_enable names unknown check '$name' (ignored; use a check script name without .sh, e.g. check-ground-truth)" >&2 ;;
+    esac
+  done <<<"$(_rebar_checks_enable)"
+}
+
+# The tier check <name> runs at: 3 when checks_enable names it, otherwise the
+# configured tier.
+_rebar_check_tier() {
+  local check="${1%.sh}" name
+  while IFS= read -r name; do
+    if [ -n "$name" ] && [ "$name" = "$check" ]; then
+      echo 3
+      return
+    fi
+  done <<<"$(_rebar_checks_enable)"
+  _rebar_tier
+}
+
+# Check if a script should run based on its minimum required tier.
+# Usage: _rebar_skip 2 check-freshness && exit 0   # skip if tier < 2
+# A check named in checks_enable runs at any tier. Without a check name the
+# caller's script name is used.
 _rebar_skip() {
-  local min_tier="$1"
+  local min_tier="$1" check="${2:-$(basename "$0" .sh)}"
   local current_tier
+  _rebar_checks_enable_warn
   current_tier=$(_rebar_tier)
 
   if [ "$current_tier" -lt "$min_tier" ]; then
-    echo "SKIP: tier $current_tier < required tier $min_tier (set REBAR_TIER or .rebarrc to change)"
+    if [ "$(_rebar_check_tier "$check")" -ge "$min_tier" ]; then
+      echo "NOTE: tier $current_tier < required tier $min_tier; running $check because .rebarrc checks_enable names it"
+      return 1  # false = should run
+    fi
+    echo "SKIP: tier $current_tier < required tier $min_tier (set REBAR_TIER or .rebarrc to change, or name it in checks_enable)"
     return 0  # true = should skip
   fi
   return 1  # false = should run
@@ -68,15 +160,24 @@ _rebar_config() {
     return
   fi
 
-  local script_dir project_root rc_file value=""
-  script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-  project_root="$(cd "$script_dir/.." && pwd)"
-  rc_file="$project_root/.rebarrc"
+  local rc_file value=""
+  rc_file="$(_rebar_project_root)/.rebarrc"
   if [ -f "$rc_file" ]; then
     value=$(grep "^${key}[[:space:]]*=" "$rc_file" 2>/dev/null | head -1 \
       | sed 's/^[^=]*=[[:space:]]*//; s/[[:space:]]*#.*$//; s/[[:space:]]*$//')
   fi
   echo "${value:-$default}"
+}
+
+# Directory holding the contracts (CONTRACT-*.md, CONTRACT-REGISTRY.md and
+# the steward's .state/), relative to the project root: .rebarrc
+# `contracts_dir` (env REBAR_CONTRACTS_DIR), default `architecture`. It names
+# the contracts location only; repos may keep other design docs elsewhere.
+_rebar_contracts_dir() {
+  local dir
+  dir=$(_rebar_config contracts_dir REBAR_CONTRACTS_DIR architecture)
+  dir="${dir%/}"
+  echo "${dir:-architecture}"
 }
 
 # Read the rebar-scripts version from a script file

@@ -73,11 +73,11 @@ cp "$BOOTSTRAP/CONSUMES.md"  "$PROJECT/CONSUMES.md"  # then edit or delete
 # Practice reference guides (recommended)
 cp -r practices/             "$PROJECT/practices/"
 
-# Enforcement scripts and conventions (recommended).
-# Scripts/ is the single source of truth — `templates/project-bootstrap/scripts/`
-# is mechanically synced from it (see scripts/sync-bootstrap.sh) so either copy
-# yields the same result. We use the root copy here.
-cp -r scripts/               "$PROJECT/scripts/"
+# Enforcement entry points and conventions (recommended).
+# The checks themselves run from the rebar install (`rebar check`,
+# `rebar run <script>`); the project gets only ci-check.sh + pre-commit.sh,
+# and tailors the checks in .rebarrc.
+cp -r "$BOOTSTRAP/scripts/"  "$PROJECT/scripts/"
 cp conventions.md            "$PROJECT/conventions.md"
 # State directory for steward
 mkdir -p "$PROJECT/architecture/.state"

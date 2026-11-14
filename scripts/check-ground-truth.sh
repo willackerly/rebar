@@ -6,7 +6,8 @@
 # METRICS file. Catches "silent success" drift where everything works but
 # documented numbers describe a different reality.
 #
-# CUSTOMIZATION REQUIRED: Define your project's metrics in compute_metrics().
+# Metrics are declared in .rebarrc, so a project needs no copy of this
+# script (see "Metrics declared in .rebarrc" below).
 #
 # METRICS lines are `key = value` (must match exactly) or `key >= value`
 # (a floor: passes while the computed count is at least value). Use floors
@@ -21,9 +22,9 @@ set -euo pipefail
 
 # Tier gate: ground truth is Tier 3 only (skip for Tier 1-2)
 SCRIPT_DIR_GT="$(cd "$(dirname "$0")" && pwd)"
-[ -f "$SCRIPT_DIR_GT/_rebar-config.sh" ] && source "$SCRIPT_DIR_GT/_rebar-config.sh" && _rebar_skip 3 && exit 0
+[ -f "$SCRIPT_DIR_GT/_rebar-config.sh" ] && source "$SCRIPT_DIR_GT/_rebar-config.sh" && _rebar_skip 3 check-ground-truth && exit 0
 
-REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+REPO_ROOT="${REBAR_PROJECT_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}"
 # METRICS or METRICS.md — the template ships .md and `rebar audit`
 # accepts both, so this checker must too.
 METRICS_FILE="$REPO_ROOT/METRICS"
@@ -35,25 +36,111 @@ YELLOW='\033[1;33m'
 NC='\033[0m'
 exit_code=0
 
-# ── CUSTOMIZE: Define your project's metrics ──
+# ── Metrics declared in .rebarrc ──
 #
-# Each metric is a key=value pair echoed to stdout.
-# Keys must match entries in the METRICS file.
+# Each metric is a group of `metric.<name>.<field> = value` lines. <name> is
+# the METRICS key. All fields are optional; values are space-separated lists
+# where a list makes sense, and `#` starts a comment.
 #
-# By convention, these locations are reliable and countable:
-#   tests/          — all test files live here
-#   architecture/   — all contracts live here
-#   src/            — source code with CONTRACT: headers
+#   type           files (default) or dirs
+#   paths          where to look, relative to the repo root (default: .)
+#   names          name globs to count (default: everything)
+#   exclude_names  name globs to leave out
+#   exclude_dirs   directory names to skip anywhere (.git is always skipped)
+#   min_depth      as find -mindepth, relative to each path
+#   max_depth      as find -maxdepth
+#   contains       ERE; count only files whose content matches
+#   distinct       ERE with one group, matched against each name; count the
+#                  distinct values of the group (a name that does not match
+#                  counts as itself)
 #
-compute_metrics() {
-  # Examples (uncomment and adjust for your project):
-  #
-  # echo "unit_test_files=$(find tests/ -name '*.test.ts' -o -name '*.test.tsx' 2>/dev/null | wc -l | tr -d ' ')"
-  # echo "e2e_spec_files=$(find tests/e2e/ -name '*.spec.ts' 2>/dev/null | wc -l | tr -d ' ')"
-  # echo "contracts=$(ls architecture/CONTRACT-*.md 2>/dev/null | wc -l | tr -d ' ')"
-  # echo "api_route_modules=$(find src/routes/ -name '*.ts' -not -name 'index.ts' -not -name '*.test.ts' 2>/dev/null | wc -l | tr -d ' ')"
+# Example — test files under two roots, and contract IDs across versions:
+#   metric.test_files.paths    = api sdk
+#   metric.test_files.names    = *_test.go *.test.ts
+#   metric.test_files.exclude_dirs = node_modules vendor dist
+#   metric.contract_ids.paths  = architecture
+#   metric.contract_ids.max_depth = 1
+#   metric.contract_ids.names  = CONTRACT-*.md
+#   metric.contract_ids.exclude_names = CONTRACT-TEMPLATE.md CONTRACT-REGISTRY.md
+#   metric.contract_ids.distinct = ^CONTRACT-(.*)\.[0-9]+\.[0-9]+\.md$
+RC_FILE="$REPO_ROOT/.rebarrc"
 
-  :  # no-op — remove this line when adding metrics
+metric_names() {
+  [ -f "$RC_FILE" ] || return 0
+  sed -n -E 's/^metric\.([A-Za-z0-9_-]+)\.[a-z_]+[[:space:]]*=.*/\1/p' "$RC_FILE" \
+    | awk '!seen[$0]++'
+}
+
+metric_field() {
+  _rebar_config "metric.$1.$2" _REBAR_NO_ENV "${3:-}"
+}
+
+# count_metric <name>: print the computed value of one declared metric.
+count_metric() {
+  local name="$1" type paths names exclude_names exclude_dirs min max contains distinct
+  type=$(metric_field "$name" type files)
+  paths=$(metric_field "$name" paths .)
+  names=$(metric_field "$name" names)
+  exclude_names=$(metric_field "$name" exclude_names)
+  exclude_dirs=$(metric_field "$name" exclude_dirs)
+  min=$(metric_field "$name" min_depth)
+  max=$(metric_field "$name" max_depth)
+  contains=$(metric_field "$name" contains)
+  distinct=$(metric_field "$name" distinct)
+
+  # Globs in the values are patterns for find, not for this shell.
+  set -f
+  local args=() p first
+  for p in $paths; do
+    [ -e "$REPO_ROOT/$p" ] && args+=("$REPO_ROOT/$p")
+  done
+  if [ ${#args[@]} -eq 0 ]; then
+    set +f
+    echo 0
+    return
+  fi
+  [ -n "$min" ] && args+=(-mindepth "$min")
+  [ -n "$max" ] && args+=(-maxdepth "$max")
+  args+=( '(' -type d '(' -name .git )
+  for p in $exclude_dirs; do args+=(-o -name "$p"); done
+  args+=( ')' ')' -prune -o )
+  case "$type" in
+    dirs) args+=( '(' -type d ) ;;
+    *)    args+=( '(' -type f ) ;;
+  esac
+  if [ -n "$names" ]; then
+    args+=( '(' )
+    first=true
+    for p in $names; do
+      $first || args+=(-o)
+      args+=(-name "$p")
+      first=false
+    done
+    args+=( ')' )
+  fi
+  for p in $exclude_names; do args+=( ! -name "$p" ); done
+  args+=( ')' )
+  if [ -n "$contains" ]; then
+    args+=(-exec grep -lE -- "$contains" {} +)
+  else
+    args+=(-print)
+  fi
+  set +f
+
+  if [ -n "$distinct" ]; then
+    { find "${args[@]}" 2>/dev/null || true; } \
+      | sed 's|.*/||' | sed -E "s#${distinct}#\\1#" | LC_ALL=C sort -u | wc -l | tr -d ' '
+  else
+    { find "${args[@]}" 2>/dev/null || true; } | wc -l | tr -d ' '
+  fi
+}
+
+compute_metrics() {
+  type _rebar_config >/dev/null 2>&1 || return 0
+  local name
+  for name in $(metric_names); do
+    echo "$name=$(count_metric "$name")"
+  done
 }
 
 # ── Verification engine (do not modify below this line) ──
@@ -61,8 +148,8 @@ compute_metrics() {
 verify() {
   if [ ! -f "$METRICS_FILE" ]; then
     echo -e "${YELLOW}SKIP${NC}: No METRICS file found"
-    echo "  Create a METRICS file with key = value pairs."
-    echo "  See scripts/check-ground-truth.sh for examples."
+    echo "  Create a METRICS file with key = value pairs and declare how"
+    echo "  to compute each one as metric.<key>.* lines in .rebarrc."
     return 0
   fi
 
@@ -70,7 +157,7 @@ verify() {
   computed=$(compute_metrics)
 
   if [ -z "$computed" ]; then
-    echo "No metrics defined. Customize compute_metrics() in this script."
+    echo "No metrics declared. Add metric.<key>.* lines to .rebarrc (see this script's header)."
     return 0
   fi
 

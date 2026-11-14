@@ -107,6 +107,7 @@ func runContext(cmd *cobra.Command, args []string) error {
 
 	printed := 0
 	for _, pattern := range patterns {
+		pattern = withContractsDir(pattern)
 		fullPattern := filepath.Join(cfg.RepoRoot, pattern)
 		matches, err := filepath.Glob(fullPattern)
 		if err != nil || len(matches) == 0 {
@@ -221,8 +222,7 @@ func findBranchContracts() []string {
 
 func runSessionStart() error {
 	// First, try to run refresh-context.sh
-	refreshScript := filepath.Join(cfg.RepoRoot, "scripts", "refresh-context.sh")
-	if _, err := os.Stat(refreshScript); err == nil {
+	if _, ok := resolveScript(cfg.RepoRoot, findRebarRoot(), "refresh-context.sh"); ok {
 		fmt.Println("═══ Freshness Check ═══")
 		fmt.Println()
 		out := gitOutput("log", "--since=7 days", "--oneline")

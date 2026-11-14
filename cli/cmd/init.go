@@ -242,10 +242,10 @@ _None currently._
 		}
 	}
 
-	// scripts/ — the curated adopter set, mirrored from rebar's
+	// scripts/ — the thin entry points from rebar's
 	// templates/project-bootstrap/scripts/ (identical to what the
 	// `cp -r templates/project-bootstrap/. <target>/` adoption path
-	// delivers; maintainer-only scripts are already excluded there).
+	// delivers); the checks themselves run from the rebar install.
 	// Never overwrites existing files.
 	scriptsDir := filepath.Join(root, "scripts")
 	if rebarRoot := findRebarRoot(); rebarRoot == "" {
@@ -272,13 +272,14 @@ _None currently._
 			}
 		}
 		if copiedScripts > 0 {
-			fmt.Printf("  Created scripts/ (%d scripts incl. cold-start-checks.sh, ci-check.sh, inbox-watch.sh)\n", copiedScripts)
+			fmt.Printf("  Created scripts/ (%d files: ci-check.sh + pre-commit.sh entry points; checks run from the rebar install)\n", copiedScripts)
 			created++
 		}
 	}
 
-	// architecture/ directory
-	archDir := filepath.Join(root, "architecture")
+	// contracts directory (architecture/ unless .rebarrc contracts_dir says otherwise)
+	contractsDir := config.ContractsDirFor(root)
+	archDir := filepath.Join(root, contractsDir)
 	if _, err := os.Stat(archDir); os.IsNotExist(err) {
 		os.MkdirAll(archDir, 0755)
 		// Copy contract template
@@ -288,12 +289,12 @@ _None currently._
 			dst := filepath.Join(archDir, "CONTRACT-TEMPLATE.md")
 			if data, err := os.ReadFile(src); err == nil {
 				os.WriteFile(dst, data, 0644)
-				fmt.Println("  Created architecture/ with contract template")
+				fmt.Printf("  Created %s/ with contract template\n", contractsDir)
 				created++
 			}
 		} else {
 			os.WriteFile(filepath.Join(archDir, ".gitkeep"), []byte(""), 0644)
-			fmt.Println("  Created architecture/")
+			fmt.Printf("  Created %s/\n", contractsDir)
 			created++
 		}
 	}
@@ -478,17 +479,18 @@ func ensureAgentsScaffolding(root string) bool {
 	return true
 }
 
-// findRebarRoot locates the rebar framework repo. The marker is
-// templates/project-bootstrap/ — only the rebar SOURCE repo has it;
-// DESIGN.md + architecture/ alone also match rebar-adopted projects,
-// which made re-init in an adopted repo copy from itself (a no-op).
+// findRebarRoot locates the rebar framework repo (a source checkout or the
+// setup-rebar.sh install, which is a clone). The marker is
+// templates/project-bootstrap/ plus the scripts/ the CLI runs — only the
+// rebar SOURCE repo has both; DESIGN.md + architecture/ alone also match
+// rebar-adopted projects, which made re-init in an adopted repo copy from
+// itself (a no-op).
 func findRebarRoot() string {
 	isRebarSource := func(dir string) bool {
 		if dir == "" {
 			return false
 		}
-		_, err := os.Stat(filepath.Join(dir, "templates", "project-bootstrap", "scripts", "steward.sh"))
-		return err == nil
+		return isRebarSourceDir(dir)
 	}
 
 	// Explicit override first
@@ -569,4 +571,13 @@ func ensureRebarRC(root string) {
 tier = 1
 `
 	os.WriteFile(rcPath, []byte(content), 0644)
+}
+
+// isRebarSourceDir reports whether dir is a rebar source checkout or install.
+// Shared with scripts/rebar-doc.sh, which tests the same two paths.
+func isRebarSourceDir(dir string) bool {
+	if info, err := os.Stat(filepath.Join(dir, "templates", "project-bootstrap")); err != nil || !info.IsDir() {
+		return false
+	}
+	return isFile(filepath.Join(dir, "scripts", "steward.sh"))
 }

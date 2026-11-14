@@ -90,8 +90,8 @@ my-project/
 
 ```bash
 # Before committing
-scripts/check-contract-refs.sh    # Contract links valid
-scripts/check-todos.sh           # No untracked TODOs
+rebar run check-contract-refs    # Contract links valid
+rebar run check-todos           # No untracked TODOs
 
 # Before merging
 scripts/ci-check.sh              # Full quality scan

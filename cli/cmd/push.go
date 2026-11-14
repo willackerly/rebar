@@ -8,6 +8,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/willackerly/rebar/cli/internal/integrity"
+	"github.com/willackerly/rebar/cli/internal/scripts"
 )
 
 var pushCmd = &cobra.Command{
@@ -48,14 +49,15 @@ func runPush(cmd *cobra.Command, args []string) error {
 	fmt.Println("Integrity verified ✓")
 
 	// 2. Run checks (if scripts exist)
-	if _, err := os.Stat(cfg.ScriptsDir + "/ci-check.sh"); err == nil {
+	if s, ok := resolveScript(cfg.RepoRoot, findRebarRoot(), "ci-check.sh"); ok {
 		fmt.Println("Running checks...")
+		warnLegacy(s)
 		// Run checks but don't block on missing scripts
-		checkOut, err := exec.Command("bash", cfg.ScriptsDir+"/ci-check.sh").CombinedOutput()
-		if err != nil {
+		checkOut, code, err := scripts.OutputInProject(s.Path, cfg.RepoRoot)
+		if err != nil || code != 0 {
 			fmt.Println(string(checkOut))
 			// Only fail if it's a real check failure, not a missing dependency
-			if exitErr, ok := err.(*exec.ExitError); ok && exitErr.ExitCode() == 1 {
+			if code == 1 {
 				return fmt.Errorf("checks failed — fix before pushing")
 			}
 		} else {

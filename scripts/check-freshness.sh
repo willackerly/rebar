@@ -3,7 +3,7 @@
 # rebar-scripts: 2026.03.20
 #
 # Usage: ./scripts/check-freshness.sh [max-age-days]
-# Default: 14 days
+# Default: .rebarrc `freshness_max_days`, else 14 days
 #
 # Scans all .md files for <!-- freshness: YYYY-MM-DD --> markers
 # and flags any that are older than the threshold.
@@ -14,9 +14,13 @@ set -euo pipefail
 
 # Tier gate: freshness checks are Tier 2+ (skip for Tier 1 / partial adoption)
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-[ -f "$SCRIPT_DIR/_rebar-config.sh" ] && source "$SCRIPT_DIR/_rebar-config.sh" && _rebar_skip 2 && exit 0
+[ -f "$SCRIPT_DIR/_rebar-config.sh" ] && source "$SCRIPT_DIR/_rebar-config.sh" && _rebar_skip 2 check-freshness && exit 0
 
-MAX_AGE_DAYS="${1:-14}"
+MAX_AGE_DAYS="${1:-}"
+if [ -z "$MAX_AGE_DAYS" ] && type _rebar_config >/dev/null 2>&1; then
+  MAX_AGE_DAYS=$(_rebar_config freshness_max_days _REBAR_NO_ENV 14)
+fi
+MAX_AGE_DAYS="${MAX_AGE_DAYS:-14}"
 TODAY=$(date +%s)
 stale=0
 total=0

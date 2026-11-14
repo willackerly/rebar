@@ -24,8 +24,12 @@
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+PROJECT_ROOT="${REBAR_PROJECT_ROOT:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 ARCH_DIR="architecture"
+# shellcheck source=scripts/_rebar-config.sh
+source "$SCRIPT_DIR/_rebar-config.sh" 2>/dev/null || true
+type _rebar_script >/dev/null 2>&1 || _rebar_script() { echo "$SCRIPT_DIR/$1"; }
+type _rebar_contracts_dir >/dev/null 2>&1 && ARCH_DIR=$(_rebar_contracts_dir)
 ESC=$(printf '\033')
 START_EPOCH=$(date +%s)
 
@@ -38,6 +42,8 @@ if ! cd "$PROJECT_ROOT" 2>/dev/null; then
 fi
 
 echo "rebar cold-start health — advisory (this hook always exits 0)"
+# Unknown .rebarrc checks_enable names are reported once here, not per check.
+if type _rebar_checks_enable_warn >/dev/null 2>&1; then _rebar_checks_enable_warn 2>&1; fi
 
 fail_count=0
 run_count=0
@@ -55,8 +61,9 @@ summarize() {
 }
 
 run_check() {
-  local name="$1" script="scripts/${1}.sh"
+  local name="$1" script
   local output status summary label
+  script="$(_rebar_script "${1}.sh" 2>/dev/null)"
   if [ ! -f "$script" ]; then
     echo "[MISS] $name — $script not installed"
     return
@@ -151,7 +158,7 @@ fi
 
 elapsed=$(( $(date +%s) - START_EPOCH ))
 if [ "$fail_count" -gt 0 ]; then
-  echo "$fail_count of $run_count checks failing (${elapsed}s) — rerun the named scripts/*.sh for full output."
+  echo "$fail_count of $run_count checks failing (${elapsed}s) — rerun the named check (\`rebar run <name>\`) for full output."
 else
   echo "all $run_count checks passing (${elapsed}s)."
 fi

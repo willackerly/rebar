@@ -84,15 +84,14 @@ ask steward summary  # Automated quality health check
 - **Commit frequently** — uncommitted work is lost work (login expires, crashes)
 - **Update QUICKCONTEXT.md** as you change project state
 - **Link to contracts** — maintain `CONTRACT:` headers in all source files
-- **Run quality checks** — `scripts/check-contract-refs.sh` before commits
+- **Run quality checks** — `rebar run check-contract-refs` before commits
 
 ### Parallel Agent Protocol
 
 When launching subagents for parallel work, every agent follows **The 10 Rules**
 in `rebar:agents/subagent-guidelines`. The orchestrator follows the pre-launch
 audit and merge strategy in `rebar:practice/multi-agent-orchestration`. Resolve
-any `rebar:` ref with `scripts/rebar-doc.sh <ref> --cat` (or `rebar doc <ref>`
-if the REBAR CLI is installed).
+any `rebar:` ref with `rebar doc <ref> --cat`.
 
 **The 3 absolute invariants (never violated):**
 1. **Worktree isolation** for any agent writing code
@@ -110,7 +109,7 @@ form of doc rot — every commit that adds a test file silently invalidates
 counts in 3-5 documents unless there's a single computed source.
 
 The `METRICS` file is the canonical location for project-wide numbers.
-`scripts/check-ground-truth.sh` verifies it against code. When the metric
+`rebar run check-ground-truth` verifies it against code. When the metric
 changes, update `METRICS`; the ground truth script catches stale
 cross-references.
 
@@ -180,8 +179,8 @@ in your inner loop.
 
 **Quality enforcement:**
 ```bash
-scripts/check-contract-refs.sh  # Contract links valid
-scripts/check-todos.sh         # No untracked TODOs
+rebar run check-contract-refs  # Contract links valid
+rebar run check-todos         # No untracked TODOs
 scripts/ci-check.sh           # Full quality scan
 ```
 
@@ -200,8 +199,8 @@ the FIRST hypothesis is *"I broke the test's contract assumption"* —
 investigate before bypassing. If the contract change is intended, the test
 update is part of the same PR. "Test contract drift" is not a free pass.
 
-Mechanical commit-msg gates (`scripts/check-fix-commit.sh` for Gate G,
-`scripts/check-bypass-flags.sh` for Gate I) catch the related failure modes
+Mechanical commit-msg gates (`rebar run check-fix-commit` for Gate G,
+`rebar run check-bypass-flags` for Gate I) catch the related failure modes
 that ARE script-detectable. See `rebar:practice/regression-fix-protocol` for
 the full six-gate protocol.
 

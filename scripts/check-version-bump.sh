@@ -17,17 +17,23 @@
 
 set -euo pipefail
 
+CONTRACTS_DIR=architecture
+if [ -f "$(dirname "$0")/_rebar-config.sh" ]; then
+  # shellcheck source=scripts/_rebar-config.sh
+  source "$(dirname "$0")/_rebar-config.sh"
+  CONTRACTS_DIR=$(_rebar_contracts_dir)
+fi
 REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || exit 0
 cd "$REPO_ROOT"
 
-OUTBOX="${REBAR_OUTBOX:-architecture/.state/pending-notifications.md}"
+OUTBOX="${REBAR_OUTBOX:-$CONTRACTS_DIR/.state/pending-notifications.md}"
 
-# Detect renames in architecture/CONTRACT-*.md from the most recent commit.
+# Detect renames in <contracts_dir>/CONTRACT-*.md from the most recent commit.
 # A rename like CONTRACT-C1-AGENTS.2.0.md → CONTRACT-C1-AGENTS.3.0.md is
 # the rebar-convention signal of a semver bump.
 renames=$(git diff-tree --no-commit-id --name-status -r --diff-filter=R \
   --find-renames=80% HEAD 2>/dev/null \
-  | awk '$1 ~ /^R/ && $2 ~ /^architecture\/CONTRACT-.*\.md$/ && $3 ~ /^architecture\/CONTRACT-.*\.md$/ {print $2 "|" $3}')
+  | awk -v dir="$CONTRACTS_DIR/CONTRACT-" '$1 ~ /^R/ && index($2, dir) == 1 && index($3, dir) == 1 && $2 ~ /\.md$/ && $3 ~ /\.md$/ {print $2 "|" $3}')
 
 [ -z "$renames" ] && exit 0
 

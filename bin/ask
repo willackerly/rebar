@@ -1788,11 +1788,15 @@ _detect_project_context() {
   [ -f "DESIGN.md" ] && lines+=("- \`DESIGN.md\` (contract design philosophy)")
   [ -f "methodology.md" ] && lines+=("- \`methodology.md\` (contract methodology)")  # legacy name
 
-  # Architecture
-  if [ -d "architecture" ]; then
+  # Contracts (.rebarrc contracts_dir, default architecture/)
+  local cdir
+  cdir=$(sed -n 's/^contracts_dir[[:space:]]*=[[:space:]]*//p' .rebarrc 2>/dev/null \
+    | sed 's/[[:space:]]*#.*$//; s/[[:space:]]*$//; s:/$::' | head -1) || true
+  cdir="${REBAR_CONTRACTS_DIR:-${cdir:-architecture}}"
+  if [ -d "$cdir" ]; then
     local count
-    count=$(ls architecture/CONTRACT-*.md 2>/dev/null | wc -l | tr -d ' ')
-    lines+=("- \`architecture/\` ($count contracts)")
+    count=$(ls "$cdir"/CONTRACT-*.md 2>/dev/null | wc -l | tr -d ' ')
+    lines+=("- \`$cdir/\` ($count contracts)")
   fi
 
   # Product

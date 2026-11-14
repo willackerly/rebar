@@ -1,81 +1,47 @@
-# Scripts
+# scripts/
 
-Enforcement scripts and quality scanning for the contract-driven methodology.
+rebar's checks live in the rebar install, not in this project. This directory
+holds only two entry points that hand off to the `rebar` CLI, so CI and the git
+hook have a stable path to call. Upgrading rebar upgrades every check; there
+is nothing to sync.
 
-See the [root README](../README.md) for how scripts fit into the overall system.
+| File | Runs | Used by |
+|------|------|---------|
+| `ci-check.sh` | `rebar check` (full suite) | CI |
+| `pre-commit.sh` | `rebar check --pre-commit` (TODOs, contract refs, ground truth) | git pre-commit hook |
 
-## Quality Scanner
+Both are marked `# rebar-thin-wrapper`; the CLI never runs a marked file
+itself. Calling `rebar check` directly from CI works just as well.
 
-| Script | What It Does | Invocation |
-|--------|-------------|-----------|
-| `steward.sh` | Full quality scan — contract lifecycle, enforcement, discoveries | `ask steward` or `./scripts/steward.sh` |
-| `steward.sh --json` | Aggregate JSON to stdout | `ask steward json` |
-| `steward.sh --summary` | One-line health summary | `ask steward summary` |
-| `steward.sh --check <id>` | Single contract scan | `ask steward check C1` |
-
-Output goes to `architecture/.state/` (JSON) and `STEWARD_REPORT.md` (human-readable).
-
-## Enforcement Checks
-
-Each script is standalone, runs in <5 seconds, and exits 0 (pass) or 1 (fail).
-
-| Script | What It Checks |
-|--------|---------------|
-| `check-contract-headers.sh` | Every source file has a `CONTRACT:` header |
-| `check-contract-refs.sh` | Every `CONTRACT:` ref points to a real contract file |
-| `check-todos.sh` | No untracked `TODO:` comments (two-tag system) |
-| `check-freshness.sh` | Doc freshness dates aren't stale (>14 days) |
-| `check-registry.sh` | Contract registry matches actual files |
-| `check-ground-truth.sh` | METRICS file matches codebase reality |
-
-## Composite Runners
-
-| Script | When to Run |
-|--------|-------------|
-| `ci-check.sh` | CI pipeline — runs all checks including steward |
-| `pre-commit.sh` | Git hook — fast checks (TODOs + contract refs) |
-
-## Installation
+## Wire the hook
 
 ```bash
-# Pre-commit hook (pick one)
-cp scripts/pre-commit.sh .git/hooks/pre-commit     # copy
-ln -sf ../../scripts/pre-commit.sh .git/hooks/pre-commit  # symlink
-
-# Make all scripts executable
-chmod +x scripts/*.sh
-
-# CI pipeline (GitHub Actions example)
-# - run: ./scripts/ci-check.sh --strict
+ln -sf ../../scripts/pre-commit.sh .git/hooks/pre-commit
 ```
 
-## Configuration
+## Configure, don't copy
 
-| Environment Variable | Default | Purpose |
-|---------------------|---------|---------|
-| `CONTRACT_EXTENSIONS` | `.go .ts .tsx .js .jsx .py .rs` | File extensions to scan |
-| `SKIP_CONTRACT_HEADERS` | `0` | Skip header check |
-| `SKIP_CONTRACT_REFS` | `0` | Skip ref check |
-| `SKIP_TODOS` | `0` | Skip TODO check |
-| `SKIP_FRESHNESS` | `0` | Skip freshness check |
-| `SKIP_REGISTRY` | `0` | Skip registry check |
-| `SKIP_GROUND_TRUTH` | `0` | Skip ground truth check |
-| `SKIP_STEWARD` | `0` | Skip steward scan |
+Repo-specific settings go in `.rebarrc` (see the commented examples there):
+source roots and extensions, the freshness window, registry classification,
+and the METRICS ground-truth declarations (`metric.<key>.*`).
 
-## Automation Hierarchy
+## Run a single check or tool
 
-```
-Pre-commit (fast, <5s)       CI (thorough, <30s)          Full scan (comprehensive)
-├── check-todos.sh           ├── all pre-commit checks    ├── all CI checks
-└── check-contract-refs.sh   ├── check-contract-headers   ├── steward.sh (lifecycle,
-                             ├── check-freshness              discoveries, action items)
-                             ├── check-registry            └── STEWARD_REPORT.md
-                             ├── check-ground-truth
-                             └── steward.sh
+```bash
+rebar run                     # list everything the install provides
+rebar run check-todos         # one check
+rebar run compute-registry    # regenerate architecture/CONTRACT-REGISTRY.md
+rebar run steward             # quality scan → STEWARD_REPORT.md
+rebar run inbox-watch inbox   # watch the peer inbox
 ```
 
-## Dependencies
+Skip a check in CI with its variable, e.g. `SKIP_FRESHNESS=1 ./scripts/ci-check.sh`;
+the full list is in the header of the install's `scripts/ci-check.sh`.
 
-- **bash** — all scripts are bash
-- **jq** — required by steward.sh and ground truth verification
-- **grep, find** — standard Unix tools
+## Coming from copied scripts
+
+Older adopters copied all of rebar's scripts here. Those copies still run (the
+CLI prefers a project's own full copy and prints a deprecation notice), but they
+no longer receive fixes. To migrate: move any customization into `.rebarrc`,
+replace `ci-check.sh` and `pre-commit.sh` with the two files above, and delete
+the rest.

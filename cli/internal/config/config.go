@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 )
@@ -17,7 +18,17 @@ type Config struct {
 	ScriptsDir string // scripts/
 	AgentsDir  string // agents/
 	BinDir     string // bin/
+	// ContractsDir holds the contracts (CONTRACT-*.md, CONTRACT-REGISTRY.md,
+	// the steward's .state/), relative to RepoRoot. It names the contracts
+	// location only: some repos keep other design docs in architecture/.
+	ContractsDir string
+	// ChecksEnable lists the checks .rebarrc checks_enable force-enables
+	// below their tier (see ChecksEnableFor).
+	ChecksEnable []string
 }
+
+// DefaultContractsDir is where contracts live unless .rebarrc says otherwise.
+const DefaultContractsDir = "architecture"
 
 // Load reads configuration from .rebarrc and .rebar-version, respecting
 // REBAR_TIER env override. Mirrors the logic in scripts/_rebar-config.sh.
@@ -30,6 +41,8 @@ func Load(repoRoot string) (*Config, error) {
 		BinDir:     filepath.Join(repoRoot, "bin"),
 		Tier:       3, // default: full enforcement
 	}
+	c.ContractsDir = ContractsDirFor(repoRoot)
+	c.ChecksEnable = ChecksEnableFor(repoRoot)
 
 	// REBAR_TIER env takes precedence
 	if env := os.Getenv("REBAR_TIER"); env != "" {
@@ -123,4 +136,92 @@ func EnsureRebarDir(repoRoot string) error {
 		}
 	}
 	return nil
+}
+
+// ContractsDirFor returns the contracts directory of the repo at repoRoot,
+// relative to it: env REBAR_CONTRACTS_DIR, then .rebarrc contracts_dir, then
+// "architecture". Mirrors _rebar_contracts_dir in scripts/_rebar-config.sh.
+// A value that is absolute or leaves the repo falls back to the default.
+func ContractsDirFor(repoRoot string) string {
+	dir := os.Getenv("REBAR_CONTRACTS_DIR")
+	if dir == "" {
+		dir = RCValue(repoRoot, "contracts_dir")
+	}
+	dir = filepath.Clean(strings.TrimSpace(dir))
+	if dir == "." || filepath.IsAbs(dir) || dir == ".." || strings.HasPrefix(dir, ".."+string(filepath.Separator)) {
+		return DefaultContractsDir
+	}
+	return dir
+}
+
+// RCValue returns the value of key in repoRoot/.rebarrc ("" if absent),
+// parsed like scripts/_rebar-config.sh: the first `key = value` line wins
+// and `#` starts a comment.
+func RCValue(repoRoot, key string) string {
+	f, err := os.Open(filepath.Join(repoRoot, ".rebarrc"))
+	if err != nil {
+		return ""
+	}
+	defer f.Close()
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		line := scanner.Text()
+		k, v, ok := strings.Cut(line, "=")
+		if !ok || strings.TrimRight(k, " \t") != key {
+			continue
+		}
+		if i := strings.Index(v, "#"); i >= 0 {
+			v = v[:i]
+		}
+		return strings.TrimSpace(v)
+	}
+	return ""
+}
+
+// KnownChecks are the names checks_enable accepts: the script basenames
+// (without .sh) of every check the suites run. Mirrors _REBAR_KNOWN_CHECKS in
+// scripts/_rebar-config.sh.
+var KnownChecks = []string{
+	"check-bypass-flags", "check-compliance", "check-contract-headers",
+	"check-contract-refs", "check-decay-patterns", "check-doc-refs",
+	"check-fix-commit", "check-freshness", "check-ground-truth",
+	"check-jtbd-presence", "check-prefix-uniqueness", "check-todos",
+	"compute-registry", "steward", "sync-bootstrap",
+}
+
+// ChecksEnableFor returns the checks the repo at repoRoot force-enables below
+// their tier: env REBAR_CHECKS_ENABLE, else .rebarrc checks_enable, split on
+// whitespace with any .sh suffix dropped. Unknown names are kept (see
+// UnknownChecks); the scripts warn about and ignore them. Mirrors
+// _rebar_checks_enable in scripts/_rebar-config.sh.
+func ChecksEnableFor(repoRoot string) []string {
+	raw := os.Getenv("REBAR_CHECKS_ENABLE")
+	if raw == "" {
+		raw = RCValue(repoRoot, "checks_enable")
+	}
+	var names []string
+	for _, f := range strings.Fields(raw) {
+		names = append(names, strings.TrimSuffix(f, ".sh"))
+	}
+	return names
+}
+
+// UnknownChecks returns the names that are not in KnownChecks.
+func UnknownChecks(names []string) []string {
+	var unknown []string
+	for _, n := range names {
+		if !slices.Contains(KnownChecks, n) {
+			unknown = append(unknown, n)
+		}
+	}
+	return unknown
+}
+
+// CheckTier is the tier check name runs at: 3 when checks_enable names it,
+// otherwise the configured tier. Mirrors _rebar_check_tier.
+func (c *Config) CheckTier(name string) int {
+	if slices.Contains(c.ChecksEnable, strings.TrimSuffix(name, ".sh")) {
+		return 3
+	}
+	return c.Tier
 }

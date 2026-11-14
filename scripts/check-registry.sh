@@ -12,14 +12,20 @@
 #   2. Every registry entry points to an existing file
 #   3. Orphaned contracts (no implementing code) are flagged — OK if in TODO.md
 #
-# Usage: ./scripts/check-registry.sh [architecture-dir]
-# Default: architecture/
+# Usage: ./scripts/check-registry.sh [contracts-dir]
+# Default: .rebarrc contracts_dir, else architecture/
 #
 # Exit code: 0 = all consistent, 1 = inconsistencies found
 
 set -euo pipefail
 
-ARCH_DIR="${1:-architecture}"
+CONTRACTS_DIR=architecture
+if [ -f "$(dirname "$0")/_rebar-config.sh" ]; then
+  # shellcheck source=scripts/_rebar-config.sh
+  source "$(dirname "$0")/_rebar-config.sh"
+  CONTRACTS_DIR=$(_rebar_contracts_dir)
+fi
+ARCH_DIR="${1:-$CONTRACTS_DIR}"
 REGISTRY="${ARCH_DIR}/CONTRACT-REGISTRY.md"
 
 if [ ! -d "$ARCH_DIR" ]; then
@@ -66,7 +72,7 @@ for contract in "$ARCH_DIR"/CONTRACT-*.md; do
     --include="*.go" --include="*.ts" --include="*.tsx" --include="*.js" --include="*.jsx" \
     --include="*.py" --include="*.rs" --include="*.mjs" --include="*.cjs" \
     . 2>/dev/null \
-    | grep -v "node_modules\|vendor\|dist\|\.git\|architecture/" \
+    | grep -v "node_modules\|vendor\|dist\|\.git\|${ARCH_DIR%/}/" \
     | wc -l | tr -d ' ')
 
   if [ "$ref_count" -eq 0 ]; then

@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+
+	"github.com/willackerly/rebar/cli/internal/config"
 )
 
 // DefaultRoleForCategory returns the expected role for a file category.
@@ -41,8 +43,8 @@ func ScanProtectedFiles(repoRoot string) (map[string][]string, error) {
 		result[CategoryEnforcement] = append(result[CategoryEnforcement], rel)
 	}
 
-	// Contracts: architecture/CONTRACT-*.md (exclude templates and .impl.md)
-	contracts, err := filepath.Glob(filepath.Join(repoRoot, "architecture", "CONTRACT-*.md"))
+	// Contracts: <contracts_dir>/CONTRACT-*.md (exclude templates and .impl.md)
+	contracts, err := filepath.Glob(filepath.Join(repoRoot, config.ContractsDirFor(repoRoot), "CONTRACT-*.md"))
 	if err != nil {
 		return nil, err
 	}

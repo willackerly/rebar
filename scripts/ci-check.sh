@@ -20,9 +20,13 @@
 #   SKIP_STEWARD=1          — skip steward health scan
 #   SKIP_DOC_REFS=1         — skip cross-doc reference check
 #   SKIP_DECAY_PATTERNS=1   — skip soft-hardening decay pattern check
-#   SKIP_BOOTSTRAP_SYNC=1   — skip templates/project-bootstrap/scripts drift check
+#   SKIP_BOOTSTRAP_SYNC=1   — skip the thin templates/project-bootstrap/scripts check
+#   SKIP_SCRIPT_TESTS=1     — skip scripts/tests/*.test.sh (rebar source repo only)
 #   SKIP_FIX_COMMIT=1       — skip Gate G (HEAD's fix:/regression: must have Reproduced on:)
 #   SKIP_BYPASS_FLAGS=1     — skip Gate I (HEAD's bypass mentions must have Bypass tickets:)
+#
+# REBAR_PROJECT_ROOT=<dir> checks <dir> with these scripts instead of the
+# repo they live in; `rebar check` sets it so adopters need no local copies.
 #
 # Exit code: 0 = all pass, 1 = failures in strict mode
 
@@ -30,6 +34,15 @@ set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 STRICT="${1:---strict}"
+
+# shellcheck source=scripts/_rebar-config.sh
+source "$SCRIPT_DIR/_rebar-config.sh" 2>/dev/null || true
+type _rebar_script >/dev/null 2>&1 || _rebar_script() { echo "$SCRIPT_DIR/$1"; }
+# Unknown .rebarrc checks_enable names are reported once here, not per check.
+if type _rebar_checks_enable_warn >/dev/null 2>&1; then _rebar_checks_enable_warn; fi
+if [ -n "${REBAR_PROJECT_ROOT:-}" ]; then
+  cd "$REBAR_PROJECT_ROOT" || exit 1
+fi
 
 passed=0
 failed=0
@@ -39,7 +52,8 @@ results=()
 run_check() {
   local name="$1"
   local skip_var="$2"
-  local script="$3"
+  local script
+  script="$(_rebar_script "$3")"
   shift 3
 
   # Check skip flag
@@ -69,21 +83,22 @@ run_check() {
 
 echo "Running contract and documentation checks..."
 
-run_check "Contract Headers"    SKIP_CONTRACT_HEADERS "$SCRIPT_DIR/check-contract-headers.sh"
-run_check "Contract References" SKIP_CONTRACT_REFS    "$SCRIPT_DIR/check-contract-refs.sh"
-run_check "Doc References"      SKIP_DOC_REFS         "$SCRIPT_DIR/check-doc-refs.sh"
-run_check "TODO Tracking"       SKIP_TODOS            "$SCRIPT_DIR/check-todos.sh"
-run_check "Doc Freshness"       SKIP_FRESHNESS        "$SCRIPT_DIR/check-freshness.sh"
-run_check "Registry Consistency" SKIP_REGISTRY         "$SCRIPT_DIR/compute-registry.sh" --check
-run_check "JTBD Presence"       SKIP_JTBD             "$SCRIPT_DIR/check-jtbd-presence.sh"
-run_check "Prefix Uniqueness"   SKIP_PREFIX_UNIQUENESS "$SCRIPT_DIR/check-prefix-uniqueness.sh"
-run_check "Ground Truth"        SKIP_GROUND_TRUTH     "$SCRIPT_DIR/check-ground-truth.sh"
-run_check "Rebar Compliance"    SKIP_COMPLIANCE       "$SCRIPT_DIR/check-compliance.sh"
-run_check "Decay Patterns"      SKIP_DECAY_PATTERNS   "$SCRIPT_DIR/check-decay-patterns.sh"
-run_check "Bootstrap Sync"      SKIP_BOOTSTRAP_SYNC   "$SCRIPT_DIR/sync-bootstrap.sh" --check
-run_check "Fix Commit Gate"     SKIP_FIX_COMMIT       "$SCRIPT_DIR/check-fix-commit.sh"
-run_check "Bypass Flags Gate"   SKIP_BYPASS_FLAGS     "$SCRIPT_DIR/check-bypass-flags.sh"
-run_check "Steward"             SKIP_STEWARD          "$SCRIPT_DIR/steward.sh"
+run_check "Contract Headers"    SKIP_CONTRACT_HEADERS check-contract-headers.sh
+run_check "Contract References" SKIP_CONTRACT_REFS    check-contract-refs.sh
+run_check "Doc References"      SKIP_DOC_REFS         check-doc-refs.sh
+run_check "TODO Tracking"       SKIP_TODOS            check-todos.sh
+run_check "Doc Freshness"       SKIP_FRESHNESS        check-freshness.sh
+run_check "Registry Consistency" SKIP_REGISTRY         compute-registry.sh --check
+run_check "JTBD Presence"       SKIP_JTBD             check-jtbd-presence.sh
+run_check "Prefix Uniqueness"   SKIP_PREFIX_UNIQUENESS check-prefix-uniqueness.sh
+run_check "Ground Truth"        SKIP_GROUND_TRUTH     check-ground-truth.sh
+run_check "Rebar Compliance"    SKIP_COMPLIANCE       check-compliance.sh
+run_check "Decay Patterns"      SKIP_DECAY_PATTERNS   check-decay-patterns.sh
+run_check "Bootstrap Sync"      SKIP_BOOTSTRAP_SYNC   sync-bootstrap.sh --check
+run_check "Script Tests"        SKIP_SCRIPT_TESTS     tests/run.sh
+run_check "Fix Commit Gate"     SKIP_FIX_COMMIT       check-fix-commit.sh
+run_check "Bypass Flags Gate"   SKIP_BYPASS_FLAGS     check-bypass-flags.sh
+run_check "Steward"             SKIP_STEWARD          steward.sh
 
 # NOTE: Tag-to-CI coverage check (Node.js, project-specific) lives at
 # templates/scripts/check-tag-ci-coverage.mjs. Adopters with Playwright

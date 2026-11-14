@@ -22,18 +22,13 @@
 # Override the scripts under test with REBAR_SCRIPTS_DIR.
 set -uo pipefail
 
-HERE="$(cd "$(dirname "$0")" && pwd)"
-SRC="${REBAR_SCRIPTS_DIR:-$HERE/..}"
-
-fail() { echo "FAIL: $*" >&2; exit 1; }
-
-TMP="$(mktemp -d)"
-trap 'rm -rf "$TMP"' EXIT
+. "$(dirname "$0")/lib.sh"
+SRC="$REBAR_SCRIPTS"
+rebar_tmpdir merge-friendly
 
 # Built at runtime so rebar's own registry scan doesn't read it as a reference.
 HEADER="CONTRACT"":S1-FOO.1.0"
 
-g() { git -c user.name=t -c user.email=t@example.com -c commit.gpgsign=false "$@"; }
 
 # new_repo <dir> <impl_counts>: base repo with two contracts, one impl, one test
 new_repo() {

@@ -7,8 +7,8 @@
 
 | ID | Version | Status | Impl Files | Purpose |
 |----|---------|--------|------------|---------|
-| S1-STEWARD | 1.0 | superseded | 2 | — |
-| S1-STEWARD | 2.0 | active | 2 | — |
+| S1-STEWARD | 1.0 | superseded | 1 | — |
+| S1-STEWARD | 2.0 | active | 1 | — |
 | S2-ASK-CLI | 1.0 | active | 3 | — |
 | S3-MCP-SERVER | 1.0 | active | 1 | — |
 

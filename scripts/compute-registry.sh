@@ -30,17 +30,30 @@ set -euo pipefail
 export LC_ALL=C
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-ARCH_DIR="$PROJECT_ROOT/architecture"
-REGISTRY="$ARCH_DIR/CONTRACT-REGISTRY.md"
+PROJECT_ROOT="${REBAR_PROJECT_ROOT:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+CONTRACTS_DIR=architecture
 MODE="${1:-generate}"
 
+# Settings from .rebarrc (see the helpers below for what each one does).
 IMPL_COUNTS=true
+SCOPE_PREFIXES=""
+PURPOSE_HEADING=""
+PURPOSE_STYLE=ellipsis
+IMPL_GLOBS="*.go *.ts *.tsx *.js *.py *.rs *.java *.rb *.jsx *.sh bin/"
+EXCLUDE_DIRS="node_modules vendor dist"
 if [ -f "$SCRIPT_DIR/_rebar-config.sh" ]; then
   # shellcheck source=scripts/_rebar-config.sh
   source "$SCRIPT_DIR/_rebar-config.sh"
   IMPL_COUNTS=$(_rebar_config registry_impl_counts REBAR_REGISTRY_IMPL_COUNTS true)
+  SCOPE_PREFIXES=$(_rebar_config registry_scope_prefixes _REBAR_NO_ENV "")
+  PURPOSE_HEADING=$(_rebar_config registry_purpose_heading _REBAR_NO_ENV "")
+  PURPOSE_STYLE=$(_rebar_config registry_purpose_style _REBAR_NO_ENV ellipsis)
+  IMPL_GLOBS=$(_rebar_config registry_impl_globs _REBAR_NO_ENV "$IMPL_GLOBS")
+  EXCLUDE_DIRS=$(_rebar_config registry_exclude_dirs _REBAR_NO_ENV "$EXCLUDE_DIRS")
+  CONTRACTS_DIR=$(_rebar_contracts_dir)
 fi
+ARCH_DIR="$PROJECT_ROOT/$CONTRACTS_DIR"
+REGISTRY="$ARCH_DIR/CONTRACT-REGISTRY.md"
 case "$IMPL_COUNTS" in
   false|0|no|off) IMPL_COUNTS=false ;;
   *) IMPL_COUNTS=true ;;
@@ -76,15 +89,47 @@ extract_status() {
   echo "${status:-draft}"
 }
 
-# Extract purpose (first non-empty line after ## Purpose)
+# Extract purpose: the first non-empty line after the purpose heading.
+#
+#   registry_purpose_heading  heading text (ERE) to take the purpose from,
+#                             e.g. `Purpose|Why this exists`. When set, a
+#                             numbered heading (`## 2. Purpose`) also matches.
+#                             Unset: `## Purpose` only.
+#   registry_purpose_style    ellipsis (default): escape `|` for the table
+#                             and cut to 77 characters plus `...`.
+#                             bytes: the first 80 bytes, as before v3.0.0-beta.5
+#                             (can split a multibyte character, leaves `|`
+#                             unescaped).
 extract_purpose() {
-  local file="$1"
-  awk '/^## Purpose/{found=1; next} found && /^[^#]/ && NF{print; exit}' "$file" 2>/dev/null | head -c 80
+  local file="$1" heading_re purpose
+  heading_re='^## Purpose'
+  if [ -n "$PURPOSE_HEADING" ]; then
+    heading_re="^## ([0-9]+[.][[:space:]]*)?(${PURPOSE_HEADING})"
+  fi
+  purpose=$(awk -v re="$heading_re" '$0 ~ re {found=1; next} found && /^[^#]/ && NF{print; exit}' "$file" 2>/dev/null)
+  if [ "$PURPOSE_STYLE" != bytes ]; then
+    # Character-aware slicing needs a UTF-8 locale; the rest of the script
+    # stays in C for stable sort order.
+    (
+      export LC_ALL=C.UTF-8
+      purpose=${purpose//|/\\|}
+      if [ "${#purpose}" -gt 80 ]; then
+        purpose="${purpose:0:77}..."
+      fi
+      printf '%s' "$purpose"
+    )
+  else
+    printf '%s' "$purpose" | head -c 80
+  fi
 }
 
-# Classify by prefix
+# Classify by prefix. registry_scope_prefixes (e.g. `SDK- MCP-`) are
+# stripped, in order, before classifying, so SDK-S1-FOO files as a Service.
 classify_prefix() {
-  local id="$1"
+  local id="$1" prefix
+  for prefix in $SCOPE_PREFIXES; do
+    id="${id#"$prefix"}"
+  done
   case "$id" in
     S*) echo "Services" ;;
     C*) echo "Components" ;;
@@ -115,22 +160,45 @@ if git -C "$PROJECT_ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
   IN_GIT=true
 fi
 
+# The searched files are configurable in .rebarrc:
+#   registry_impl_globs    git pathspecs; a trailing / means a whole directory
+#                          (default: the list above plus bin/)
+#   registry_exclude_dirs  directory names skipped anywhere
+#                          (default: node_modules vendor dist)
+set -f
+GIT_PATHSPECS=()
+GREP_INCLUDES=()
+GREP_DIRS=()
+for glob in $IMPL_GLOBS; do
+  GIT_PATHSPECS+=("$glob")
+  case "$glob" in
+    */) GREP_DIRS+=("${glob%/}") ;;
+    *)  GREP_INCLUDES+=("--include=$glob") ;;
+  esac
+done
+GIT_PATHSPECS+=(":(exclude)$CONTRACTS_DIR/")
+GREP_EXCLUDE="\\.git\\|$CONTRACTS_DIR/"
+for dir in $EXCLUDE_DIRS; do
+  GIT_PATHSPECS+=(":(exclude,glob)**/$dir/**")
+  GREP_EXCLUDE="$dir\\|$GREP_EXCLUDE"
+done
+set +f
+
 search_source() {
   if [ "$IN_GIT" = true ]; then
-    git -C "$PROJECT_ROOT" grep "$@" -- \
-      '*.go' '*.ts' '*.tsx' '*.js' '*.py' '*.rs' '*.java' '*.rb' '*.jsx' '*.sh' 'bin/' \
-      ':(exclude)architecture/' ':(exclude,glob)**/node_modules/**' \
-      ':(exclude,glob)**/vendor/**' ':(exclude,glob)**/dist/**' 2>/dev/null
+    git -C "$PROJECT_ROOT" grep "$@" -- "${GIT_PATHSPECS[@]}" 2>/dev/null
   else
     {
-      grep -r "$@" "$PROJECT_ROOT" \
-        --include='*.go' --include='*.ts' --include='*.tsx' --include='*.js' \
-        --include='*.py' --include='*.rs' --include='*.java' --include='*.rb' \
-        --include='*.jsx' --include='*.sh' 2>/dev/null
-      if [ -d "$PROJECT_ROOT/bin" ]; then
-        grep -r "$@" "$PROJECT_ROOT/bin" 2>/dev/null
+      if [ ${#GREP_INCLUDES[@]} -gt 0 ]; then
+        grep -r "$@" "$PROJECT_ROOT" "${GREP_INCLUDES[@]}" 2>/dev/null
       fi
-    } | grep -v "node_modules\|vendor\|dist\|\.git\|architecture/"
+      local dir
+      for dir in ${GREP_DIRS[@]+"${GREP_DIRS[@]}"}; do
+        if [ -d "$PROJECT_ROOT/$dir" ]; then
+          grep -r "$@" "$PROJECT_ROOT/$dir" 2>/dev/null
+        fi
+      done
+    } | grep -v "$GREP_EXCLUDE"
   fi
 }
 
@@ -289,7 +357,7 @@ generate_health() {
     [ -z "$ref_id" ] && continue
     case "$known_ids" in
       *" $ref_id "*) ;;  # known — not a shadow
-      *) shadows+=("- **$ref_id** — referenced in source, no architecture/CONTRACT-${ref_id}.*.md found") ;;
+      *) shadows+=("- **$ref_id** — referenced in source, no $CONTRACTS_DIR/CONTRACT-${ref_id}.*.md found") ;;
     esac
   done < "$shadows_tmp"
   rm -f "$shadows_tmp"

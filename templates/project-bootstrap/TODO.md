@@ -31,7 +31,7 @@ _None currently._
 
 ## Discoveries
 
-<!-- The Steward (scripts/steward.sh) parses this section to track contract health.
+<!-- The Steward (rebar run steward) parses this section to track contract health.
      Format: checkbox, type tag, contract ref, description. -->
 
 - [ ] **DISCOVERY** `none` — Project setup complete, ready for first contract implementation

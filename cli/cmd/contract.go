@@ -12,7 +12,7 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
-	"github.com/willackerly/rebar/cli/internal/scripts"
+	"github.com/willackerly/rebar/cli/internal/config"
 )
 
 var contractCmd = &cobra.Command{
@@ -24,24 +24,25 @@ var contractVerifyCmd = &cobra.Command{
 	Use:   "verify",
 	Short: "Verify contract references and headers",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		fmt.Println("Checking contract references...")
-		exitCode, err := scripts.RunPassthrough(cfg.ScriptsDir, "check-contract-refs.sh")
-		if err != nil {
-			return err
+		for i, step := range []struct{ label, script string }{
+			{"Checking contract references...", "check-contract-refs.sh"},
+			{"Checking contract headers...", "check-contract-headers.sh"},
+		} {
+			if i > 0 {
+				fmt.Println()
+			}
+			fmt.Println(step.label)
+			exitCode, found, err := runRebarScript(step.script)
+			if err != nil {
+				return err
+			}
+			if !found {
+				return fmt.Errorf("%s not found in the project or a rebar install (set REBAR_ROOT)", step.script)
+			}
+			if exitCode != 0 {
+				os.Exit(exitCode)
+			}
 		}
-		if exitCode != 0 {
-			os.Exit(exitCode)
-		}
-
-		fmt.Println("\nChecking contract headers...")
-		exitCode, err = scripts.RunPassthrough(cfg.ScriptsDir, "check-contract-headers.sh")
-		if err != nil {
-			return err
-		}
-		if exitCode != 0 {
-			os.Exit(exitCode)
-		}
-
 		return nil
 	},
 }
@@ -202,10 +203,11 @@ func resolveOwnerRepoPath(name string) (string, error) {
 	return "", fmt.Errorf("owner repo %q not registered (run `ask register %s` in that repo, or set REBAR_REPOS)", name, name)
 }
 
-// listOwnerVersions scans the owner repo's architecture/ for
+// listOwnerVersions scans the owner repo's contracts dir (its own
+// .rebarrc contracts_dir, default architecture/) for
 // CONTRACT-<id>.<ver>.md files and returns sorted semver strings.
 func listOwnerVersions(ownerPath, contractID string) ([]string, error) {
-	archDir := filepath.Join(ownerPath, "architecture")
+	archDir := filepath.Join(ownerPath, config.ContractsDirFor(ownerPath))
 	pattern := fmt.Sprintf("CONTRACT-%s.*.md", contractID)
 	matches, err := filepath.Glob(filepath.Join(archDir, pattern))
 	if err != nil {

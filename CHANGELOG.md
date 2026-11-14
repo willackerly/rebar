@@ -18,7 +18,33 @@ All notable changes to rebar. Versioned with [semver](https://semver.org/).
 
 ## Unreleased
 
-_Nothing yet._
+- **Adopters carry configuration, not rebar's scripts.** `rebar check`,
+  `rebar check --pre-commit|--cold-start` and the new `rebar run <script>`
+  run the rebar install's scripts against the project
+  (`REBAR_PROJECT_ROOT`). The bootstrap template's `scripts/` is down to
+  two `# rebar-thin-wrapper` entry points. Legacy project copies keep
+  running, with a deprecation notice. Design and migration:
+  `feedback/2026-11-14-self-contained-install.md` (from #8).
+- **Repo-specific settings in `.rebarrc`:** declarative METRICS
+  (`metric.<key>.*`, same `=` / `>=` semantics), registry classification
+  and purpose settings, `source_dirs`, `source_extensions`,
+  `freshness_max_days`.
+- **`contracts_dir`** (default `architecture`) moves the contracts,
+  registry and steward state anywhere in the repo; honored by every script
+  and the CLI.
+- **Registry purposes are cut cleanly by default** (`registry_purpose_style
+  = ellipsis`): `|` is escaped so it can't break the table, and long
+  purposes are cut to 77 characters plus `...` instead of at byte 80, which
+  could split a multibyte character. **Upgrade note:** a registry generated
+  with the old cut reports STALE once; regenerate it, or set
+  `registry_purpose_style = bytes` to keep the old output.
+- **`checks_enable`** (`.rebarrc`, env `REBAR_CHECKS_ENABLE`) runs named
+  checks regardless of the tier, each as it would run at tier 3:
+  `tier = 1` + `checks_enable = check-ground-truth` runs ground truth.
+  Names are check script basenames without `.sh`; an unknown name warns
+  once per run and is ignored. `rebar status` and `rebar audit --all` show
+  the enabled checks. Unset, nothing changes. The registry check was never
+  tier-gated (docs said tier 2+); they now say it runs at every tier.
 
 ---
 
