@@ -18,7 +18,20 @@ All notable changes to rebar. Versioned with [semver](https://semver.org/).
 
 ## Unreleased
 
-_Nothing yet._
+- **Adopters carry configuration, not rebar's scripts.** `rebar check`,
+  `rebar check --pre-commit|--cold-start` and the new `rebar run <script>`
+  run the rebar install's scripts against the project
+  (`REBAR_PROJECT_ROOT`). The bootstrap template's `scripts/` is down to
+  two `# rebar-thin-wrapper` entry points. Legacy project copies keep
+  running, with a deprecation notice. Design and migration:
+  `feedback/2026-11-14-self-contained-install.md` (from #8).
+- **Repo-specific settings in `.rebarrc`:** declarative METRICS
+  (`metric.<key>.*`, same `=` / `>=` semantics), registry classification
+  and purpose settings, `source_dirs`, `source_extensions`,
+  `freshness_max_days`.
+- **`contracts_dir`** (default `architecture`) moves the contracts,
+  registry and steward state anywhere in the repo; honored by every script
+  and the CLI.
 
 ---
 
