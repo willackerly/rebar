@@ -176,10 +176,14 @@ Nothing breaks on upgrade: relaxation, not migration.
 - A full project `scripts/ci-check.sh` (no marker) still runs as before
   under `rebar check`, with a deprecation notice; so do individual check
   copies picked by the install suite.
-- To migrate: express customizations in `.rebarrc` (the appendix is a worked
-  example), replace `ci-check.sh` / `pre-commit.sh` with the template's two
-  files (or call `rebar check` from CI directly), delete the rest. A
-  `METRICS` key like `shell_scripts` will drop accordingly.
+- To migrate: run `rebar migrate` (dry run), then `rebar migrate --apply`.
+  It derives the `.rebarrc` settings from the copies by running them,
+  deletes only the copies the install verifiably reproduces, replaces
+  `ci-check.sh` / `pre-commit.sh` with the template's two files, and lowers
+  `METRICS` keys like `shell_scripts` that count the deleted files
+  (`feedback/2026-11-14-rebar-migrate.md`). By hand: express customizations
+  in `.rebarrc` (the appendix is a worked example), replace the two entry
+  points (or call `rebar check` from CI directly), delete the rest.
 - Hooks: `.git/hooks/pre-commit → ../../scripts/pre-commit.sh` keeps
   working; the target just gets shorter.
 

@@ -18,6 +18,18 @@ All notable changes to rebar. Versioned with [semver](https://semver.org/).
 
 ## Unreleased
 
+- **`rebar migrate`** turns an adopter's legacy, possibly customized,
+  script copies into `.rebarrc` settings, decided by running them: each
+  `compute_metrics()` line of a custom `check-ground-truth.sh` becomes
+  `metric.<key>.*` only if the install computes the same value; registry
+  settings are kept only if `compute-registry.sh --stdout` stays
+  byte-identical (`registry_purpose_style = bytes` when the old cut is
+  needed); other checks must give the same exit status and findings, on the
+  project and on a probe tree. Dry run by default; `--apply` writes
+  `.rebarrc`, deletes only verified copies, adjusts METRICS counts the
+  deletions change, reruns the checks and exits 1 on a regression.
+  `check-ground-truth.sh --print` and `REBAR_RCFILE` support it. Design:
+  `feedback/2026-11-14-rebar-migrate.md`.
 - **Adopters carry configuration, not rebar's scripts.** `rebar check`,
   `rebar check --pre-commit|--cold-start` and the new `rebar run <script>`
   run the rebar install's scripts against the project

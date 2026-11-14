@@ -88,9 +88,13 @@ protected files you changed with `rebar commit`. Don't hand-merge hashes.
 
 ## Adopting in an existing repo
 
-1. Update `scripts/compute-registry.sh`, `scripts/_rebar-config.sh` and the
-   verification engine in `scripts/check-ground-truth.sh` (below the
-   "do not modify" line) from this version. Keep any local customizations.
+1. Get this version's `compute-registry.sh` and ground-truth engine. With
+   copied scripts, `rebar migrate --apply` moves your customizations into
+   `.rebarrc` and deletes the copies it verified, so the install's current
+   scripts run (with `registry_purpose_style = bytes` if your registry needs
+   the old purpose cut). Otherwise update `scripts/compute-registry.sh`,
+   `scripts/_rebar-config.sh` and the engine of `scripts/check-ground-truth.sh`
+   (below the "do not modify" line) by hand, keeping local customizations.
 2. Add `registry_impl_counts = false` to `.rebarrc` and regenerate the registry
    once: `scripts/compute-registry.sh`.
 3. Change churning `METRICS` lines to `>=` floors.
