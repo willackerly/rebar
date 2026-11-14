@@ -18,6 +18,17 @@ All notable changes to rebar. Versioned with [semver](https://semver.org/).
 
 ## Unreleased
 
+_Nothing yet._
+
+---
+
+## v3.0.0-beta.3 — 2026-11-14
+
+Third annealing increment on the v3 line, driven by an adopter
+(virtru-analyze) whose parallel PRs conflicted on rebar's generated files.
+**Not** graduation: the `docs/v3-beta-plan.md` §Graduation scoreboard was not
+rescored for this release.
+
 ### Merge-friendly generated files for busy repos
 
 Parallel PRs no longer conflict on rebar's generated files when they change
@@ -45,6 +56,13 @@ unrelated things. See `practices/busy-repos.md`.
 - **`_rebar-config.sh`** gains `_rebar_config <key> <ENV> <default>`.
 - Regression tests: `scripts/tests/merge-friendly.test.sh`,
   `cli/internal/integrity/manifest_test.go`.
+
+### Release housekeeping
+
+- `rebar version` now reports the release (`v3.0.0-beta.3`). It had stayed
+  at `v3.0.0-beta` through beta.2. `rebar new` and `rebar adopt` stamp the
+  README badge from the same constant.
+- `bin/rebar` rebuilt from this source (darwin/arm64).
 
 ---
 

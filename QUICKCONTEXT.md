@@ -1,8 +1,8 @@
 # QUICKCONTEXT — rebar (main, v3 line)
 
-last-synced: 2026-08-12
-<!-- freshness: 2026-08-12 -->
-**Branch:** main — **now tracks v3** at `v3.0.0-beta.2` (plan D11)
+last-synced: 2026-11-14
+<!-- freshness: 2026-11-14 -->
+**Branch:** main — **now tracks v3** at `v3.0.0-beta.3` (plan D11)
 **Tier:** 3 (ENFORCED) — rebar dogfoods its own methodology
 
 ---
@@ -14,6 +14,12 @@ last-synced: 2026-08-12
   second annealing increment, *not* graduation. The version string carries
   the anneal state — `v3.0.0` final is gated on the graduation criteria
   in `docs/v3-beta-plan.md`. Tag `v2.0.0` remains the stable v2 point.
+- **`v3.0.0-beta.3` released 2026-11-14** — merge-friendly generated files
+  for busy repos (#9, #10): the `integrity.json` header is no longer
+  restamped, ratchet floors are derived, the registry has no timestamp and
+  can leave out code-derived impl counts (`registry_impl_counts`), and
+  `METRICS` accepts `>=` floors. See `practices/busy-repos.md`. Also not
+  graduation.
 - **Contract prefix numbering is retired** (beta.2): the full descriptive
   name is the key — `CONTRACT-BLOBSTORE.2.1.md`, not `C1-BLOBSTORE`. A
   relaxation, not a migration: existing numbered contracts stay, never
@@ -44,11 +50,17 @@ last-synced: 2026-08-12
 
 | Branch | Purpose | Where to look |
 |--------|---------|---------------|
-| `main` | **the v3 line** (`v3.0.0-beta.2`, annealing toward v3.0.0) | this file + `docs/v3-beta-plan.md` |
+| `main` | **the v3 line** (`v3.0.0-beta.3`, annealing toward v3.0.0) | this file + `docs/v3-beta-plan.md` |
 | `v3.0.0-beta` | merged into main 2026-07-04; retained for provenance with the tag | history only |
 | `v3.0.0-alpha` / `v3.0.1-alpha` | retired (never built; see plan D1) | history only |
 
 ## In Progress
+
+- **Graduation rescore is overdue.** The scoreboard below is from
+  2026-08-12; the 2026-08-16 date for criterion 1 passed with no recorded
+  rescore, and beta.3 did not rescore. Rescore §Graduation before
+  graduating — including whether beta.3's integrity/registry changes count
+  as v3-feature changes for the clean clock.
 
 - **Annealing toward v3.0.0 final.** Rescored 2026-08-12 against
   `docs/v3-beta-plan.md` §Graduation — **3 of 4 met**:
@@ -60,9 +72,10 @@ last-synced: 2026-08-12
   | 3 | All v3-feature feedback dispositioned | **MET 2026-08-02** — all five items filed in the window implemented and moved to `feedback/processed/`. |
   | 4 | No downstream parser of computed `verified` | **MET 2026-08-02, verified by reading** — every v3 repo emits `impl-present`, zero `lifecycle == "verified"` comparisons. |
 
-- **Quiet since 2026-08-02.** No inbox deposits and no commits in the
-  10 days to 2026-08-12. The beta is annealing exactly as intended:
-  the clock runs while nothing breaks.
+- **Quiet 2026-08-12 → 2026-11-14**, then beta.3 (#9, #10) from
+  virtru-analyze's busy-repo feedback
+  (`feedback/2026-11-14-busy-repo-merge-conflicts.md`). Queued from it:
+  flip the `registry_impl_counts` default to `false` in 3.1.
 
 - **Watcher re-armed 2026-08-12** with own-sender suppression
   (`--self`, default = repo dir name). Two stale pre-fix watchers on
@@ -144,7 +157,7 @@ cat docs/v3-beta-plan.md              # plan + decision log D1-D11 + graduation
 ## Cross-device handoff (2026-08-12)
 
 Everything lives on `main` at origin (plus tags `v2.0.0`,
-`v3.0.0-beta`, `v3.0.0-beta.2`). Resume with:
+`v3.0.0-beta`, `v3.0.0-beta.2`, `v3.0.0-beta.3`). Resume with:
 
 ```bash
 git fetch origin && git checkout main
