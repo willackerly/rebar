@@ -92,7 +92,7 @@ behavior.
 | `registry_impl_counts` (env `REBAR_REGISTRY_IMPL_COUNTS`) | `true` | compute-registry (from #9) |
 | `registry_scope_prefixes` | none | compute-registry: stripped before Services/Components/… classification |
 | `registry_purpose_heading` | `## Purpose` only | compute-registry: heading text (ERE); numbered headings also match |
-| `registry_purpose_style` | `bytes` (first 80 bytes) | `ellipsis`: escape `\|`, cut to 77 chars + `...` |
+| `registry_purpose_style` | `ellipsis`: escape `\|`, cut to 77 chars + `...` | `bytes`: first 80 bytes (the pre-beta.5 output) |
 | `registry_impl_globs` | `*.go *.ts *.tsx *.js *.py *.rs *.java *.rb *.jsx *.sh bin/` | compute-registry: where CONTRACT: headers count |
 | `registry_exclude_dirs` | `node_modules vendor dist` | compute-registry |
 | `metric.<key>.<field>` | none | check-ground-truth; see below |
@@ -334,4 +334,8 @@ Answered 2026-11-14:
 
 - **Q2 — no.** No metric escape hatch. Metrics stay declarative; an adopter
   whose count the schema can't express should ask for a schema addition.
+- **Q3 — yes, now.** `ellipsis` is the default. Adopters whose registry was
+  generated with the old byte cut see `compute-registry.sh --check` report
+  STALE once after upgrading; regenerate, or set
+  `registry_purpose_style = bytes` to keep the old output.
 - **Q6 — namespace work stays with #8**, rebased on this branch.

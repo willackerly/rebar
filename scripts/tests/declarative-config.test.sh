@@ -109,14 +109,17 @@ printf '%s\n' "$out" | grep -q '| S1-FOO | 1.0 | active | — |' \
 cat >> "$P/.rebarrc" <<'EOF'
 registry_scope_prefixes  = SDK-
 registry_purpose_heading = Purpose|Why this exists
-registry_purpose_style   = ellipsis
 EOF
 out="$(reg)"
 printf '%s\n' "$out" | grep -A4 '^## Components' | grep -q 'SDK-C2-BAR' \
   || { echo "$out"; fail "T3: SDK-C2-BAR should be a Component"; }
 printf '%s\n' "$out" | grep -qF '| S1-FOO | 1.0 | active | Short \| purpose. |' \
-  || { echo "$out"; fail "T3: purpose heading/escaping not applied"; }
-ok "T3: registry scope prefixes and purpose settings apply"
+  || { echo "$out"; fail "T3: purpose heading not applied, or ellipsis (the default) did not escape |"; }
+printf 'registry_purpose_style   = bytes\n' >> "$P/.rebarrc"
+out="$(reg)"
+printf '%s\n' "$out" | grep -qF '| S1-FOO | 1.0 | active | Short | purpose. |' \
+  || { echo "$out"; fail "T3: registry_purpose_style = bytes should keep the raw purpose"; }
+ok "T3: registry scope prefixes and purpose settings apply (ellipsis default, bytes opt-out)"
 
 # T4 — source_dirs and source_extensions drive check-todos.
 mkdir -p "$P/tools"

@@ -32,6 +32,12 @@ All notable changes to rebar. Versioned with [semver](https://semver.org/).
 - **`contracts_dir`** (default `architecture`) moves the contracts,
   registry and steward state anywhere in the repo; honored by every script
   and the CLI.
+- **Registry purposes are cut cleanly by default** (`registry_purpose_style
+  = ellipsis`): `|` is escaped so it can't break the table, and long
+  purposes are cut to 77 characters plus `...` instead of at byte 80, which
+  could split a multibyte character. **Upgrade note:** a registry generated
+  with the old cut reports STALE once; regenerate it, or set
+  `registry_purpose_style = bytes` to keep the old output.
 
 ---
 

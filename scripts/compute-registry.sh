@@ -38,7 +38,7 @@ MODE="${1:-generate}"
 IMPL_COUNTS=true
 SCOPE_PREFIXES=""
 PURPOSE_HEADING=""
-PURPOSE_STYLE=bytes
+PURPOSE_STYLE=ellipsis
 IMPL_GLOBS="*.go *.ts *.tsx *.js *.py *.rs *.java *.rb *.jsx *.sh bin/"
 EXCLUDE_DIRS="node_modules vendor dist"
 if [ -f "$SCRIPT_DIR/_rebar-config.sh" ]; then
@@ -47,7 +47,7 @@ if [ -f "$SCRIPT_DIR/_rebar-config.sh" ]; then
   IMPL_COUNTS=$(_rebar_config registry_impl_counts REBAR_REGISTRY_IMPL_COUNTS true)
   SCOPE_PREFIXES=$(_rebar_config registry_scope_prefixes _REBAR_NO_ENV "")
   PURPOSE_HEADING=$(_rebar_config registry_purpose_heading _REBAR_NO_ENV "")
-  PURPOSE_STYLE=$(_rebar_config registry_purpose_style _REBAR_NO_ENV bytes)
+  PURPOSE_STYLE=$(_rebar_config registry_purpose_style _REBAR_NO_ENV ellipsis)
   IMPL_GLOBS=$(_rebar_config registry_impl_globs _REBAR_NO_ENV "$IMPL_GLOBS")
   EXCLUDE_DIRS=$(_rebar_config registry_exclude_dirs _REBAR_NO_ENV "$EXCLUDE_DIRS")
   CONTRACTS_DIR=$(_rebar_contracts_dir)
@@ -95,9 +95,11 @@ extract_status() {
 #                             e.g. `Purpose|Why this exists`. When set, a
 #                             numbered heading (`## 2. Purpose`) also matches.
 #                             Unset: `## Purpose` only.
-#   registry_purpose_style    bytes (default): first 80 bytes, as before.
-#                             ellipsis: escape `|` for the table and cut to
-#                             77 characters plus `...`.
+#   registry_purpose_style    ellipsis (default): escape `|` for the table
+#                             and cut to 77 characters plus `...`.
+#                             bytes: the first 80 bytes, as before v3.0.0-beta.5
+#                             (can split a multibyte character, leaves `|`
+#                             unescaped).
 extract_purpose() {
   local file="$1" heading_re purpose
   heading_re='^## Purpose'
@@ -105,7 +107,7 @@ extract_purpose() {
     heading_re="^## ([0-9]+[.][[:space:]]*)?(${PURPOSE_HEADING})"
   fi
   purpose=$(awk -v re="$heading_re" '$0 ~ re {found=1; next} found && /^[^#]/ && NF{print; exit}' "$file" 2>/dev/null)
-  if [ "$PURPOSE_STYLE" = ellipsis ]; then
+  if [ "$PURPOSE_STYLE" != bytes ]; then
     # Character-aware slicing needs a UTF-8 locale; the rest of the script
     # stays in C for stable sort order.
     (
