@@ -3,19 +3,38 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"regexp"
 
 	"github.com/spf13/cobra"
 	"github.com/willackerly/rebar/cli/internal/config"
 )
 
-// Version is the rebar release this binary reports. Release builds and
-// setup-rebar.sh source builds stamp it with
+// releaseVersion is the release string of this source tree. Bump it with
+// each release; the release workflow refuses a tag that disagrees with it.
+const releaseVersion = "v3.0.0-beta.4"
+
+// Version is what `rebar version` reports. Release builds and setup-rebar.sh
+// source builds stamp it with
 //
 //	go build -ldflags "-X github.com/willackerly/rebar/cli/cmd.Version=<ver>"
 //
-// The default is the release string of this source tree; bump it with each
-// release (the release workflow refuses a tag that disagrees with it).
-var Version = "v3.0.0-beta.4"
+// (a tag, or <branch>@<sha7> for a branch build). Unstamped, it is
+// releaseVersion.
+var Version = releaseVersion
+
+// semverTag matches the release tags check-compliance.sh accepts in a badge.
+var semverTag = regexp.MustCompile(`^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$`)
+
+// badgeVersion is the version new/adopt write into a project's README badge,
+// which check-compliance.sh validates: the stamped Version when it is a
+// release tag, else this tree's releaseVersion, so a branch build does not
+// write "feat/x@abc1234" into an adopter's badge.
+func badgeVersion() string {
+	if semverTag.MatchString(Version) {
+		return Version
+	}
+	return releaseVersion
+}
 
 var (
 	verbose  bool

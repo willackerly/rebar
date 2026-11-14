@@ -3,7 +3,6 @@ package cmd
 import (
 	"os"
 	"path/filepath"
-	"regexp"
 	"testing"
 
 	"github.com/willackerly/rebar/cli/internal/testutil"
@@ -11,13 +10,35 @@ import (
 
 // The release workflow and setup-rebar.sh stamp Version through -ldflags -X;
 // that only works while Version stays a plain package-level string var and
-// the root command reads it.
+// the root command reads it. Unstamped, it is the tree's release string.
 func TestVersionIsStampable(t *testing.T) {
 	if rootCmd.Version != Version {
 		t.Fatalf("rootCmd.Version = %q, want Version (%q)", rootCmd.Version, Version)
 	}
-	if !regexp.MustCompile(`^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$`).MatchString(Version) {
-		t.Fatalf("default Version %q is not a release tag", Version)
+	if Version != releaseVersion {
+		t.Fatalf("unstamped Version = %q, want releaseVersion (%q)", Version, releaseVersion)
+	}
+	if !semverTag.MatchString(releaseVersion) {
+		t.Fatalf("releaseVersion %q is not a release tag", releaseVersion)
+	}
+}
+
+// Badges (validated by check-compliance.sh) carry a release tag even when
+// the binary is a branch build.
+func TestBadgeVersion(t *testing.T) {
+	saved := Version
+	t.Cleanup(func() { Version = saved })
+	for stamp, want := range map[string]string{
+		"v9.9.9":                     "v9.9.9",
+		"v9.9.9-beta.2":              "v9.9.9-beta.2",
+		"feat/versioned@abc1234":     releaseVersion,
+		"0123456789abcdef@0123456":   releaseVersion,
+		"v9.9.9-beta.2-local.test.1": releaseVersion, // check-compliance rejects '-' inside the pre-release
+	} {
+		Version = stamp
+		if got := badgeVersion(); got != want {
+			t.Errorf("Version %q: badgeVersion() = %q, want %q", stamp, got, want)
+		}
 	}
 }
 
