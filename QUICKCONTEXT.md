@@ -124,9 +124,6 @@ an events ledger in the peer lane (the inbox *is* the trail).
   the feature. Pre-v3 repos (zero `Status:` fields) get one advisory.
 - `rebar new` compliance floor is ~6.9/10 (fresh projects lack tests
   and contracts by definition).
-- **`rebar new` writes `.rebar-version` = `v3.0.0-beta`** (hardcoded) while
-  the badge says `v3.0.0`, so `check-compliance.sh` FAILs a fresh project.
-  Pre-existing since beta.3; tracked in TODO.md P1.
 - Auto-federation experiments stay research-only until the 7 open
   questions are answered.
 - **Two freshness thresholds disagree by design-accident:**

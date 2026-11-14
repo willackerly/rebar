@@ -15,21 +15,16 @@ This file holds short-horizon work that's actively in flight or imminent.
 
 ## P1 — Imminent
 
-- [ ] **`rebar new` / `init` / `adopt` write a stale `.rebar-version`.**
-      `cli/cmd/new.go`, `init.go` and `audit.go` hardcode `v3.0.0-beta`
-      while the README badge comes from `rootCmd.Version`, so a fresh
-      `rebar new` project fails its own `check-compliance.sh` ("Badge says
-      v3.0.0 but .rebar-version says v3.0.0-beta"). Present since beta.3,
-      when the badge moved to the constant; measured 2026-11-14 against
-      the v3.0.0 build. Fix: write `rootCmd.Version` in all three, and
-      refresh `templates/project-bootstrap/.rebar-version` /
-      `README.md` badge (still `v3.0.0-beta` / `-beta.2`).
 - [ ] **Leaked test watcher.** A test-spawned `inbox-watch.sh` ran for
       **10 days** against a deleted `/var/folders/...` temp dir (found and
       killed 2026-08-12). Both `scripts/tests/inbox-watch*.test.sh` have
       EXIT traps and explicit kills, so the leak path is not obvious —
       needs a real look, not a guess. A leaked poller is cheap to ignore
       and exactly the kind of thing that erodes trust in the watcher.
+      **Root cause found 2026-11-14:** `inbox-watch-lock.test.sh` calls
+      `X="$(arm ...)"`, so `arm`'s `PIDS+=` ran in a subshell and never
+      reached the EXIT cleanup. Fixed in #14 (b9fbb58, on
+      `release/v3.1.0-rc`); close this when that ships.
 - [ ] **A harness-backed watcher does not outlive its task.** Observed
       2026-08-12: `scripts/inbox-watch.sh` armed as a background task was
       reaped when the harness marked the task complete — it released its

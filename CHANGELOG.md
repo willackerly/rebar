@@ -26,9 +26,15 @@ _Nothing yet._
 
 Graduation of the v3 line. The four annealing betas (`v3.0.0-beta`,
 `-beta.2`, `-beta.3`, `-beta.4`) shipped on `main`, honestly labeled; this
-release drops the pre-release suffix. No code change since `v3.0.0-beta.4`
-(`git diff v3.0.0-beta.4 origin/main` is empty); this commit only moves version
-strings, rebuilds `bin/rebar`, and records the decision.
+release drops the pre-release suffix. One fix since `v3.0.0-beta.4`; otherwise
+only version strings, the rebuilt `bin/rebar`, and the recorded decision.
+
+- **`rebar new` projects passed their own compliance check again.** `rebar new`,
+  `rebar init` and `rebar audit --fix` wrote a hardcoded `v3.0.0-beta` into
+  `.rebar-version` while the README badge used the CLI's version, so a fresh
+  project failed `check-compliance.sh` ("Badge says v3.0.0 but .rebar-version
+  says v3.0.0-beta"). All three now write the CLI's version, and the bootstrap
+  template's `.rebar-version` and badge say `v3.0.0`. Broken since beta.3.
 
 **What v3 is:** badges that stop lying by default. Contracts declare their
 maturity (`Status:` stub → verified) and the compliance badge is weighted by
