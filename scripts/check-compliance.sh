@@ -53,12 +53,12 @@ echo ""
 
 if [ ! -f "$VERSION_FILE" ]; then
   echo "FAIL: .rebar-version file not found"
-  echo "  Create it with: echo 'v3.0.0-beta.3' > .rebar-version"
+  echo "  Create it with: echo 'v3.0.0-beta.4' > .rebar-version"
   errors=$((errors + 1))
   declared_version=""
 else
   declared_version=$(cat "$VERSION_FILE" | tr -d '[:space:]')
-  # Semver with optional pre-release suffix (v3.0.0-beta.3, v3.1.0-rc.1)
+  # Semver with optional pre-release suffix (v3.0.0-beta.4, v3.1.0-rc.1)
   if [[ "$declared_version" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$ ]]; then
     echo "OK: .rebar-version = $declared_version"
   else
@@ -98,7 +98,7 @@ else
   if [ -z "$badge_line" ]; then
     echo "FAIL: README.md has no rebar badge"
     echo "  Add this as the first line after your # Title:"
-    echo '  > **rebar v3.0.0-beta.3** | **Tier 2: ADOPTED**'
+    echo '  > **rebar v3.0.0-beta.4** | **Tier 2: ADOPTED**'
     errors=$((errors + 1))
   else
     line_num=$(echo "$badge_line" | cut -d: -f1)
