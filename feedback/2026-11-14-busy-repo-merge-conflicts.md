@@ -78,6 +78,6 @@ Questions answered 2026-11-14:
 
 1. **Yes.** `registry_impl_counts` stays `true` on the 3.0 line and flips to
    `false` in 3.1. Queued in INVENTORY.
-2. **Yes.** Tracked-files-only impl counting (`git grep`) ships as a separate
-   follow-up PR.
+2. **Yes.** Tracked-files-only impl counting (`git grep`) shipped as a
+   follow-up PR (`merge-friendly.test.sh` T6).
 3. **Skip.** No local merge driver.

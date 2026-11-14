@@ -94,31 +94,51 @@ classify_prefix() {
   esac
 }
 
-# Count implementing files for a contract.
-# `grep` returns 1 when there are no matches; under `set -o pipefail` that
-# would abort the whole script for any orphan contract. The greps in this
-# pipeline legitimately return 1 on empty input, so we run with pipefail
-# temporarily disabled.
+# Search source files for a pattern: search_source <grep flags...> <pattern>.
 #
-# Two passes, deduplicated by file path:
+# In a git work tree this searches tracked files only (git grep), so counts
+# are the same on every checkout: an untracked scratch file or a gitignored
+# build output with a CONTRACT: header doesn't change the registry. Outside
+# git it falls back to grep -r.
+#
+# Searched files:
 #   1. Source files matching the standard extension whitelist
 #   2. Files anywhere under `bin/` (CLI entry points often have no extension —
 #      `bin/ask`, `bin/ask-mcp-server`, `bin/rebar`)
+# minus the top-level architecture/ (the contracts themselves) and any
+# node_modules/, vendor/ or dist/ directory.
+#
+# `grep` returns 1 when there are no matches; callers run with pipefail
+# temporarily disabled so an orphan contract doesn't abort the script.
+IN_GIT=false
+if git -C "$PROJECT_ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  IN_GIT=true
+fi
+
+search_source() {
+  if [ "$IN_GIT" = true ]; then
+    git -C "$PROJECT_ROOT" grep "$@" -- \
+      '*.go' '*.ts' '*.tsx' '*.js' '*.py' '*.rs' '*.java' '*.rb' '*.jsx' '*.sh' 'bin/' \
+      ':(exclude)architecture/' ':(exclude,glob)**/node_modules/**' \
+      ':(exclude,glob)**/vendor/**' ':(exclude,glob)**/dist/**' 2>/dev/null
+  else
+    {
+      grep -r "$@" "$PROJECT_ROOT" \
+        --include='*.go' --include='*.ts' --include='*.tsx' --include='*.js' \
+        --include='*.py' --include='*.rs' --include='*.java' --include='*.rb' \
+        --include='*.jsx' --include='*.sh' 2>/dev/null
+      if [ -d "$PROJECT_ROOT/bin" ]; then
+        grep -r "$@" "$PROJECT_ROOT/bin" 2>/dev/null
+      fi
+    } | grep -v "node_modules\|vendor\|dist\|\.git\|architecture/"
+  fi
+}
+
+# Count implementing files for a contract, deduplicated by path.
 count_implementations() {
   local id="$1"
   set +o pipefail
-  {
-    grep -rln "CONTRACT:${id}" "$PROJECT_ROOT" \
-      --include='*.go' --include='*.ts' --include='*.tsx' --include='*.js' \
-      --include='*.py' --include='*.rs' --include='*.java' --include='*.rb' \
-      --include='*.jsx' --include='*.sh' 2>/dev/null
-    if [ -d "$PROJECT_ROOT/bin" ]; then
-      grep -rln "CONTRACT:${id}" "$PROJECT_ROOT/bin" 2>/dev/null
-    fi
-  } \
-    | grep -v "node_modules\|vendor\|dist\|\.git\|architecture/" \
-    | sort -u \
-    | wc -l | tr -d ' '
+  search_source -l "CONTRACT:${id}" | sort -u | wc -l | tr -d ' '
   set -o pipefail
 }
 
@@ -259,17 +279,8 @@ generate_health() {
   local shadows_tmp
   shadows_tmp="$(mktemp)"
   set +o pipefail
-  {
-    grep -rEhno 'CONTRACT:[A-Za-z0-9_-]+\.[0-9]+\.[0-9]+' "$PROJECT_ROOT" \
-      --include='*.go' --include='*.ts' --include='*.tsx' --include='*.js' \
-      --include='*.py' --include='*.rs' --include='*.java' --include='*.rb' \
-      --include='*.jsx' --include='*.sh' 2>/dev/null
-    if [ -d "$PROJECT_ROOT/bin" ]; then
-      grep -rEhno 'CONTRACT:[A-Za-z0-9_-]+\.[0-9]+\.[0-9]+' "$PROJECT_ROOT/bin" 2>/dev/null
-    fi
-  } \
-    | grep -v "node_modules\|vendor\|dist\|\.git\|architecture/" \
-    | sed -E 's/^[^:]*:[^:]*://; s/^CONTRACT://; s/\.[0-9]+\.[0-9]+$//' \
+  search_source -Eho 'CONTRACT:[A-Za-z0-9_-]+\.[0-9]+\.[0-9]+' \
+    | sed -E 's/^CONTRACT://; s/\.[0-9]+\.[0-9]+$//' \
     | sort -u > "$shadows_tmp"
   set -o pipefail
 
