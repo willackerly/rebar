@@ -136,12 +136,6 @@ func runInit(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	// Compute initial ratchets
-	computed, err := integrity.ComputeRatchets(root)
-	if err == nil {
-		integrity.UpdateRatchets(manifest, computed)
-	}
-
 	manifest.GeneratedBy = "rebar init"
 	if err := manifest.Save(rebarDir); err != nil {
 		return fmt.Errorf("saving manifest: %w", err)

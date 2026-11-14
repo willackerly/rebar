@@ -3,6 +3,7 @@ package integrity
 import (
 	"fmt"
 	"path/filepath"
+	"sort"
 )
 
 // RatchetResult reports whether a ratchet was violated.
@@ -36,37 +37,50 @@ func ComputeRatchets(repoRoot string) (map[string]int, error) {
 	}, nil
 }
 
-// CheckRatchets compares computed values against manifest minimums.
-// Returns results for each ratchet, with Violated=true if current < min.
-func CheckRatchets(manifest *Manifest, computed map[string]int) []RatchetResult {
-	var results []RatchetResult
-	for name, ratchet := range manifest.Ratchets {
-		current, ok := computed[name]
-		if !ok {
-			current = 0
+// DerivedFloors computes ratchet floors from the manifest's per-file entries:
+// the sum of recorded assertion counts, and the number of tracked contracts and
+// test files. Deriving floors (instead of storing a raised minimum) keeps
+// commits from rewriting a shared aggregate line that every branch touches.
+func DerivedFloors(manifest *Manifest) map[string]int {
+	totalAssertions := 0
+	for _, entry := range manifest.Checksums[CategoryTests] {
+		if entry.AssertCount != nil {
+			totalAssertions += *entry.AssertCount
 		}
+	}
+	return map[string]int{
+		"total_assertions": totalAssertions,
+		"contract_count":   len(manifest.Checksums[CategoryContracts]),
+		"test_file_count":  len(manifest.Checksums[CategoryTests]),
+	}
+}
+
+// CheckRatchets compares computed values against the manifest's floors.
+// A floor is the larger of the derived floor and any legacy stored minimum.
+// Returns results sorted by name, with Violated=true if current < floor.
+func CheckRatchets(manifest *Manifest, computed map[string]int) []RatchetResult {
+	floors := DerivedFloors(manifest)
+	for name, r := range manifest.Ratchets {
+		if r.Min > floors[name] {
+			floors[name] = r.Min
+		}
+	}
+
+	names := make([]string, 0, len(floors))
+	for name := range floors {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+
+	var results []RatchetResult
+	for _, name := range names {
+		current := computed[name]
 		results = append(results, RatchetResult{
 			Name:     name,
-			Min:      ratchet.Min,
+			Min:      floors[name],
 			Current:  current,
-			Violated: current < ratchet.Min,
+			Violated: current < floors[name],
 		})
 	}
 	return results
-}
-
-// UpdateRatchets updates the manifest with computed values.
-// Min ratchets up: min = max(old min, current).
-func UpdateRatchets(manifest *Manifest, computed map[string]int) {
-	for name, current := range computed {
-		r, ok := manifest.Ratchets[name]
-		if !ok {
-			r = Ratchet{}
-		}
-		r.Current = current
-		if current > r.Min {
-			r.Min = current
-		}
-		manifest.Ratchets[name] = r
-	}
 }

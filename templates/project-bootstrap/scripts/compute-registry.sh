@@ -6,18 +6,45 @@
 #   ./scripts/compute-registry.sh           Generate architecture/CONTRACT-REGISTRY.md
 #   ./scripts/compute-registry.sh --check   Exit 0 if current, 1 if stale
 #   ./scripts/compute-registry.sh --stdout   Print to stdout instead of writing file
+#   ./scripts/compute-registry.sh --health   Print implementing-file counts and
+#                                            zombie/shadow contracts to stdout
 #
 # The contract filesystem IS the registry. This script just renders it.
+#
+# The output is deterministic (no timestamp, C collation), so two branches
+# that regenerate it from the same contracts produce identical bytes and merge
+# cleanly. Implementing-file counts and the Contract Health section are derived
+# from source code, so any PR that adds or removes a CONTRACT: header changes
+# them. Busy repos should keep them out of the committed file:
+#
+#   .rebarrc:  registry_impl_counts = false    (env: REBAR_REGISTRY_IMPL_COUNTS)
+#
+# and read them with --health (or scripts/check-registry.sh) instead.
 #
 # Exit code: 0 = success/current, 1 = stale (--check mode)
 
 set -euo pipefail
+
+# Glob and sort order must not depend on the caller's locale, or two machines
+# render the same contracts in different orders.
+export LC_ALL=C
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 ARCH_DIR="$PROJECT_ROOT/architecture"
 REGISTRY="$ARCH_DIR/CONTRACT-REGISTRY.md"
 MODE="${1:-generate}"
+
+IMPL_COUNTS=true
+if [ -f "$SCRIPT_DIR/_rebar-config.sh" ]; then
+  # shellcheck source=scripts/_rebar-config.sh
+  source "$SCRIPT_DIR/_rebar-config.sh"
+  IMPL_COUNTS=$(_rebar_config registry_impl_counts REBAR_REGISTRY_IMPL_COUNTS true)
+fi
+case "$IMPL_COUNTS" in
+  false|0|no|off) IMPL_COUNTS=false ;;
+  *) IMPL_COUNTS=true ;;
+esac
 
 # ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -67,31 +94,51 @@ classify_prefix() {
   esac
 }
 
-# Count implementing files for a contract.
-# `grep` returns 1 when there are no matches; under `set -o pipefail` that
-# would abort the whole script for any orphan contract. The greps in this
-# pipeline legitimately return 1 on empty input, so we run with pipefail
-# temporarily disabled.
+# Search source files for a pattern: search_source <grep flags...> <pattern>.
 #
-# Two passes, deduplicated by file path:
+# In a git work tree this searches tracked files only (git grep), so counts
+# are the same on every checkout: an untracked scratch file or a gitignored
+# build output with a CONTRACT: header doesn't change the registry. Outside
+# git it falls back to grep -r.
+#
+# Searched files:
 #   1. Source files matching the standard extension whitelist
 #   2. Files anywhere under `bin/` (CLI entry points often have no extension —
 #      `bin/ask`, `bin/ask-mcp-server`, `bin/rebar`)
+# minus the top-level architecture/ (the contracts themselves) and any
+# node_modules/, vendor/ or dist/ directory.
+#
+# `grep` returns 1 when there are no matches; callers run with pipefail
+# temporarily disabled so an orphan contract doesn't abort the script.
+IN_GIT=false
+if git -C "$PROJECT_ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  IN_GIT=true
+fi
+
+search_source() {
+  if [ "$IN_GIT" = true ]; then
+    git -C "$PROJECT_ROOT" grep "$@" -- \
+      '*.go' '*.ts' '*.tsx' '*.js' '*.py' '*.rs' '*.java' '*.rb' '*.jsx' '*.sh' 'bin/' \
+      ':(exclude)architecture/' ':(exclude,glob)**/node_modules/**' \
+      ':(exclude,glob)**/vendor/**' ':(exclude,glob)**/dist/**' 2>/dev/null
+  else
+    {
+      grep -r "$@" "$PROJECT_ROOT" \
+        --include='*.go' --include='*.ts' --include='*.tsx' --include='*.js' \
+        --include='*.py' --include='*.rs' --include='*.java' --include='*.rb' \
+        --include='*.jsx' --include='*.sh' 2>/dev/null
+      if [ -d "$PROJECT_ROOT/bin" ]; then
+        grep -r "$@" "$PROJECT_ROOT/bin" 2>/dev/null
+      fi
+    } | grep -v "node_modules\|vendor\|dist\|\.git\|architecture/"
+  fi
+}
+
+# Count implementing files for a contract, deduplicated by path.
 count_implementations() {
   local id="$1"
   set +o pipefail
-  {
-    grep -rln "CONTRACT:${id}" "$PROJECT_ROOT" \
-      --include='*.go' --include='*.ts' --include='*.tsx' --include='*.js' \
-      --include='*.py' --include='*.rs' --include='*.java' --include='*.rb' \
-      --include='*.jsx' --include='*.sh' 2>/dev/null
-    if [ -d "$PROJECT_ROOT/bin" ]; then
-      grep -rln "CONTRACT:${id}" "$PROJECT_ROOT/bin" 2>/dev/null
-    fi
-  } \
-    | grep -v "node_modules\|vendor\|dist\|\.git\|architecture/" \
-    | sort -u \
-    | wc -l | tr -d ' '
+  search_source -l "CONTRACT:${id}" | sort -u | wc -l | tr -d ' '
   set -o pipefail
 }
 
@@ -115,9 +162,13 @@ for contract in "$ARCH_DIR"/CONTRACT-*.md; do
   parse_contract_file "$contract"
   local_status=$(extract_status "$contract")
   local_purpose=$(extract_purpose "$contract")
-  impl_count=$(count_implementations "$CONTRACT_ID")
 
-  entry="| $CONTRACT_ID | $CONTRACT_VERSION | $local_status | $impl_count | ${local_purpose:-—} |"
+  if [ "$IMPL_COUNTS" = true ]; then
+    impl_count=$(count_implementations "$CONTRACT_ID")
+    entry="| $CONTRACT_ID | $CONTRACT_VERSION | $local_status | $impl_count | ${local_purpose:-—} |"
+  else
+    entry="| $CONTRACT_ID | $CONTRACT_VERSION | $local_status | ${local_purpose:-—} |"
+  fi
 
   category=$(classify_prefix "$CONTRACT_ID")
   case "$category" in
@@ -131,14 +182,11 @@ done
 
 # ─── Generate Output ────────────────────────────────────────────────────────
 
-GENERATED_AT="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
-
 generate_registry() {
   cat <<HEADER
 # Contract Registry
 
 <!-- AUTO-GENERATED by scripts/compute-registry.sh — do not edit manually -->
-<!-- Generated: $GENERATED_AT -->
 <!-- Regenerate: ./scripts/compute-registry.sh -->
 
 HEADER
@@ -150,8 +198,13 @@ HEADER
     [ $# -eq 0 ] && return
     echo "## $category"
     echo ""
-    echo "| ID | Version | Status | Impl Files | Purpose |"
-    echo "|----|---------|--------|------------|---------|"
+    if [ "$IMPL_COUNTS" = true ]; then
+      echo "| ID | Version | Status | Impl Files | Purpose |"
+      echo "|----|---------|--------|------------|---------|"
+    else
+      echo "| ID | Version | Status | Purpose |"
+      echo "|----|---------|--------|---------|"
+    fi
     local entry
     for entry in "$@"; do
       echo "$entry"
@@ -182,7 +235,13 @@ HEADER
   done
   echo ""
 
-  # ─── Contract Health: zombie + shadow detection ──────────────────────────
+  if [ "$IMPL_COUNTS" = true ]; then
+    generate_health
+  fi
+}
+
+# ─── Contract Health: zombie + shadow detection ────────────────────────────
+generate_health() {
   # zombie  — contract file exists but no CONTRACT:<ID> headers in source
   #           (deletion candidate unless tracked in TODO.md)
   # shadow  — CONTRACT:<ID> reference in source but no architecture/<ID>.md
@@ -220,17 +279,8 @@ HEADER
   local shadows_tmp
   shadows_tmp="$(mktemp)"
   set +o pipefail
-  {
-    grep -rEhno 'CONTRACT:[A-Za-z0-9_-]+\.[0-9]+\.[0-9]+' "$PROJECT_ROOT" \
-      --include='*.go' --include='*.ts' --include='*.tsx' --include='*.js' \
-      --include='*.py' --include='*.rs' --include='*.java' --include='*.rb' \
-      --include='*.jsx' --include='*.sh' 2>/dev/null
-    if [ -d "$PROJECT_ROOT/bin" ]; then
-      grep -rEhno 'CONTRACT:[A-Za-z0-9_-]+\.[0-9]+\.[0-9]+' "$PROJECT_ROOT/bin" 2>/dev/null
-    fi
-  } \
-    | grep -v "node_modules\|vendor\|dist\|\.git\|architecture/" \
-    | sed -E 's/^[^:]*:[^:]*://; s/^CONTRACT://; s/\.[0-9]+\.[0-9]+$//' \
+  search_source -Eho 'CONTRACT:[A-Za-z0-9_-]+\.[0-9]+\.[0-9]+' \
+    | sed -E 's/^CONTRACT://; s/\.[0-9]+\.[0-9]+$//' \
     | sort -u > "$shadows_tmp"
   set -o pipefail
 
@@ -273,6 +323,29 @@ HEADER
   fi
 }
 
+# Implementing-file counts plus zombie/shadow detection, for --health.
+generate_health_report() {
+  echo "## Implementing Files"
+  echo ""
+  echo "| ID | Impl Files |"
+  echo "|----|------------|"
+  local contract basename
+  for contract in "$ARCH_DIR"/CONTRACT-*.md; do
+    [ ! -f "$contract" ] && continue
+    basename=$(basename "$contract")
+    case "$basename" in
+      CONTRACT-TEMPLATE.md|CONTRACT-SEAM-TEMPLATE.md|CONTRACT-REGISTRY.md|CONTRACT-REGISTRY.template.md|CONTRACT-GAPS.md)
+        continue ;;
+      *.impl.md)
+        continue ;;
+    esac
+    parse_contract_file "$contract"
+    echo "| $CONTRACT_ID | $(count_implementations "$CONTRACT_ID") |"
+  done | sort -u
+  echo ""
+  generate_health
+}
+
 # ─── Execute Mode ───────────────────────────────────────────────────────────
 
 case "$MODE" in
@@ -286,7 +359,7 @@ case "$MODE" in
     tmpfile=$(mktemp)
     generate_registry > "$tmpfile"
 
-    # Compare ignoring the timestamp line
+    # Ignore the timestamp line older versions wrote
     if diff <(grep -v "^<!-- Generated:" "$REGISTRY") <(grep -v "^<!-- Generated:" "$tmpfile") >/dev/null 2>&1; then
       echo "OK: Registry is current."
       rm "$tmpfile"
@@ -300,6 +373,10 @@ case "$MODE" in
 
   --stdout)
     generate_registry
+    ;;
+
+  --health)
+    generate_health_report
     ;;
 
   *)

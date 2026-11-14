@@ -27,7 +27,11 @@ Accepted items with decision made, pending implementation. Source files
 remain in `feedback/` root until implementation lands, then move to processed/.
 
 _Wave 1, Wave 2, and Wave 3 all implemented 2026-04-25 — see Implemented
-section below._ Queue is empty pending the next batch of triaged feedback.
+section below._
+
+| Item | Decision | Source |
+|------|----------|--------|
+| Flip `registry_impl_counts` default to `false` | 3.1 (stays `true` on 3.0) | `feedback/2026-11-14-busy-repo-merge-conflicts.md` Q1 |
 
 ### 2026-08-02 window — all five implemented same-day
 
@@ -98,7 +102,7 @@ source project(s) so accumulation is visible.
 | ~~CI-triggered catalog collection~~ | ~~1~~ | ~~scalability-deep-review~~ | ~~M~~ | **REJECTED 2026-04-28** — depended on the rejected catalog above. |
 | ~~Cross-repo breaking-change detection script~~ | ~~1~~ | ~~scalability-deep-review~~ | ~~S~~ | **SUPERSEDED 2026-04-28** by `rebar contract drift-check` (consumer-side) + `scripts/check-version-bump.sh` (owner-side) in the federation design. |
 | `WORKSTREAMS.md` split from AGENTS.md | 1 | scalability-deep-review | S | Document as optional in small-team profile instead of structural change |
-| `compute-metrics.sh` (generate METRICS, not verify) | 1 | scalability-assessment | S | Tier 2 optimization; wait for real merge-conflict pain |
+| ~~`compute-metrics.sh` (generate METRICS, not verify)~~ | ~~2~~ | ~~scalability-assessment, virtru-analyze~~ | ~~S~~ | **ADDRESSED 2026-11-14** with `METRICS` `>=` floors instead of generation, after real merge-conflict pain. Source: `feedback/2026-11-14-busy-repo-merge-conflicts.md`. |
 | Un-gitignore shared agent memory + summarizer | 1 | scalability-assessment | M | log/summary split done; summarizer waits for demand |
 | Maturity model L1-L5 self-assessment doc | 1 | scalability-assessment | S | Add when 2nd adopter asks how to self-assess |
 | Template profiles strip AGENTS.md bloat (solo gets 10KB not 39KB) | 1 | scalability-deep-review | M | solo-dev profile partially addresses; wait for bloat complaint |

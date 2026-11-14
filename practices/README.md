@@ -17,6 +17,7 @@ Reference guides for specific workflows. AGENTS.md contains the mandatory founda
 | [Multi-Agent Orchestration](multi-agent-orchestration.md) | Planning fan-out, launching subagents, pre-launch audit |
 | [Regression Fix Protocol](regression-fix-protocol.md) | Fixing a bug that a test should have caught |
 | [Worktree Collaboration](worktree-collaboration.md) | Coordinating parallel agents, merge strategy, conflict resolution |
+| [Busy Repos](busy-repos.md) | Several PRs open at once and rebar's generated files conflict on every merge |
 | [Red Team Protocol](red-team-protocol.md) | Running adversarial quality reviews before releases |
 | [Visual Fidelity](visual-fidelity.md) | Projects that produce visual output (renderers, PDF, images) |
 | [Diagram and Document Assets](diagram-and-document-assets.md) | A figure outgrows an ASCII fence; a deliverable must open in Word or PowerPoint |

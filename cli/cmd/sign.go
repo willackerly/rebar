@@ -3,7 +3,6 @@ package cmd
 import (
 	"fmt"
 	"path/filepath"
-	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/willackerly/rebar/cli/internal/integrity"
@@ -125,8 +124,6 @@ func runSign(cmd *cobra.Command, args []string) error {
 	}
 
 	// Save updated manifest
-	manifest.GeneratedBy = fmt.Sprintf("rebar sign --role %s", signRole)
-	manifest.GeneratedAt = time.Now().UTC()
 	if err := manifest.Save(cfg.RebarDir); err != nil {
 		return err
 	}

@@ -26,6 +26,7 @@ var commitCmd = &cobra.Command{
   - Runs pre-commit checks (no bypass possible)
   - Updates integrity hashes for protected files
   - Checks ratchets (assertion counts cannot decrease)
+  - Changes only the manifest entries of staged files, so branches merge cleanly
   - NO --no-verify flag exists`,
 	RunE: runCommit,
 }
@@ -92,7 +93,18 @@ func runCommit(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("nothing staged to commit — stage files first or pass them as arguments")
 	}
 
-	// 4. Update hashes for staged protected files
+	// 4. Check ratchets against the floors recorded before this commit
+	computed, err := integrity.ComputeRatchets(cfg.RepoRoot)
+	if err == nil {
+		results := integrity.CheckRatchets(manifest, computed)
+		for _, r := range results {
+			if r.Violated {
+				return fmt.Errorf("ratchet violation: %s is %d, minimum is %d — cannot decrease", r.Name, r.Current, r.Min)
+			}
+		}
+	}
+
+	// 5. Update hashes for staged protected files
 	protectedFiles, _ := integrity.ScanProtectedFiles(cfg.RepoRoot)
 	protectedSet := map[string]string{} // path → category
 	for cat, paths := range protectedFiles {
@@ -145,20 +157,7 @@ func runCommit(cmd *cobra.Command, args []string) error {
 		updated++
 	}
 
-	// 5. Check ratchets
-	computed, err := integrity.ComputeRatchets(cfg.RepoRoot)
-	if err == nil {
-		results := integrity.CheckRatchets(manifest, computed)
-		for _, r := range results {
-			if r.Violated {
-				return fmt.Errorf("ratchet violation: %s is %d, minimum is %d — cannot decrease", r.Name, r.Current, r.Min)
-			}
-		}
-		integrity.UpdateRatchets(manifest, computed)
-	}
-
 	// 6. Save manifest and stage it
-	manifest.GeneratedBy = "rebar commit"
 	if err := manifest.Save(cfg.RebarDir); err != nil {
 		return fmt.Errorf("saving manifest: %w", err)
 	}

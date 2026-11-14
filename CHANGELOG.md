@@ -18,7 +18,33 @@ All notable changes to rebar. Versioned with [semver](https://semver.org/).
 
 ## Unreleased
 
-_Nothing yet._
+### Merge-friendly generated files for busy repos
+
+Parallel PRs no longer conflict on rebar's generated files when they change
+unrelated things. See `practices/busy-repos.md`.
+
+- **`rebar commit` / `rebar sign`** no longer restamp `generated_at` /
+  `generated_by` in `.rebar/integrity.json`; the header is written once by
+  `rebar init`. `rebar status` shows it as "Created".
+- **Ratchet floors are derived** from per-file entries instead of a stored,
+  constantly raised `min`. Legacy stored floors stay as a frozen lower bound;
+  `current` is no longer written.
+- **`compute-registry.sh`** drops the `Generated:` timestamp and pins
+  `LC_ALL=C`, so output is identical on every machine. New `.rebarrc` key
+  `registry_impl_counts = false` (env `REBAR_REGISTRY_IMPL_COUNTS`) keeps the
+  code-derived `Impl Files` column and Contract Health section out of the
+  committed registry; `--health` prints them.
+- **`compute-registry.sh`** counts implementing files over tracked files only
+  (`git grep`) in a git work tree, so untracked scratch files and gitignored
+  build output no longer change the registry; outside git it falls back to
+  `grep -r`. The exclusions now match path components instead of substrings:
+  only the top-level `architecture/` is skipped (a nested
+  `website/src/pages/architecture/` file now counts), as are `node_modules/`,
+  `vendor/` and `dist/` directories. Counts can shift once on regeneration.
+- **`check-ground-truth.sh`** accepts `key >= N` floors in `METRICS`.
+- **`_rebar-config.sh`** gains `_rebar_config <key> <ENV> <default>`.
+- Regression tests: `scripts/tests/merge-friendly.test.sh`,
+  `cli/internal/integrity/manifest_test.go`.
 
 ---
 

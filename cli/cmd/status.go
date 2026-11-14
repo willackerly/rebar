@@ -50,7 +50,7 @@ func runStatus(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	fmt.Printf("  Last check:  %s\n", manifest.GeneratedAt.Format("2006-01-02 15:04:05 UTC"))
+	fmt.Printf("  Created:     %s\n", manifest.GeneratedAt.Format("2006-01-02 15:04:05 UTC"))
 
 	// File counts per category
 	total := 0
@@ -64,10 +64,10 @@ func runStatus(cmd *cobra.Command, args []string) error {
 	fmt.Printf("  Total:       %d protected files\n", total)
 
 	// Ratchets
-	if len(manifest.Ratchets) > 0 {
+	if computed, err := integrity.ComputeRatchets(cfg.RepoRoot); err == nil {
 		fmt.Println("\n  Ratchets:")
-		for name, r := range manifest.Ratchets {
-			fmt.Printf("    %-20s current: %d, min: %d\n", name, r.Current, r.Min)
+		for _, r := range integrity.CheckRatchets(manifest, computed) {
+			fmt.Printf("    %-20s current: %d, min: %d\n", r.Name, r.Current, r.Min)
 		}
 	}
 

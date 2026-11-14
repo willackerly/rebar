@@ -110,7 +110,7 @@ freely. The integrity system protects the *methodology*, not the product.
 {
   "schema_version": "1.0",
   "generated_at": "2026-03-27T14:00:00Z",
-  "generated_by": "rebar verify",
+  "generated_by": "rebar init",
   "repo_id": "a1b2c3d4-...",
   "repo_salt": "hex-encoded-random-256-bit",
   "checksums": {
@@ -139,14 +139,14 @@ freely. The integrity system protects the *methodology*, not the product.
         "modified_at": "2026-03-27T12:00:00Z"
       }
     }
-  },
-  "ratchets": {
-    "total_assertions": { "min": 70, "current": 70 },
-    "contract_count": { "min": 2, "current": 2 },
-    "test_file_count": { "min": 2, "current": 2 }
   }
 }
 ```
+
+`generated_at` and `generated_by` record when and how the manifest was
+created. They are written once by `rebar init` and never restamped, so commits
+on different branches change only the entries of the files they touch and
+merge cleanly. See `practices/busy-repos.md`.
 
 ### Role Salts
 
@@ -185,7 +185,14 @@ Certain metrics can only increase:
 - **contract_count**: number of contracts in the registry
 - **test_file_count**: number of test files
 
-If a commit would decrease a ratcheted value, `rebar commit` blocks it.
+The floors are derived from the manifest itself: the sum of the per-file
+`assertion_count` values and the number of tracked contract and test entries.
+Nothing stores a raised minimum, so no commit rewrites a shared aggregate line.
+Manifests written by older versions may carry a `ratchets` block. Its `min`
+values stay as a frozen lower bound, and `current` is no longer written.
+
+If a commit would decrease a ratcheted value below the floor recorded before
+the commit, `rebar commit` blocks it.
 Ratchets can be explicitly lowered with `rebar ratchet reset <metric> <value>`
 which requires justification (logged in the manifest history).
 
