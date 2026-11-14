@@ -8,6 +8,12 @@
 #
 # CUSTOMIZATION REQUIRED: Define your project's metrics in compute_metrics().
 #
+# METRICS lines are `key = value` (must match exactly) or `key >= value`
+# (a floor: passes while the computed count is at least value). Use floors
+# for counts that most PRs change, such as test files or CI workflows: with
+# exact counts, two PRs that each add a test both edit the same line, so they
+# conflict or, if both write the same number, leave main's count wrong.
+#
 # Usage: ./scripts/check-ground-truth.sh
 # Exit: 0 = all claims match, 1 = drift detected
 
@@ -76,13 +82,20 @@ verify() {
     key=$(echo "$key" | xargs)
     value=$(echo "$value" | xargs)
 
-    # Look up key in METRICS file
-    local documented
-    documented=$(grep "^[[:space:]]*${key}[[:space:]]*=" "$METRICS_FILE" 2>/dev/null \
-      | head -1 | cut -d'=' -f2 | xargs) || true
+    # Look up key in METRICS file: `key = N` (exact) or `key >= N` (floor)
+    local line documented
+    line=$(grep -E "^[[:space:]]*${key}[[:space:]]*>?=" "$METRICS_FILE" 2>/dev/null | head -1) || true
+    documented=$(echo "$line" | sed -E 's/^[^=]*=//' | xargs)
 
     if [ -z "$documented" ]; then
       echo -e "${YELLOW}NEW${NC}:   $key = $value  (not in METRICS file)"
+    elif echo "$line" | grep -Eq "^[[:space:]]*${key}[[:space:]]*>="; then
+      if [[ "$value" =~ ^[0-9]+$ && "$documented" =~ ^[0-9]+$ ]] && [ "$value" -ge "$documented" ]; then
+        echo -e "${GREEN}OK${NC}:    $key = $value  (floor $documented)"
+      else
+        echo -e "${RED}DRIFT${NC}: $key — METRICS floor is $documented, code says $value"
+        exit_code=1
+      fi
     elif [ "$value" = "$documented" ]; then
       echo -e "${GREEN}OK${NC}:    $key = $value"
     else

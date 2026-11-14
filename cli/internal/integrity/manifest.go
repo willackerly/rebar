@@ -9,13 +9,21 @@ import (
 )
 
 // Manifest is the central integrity tracking document at .rebar/integrity.json.
+//
+// The file is merge-friendly by construction: the header (generated_at,
+// generated_by) is written once by `rebar init` and never restamped, and the
+// ratchet floors are derived from the per-file entries (see DerivedFloors), so
+// a commit only changes the entries of the files it touches. Two branches that
+// touch different protected files merge without conflict.
 type Manifest struct {
-	SchemaVersion string                         `json:"schema_version"`
-	GeneratedAt   time.Time                      `json:"generated_at"`
-	GeneratedBy   string                         `json:"generated_by"`
-	RepoID        string                         `json:"repo_id"`
+	SchemaVersion string                          `json:"schema_version"`
+	GeneratedAt   time.Time                       `json:"generated_at"`
+	GeneratedBy   string                          `json:"generated_by"`
+	RepoID        string                          `json:"repo_id"`
 	Checksums     map[string]map[string]FileEntry `json:"checksums"` // category → path → entry
-	Ratchets      map[string]Ratchet             `json:"ratchets"`
+	// Ratchets holds legacy stored floors from manifests written before floors
+	// were derived. They are kept as a frozen lower bound and never raised.
+	Ratchets map[string]Ratchet `json:"ratchets,omitempty"`
 }
 
 // FileEntry tracks a single protected file's integrity state.
@@ -38,10 +46,11 @@ type Signature struct {
 	Sig        string    `json:"signature"`
 }
 
-// Ratchet is a monotonically non-decreasing metric.
+// Ratchet is a legacy stored floor for a monotonically non-decreasing metric.
+// Current is read from old manifests but no longer written.
 type Ratchet struct {
 	Min     int `json:"min"`
-	Current int `json:"current"`
+	Current int `json:"current,omitempty"`
 }
 
 // Categories of protected files.
@@ -62,11 +71,6 @@ func NewManifest(repoID string) *Manifest {
 			CategoryEnforcement: {},
 			CategoryContracts:   {},
 			CategoryTests:       {},
-		},
-		Ratchets: map[string]Ratchet{
-			"total_assertions": {Min: 0, Current: 0},
-			"contract_count":   {Min: 0, Current: 0},
-			"test_file_count":  {Min: 0, Current: 0},
 		},
 	}
 }
@@ -90,8 +94,14 @@ func LoadManifest(rebarDir string) (*Manifest, error) {
 }
 
 // Save writes the manifest atomically (write to temp, rename).
+//
+// Save does not restamp GeneratedAt: a per-save timestamp changes the same
+// line on every branch, so every pair of PRs would conflict on it.
 func (m *Manifest) Save(rebarDir string) error {
-	m.GeneratedAt = time.Now().UTC()
+	for name, r := range m.Ratchets {
+		r.Current = 0
+		m.Ratchets[name] = r
+	}
 	data, err := json.MarshalIndent(m, "", "  ")
 	if err != nil {
 		return fmt.Errorf("marshaling manifest: %w", err)

@@ -8,6 +8,7 @@
 # Provides:
 #   _rebar_tier    — returns the configured enforcement tier (1, 2, or 3)
 #   _rebar_skip    — returns 0 (should run) or 1 (should skip) for a minimum tier
+#   _rebar_config  — reads a .rebarrc key (env override, then .rebarrc, then default)
 #
 # Tier definitions:
 #   1 = Partial  — contract-refs + TODOs only (minimum viable)
@@ -55,6 +56,27 @@ _rebar_skip() {
     return 0  # true = should skip
   fi
   return 1  # false = should run
+}
+
+# Read a key from .rebarrc, with an env override and a default.
+# Usage: _rebar_config <key> <ENV_VAR> <default>
+#   value=$(_rebar_config registry_impl_counts REBAR_REGISTRY_IMPL_COUNTS true)
+_rebar_config() {
+  local key="$1" env_var="$2" default="$3"
+  if [ -n "${!env_var:-}" ]; then
+    echo "${!env_var}"
+    return
+  fi
+
+  local script_dir project_root rc_file value=""
+  script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  project_root="$(cd "$script_dir/.." && pwd)"
+  rc_file="$project_root/.rebarrc"
+  if [ -f "$rc_file" ]; then
+    value=$(grep "^${key}[[:space:]]*=" "$rc_file" 2>/dev/null | head -1 \
+      | sed 's/^[^=]*=[[:space:]]*//; s/[[:space:]]*#.*$//; s/[[:space:]]*$//')
+  fi
+  echo "${value:-$default}"
 }
 
 # Read the rebar-scripts version from a script file
