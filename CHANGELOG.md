@@ -22,6 +22,32 @@ _Nothing yet._
 
 ---
 
+## v3.0.0 — 2026-11-14
+
+Graduation of the v3 line. The four annealing betas (`v3.0.0-beta`,
+`-beta.2`, `-beta.3`, `-beta.4`) shipped on `main`, honestly labeled; this
+release drops the pre-release suffix. No code change since `v3.0.0-beta.4`
+(`git diff v3.0.0-beta.4 origin/main` is empty); this commit only moves version
+strings, rebuilds `bin/rebar`, and records the decision.
+
+**What v3 is:** badges that stop lying by default. Contracts declare their
+maturity (`Status:` stub → verified) and the compliance badge is weighted by
+it; the steward's computed `verified` is renamed `impl-present` so the two
+vocabularies never share a word; a SessionStart hook makes the cold start a
+harness fact; and the field-proven peer-inbox paradigm, Claude Skills, and
+abstract `rebar:` refs ship alongside. Details and upgrade notes are in the
+beta entries below, starting with `v3.0.0-beta`.
+
+**Graduation decision.** Decided by the project owner on 2026-11-14, not
+measured to completion. Of the four criteria in `docs/v3-beta-plan.md`
+§Graduation, criteria 2, 3 and 4 were met on 2026-08-02. Criterion 1 (two
+migrated repos clean for ≥2 weeks) had its repo count met and a clean window
+expected to close 2026-08-16, but it was never re-verified, and beta.3 and
+beta.4 shipped changes after that date. It was accepted by the owner's
+decision, recorded as D12 in the plan's decision log.
+
+---
+
 ## v3.0.0-beta.4 — 2026-11-14
 
 Installer fix. **Not** graduation; the §Graduation scoreboard was not
