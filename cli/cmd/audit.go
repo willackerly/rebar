@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+	"github.com/willackerly/rebar/cli/internal/config"
 )
 
 var (
@@ -222,9 +223,10 @@ func auditStructure(root string) auditResult {
 }
 
 func auditContracts(root string) auditResult {
-	archDir := filepath.Join(root, "architecture")
+	contractsDir := config.ContractsDirFor(root)
+	archDir := filepath.Join(root, contractsDir)
 	checks := []checkResult{
-		dirExists(root, "architecture", "architecture/ directory"),
+		dirExists(root, contractsDir, contractsDir+"/ directory"),
 	}
 
 	// Count contract files
@@ -551,8 +553,9 @@ func applyFixes(root string) int {
 		}
 	}
 
-	// architecture/ directory
-	archDir := filepath.Join(root, "architecture")
+	// contracts directory (architecture/ unless .rebarrc contracts_dir says otherwise)
+	contractsDir := config.ContractsDirFor(root)
+	archDir := filepath.Join(root, contractsDir)
 	if _, err := os.Stat(archDir); os.IsNotExist(err) {
 		os.MkdirAll(archDir, 0755)
 		rebarRoot := findRebarRoot()
@@ -562,7 +565,7 @@ func applyFixes(root string) int {
 				os.WriteFile(filepath.Join(archDir, "CONTRACT-TEMPLATE.md"), data, 0644)
 			}
 		}
-		fmt.Println("  ✓ Created architecture/ with contract template")
+		fmt.Printf("  ✓ Created %s/ with contract template\n", contractsDir)
 		fixed++
 	}
 

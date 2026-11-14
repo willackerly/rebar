@@ -17,7 +17,7 @@ var runCmd = &cobra.Command{
 for example:
 
   rebar run steward              quality scan
-  rebar run compute-registry     regenerate architecture/CONTRACT-REGISTRY.md
+  rebar run compute-registry     regenerate CONTRACT-REGISTRY.md
   rebar run check-ground-truth   verify METRICS
   rebar run inbox-watch inbox    watch the peer inbox
 

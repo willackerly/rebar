@@ -17,10 +17,16 @@
 
 set -euo pipefail
 
+CONTRACTS_DIR=architecture
+if [ -f "$(dirname "$0")/_rebar-config.sh" ]; then
+  # shellcheck source=scripts/_rebar-config.sh
+  source "$(dirname "$0")/_rebar-config.sh"
+  CONTRACTS_DIR=$(_rebar_contracts_dir)
+fi
 REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 cd "$REPO_ROOT"
 
-OUTBOX="${REBAR_OUTBOX:-architecture/.state/pending-notifications.md}"
+OUTBOX="${REBAR_OUTBOX:-$CONTRACTS_DIR/.state/pending-notifications.md}"
 DRY_RUN=0
 SEVERITY_OVERRIDE=""
 NOTIFY_DEFAULT="${REBAR_NOTIFY_DEFAULT:-notify}"  # "notify" or "skip"

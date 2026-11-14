@@ -11,6 +11,7 @@
 #   _rebar_config  — reads a .rebarrc key (env override, then .rebarrc, then default)
 #   _rebar_project_root — the repo the scripts check (REBAR_PROJECT_ROOT or ../)
 #   _rebar_script  — path of a helper script, preferring the project's own copy
+#   _rebar_contracts_dir — where the contracts live (.rebarrc contracts_dir)
 #
 # Tier definitions:
 #   1 = Partial  — contract-refs + TODOs only (minimum viable)
@@ -104,6 +105,17 @@ _rebar_config() {
       | sed 's/^[^=]*=[[:space:]]*//; s/[[:space:]]*#.*$//; s/[[:space:]]*$//')
   fi
   echo "${value:-$default}"
+}
+
+# Directory holding the contracts (CONTRACT-*.md, CONTRACT-REGISTRY.md and
+# the steward's .state/), relative to the project root: .rebarrc
+# `contracts_dir` (env REBAR_CONTRACTS_DIR), default `architecture`. It names
+# the contracts location only; repos may keep other design docs elsewhere.
+_rebar_contracts_dir() {
+  local dir
+  dir=$(_rebar_config contracts_dir REBAR_CONTRACTS_DIR architecture)
+  dir="${dir%/}"
+  echo "${dir:-architecture}"
 }
 
 # Read the rebar-scripts version from a script file

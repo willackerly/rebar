@@ -17,7 +17,14 @@ type Config struct {
 	ScriptsDir string // scripts/
 	AgentsDir  string // agents/
 	BinDir     string // bin/
+	// ContractsDir holds the contracts (CONTRACT-*.md, CONTRACT-REGISTRY.md,
+	// the steward's .state/), relative to RepoRoot. It names the contracts
+	// location only: some repos keep other design docs in architecture/.
+	ContractsDir string
 }
+
+// DefaultContractsDir is where contracts live unless .rebarrc says otherwise.
+const DefaultContractsDir = "architecture"
 
 // Load reads configuration from .rebarrc and .rebar-version, respecting
 // REBAR_TIER env override. Mirrors the logic in scripts/_rebar-config.sh.
@@ -30,6 +37,7 @@ func Load(repoRoot string) (*Config, error) {
 		BinDir:     filepath.Join(repoRoot, "bin"),
 		Tier:       3, // default: full enforcement
 	}
+	c.ContractsDir = ContractsDirFor(repoRoot)
 
 	// REBAR_TIER env takes precedence
 	if env := os.Getenv("REBAR_TIER"); env != "" {
@@ -123,4 +131,44 @@ func EnsureRebarDir(repoRoot string) error {
 		}
 	}
 	return nil
+}
+
+// ContractsDirFor returns the contracts directory of the repo at repoRoot,
+// relative to it: env REBAR_CONTRACTS_DIR, then .rebarrc contracts_dir, then
+// "architecture". Mirrors _rebar_contracts_dir in scripts/_rebar-config.sh.
+// A value that is absolute or leaves the repo falls back to the default.
+func ContractsDirFor(repoRoot string) string {
+	dir := os.Getenv("REBAR_CONTRACTS_DIR")
+	if dir == "" {
+		dir = RCValue(repoRoot, "contracts_dir")
+	}
+	dir = filepath.Clean(strings.TrimSpace(dir))
+	if dir == "." || filepath.IsAbs(dir) || dir == ".." || strings.HasPrefix(dir, ".."+string(filepath.Separator)) {
+		return DefaultContractsDir
+	}
+	return dir
+}
+
+// RCValue returns the value of key in repoRoot/.rebarrc ("" if absent),
+// parsed like scripts/_rebar-config.sh: the first `key = value` line wins
+// and `#` starts a comment.
+func RCValue(repoRoot, key string) string {
+	f, err := os.Open(filepath.Join(repoRoot, ".rebarrc"))
+	if err != nil {
+		return ""
+	}
+	defer f.Close()
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		line := scanner.Text()
+		k, v, ok := strings.Cut(line, "=")
+		if !ok || strings.TrimRight(k, " \t") != key {
+			continue
+		}
+		if i := strings.Index(v, "#"); i >= 0 {
+			v = v[:i]
+		}
+		return strings.TrimSpace(v)
+	}
+	return ""
 }

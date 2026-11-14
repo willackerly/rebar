@@ -19,11 +19,13 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_ROOT="${REBAR_PROJECT_ROOT:-$(cd "$SCRIPT_DIR/.." && pwd)}"
-STATE_DIR="$PROJECT_ROOT/architecture/.state"
-ARCH_DIR="$PROJECT_ROOT/architecture"
 # shellcheck source=scripts/_rebar-config.sh
 source "$SCRIPT_DIR/_rebar-config.sh" 2>/dev/null || true
 type _rebar_script >/dev/null 2>&1 || _rebar_script() { echo "$SCRIPT_DIR/$1"; }
+CONTRACTS_DIR=architecture
+type _rebar_contracts_dir >/dev/null 2>&1 && CONTRACTS_DIR=$(_rebar_contracts_dir)
+STATE_DIR="$PROJECT_ROOT/$CONTRACTS_DIR/.state"
+ARCH_DIR="$PROJECT_ROOT/$CONTRACTS_DIR"
 
 # Ensure state directory exists
 mkdir -p "$STATE_DIR"

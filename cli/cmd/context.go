@@ -107,6 +107,7 @@ func runContext(cmd *cobra.Command, args []string) error {
 
 	printed := 0
 	for _, pattern := range patterns {
+		pattern = withContractsDir(pattern)
 		fullPattern := filepath.Join(cfg.RepoRoot, pattern)
 		matches, err := filepath.Glob(fullPattern)
 		if err != nil || len(matches) == 0 {

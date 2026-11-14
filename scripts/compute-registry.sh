@@ -31,8 +31,7 @@ export LC_ALL=C
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_ROOT="${REBAR_PROJECT_ROOT:-$(cd "$SCRIPT_DIR/.." && pwd)}"
-ARCH_DIR="$PROJECT_ROOT/architecture"
-REGISTRY="$ARCH_DIR/CONTRACT-REGISTRY.md"
+CONTRACTS_DIR=architecture
 MODE="${1:-generate}"
 
 # Settings from .rebarrc (see the helpers below for what each one does).
@@ -51,7 +50,10 @@ if [ -f "$SCRIPT_DIR/_rebar-config.sh" ]; then
   PURPOSE_STYLE=$(_rebar_config registry_purpose_style _REBAR_NO_ENV bytes)
   IMPL_GLOBS=$(_rebar_config registry_impl_globs _REBAR_NO_ENV "$IMPL_GLOBS")
   EXCLUDE_DIRS=$(_rebar_config registry_exclude_dirs _REBAR_NO_ENV "$EXCLUDE_DIRS")
+  CONTRACTS_DIR=$(_rebar_contracts_dir)
 fi
+ARCH_DIR="$PROJECT_ROOT/$CONTRACTS_DIR"
+REGISTRY="$ARCH_DIR/CONTRACT-REGISTRY.md"
 case "$IMPL_COUNTS" in
   false|0|no|off) IMPL_COUNTS=false ;;
   *) IMPL_COUNTS=true ;;
@@ -172,8 +174,8 @@ for glob in $IMPL_GLOBS; do
     *)  GREP_INCLUDES+=("--include=$glob") ;;
   esac
 done
-GIT_PATHSPECS+=(':(exclude)architecture/')
-GREP_EXCLUDE='\.git\|architecture/'
+GIT_PATHSPECS+=(":(exclude)$CONTRACTS_DIR/")
+GREP_EXCLUDE="\\.git\\|$CONTRACTS_DIR/"
 for dir in $EXCLUDE_DIRS; do
   GIT_PATHSPECS+=(":(exclude,glob)**/$dir/**")
   GREP_EXCLUDE="$dir\\|$GREP_EXCLUDE"
@@ -353,7 +355,7 @@ generate_health() {
     [ -z "$ref_id" ] && continue
     case "$known_ids" in
       *" $ref_id "*) ;;  # known — not a shadow
-      *) shadows+=("- **$ref_id** — referenced in source, no architecture/CONTRACT-${ref_id}.*.md found") ;;
+      *) shadows+=("- **$ref_id** — referenced in source, no $CONTRACTS_DIR/CONTRACT-${ref_id}.*.md found") ;;
     esac
   done < "$shadows_tmp"
   rm -f "$shadows_tmp"

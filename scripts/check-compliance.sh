@@ -268,7 +268,9 @@ fi
 # The badge is weighted by how much of the live contract set is still
 # stub-or-draft, so a tier can't sit on top of placeholder contracts.
 
-ARCH_DIR="$PROJECT_ROOT/architecture"
+CONTRACTS_DIR=architecture
+type _rebar_contracts_dir >/dev/null 2>&1 && CONTRACTS_DIR=$(_rebar_contracts_dir)
+ARCH_DIR="$PROJECT_ROOT/$CONTRACTS_DIR"
 
 if [ -d "$ARCH_DIR" ]; then
   echo ""
@@ -355,14 +357,14 @@ if [ -d "$ARCH_DIR" ]; then
     if [ "$live_total" -gt 0 ]; then
       echo "ADVISORY: no contract declares a Status: field — treating as a pre-v3 repo (no maturity penalty)."
       echo "  Add '**Status:** <stub|draft|in-progress|active|verified>' to each contract header"
-      echo "  (see architecture/CONTRACT-TEMPLATE.md) so the badge can reflect real maturity."
+      echo "  (see $CONTRACTS_DIR/CONTRACT-TEMPLATE.md) so the badge can reflect real maturity."
     else
       echo "OK: no contracts found — maturity weighting not applicable"
     fi
   elif [ -n "$missing_status" ]; then
     # Partially migrated: some contracts declare Status:, these don't.
     printf '%s' "$missing_status" | while IFS= read -r mname; do
-      echo "WARN: $mname has no Status: line — add one (see architecture/CONTRACT-TEMPLATE.md header)"
+      echo "WARN: $mname has no Status: line — add one (see $CONTRACTS_DIR/CONTRACT-TEMPLATE.md header)"
     done
   fi
 

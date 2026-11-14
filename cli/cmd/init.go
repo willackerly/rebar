@@ -277,8 +277,9 @@ _None currently._
 		}
 	}
 
-	// architecture/ directory
-	archDir := filepath.Join(root, "architecture")
+	// contracts directory (architecture/ unless .rebarrc contracts_dir says otherwise)
+	contractsDir := config.ContractsDirFor(root)
+	archDir := filepath.Join(root, contractsDir)
 	if _, err := os.Stat(archDir); os.IsNotExist(err) {
 		os.MkdirAll(archDir, 0755)
 		// Copy contract template
@@ -288,12 +289,12 @@ _None currently._
 			dst := filepath.Join(archDir, "CONTRACT-TEMPLATE.md")
 			if data, err := os.ReadFile(src); err == nil {
 				os.WriteFile(dst, data, 0644)
-				fmt.Println("  Created architecture/ with contract template")
+				fmt.Printf("  Created %s/ with contract template\n", contractsDir)
 				created++
 			}
 		} else {
 			os.WriteFile(filepath.Join(archDir, ".gitkeep"), []byte(""), 0644)
-			fmt.Println("  Created architecture/")
+			fmt.Printf("  Created %s/\n", contractsDir)
 			created++
 		}
 	}

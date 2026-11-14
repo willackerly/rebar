@@ -29,6 +29,7 @@ ARCH_DIR="architecture"
 # shellcheck source=scripts/_rebar-config.sh
 source "$SCRIPT_DIR/_rebar-config.sh" 2>/dev/null || true
 type _rebar_script >/dev/null 2>&1 || _rebar_script() { echo "$SCRIPT_DIR/$1"; }
+type _rebar_contracts_dir >/dev/null 2>&1 && ARCH_DIR=$(_rebar_contracts_dir)
 ESC=$(printf '\033')
 START_EPOCH=$(date +%s)
 

@@ -50,7 +50,7 @@ fi
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_ROOT="${REBAR_PROJECT_ROOT:-$(cd "$SCRIPT_DIR/.." && pwd)}"
-REGISTRY="$PROJECT_ROOT/architecture/CONTRACT-REGISTRY.md"
+CONTRACTS_DIR=architecture
 
 # Tier gate: prefix uniqueness is Tier 2+ (warning) and blocks at Tier 3
 TIER=3
@@ -58,10 +58,12 @@ if [ -f "$SCRIPT_DIR/_rebar-config.sh" ]; then
   source "$SCRIPT_DIR/_rebar-config.sh"
   _rebar_skip 2 && exit 0
   TIER="$(_rebar_tier)"
+  CONTRACTS_DIR=$(_rebar_contracts_dir)
 fi
+REGISTRY="$PROJECT_ROOT/$CONTRACTS_DIR/CONTRACT-REGISTRY.md"
 
 if [ ! -f "$REGISTRY" ]; then
-  echo "SKIP: no architecture/CONTRACT-REGISTRY.md (run scripts/compute-registry.sh to generate)."
+  echo "SKIP: no $CONTRACTS_DIR/CONTRACT-REGISTRY.md (run scripts/compute-registry.sh to generate)."
   exit 0
 fi
 

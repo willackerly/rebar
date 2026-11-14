@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+	"github.com/willackerly/rebar/cli/internal/config"
 	"github.com/willackerly/rebar/cli/internal/llm"
 )
 
@@ -154,7 +155,7 @@ Only propose contracts for code that actually exists — don't invent components
 					fmt.Printf("    %s\n", line)
 				}
 				fmt.Println()
-				fmt.Println("  To create these contracts, use the template at architecture/CONTRACT-TEMPLATE.md")
+				fmt.Printf("  To create these contracts, use the template at %s/CONTRACT-TEMPLATE.md\n", config.ContractsDirFor(root))
 				fmt.Println("  Then add CONTRACT: headers to the implementing source files.")
 			}
 		}

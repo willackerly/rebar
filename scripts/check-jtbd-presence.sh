@@ -40,7 +40,7 @@ fi
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_ROOT="${REBAR_PROJECT_ROOT:-$(cd "$SCRIPT_DIR/.." && pwd)}"
-ARCH_DIR="$PROJECT_ROOT/architecture"
+CONTRACTS_DIR=architecture
 
 # Tier gate: JTBD presence is Tier 2+ (warning) and blocks at Tier 3
 TIER=3
@@ -48,10 +48,12 @@ if [ -f "$SCRIPT_DIR/_rebar-config.sh" ]; then
   source "$SCRIPT_DIR/_rebar-config.sh"
   _rebar_skip 2 && exit 0
   TIER="$(_rebar_tier)"
+  CONTRACTS_DIR=$(_rebar_contracts_dir)
 fi
+ARCH_DIR="$PROJECT_ROOT/$CONTRACTS_DIR"
 
 if [ ! -d "$ARCH_DIR" ]; then
-  echo "SKIP: no architecture/ directory found."
+  echo "SKIP: no $CONTRACTS_DIR/ directory found."
   exit 0
 fi
 
@@ -88,7 +90,7 @@ for contract in "$ARCH_DIR"/CONTRACT-*.md; do
 done
 
 if [ ! -s "$index_tmp" ]; then
-  echo "OK: no contracts found in architecture/ — nothing to check."
+  echo "OK: no contracts found in $CONTRACTS_DIR/ — nothing to check."
   exit 0
 fi
 
@@ -149,7 +151,7 @@ while IFS= read -r base; do
   section_present "$file" '^## Scenarios'       || missing="$missing 'Scenarios'"
 
   if [ -n "$missing" ]; then
-    echo "MISSING: architecture/$base —$missing"
+    echo "MISSING: $CONTRACTS_DIR/$base —$missing"
     failed=$((failed + 1))
   fi
 done < "$latest_tmp"
@@ -161,7 +163,7 @@ if [ "$failed" -gt 0 ]; then
   echo ""
   echo "Every contract needs non-empty 'Why this exists', 'Who needs this', and"
   echo "'Scenarios' sections. An interface description is not a Job To Be Done —"
-  echo "see architecture/CONTRACT-TEMPLATE.md for the required framing."
+  echo "see $CONTRACTS_DIR/CONTRACT-TEMPLATE.md for the required framing."
   if [ "$TIER" -ge 3 ]; then
     exit 1
   fi

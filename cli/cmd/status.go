@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+	"github.com/willackerly/rebar/cli/internal/config"
 	"github.com/willackerly/rebar/cli/internal/integrity"
 )
 
@@ -171,10 +172,10 @@ func extractDate(text, key string) string {
 }
 
 // printPendingNotifications counts entries in
-// architecture/.state/pending-notifications.md with status: pending and
+// <contracts_dir>/.state/pending-notifications.md with status: pending and
 // surfaces a one-liner. Silent when no outbox or zero pending.
 func printPendingNotifications(repoRoot string) {
-	outbox := filepath.Join(repoRoot, "architecture", ".state", "pending-notifications.md")
+	outbox := filepath.Join(repoRoot, config.ContractsDirFor(repoRoot), ".state", "pending-notifications.md")
 	data, err := os.ReadFile(outbox)
 	if err != nil {
 		return

@@ -22,6 +22,11 @@ REBAR_VERSION=3.0.0-beta
 # where a project tailors them. Everything below is optional and shown with
 # an example value. `#` starts a comment, so values cannot contain it.
 
+# Where the contracts live (CONTRACT-*.md, CONTRACT-REGISTRY.md, the steward's
+# .state/). Names the contracts location only; architecture/ can keep other
+# design docs either way.
+# contracts_dir = architecture
+
 # Source roots and file types for check-todos / contract headers / refs.
 # source_dirs       = src internal cmd client packages lib app
 # source_extensions = go ts tsx js jsx py rs

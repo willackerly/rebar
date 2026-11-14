@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+	"github.com/willackerly/rebar/cli/internal/config"
 )
 
 var contractCmd = &cobra.Command{
@@ -202,10 +203,11 @@ func resolveOwnerRepoPath(name string) (string, error) {
 	return "", fmt.Errorf("owner repo %q not registered (run `ask register %s` in that repo, or set REBAR_REPOS)", name, name)
 }
 
-// listOwnerVersions scans the owner repo's architecture/ for
+// listOwnerVersions scans the owner repo's contracts dir (its own
+// .rebarrc contracts_dir, default architecture/) for
 // CONTRACT-<id>.<ver>.md files and returns sorted semver strings.
 func listOwnerVersions(ownerPath, contractID string) ([]string, error) {
-	archDir := filepath.Join(ownerPath, "architecture")
+	archDir := filepath.Join(ownerPath, config.ContractsDirFor(ownerPath))
 	pattern := fmt.Sprintf("CONTRACT-%s.*.md", contractID)
 	matches, err := filepath.Glob(filepath.Join(archDir, pattern))
 	if err != nil {
