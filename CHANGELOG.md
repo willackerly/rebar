@@ -22,6 +22,19 @@ _Nothing yet._
 
 ---
 
+## v3.0.0-beta.4 — 2026-11-14
+
+Installer fix. **Not** graduation; the §Graduation scoreboard was not
+rescored.
+
+- **`setup-rebar.sh`:** the one-line `curl … | bash` install failed on a
+  stock Mac. `/bin/bash` 3.2 treats an empty `"${install_args[@]}"` as
+  unbound under `set -u`, so the installer died after cloning unless
+  `--server` was passed. Present since at least beta.2 (#12).
+- `bin/rebar` rebuilt so `rebar version` reports `v3.0.0-beta.4`.
+
+---
+
 ## v3.0.0-beta.3 — 2026-11-14
 
 Third annealing increment on the v3 line, driven by an adopter

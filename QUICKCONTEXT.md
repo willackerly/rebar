@@ -2,7 +2,7 @@
 
 last-synced: 2026-11-14
 <!-- freshness: 2026-11-14 -->
-**Branch:** main — **now tracks v3** at `v3.0.0-beta.3` (plan D11)
+**Branch:** main — **now tracks v3** at `v3.0.0-beta.4` (plan D11)
 **Tier:** 3 (ENFORCED) — rebar dogfoods its own methodology
 
 ---
@@ -20,6 +20,8 @@ last-synced: 2026-11-14
   can leave out code-derived impl counts (`registry_impl_counts`), and
   `METRICS` accepts `>=` floors. See `practices/busy-repos.md`. Also not
   graduation.
+- **`v3.0.0-beta.4` released 2026-11-14** — installer fix: the one-line
+  `curl … | bash` install now works under macOS `/bin/bash` 3.2 (#12).
 - **Contract prefix numbering is retired** (beta.2): the full descriptive
   name is the key — `CONTRACT-BLOBSTORE.2.1.md`, not `C1-BLOBSTORE`. A
   relaxation, not a migration: existing numbered contracts stay, never
@@ -50,7 +52,7 @@ last-synced: 2026-11-14
 
 | Branch | Purpose | Where to look |
 |--------|---------|---------------|
-| `main` | **the v3 line** (`v3.0.0-beta.3`, annealing toward v3.0.0) | this file + `docs/v3-beta-plan.md` |
+| `main` | **the v3 line** (`v3.0.0-beta.4`, annealing toward v3.0.0) | this file + `docs/v3-beta-plan.md` |
 | `v3.0.0-beta` | merged into main 2026-07-04; retained for provenance with the tag | history only |
 | `v3.0.0-alpha` / `v3.0.1-alpha` | retired (never built; see plan D1) | history only |
 
@@ -157,7 +159,7 @@ cat docs/v3-beta-plan.md              # plan + decision log D1-D11 + graduation
 ## Cross-device handoff (2026-08-12)
 
 Everything lives on `main` at origin (plus tags `v2.0.0`,
-`v3.0.0-beta`, `v3.0.0-beta.2`, `v3.0.0-beta.3`). Resume with:
+`v3.0.0-beta`, `v3.0.0-beta.2`, `v3.0.0-beta.3`, `v3.0.0-beta.4`). Resume with:
 
 ```bash
 git fetch origin && git checkout main
