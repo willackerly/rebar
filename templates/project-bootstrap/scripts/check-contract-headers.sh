@@ -13,15 +13,22 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 [ -f "$SCRIPT_DIR/_rebar-config.sh" ] && source "$SCRIPT_DIR/_rebar-config.sh" && _rebar_skip 2 && exit 0
 
-# Configurable: file extensions to check
-EXTENSIONS="${CONTRACT_EXTENSIONS:-.go .ts .tsx .js .jsx .py .rs}"
+# Configurable: file extensions to check (env CONTRACT_EXTENSIONS, then
+# .rebarrc `source_extensions`, then the default list)
+SOURCE_DIRS="src internal cmd client packages lib app"
+EXTENSIONS=".go .ts .tsx .js .jsx .py .rs"
+if type _rebar_config >/dev/null 2>&1; then
+  SOURCE_DIRS=$(_rebar_config source_dirs _REBAR_NO_ENV "$SOURCE_DIRS")
+  EXTENSIONS=$(_rebar_config source_extensions CONTRACT_EXTENSIONS "$EXTENSIONS")
+fi
+EXTENSIONS="${CONTRACT_EXTENSIONS:-$EXTENSIONS}"
 
-# Configurable: directories to scan (override with args)
+# Configurable: directories to scan (args, then .rebarrc `source_dirs`)
 if [ $# -gt 0 ]; then
   DIRS=("$@")
 else
   DIRS=()
-  for d in src internal cmd client packages lib app; do
+  for d in $SOURCE_DIRS; do
     [ -d "$d" ] && DIRS+=("$d")
   done
 fi
@@ -36,10 +43,10 @@ FIND_ARGS=()
 first=true
 for ext in $EXTENSIONS; do
   if $first; then
-    FIND_ARGS+=(-name "*${ext}")
+    FIND_ARGS+=(-name "*.${ext#.}")
     first=false
   else
-    FIND_ARGS+=(-o -name "*${ext}")
+    FIND_ARGS+=(-o -name "*.${ext#.}")
   fi
 done
 

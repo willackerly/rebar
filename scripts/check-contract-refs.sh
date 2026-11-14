@@ -11,6 +11,19 @@ set -euo pipefail
 
 ARCH_DIR="${1:-architecture}"
 
+# File types to scan: .rebarrc `source_extensions`, else the default list.
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+SOURCE_EXTENSIONS="go ts tsx js py rs jsx"
+if [ -f "$SCRIPT_DIR/_rebar-config.sh" ]; then
+  # shellcheck source=scripts/_rebar-config.sh
+  source "$SCRIPT_DIR/_rebar-config.sh"
+  SOURCE_EXTENSIONS=$(_rebar_config source_extensions _REBAR_NO_ENV "$SOURCE_EXTENSIONS")
+fi
+INCLUDES=()
+for ext in $SOURCE_EXTENSIONS; do
+  INCLUDES+=("--include=*.${ext#.}")
+done
+
 if [ ! -d "$ARCH_DIR" ]; then
   echo "Architecture directory '$ARCH_DIR' not found."
   exit 1
@@ -38,8 +51,7 @@ while IFS= read -r line; do
     broken=$((broken + 1))
   fi
 done < <(grep -rn "CONTRACT:[A-Za-z0-9_-]*\.[0-9]*\.[0-9]*" \
-  --include="*.go" --include="*.ts" --include="*.tsx" --include="*.js" \
-  --include="*.py" --include="*.rs" --include="*.jsx" \
+  "${INCLUDES[@]}" \
   . 2>/dev/null | grep -v "node_modules\|vendor\|dist\|\.git")
 
 echo ""
