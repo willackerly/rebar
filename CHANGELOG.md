@@ -34,6 +34,13 @@ unrelated things. See `practices/busy-repos.md`.
   `registry_impl_counts = false` (env `REBAR_REGISTRY_IMPL_COUNTS`) keeps the
   code-derived `Impl Files` column and Contract Health section out of the
   committed registry; `--health` prints them.
+- **`compute-registry.sh`** counts implementing files over tracked files only
+  (`git grep`) in a git work tree, so untracked scratch files and gitignored
+  build output no longer change the registry; outside git it falls back to
+  `grep -r`. The exclusions now match path components instead of substrings:
+  only the top-level `architecture/` is skipped (a nested
+  `website/src/pages/architecture/` file now counts), as are `node_modules/`,
+  `vendor/` and `dist/` directories. Counts can shift once on regeneration.
 - **`check-ground-truth.sh`** accepts `key >= N` floors in `METRICS`.
 - **`_rebar-config.sh`** gains `_rebar_config <key> <ENV> <default>`.
 - Regression tests: `scripts/tests/merge-friendly.test.sh`,

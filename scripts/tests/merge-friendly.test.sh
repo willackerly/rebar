@@ -16,6 +16,8 @@
 #       regenerates
 #   T4  output does not depend on the caller's locale
 #   T5  --health still reports implementing-file counts
+#   T6  untracked files don't change the counts (git grep over tracked files),
+#       and outside git the grep -r fallback still counts
 #
 # Override the scripts under test with REBAR_SCRIPTS_DIR.
 set -uo pipefail
@@ -120,5 +122,16 @@ health="$(cd "$R1" && scripts/compute-registry.sh --health)"
 echo "$health" | grep -q '^| S1-FOO | 3 |' \
   || fail "T5: --health does not report S1-FOO's 3 implementing files"
 echo "ok T5: --health reports implementing-file counts"
+
+# --- T6: tracked files only ---------------------------------------------------
+printf '// %s\npackage src\n' "$HEADER" > "$R1/src/scratch.go"
+health="$(cd "$R1" && scripts/compute-registry.sh --health)"
+echo "$health" | grep -q '^| S1-FOO | 3 |' \
+  || fail "T6: an untracked file changed S1-FOO's implementing-file count"
+rm -rf "$R1/.git"
+health="$(cd "$R1" && scripts/compute-registry.sh --health)"
+echo "$health" | grep -q '^| S1-FOO | 4 |' \
+  || fail "T6: grep -r fallback outside git does not count all 4 files"
+echo "ok T6: counts cover tracked files only; non-git fallback still counts"
 
 echo "PASS: merge-friendly generated files"
