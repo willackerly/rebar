@@ -8,6 +8,15 @@ import (
 	"github.com/willackerly/rebar/cli/internal/config"
 )
 
+// Version is the rebar release this binary reports. Release builds and
+// setup-rebar.sh source builds stamp it with
+//
+//	go build -ldflags "-X github.com/willackerly/rebar/cli/cmd.Version=<ver>"
+//
+// The default is the release string of this source tree; bump it with each
+// release (the release workflow refuses a tag that disagrees with it).
+var Version = "v3.0.0-beta.4"
+
 var (
 	verbose  bool
 	jsonOut  bool
@@ -17,7 +26,7 @@ var (
 
 var rootCmd = &cobra.Command{
 	Use:     "rebar",
-	Version: "v3.0.0-beta.4",
+	Version: Version,
 	Short:   "REBAR — contract-driven development framework for AI-powered teams",
 	Long: `REBAR — contract-driven development framework for AI-powered teams.
 

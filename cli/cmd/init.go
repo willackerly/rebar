@@ -479,8 +479,9 @@ func ensureAgentsScaffolding(root string) bool {
 	return true
 }
 
-// findRebarRoot locates the rebar framework repo (a source checkout or the
-// setup-rebar.sh install, which is a clone). The marker is
+// findRebarRoot locates the rebar framework repo (a source checkout, a
+// setup-rebar.sh install under ~/.rebar/versions/<ver>/, or a pre-versioned
+// ~/.rebar clone). The marker is
 // templates/project-bootstrap/ plus the scripts/ the CLI runs — only the
 // rebar SOURCE repo has both; DESIGN.md + architecture/ alone also match
 // rebar-adopted projects, which made re-init in an adopted repo copy from
@@ -499,7 +500,8 @@ func findRebarRoot() string {
 	}
 
 	// Relative to the running binary — covers the setup-rebar.sh install
-	// (~/.rebar/bin/rebar → ~/.rebar) and any checkout's bin/rebar.
+	// (~/.rebar/current/bin/rebar resolves to ~/.rebar/versions/<ver>), a
+	// pre-versioned ~/.rebar clone, and any checkout's bin/rebar.
 	if exe, err := os.Executable(); err == nil {
 		if resolved, err := filepath.EvalSymlinks(exe); err == nil {
 			exe = resolved
@@ -517,6 +519,7 @@ func findRebarRoot() string {
 	// Common locations
 	home, _ := os.UserHomeDir()
 	candidates := []string{
+		filepath.Join(home, ".rebar", "current"),
 		filepath.Join(home, ".rebar"),
 		filepath.Join(home, "dev", "rebar"),
 		filepath.Join(home, "src", "rebar"),
