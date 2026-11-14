@@ -132,13 +132,17 @@ build/
 	}
 	fmt.Println("  ✓ architecture/")
 
-	// scripts/
+	// scripts/ — the thin entry points; every check runs from the rebar install.
 	scriptsDir := filepath.Join(root, "scripts")
 	os.MkdirAll(scriptsDir, 0755)
 	if rebarRoot != "" {
-		src := filepath.Join(rebarRoot, "scripts", "refresh-context.sh")
-		if data, err := os.ReadFile(src); err == nil {
-			os.WriteFile(filepath.Join(scriptsDir, "refresh-context.sh"), data, 0755)
+		srcDir := filepath.Join(rebarRoot, "templates", "project-bootstrap", "scripts")
+		if entries, err := os.ReadDir(srcDir); err == nil {
+			for _, e := range entries {
+				if data, err := os.ReadFile(filepath.Join(srcDir, e.Name())); err == nil && !e.IsDir() {
+					os.WriteFile(filepath.Join(scriptsDir, e.Name()), data, 0755)
+				}
+			}
 		}
 	}
 	fmt.Println("  ✓ scripts/")

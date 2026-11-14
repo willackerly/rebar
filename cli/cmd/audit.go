@@ -252,15 +252,17 @@ func auditContracts(root string) auditResult {
 }
 
 func auditEnforcement(root string) auditResult {
-	checks := []checkResult{
-		dirExists(root, "scripts", "scripts/ directory"),
-		hookInstalled(root),
-		fileExists(root, "scripts/refresh-context.sh", "refresh-context.sh"),
-	}
+	checks := []checkResult{hookInstalled(root)}
 
-	// Check for enforcement scripts
-	for _, script := range []string{"check-contract-refs.sh", "check-todos.sh"} {
-		checks = append(checks, fileExists(root, filepath.Join("scripts", script), script))
+	// The checks run from the rebar install; a project's own copy also counts.
+	rebarRoot := findRebarRoot()
+	for _, script := range []string{"ci-check.sh", "check-contract-refs.sh", "check-todos.sh", "refresh-context.sh"} {
+		_, ok := resolveScript(root, rebarRoot, script)
+		checks = append(checks, checkResult{
+			Name:   script + " available",
+			Pass:   ok,
+			Detail: "project scripts/ or the rebar install",
+		})
 	}
 
 	return auditResult{Section: "Enforcement & Scripts", Score: scoreChecks(checks), Weight: 15, Checks: checks}
@@ -546,21 +548,6 @@ func applyFixes(root string) int {
 			os.Symlink("../../scripts/pre-commit.sh", hookPath)
 			fmt.Println("  ✓ Installed pre-commit hook")
 			fixed++
-		}
-	}
-
-	// refresh-context.sh
-	refreshPath := filepath.Join(root, "scripts", "refresh-context.sh")
-	if _, err := os.Stat(refreshPath); os.IsNotExist(err) {
-		rebarRoot := findRebarRoot()
-		if rebarRoot != "" {
-			src := filepath.Join(rebarRoot, "scripts", "refresh-context.sh")
-			if data, err := os.ReadFile(src); err == nil {
-				os.MkdirAll(filepath.Join(root, "scripts"), 0755)
-				os.WriteFile(refreshPath, data, 0755)
-				fmt.Println("  ✓ Copied refresh-context.sh")
-				fixed++
-			}
 		}
 	}
 

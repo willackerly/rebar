@@ -193,7 +193,7 @@ Migration for downstream parsers:
 - `agents/steward/AGENT.md` — reader-role definition for ASK
 - `agents/steward/commands/*.sh` — ask-steward subcommand executables
 - `agents/architect/commands/default.sh` — parses `summary.contracts.impl_present`
-- `templates/project-bootstrap/scripts/steward.sh` — adopter copy (synced via `sync-bootstrap.sh`)
+- Adopters run it from the rebar install (`rebar run steward`, `rebar check`); older adopters' own copies keep working
 
 ## Test Requirements
 

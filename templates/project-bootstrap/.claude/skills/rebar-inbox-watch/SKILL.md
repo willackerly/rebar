@@ -6,15 +6,15 @@ description: Use during multi-repo coordination phases (release days, cross-repo
 # rebar-inbox-watch — arm the peer-inbox watcher
 
 Canonical practice: `rebar:practice/inbox-watch` (design choices, honest
-limitations, variations) — resolve with `scripts/rebar-doc.sh
-rebar:practice/inbox-watch --cat` (or `rebar doc` if the CLI is installed).
+limitations, variations) — resolve with `rebar doc
+rebar:practice/inbox-watch --cat`.
 This skill is the arming procedure only.
 
 ## Steps
 
 1. **Sweep first.** `ls -lat inbox/ | head` — process any deposits that
    arrived while no watcher was alive.
-2. **Arm the watcher.** Run `scripts/inbox-watch.sh <inbox-dir> [<dir>…]`
+2. **Arm the watcher.** Run `rebar run inbox-watch <inbox-dir> [<dir>…]`
    through the harness background-monitor facility in persistent mode
    (Claude Code: the Monitor tool, or a background Bash task). Multi-inbox
    capable — pass one directory per repo pair you are coordinating.

@@ -27,7 +27,7 @@
 ### Starting a Session
 
 **Health checks run automatically.** A `SessionStart` hook (configured in
-`.claude/settings.json`) runs `scripts/cold-start-checks.sh` before your
+`.claude/settings.json`) runs `rebar check --cold-start` before your
 first turn. Its output appears wrapped in
 `<rebar-cold-start>...</rebar-cold-start>` tags — treat that block as
 ground truth from the harness, not prose to interpret. It reports one
@@ -43,11 +43,11 @@ support hooks). Fall back to running the checks manually.
 
 **Manual fallback (harnesses without hooks, or to re-check mid-session):**
 ```bash
-scripts/cold-start-checks.sh       # same summary block the hook injects
-scripts/check-contract-refs.sh     # or run the quad individually for full detail
-scripts/check-todos.sh
-scripts/check-freshness.sh
-scripts/check-ground-truth.sh
+rebar check --cold-start       # same summary block the hook injects
+rebar run check-contract-refs     # or run the quad individually for full detail
+rebar run check-todos
+rebar run check-freshness
+rebar run check-ground-truth
 ```
 
 **Still on you** — the hook checks health; it doesn't orient you:
@@ -64,7 +64,7 @@ scripts/check-ground-truth.sh
    ```bash
    git status
    git worktree list              # Check for abandoned worktrees
-   scripts/refresh-context.sh     # Context refresh helper (if available)
+   rebar run refresh-context     # Context refresh helper (if available)
    ask steward summary
    ```
 
@@ -77,8 +77,7 @@ scripts/check-ground-truth.sh
    (rebar:feedback/2026-07-02-reflexive-push-durability-rule). The
    cold-start block warns next session if you forget.
 4. **Write a wrapup** — see `rebar:practice/session-lifecycle` for the template
-   (resolve: `scripts/rebar-doc.sh rebar:practice/session-lifecycle --cat`, or
-   `rebar doc` if the REBAR CLI is installed)
+   (resolve: `rebar doc rebar:practice/session-lifecycle --cat`)
 5. **Verify:** does QUICKCONTEXT match `git log --oneline -10`?
 
 ### Adding a Feature

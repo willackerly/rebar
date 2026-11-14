@@ -16,3 +16,35 @@ REBAR_VERSION=3.0.0-beta
 # REBAR_SKIP_CHECKS="check-freshness"
 # REBAR_TODO_STRICT=true
 # REBAR_CONTRACT_STRICT=false
+
+# ── Repo-specific settings ───────────────────────────────────────────────
+# rebar's checks run from the rebar install (`rebar check`); this file is
+# where a project tailors them. Everything below is optional and shown with
+# an example value. `#` starts a comment, so values cannot contain it.
+
+# Source roots and file types for check-todos / contract headers / refs.
+# source_dirs       = src internal cmd client packages lib app
+# source_extensions = go ts tsx js jsx py rs
+
+# Days before a freshness:/last-synced: marker counts as stale.
+# freshness_max_days = 14
+
+# Contract registry (architecture/CONTRACT-REGISTRY.md).
+# registry_impl_counts     = false              # keep churny counts out (busy repos)
+# registry_scope_prefixes  = SDK- MCP-           # strip before Services/Components/... classification
+# registry_purpose_heading = Purpose|Why this exists
+# registry_purpose_style   = ellipsis           # escape | and cut to 77 chars + ...
+# registry_impl_globs      = *.go *.ts *.py bin/ # where CONTRACT: headers are counted
+# registry_exclude_dirs    = node_modules vendor dist
+
+# METRICS ground truth: declare how each METRICS key is computed.
+# Fields: type (files|dirs), paths, names, exclude_names, exclude_dirs,
+# min_depth, max_depth, contains (ERE on content), distinct (ERE, one group).
+# METRICS then holds `key = N` (exact) or `key >= N` (floor).
+# metric.test_files.paths        = src tests
+# metric.test_files.names        = *_test.go *.test.ts
+# metric.test_files.exclude_dirs = node_modules vendor dist
+# metric.contracts.paths         = architecture
+# metric.contracts.max_depth     = 1
+# metric.contracts.names         = CONTRACT-*.md
+# metric.contracts.exclude_names = CONTRACT-TEMPLATE.md CONTRACT-REGISTRY.md *.impl.md

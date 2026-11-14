@@ -242,10 +242,10 @@ _None currently._
 		}
 	}
 
-	// scripts/ — the curated adopter set, mirrored from rebar's
+	// scripts/ — the thin entry points from rebar's
 	// templates/project-bootstrap/scripts/ (identical to what the
 	// `cp -r templates/project-bootstrap/. <target>/` adoption path
-	// delivers; maintainer-only scripts are already excluded there).
+	// delivers); the checks themselves run from the rebar install.
 	// Never overwrites existing files.
 	scriptsDir := filepath.Join(root, "scripts")
 	if rebarRoot := findRebarRoot(); rebarRoot == "" {
@@ -272,7 +272,7 @@ _None currently._
 			}
 		}
 		if copiedScripts > 0 {
-			fmt.Printf("  Created scripts/ (%d scripts incl. cold-start-checks.sh, ci-check.sh, inbox-watch.sh)\n", copiedScripts)
+			fmt.Printf("  Created scripts/ (%d files: ci-check.sh + pre-commit.sh entry points; checks run from the rebar install)\n", copiedScripts)
 			created++
 		}
 	}

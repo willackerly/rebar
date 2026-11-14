@@ -5,7 +5,7 @@
 
 **Ground truth metrics for automated verification.**
 
-This file contains quantitative claims that are verified by `scripts/check-ground-truth.sh`.
+This file contains quantitative claims that are verified by `rebar run check-ground-truth`.
 When metrics drift from reality, the enforcement script catches it.
 
 ---
@@ -60,7 +60,7 @@ When metrics drift from reality, the enforcement script catches it.
 
 <!-- GROUND TRUTH VERIFICATION
 
-This file is checked by scripts/check-ground-truth.sh which verifies that
+This file is checked by `rebar run check-ground-truth`, which verifies that
 numeric claims match reality by running checks against the actual codebase.
 
 ADD VERIFICATION WHEN:
@@ -71,7 +71,7 @@ ADD VERIFICATION WHEN:
 UPDATE PROCESS:
 1. Change the metric in this file
 2. Update the verification script (if needed)
-3. Run scripts/check-ground-truth.sh to verify
+3. Run `rebar run check-ground-truth` to verify
 4. Update freshness date
 
 This prevents the "docs say 126 tests but actually 586" problem that

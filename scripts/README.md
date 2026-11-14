@@ -39,7 +39,7 @@ Each script is standalone, runs in <5 seconds, and exits 0 (pass) or 1 (fail).
 | `check-decay-patterns.sh` | Soft-hardening anti-patterns in spec/test files |
 | `check-jtbd-presence.sh` | Latest-version contracts carry non-empty Why/Who/Scenarios sections |
 | `check-prefix-uniqueness.sh` | No prefix number (S1, I3, …) claimed by two different contract IDs |
-| `sync-bootstrap.sh --check` | `templates/project-bootstrap/scripts/` matches `/scripts/` |
+| `sync-bootstrap.sh --check` | `templates/project-bootstrap/scripts/` holds only thin entry points |
 
 ## Composite Runners
 
@@ -112,16 +112,15 @@ Pre-commit (fast, <5s)       CI (thorough, <30s)          Full scan (comprehensi
 
 | Script | What it does |
 |--------|--------------|
-| `sync-bootstrap.sh` (+ `--check`) | Mirror `/scripts/` into `templates/project-bootstrap/scripts/`; drift caught by ci-check |
+| `sync-bootstrap.sh` (+ `--check`) | Keep `templates/project-bootstrap/scripts/` down to the thin entry points; caught by ci-check |
 | `test-e2e-live.sh` | End-to-end smoke against a live LLM. Gated on `claude` CLI; per-repo gates skip cleanly when adopted repos aren't on disk. Includes version triple-check (binary / `.rebar-version` / latest tag), MCP server discovery + tools/list smoke, ASK HTTP server smoke (if running), and 4 live LLM keyword-acceptance queries (rebar:steward, rebar:architect, local-mode, cross-repo). Run after every meaningful update — single command answer to "is this still working?" |
-
-The maintainer-facing scripts are NOT mirrored into the bootstrap copy
-(they assume the rebar source repo's dev layout) — `sync-bootstrap.sh`
-explicitly skips them.
 
 ## Source-of-truth structure
 
-`/scripts/` is canonical. `templates/project-bootstrap/scripts/` is mirrored
-from it by `sync-bootstrap.sh` so adopters running `cp -r templates/project-bootstrap/.`
-get a working project in one command. Drift between the two trees is caught
-by `sync-bootstrap.sh --check` (wired into `ci-check.sh`).
+`/scripts/` is the only copy. Adopting projects don't carry these scripts:
+`rebar check` and `rebar run <script>` run them from the rebar install against
+the project (`REBAR_PROJECT_ROOT`), and the project tailors them in `.rebarrc`.
+`templates/project-bootstrap/scripts/` holds just the two thin entry points
+(`ci-check.sh`, `pre-commit.sh`) that adopters get from
+`cp -r templates/project-bootstrap/.`; `sync-bootstrap.sh --check` (wired into
+`ci-check.sh`) keeps anything else from creeping back in.

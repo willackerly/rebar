@@ -19,7 +19,7 @@ head -10 path/to/file.go
 
 # Run a quality scan across all contracts
 ask steward
-# or: ./scripts/steward.sh
+# or: rebar run steward
 
 # Check a single contract
 ask steward check C1
@@ -52,7 +52,7 @@ CONTRACT-{NAME}.{MAJOR}.{MINOR}.md
 
 ## Contract Lifecycle
 
-Computed by the [Steward](../scripts/steward.sh), never declared manually:
+Computed by the Steward (`rebar run steward`), never declared manually:
 
 | Status | Criteria |
 |--------|----------|
