@@ -329,3 +329,9 @@ metric.ci_workflows.names     = *.yml *.yaml
 Implemented on `feat/thin-adoption-scripts` in the commits that follow this one. Open
 questions await maintainer triage; close into `feedback/processed/` once
 answered.
+
+Answered 2026-11-14:
+
+- **Q2 — no.** No metric escape hatch. Metrics stay declarative; an adopter
+  whose count the schema can't express should ask for a schema addition.
+- **Q6 — namespace work stays with #8**, rebased on this branch.
