@@ -39,7 +39,8 @@ var rootCmd = &cobra.Command{
   Quality & integrity:
     rebar status                             Health dashboard
     rebar verify                             Check file integrity
-    rebar check                              Run all enforcement checks`,
+    rebar check                              Run all enforcement checks
+    rebar run <script>                       Run one of rebar's scripts`,
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 		// Skip repo detection for commands that handle their own root
 		name := cmd.Name()
@@ -120,11 +121,13 @@ func init() {
 	statusCmd.GroupID = "quality"
 	verifyCmd.GroupID = "quality"
 	checkCmd.GroupID = "quality"
+	runCmd.GroupID = "quality"
 	diffCmd.GroupID = "quality"
 	contractCmd.GroupID = "quality"
 	rootCmd.AddCommand(verifyCmd)
 	rootCmd.AddCommand(statusCmd)
 	rootCmd.AddCommand(checkCmd)
+	rootCmd.AddCommand(runCmd)
 	rootCmd.AddCommand(diffCmd)
 	rootCmd.AddCommand(contractCmd)
 

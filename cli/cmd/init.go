@@ -478,17 +478,18 @@ func ensureAgentsScaffolding(root string) bool {
 	return true
 }
 
-// findRebarRoot locates the rebar framework repo. The marker is
-// templates/project-bootstrap/ — only the rebar SOURCE repo has it;
-// DESIGN.md + architecture/ alone also match rebar-adopted projects,
-// which made re-init in an adopted repo copy from itself (a no-op).
+// findRebarRoot locates the rebar framework repo (a source checkout or the
+// setup-rebar.sh install, which is a clone). The marker is
+// templates/project-bootstrap/ plus the scripts/ the CLI runs — only the
+// rebar SOURCE repo has both; DESIGN.md + architecture/ alone also match
+// rebar-adopted projects, which made re-init in an adopted repo copy from
+// itself (a no-op).
 func findRebarRoot() string {
 	isRebarSource := func(dir string) bool {
 		if dir == "" {
 			return false
 		}
-		_, err := os.Stat(filepath.Join(dir, "templates", "project-bootstrap", "scripts", "steward.sh"))
-		return err == nil
+		return isRebarSourceDir(dir)
 	}
 
 	// Explicit override first
@@ -569,4 +570,13 @@ func ensureRebarRC(root string) {
 tier = 1
 `
 	os.WriteFile(rcPath, []byte(content), 0644)
+}
+
+// isRebarSourceDir reports whether dir is a rebar source checkout or install.
+// Shared with scripts/rebar-doc.sh, which tests the same two paths.
+func isRebarSourceDir(dir string) bool {
+	if info, err := os.Stat(filepath.Join(dir, "templates", "project-bootstrap")); err != nil || !info.IsDir() {
+		return false
+	}
+	return isFile(filepath.Join(dir, "scripts", "steward.sh"))
 }

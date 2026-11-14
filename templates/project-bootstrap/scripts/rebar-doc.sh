@@ -22,8 +22,8 @@
 #   2. $REBAR_ROOT
 #   3. a discovered checkout: ~/.rebar, ~/dev/rebar, ~/src/rebar, ~/code/rebar
 #      — verified as the rebar SOURCE repo via the presence of
-#      templates/project-bootstrap/scripts/steward.sh (the same marker
-#      cli/cmd/init.go findRebarRoot uses)
+#      templates/project-bootstrap/ and scripts/steward.sh (the same
+#      marker cli/cmd/init.go findRebarRoot uses)
 #   4. otherwise: print the canonical upstream URL and an ask-hint, exit 4
 #
 # Output (default): '<source>\t<path>', source ∈ local|REBAR_ROOT|checkout|upstream
@@ -133,7 +133,7 @@ find_current_repo() {
 # Same marker cli/cmd/init.go findRebarRoot uses to recognize the rebar
 # source repo.
 is_rebar_source() {
-  [ -n "${1:-}" ] && [ -f "$1/templates/project-bootstrap/scripts/steward.sh" ]
+  [ -n "${1:-}" ] && [ -d "$1/templates/project-bootstrap" ] && [ -f "$1/scripts/steward.sh" ]
 }
 
 # Print the first candidate that exists as a file under root $1; fail if none.

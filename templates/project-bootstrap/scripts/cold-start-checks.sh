@@ -155,7 +155,7 @@ fi
 
 elapsed=$(( $(date +%s) - START_EPOCH ))
 if [ "$fail_count" -gt 0 ]; then
-  echo "$fail_count of $run_count checks failing (${elapsed}s) — rerun the named scripts/*.sh for full output."
+  echo "$fail_count of $run_count checks failing (${elapsed}s) — rerun the named check (\`rebar run <name>\`) for full output."
 else
   echo "all $run_count checks passing (${elapsed}s)."
 fi

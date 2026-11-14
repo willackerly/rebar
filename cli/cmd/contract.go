@@ -12,7 +12,6 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
-	"github.com/willackerly/rebar/cli/internal/scripts"
 )
 
 var contractCmd = &cobra.Command{
@@ -24,24 +23,25 @@ var contractVerifyCmd = &cobra.Command{
 	Use:   "verify",
 	Short: "Verify contract references and headers",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		fmt.Println("Checking contract references...")
-		exitCode, err := scripts.RunPassthrough(cfg.ScriptsDir, "check-contract-refs.sh")
-		if err != nil {
-			return err
+		for i, step := range []struct{ label, script string }{
+			{"Checking contract references...", "check-contract-refs.sh"},
+			{"Checking contract headers...", "check-contract-headers.sh"},
+		} {
+			if i > 0 {
+				fmt.Println()
+			}
+			fmt.Println(step.label)
+			exitCode, found, err := runRebarScript(step.script)
+			if err != nil {
+				return err
+			}
+			if !found {
+				return fmt.Errorf("%s not found in the project or a rebar install (set REBAR_ROOT)", step.script)
+			}
+			if exitCode != 0 {
+				os.Exit(exitCode)
+			}
 		}
-		if exitCode != 0 {
-			os.Exit(exitCode)
-		}
-
-		fmt.Println("\nChecking contract headers...")
-		exitCode, err = scripts.RunPassthrough(cfg.ScriptsDir, "check-contract-headers.sh")
-		if err != nil {
-			return err
-		}
-		if exitCode != 0 {
-			os.Exit(exitCode)
-		}
-
 		return nil
 	},
 }
