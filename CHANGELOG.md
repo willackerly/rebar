@@ -45,6 +45,18 @@ All notable changes to rebar. Versioned with [semver](https://semver.org/).
   once per run and is ignored. `rebar status` and `rebar audit --all` show
   the enabled checks. Unset, nothing changes. The registry check was never
   tier-gated (docs said tier 2+); they now say it runs at every tier.
+- **`contract_namespace`** (optional, e.g. `github.com/org/repo`): source
+  may cite this repo's contracts as `CONTRACT:<namespace>:<ID>.<v>` as well
+  as the short form. Steward, compute-registry, check-contract-refs,
+  check-registry and `rebar context developer` treat both alike; references
+  qualified with another repo's namespace are counted, never treated as
+  ours. Filenames stay unnamespaced; composes with `contracts_dir`; unset
+  behaves exactly as before. From #8; see
+  `feedback/2026-11-14-contract-namespace.md`.
+- **Fix:** `check-registry.sh` stopped silently (exit 1, no ORPHAN line)
+  at the first contract with no implementing file.
+- `sync-bootstrap.sh --check` also keeps the bootstrap template's
+  `CONTRACT-TEMPLATE.md` identical to `architecture/`.
 
 ---
 
