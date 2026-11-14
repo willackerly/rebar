@@ -105,7 +105,9 @@ fi
 install_args=()
 [[ -n "$ASK_SERVER" ]] && install_args+=(--server "$ASK_SERVER")
 log "Running $REBAR_DIR/bin/install ${install_args[*]:-}"
-"$REBAR_DIR/bin/install" "${install_args[@]}"
+# ${arr[@]+...}: bash 3.2 (macOS /bin/bash) treats an empty "${arr[@]}" as
+# unbound under set -u, which killed every `curl | bash` install without --server.
+"$REBAR_DIR/bin/install" ${install_args[@]+"${install_args[@]}"}
 
 ok "rebar installed at $REBAR_DIR (ref: $REBAR_REF)"
 cat <<EOF
