@@ -40,7 +40,8 @@ var rootCmd = &cobra.Command{
     rebar status                             Health dashboard
     rebar verify                             Check file integrity
     rebar check                              Run all enforcement checks
-    rebar run <script>                       Run one of rebar's scripts`,
+    rebar run <script>                       Run one of rebar's scripts
+    rebar migrate [--apply]                  Move legacy script copies into .rebarrc`,
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 		// Skip repo detection for commands that handle their own root
 		name := cmd.Name()
