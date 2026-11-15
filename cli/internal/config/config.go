@@ -179,6 +179,22 @@ func RCValue(repoRoot, key string) string {
 	return ""
 }
 
+// RCValueOr returns a .rebarrc setting the way _rebar_config in
+// scripts/_rebar-config.sh does: the environment variable envVar when it is
+// set and non-empty (pass "" for keys without one), else the key's value in
+// repoRoot/.rebarrc, else def when that is absent or empty.
+func RCValueOr(repoRoot, key, envVar, def string) string {
+	if envVar != "" {
+		if v := os.Getenv(envVar); v != "" {
+			return v
+		}
+	}
+	if v := RCValue(repoRoot, key); v != "" {
+		return v
+	}
+	return def
+}
+
 // KnownChecks are the names checks_enable accepts: the script basenames
 // (without .sh) of every check the suites run. Mirrors _REBAR_KNOWN_CHECKS in
 // scripts/_rebar-config.sh.

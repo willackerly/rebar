@@ -72,8 +72,8 @@ var rootCmd = &cobra.Command{
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 		// Skip repo detection for commands that handle their own root
 		name := cmd.Name()
-		if name == "help" || name == "version" {
-			return nil
+		if name == "help" || name == "version" || name == "native" {
+			return nil // native finds its own root (nativeRoot)
 		}
 		// These commands handle their own repo root
 		if name == "init" || name == "new" || name == "audit" || name == "adopt" {
@@ -171,6 +171,9 @@ func init() {
 	keyCmd.GroupID = "keys"
 	rootCmd.AddCommand(signCmd)
 	rootCmd.AddCommand(keyCmd)
+
+	// Hidden, experimental: native check implementations (native.go).
+	rootCmd.AddCommand(nativeCmd)
 
 	rootCmd.AddCommand(&cobra.Command{
 		Use:   "version",

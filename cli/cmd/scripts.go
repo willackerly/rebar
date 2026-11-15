@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/willackerly/rebar/cli/internal/checks"
 	"github.com/willackerly/rebar/cli/internal/scripts"
 )
 
@@ -61,14 +62,30 @@ func resolveScript(projectRoot, rebarRoot, name string) (resolvedScript, bool) {
 
 // runRebarScript resolves name for the current project and runs it there.
 // found is false when neither the project nor a rebar install has it.
+//
+// Under REBAR_CHECK_IMPL=go a check with a native implementation runs that
+// instead, in process, even when no install has the script; a project's
+// own legacy copy still wins, since it may carry customizations the native
+// check does not have.
 func runRebarScript(name string, args ...string) (exitCode int, found bool, err error) {
 	s, ok := resolveScript(cfg.RepoRoot, findRebarRoot(), name)
+	if c, native := nativeFor(name, s, ok); native {
+		return runNativeCheck(c, cfg.RepoRoot, args), true, nil
+	}
 	if !ok {
 		return 0, false, nil
 	}
 	warnLegacy(s)
 	code, err := scripts.RunInProject(s.Path, cfg.RepoRoot, args...)
 	return code, true, err
+}
+
+// nativeFor returns the native check to run in place of the script
+// resolved for name (s, found): one is registered, REBAR_CHECK_IMPL=go, and
+// the script is not a project's legacy copy.
+func nativeFor(name string, s resolvedScript, found bool) (*checks.Check, bool) {
+	c, ok := checks.Native(name)
+	return c, ok && !(found && s.Legacy)
 }
 
 func warnLegacy(s resolvedScript) {

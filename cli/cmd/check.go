@@ -25,7 +25,10 @@ runs that copy instead, with a deprecation notice.
 
   rebar check               full suite (CI): scripts/ci-check.sh
   rebar check --pre-commit  fast checks for the git pre-commit hook
-  rebar check --cold-start  advisory session-start summary (always exits 0)`,
+  rebar check --cold-start  advisory session-start summary (always exits 0)
+
+Experimental: with REBAR_CHECK_IMPL=go, checks that have a native (Go)
+implementation (rebar native lists them) run it in place of their script.`,
 	Args: cobra.NoArgs,
 	RunE: runCheck,
 }

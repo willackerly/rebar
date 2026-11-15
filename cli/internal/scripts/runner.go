@@ -6,6 +6,8 @@ import (
 	"os"
 	"os/exec"
 	"time"
+
+	"github.com/willackerly/rebar/cli/internal/checks"
 )
 
 // Result captures the output of running a bash script.
@@ -80,11 +82,13 @@ func RunPassthrough(scriptsDir, scriptName string, args ...string) (int, error) 
 
 // projectCommand builds a bash invocation of scriptPath that checks
 // projectRoot: it runs there, and REBAR_PROJECT_ROOT tells scripts that live
-// in a rebar install (not in the project) which repo to check.
+// in a rebar install (not in the project) which repo to check. Under
+// REBAR_CHECK_IMPL=go, checks.ScriptEnv makes scripts with a native
+// counterpart hand off to this binary.
 func projectCommand(scriptPath, projectRoot string, args ...string) *exec.Cmd {
 	cmd := exec.Command("bash", append([]string{scriptPath}, args...)...)
 	cmd.Dir = projectRoot
-	cmd.Env = append(os.Environ(), "REBAR_PROJECT_ROOT="+projectRoot)
+	cmd.Env = append(append(os.Environ(), "REBAR_PROJECT_ROOT="+projectRoot), checks.ScriptEnv()...)
 	return cmd
 }
 

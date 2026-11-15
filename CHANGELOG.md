@@ -18,6 +18,18 @@ All notable changes to rebar. Versioned with [semver](https://semver.org/).
 
 ## Unreleased
 
+- **Experimental: native (Go) checks behind `REBAR_CHECK_IMPL=go`.** Draft
+  for 3.2; the default stays `shell` and nothing changes unless the
+  variable is set. With `REBAR_CHECK_IMPL=go`, `rebar check` (all modes)
+  and `rebar run check-todos` use a Go port of check-todos.sh, the first
+  check ported; `rebar run` works for it even without a rebar install. A
+  project's own legacy `scripts/check-todos.sh` still wins. Same output and
+  exit code, except: findings are listed in file-name order (grep -r
+  listed them in directory order), a TODO on a line that is not valid
+  UTF-8 is reported whatever the locale (the script missed it under a
+  UTF-8 locale), and a file containing a NUL byte is skipped (BSD grep
+  reported "Binary file … matches" as an untracked TODO). Proposal and
+  migration plan: `feedback/2026-11-14-go-native-checks.md`.
 - **CLI errors are printed.** A failing command printed nothing and exited 1
   (cobra's printing was off and `main` didn't print), so hints like
   "rebar install not found (set REBAR_ROOT …)" never reached the user. They now

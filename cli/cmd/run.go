@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+	"github.com/willackerly/rebar/cli/internal/checks"
 )
 
 var runCmd = &cobra.Command{
@@ -64,6 +65,10 @@ func listScripts() error {
 	sort.Strings(names)
 	fmt.Printf("Scripts in %s:\n", filepath.Join(rebarRoot, "scripts"))
 	for _, n := range names {
+		if _, native := checks.Native(n); native {
+			fmt.Printf("  %s  (native, REBAR_CHECK_IMPL=go)\n", n)
+			continue
+		}
 		fmt.Printf("  %s\n", n)
 	}
 	return nil

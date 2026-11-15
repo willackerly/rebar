@@ -176,3 +176,28 @@ func TestLocalContractRef(t *testing.T) {
 		})
 	}
 }
+
+func TestRCValueOr(t *testing.T) {
+	root := t.TempDir()
+	testutil.WriteFile(t, root, ".rebarrc", "source_dirs = cli scripts  # mine\nsource_extensions =\n")
+	t.Setenv("REBAR_TEST_SOURCE_DIRS", "")
+	cases := []struct {
+		name, key, env, envVal, want string
+	}{
+		{"value, comment dropped", "source_dirs", "", "", "cli scripts"},
+		{"empty value falls back", "source_extensions", "", "", "go"},
+		{"absent key falls back", "source_exclude_dirs", "", "", "go"},
+		{"empty env ignored", "source_dirs", "REBAR_TEST_SOURCE_DIRS", "", "cli scripts"},
+		{"env wins", "source_dirs", "REBAR_TEST_SOURCE_DIRS", "pkg", "pkg"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.env != "" {
+				t.Setenv(tc.env, tc.envVal)
+			}
+			if got := RCValueOr(root, tc.key, tc.env, "go"); got != tc.want {
+				t.Fatalf("RCValueOr(%q) = %q, want %q", tc.key, got, tc.want)
+			}
+		})
+	}
+}

@@ -17,6 +17,7 @@
 #   _rebar_contract_namespace — this repo's contract namespace (.rebarrc contract_namespace), "" if unset
 #   _rebar_contract_ref_ere — ERE for the start of a reference to this repo's contracts
 #   _rebar_contract_namespace_warn — warn once per run about an invalid contract_namespace
+#   _rebar_native  — hand a check to the rebar CLI's native implementation when asked
 #
 # Tier definitions:
 #   1 = Partial  — contract-refs + TODOs only (minimum viable)
@@ -265,6 +266,25 @@ _rebar_contract_ref_ere() {
     # `.` is the only ERE metacharacter the allowed set can contain.
     echo "CONTRACT:(${ns//./\\.}:)?"
   fi
+}
+
+# _rebar_native NAME [ARGS...] — run check NAME's native (Go) implementation
+# in place of the calling script, when the rebar CLI that started the script
+# asked for it: under REBAR_CHECK_IMPL=go, `rebar check` and `rebar run` export
+# REBAR_NATIVE_CHECKS (the checks that binary implements natively) and
+# REBAR_BIN (the binary). Otherwise it returns and the script runs as
+# before, so running a script directly, or from an older CLI, is unchanged.
+# Call it right after sourcing this file: _rebar_native check-todos "$@"
+_rebar_native() {
+  local name="$1"
+  shift
+  [ -n "${REBAR_BIN:-}" ] && [ -x "$REBAR_BIN" ] || return 0
+  case " ${REBAR_NATIVE_CHECKS:-} " in
+    *" $name "*)
+      REBAR_PROJECT_ROOT="$(_rebar_project_root)" exec "$REBAR_BIN" native "$name" "$@"
+      ;;
+  esac
+  return 0
 }
 
 # Read the rebar-scripts version from a script file
