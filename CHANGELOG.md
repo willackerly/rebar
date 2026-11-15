@@ -18,6 +18,16 @@ All notable changes to rebar. Versioned with [semver](https://semver.org/).
 
 ## Unreleased
 
+- **CLI errors are printed.** A failing command printed nothing and exited 1
+  (cobra's printing was off and `main` didn't print), so hints like
+  "rebar install not found (set REBAR_ROOT …)" never reached the user. They now
+  go to stderr as `rebar: <error>`.
+- **`rebar commit` drops manifest entries for staged deletions** (a rename
+  counts as delete + add). They used to stay, so `rebar verify --strict`
+  reported the files as Missing — e.g. after `rebar migrate --apply`.
+- The registry check's hint says `rebar run compute-registry` instead of the
+  project-local `scripts/compute-registry.sh`.
+
 - **Versioned installer.** `setup-rebar.sh [<version>|latest|<branch>]`
   installs side by side under `~/.rebar/versions/<version>/`, with
   `~/.rebar/current` pointing at the active one and `~/.rebar/current/bin`

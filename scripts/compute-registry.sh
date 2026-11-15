@@ -427,7 +427,7 @@ generate_health_report() {
 case "$MODE" in
   --check)
     if [ ! -f "$REGISTRY" ]; then
-      echo "FAIL: $REGISTRY does not exist. Run scripts/compute-registry.sh to generate."
+      echo "FAIL: $REGISTRY does not exist. Generate it: rebar run compute-registry"
       exit 1
     fi
 
@@ -441,7 +441,7 @@ case "$MODE" in
       rm "$tmpfile"
       exit 0
     else
-      echo "STALE: Registry needs regeneration. Run scripts/compute-registry.sh"
+      echo "STALE: Registry needs regeneration: rebar run compute-registry"
       rm "$tmpfile"
       exit 1
     fi
