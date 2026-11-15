@@ -503,3 +503,77 @@ func captureOutput(t *testing.T, fn func() error) string {
 
 	return buf.String()
 }
+
+// findBranchContracts maps header references to contract globs; with a
+// contract namespace, this repo's qualified references resolve like short
+// ones and other repos' references are skipped.
+func TestFindBranchContractsNamespace(t *testing.T) {
+	marker := "CONTRACT" + ":" // split so rebar's own ref scan skips it
+	files := map[string]string{
+		"src/a.go": "package src\n",
+		"src/b.go": "package src\n",
+		"src/c.go": "package src\n",
+	}
+	cases := []struct {
+		name, rc string
+		want     []string
+	}{
+		{"unset", "tier = 1\n", []string{
+			"architecture/CONTRACT-AUTH*.md",
+			"architecture/CONTRACT-github*.md", // qualified refs are not understood without a namespace
+		}},
+		{"namespace", "tier = 1\ncontract_namespace = github.com/org/repo\n", []string{
+			"architecture/CONTRACT-AUTH*.md",
+			"architecture/CONTRACT-BLOB*.md",
+		}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv("REBAR_CONTRACT_NAMESPACE", "")
+			files[".rebarrc"] = tc.rc
+			repoDir := setupTestRepo(t, files)
+			setupCfg(repoDir)
+			testutil.WriteFile(t, repoDir, "src/a.go", "// "+marker+"AUTH.1.0\npackage src\n")
+			testutil.WriteFile(t, repoDir, "src/b.go", "// "+marker+"github.com/org/repo:BLOB.2.0\npackage src\n")
+			testutil.WriteFile(t, repoDir, "src/c.go", "// "+marker+"github.com/org/other:KEYS.1.0\npackage src\n")
+			got := findBranchContracts()
+			if strings.Join(got, ",") != strings.Join(tc.want, ",") {
+				t.Fatalf("findBranchContracts = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
+// findBranchContracts globs under the configured contracts dir and reads
+// every reference on a line, so a foreign reference cannot hide a local
+// one; an ID.version before a colon is a short reference, not a namespace.
+func TestFindBranchContractsContractsDirAndAllRefs(t *testing.T) {
+	marker := "CONTRACT" + ":" // split so rebar's own ref scan skips it
+	t.Setenv("REBAR_CONTRACT_NAMESPACE", "")
+	t.Setenv("REBAR_CONTRACTS_DIR", "")
+	repoDir := setupTestRepo(t, map[string]string{
+		".rebarrc": "tier = 1\ncontracts_dir = architecture/specs\ncontract_namespace = github.com/org/repo\n",
+		"architecture/specs/CONTRACT-AUTH.1.0.md": "# Auth\n",
+		"src/a.go": "package src\n",
+		"src/b.go": "package src\n",
+	})
+	setupCfg(repoDir)
+	cfg.ContractsDir = config.ContractsDirFor(repoDir)
+	testutil.WriteFile(t, repoDir, "src/a.go", "// "+marker+"github.com/org/other:KEYS.1.0 "+marker+"AUTH.1.0\npackage src\n")
+	testutil.WriteFile(t, repoDir, "src/b.go", "// "+marker+"MISSING.1.0:see.2 section\npackage src\n")
+
+	got := findBranchContracts()
+	want := []string{"architecture/specs/CONTRACT-AUTH*.md", "architecture/specs/CONTRACT-MISSING*.md"}
+	if strings.Join(got, ",") != strings.Join(want, ",") {
+		t.Fatalf("findBranchContracts = %v, want %v", got, want)
+	}
+
+	// End to end: the branch contract is printed from the configured dir,
+	// not rewritten a second time (architecture/specs/specs/...).
+	output := captureOutput(t, func() error {
+		return runContext(&cobra.Command{}, []string{"developer"})
+	})
+	if !strings.Contains(output, "═══ architecture/specs/CONTRACT-AUTH.1.0.md ═══") {
+		t.Fatalf("developer context missing the branch contract:\n%s", output)
+	}
+}

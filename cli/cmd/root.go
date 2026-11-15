@@ -3,10 +3,38 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"regexp"
 
 	"github.com/spf13/cobra"
 	"github.com/willackerly/rebar/cli/internal/config"
 )
+
+// releaseVersion is the release string of this source tree. Bump it with
+// each release; the release workflow refuses a tag that disagrees with it.
+const releaseVersion = "v3.0.0"
+
+// Version is what `rebar version` reports. Release builds and setup-rebar.sh
+// source builds stamp it with
+//
+//	go build -ldflags "-X github.com/willackerly/rebar/cli/cmd.Version=<ver>"
+//
+// (a tag, or <branch>@<sha7> for a branch build). Unstamped, it is
+// releaseVersion.
+var Version = releaseVersion
+
+// semverTag matches the release tags check-compliance.sh accepts in a badge.
+var semverTag = regexp.MustCompile(`^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$`)
+
+// badgeVersion is the version new/adopt write into a project's README badge,
+// which check-compliance.sh validates: the stamped Version when it is a
+// release tag, else this tree's releaseVersion, so a branch build does not
+// write "feat/x@abc1234" into an adopter's badge.
+func badgeVersion() string {
+	if semverTag.MatchString(Version) {
+		return Version
+	}
+	return releaseVersion
+}
 
 var (
 	verbose  bool
@@ -17,7 +45,7 @@ var (
 
 var rootCmd = &cobra.Command{
 	Use:     "rebar",
-	Version: "v3.0.0-beta.4",
+	Version: Version,
 	Short:   "REBAR — contract-driven development framework for AI-powered teams",
 	Long: `REBAR — contract-driven development framework for AI-powered teams.
 
@@ -80,8 +108,15 @@ var rootCmd = &cobra.Command{
 	SilenceErrors: true,
 }
 
+// Execute runs the CLI. Cobra's own error printing is off (SilenceErrors),
+// so the error is printed here, once, on stderr; without this a failing
+// command (e.g. "rebar install not found (set REBAR_ROOT …)") exited 1 silently.
 func Execute() error {
-	return rootCmd.Execute()
+	err := rootCmd.Execute()
+	if err != nil {
+		fmt.Fprintln(rootCmd.ErrOrStderr(), "rebar:", err)
+	}
+	return err
 }
 
 func init() {

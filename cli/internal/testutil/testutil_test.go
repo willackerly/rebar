@@ -42,3 +42,20 @@ func TestWriteExecutableMode(t *testing.T) {
 		t.Fatalf("mode %v is not executable", info.Mode().Perm())
 	}
 }
+
+// Code that runs git itself (not through Git) must not use the developer's
+// signer or hooks either.
+func TestIsolateGitConfig(t *testing.T) {
+	home := t.TempDir()
+	WriteFile(t, home, ".gitconfig", "[commit]\n\tgpgsign = true\n[gpg]\n\tprogram = false\n")
+	t.Setenv("HOME", home)
+	IsolateGitConfig(t)
+	repo := t.TempDir()
+	Run(t, repo, "git", "init", "-q")
+	WriteFile(t, repo, "a.txt", "a\n")
+	Run(t, repo, "git", "add", "a.txt")
+	Run(t, repo, "git", "commit", "-q", "-m", "a")
+	if got := Run(t, repo, "git", "log", "--format=%an", "-1"); got != "t" {
+		t.Fatalf("author = %q, want the isolated identity", got)
+	}
+}

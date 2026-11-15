@@ -41,6 +41,7 @@ PURPOSE_HEADING=""
 PURPOSE_STYLE=ellipsis
 IMPL_GLOBS="*.go *.ts *.tsx *.js *.py *.rs *.java *.rb *.jsx *.sh bin/"
 EXCLUDE_DIRS="node_modules vendor dist"
+REF_ERE='CONTRACT:'   # with contract_namespace: CONTRACT:(<namespace>:)?
 if [ -f "$SCRIPT_DIR/_rebar-config.sh" ]; then
   # shellcheck source=scripts/_rebar-config.sh
   source "$SCRIPT_DIR/_rebar-config.sh"
@@ -51,6 +52,7 @@ if [ -f "$SCRIPT_DIR/_rebar-config.sh" ]; then
   IMPL_GLOBS=$(_rebar_config registry_impl_globs _REBAR_NO_ENV "$IMPL_GLOBS")
   EXCLUDE_DIRS=$(_rebar_config registry_exclude_dirs _REBAR_NO_ENV "$EXCLUDE_DIRS")
   CONTRACTS_DIR=$(_rebar_contracts_dir)
+  REF_ERE=$(_rebar_contract_ref_ere)
 fi
 ARCH_DIR="$PROJECT_ROOT/$CONTRACTS_DIR"
 REGISTRY="$ARCH_DIR/CONTRACT-REGISTRY.md"
@@ -167,20 +169,24 @@ fi
 #                          (default: node_modules vendor dist)
 set -f
 GIT_PATHSPECS=()
-GREP_INCLUDES=()
+FIND_NAMES=()   # outside git: find -name tests for the file globs
 GREP_DIRS=()
 for glob in $IMPL_GLOBS; do
   GIT_PATHSPECS+=("$glob")
   case "$glob" in
     */) GREP_DIRS+=("${glob%/}") ;;
-    *)  GREP_INCLUDES+=("--include=$glob") ;;
+    *)  FIND_NAMES+=(${FIND_NAMES[@]+-o} -name "$glob") ;;
   esac
 done
 GIT_PATHSPECS+=(":(exclude)$CONTRACTS_DIR/")
-GREP_EXCLUDE="\\.git\\|$CONTRACTS_DIR/"
+# Outside git, prune the contracts dir by path and excluded directories (plus
+# .git and agent worktrees under .claude) by name. Filtering grep's output
+# by substring dropped .github/, distance.go and, when the project's own path
+# contained one of the words, every match.
+FIND_PRUNE=(-path "$PROJECT_ROOT/$CONTRACTS_DIR" -o -name .git -o -name .claude)
 for dir in $EXCLUDE_DIRS; do
   GIT_PATHSPECS+=(":(exclude,glob)**/$dir/**")
-  GREP_EXCLUDE="$dir\\|$GREP_EXCLUDE"
+  FIND_PRUNE+=(-o -name "$dir")
 done
 set +f
 
@@ -189,24 +195,26 @@ search_source() {
     git -C "$PROJECT_ROOT" grep "$@" -- "${GIT_PATHSPECS[@]}" 2>/dev/null
   else
     {
-      if [ ${#GREP_INCLUDES[@]} -gt 0 ]; then
-        grep -r "$@" "$PROJECT_ROOT" "${GREP_INCLUDES[@]}" 2>/dev/null
+      if [ ${#FIND_NAMES[@]} -gt 0 ]; then
+        find "$PROJECT_ROOT" \( "${FIND_PRUNE[@]}" \) -prune -o -type f \( "${FIND_NAMES[@]}" \) -print0
       fi
       local dir
       for dir in ${GREP_DIRS[@]+"${GREP_DIRS[@]}"}; do
         if [ -d "$PROJECT_ROOT/$dir" ]; then
-          grep -r "$@" "$PROJECT_ROOT/$dir" 2>/dev/null
+          find "$PROJECT_ROOT/$dir" \( "${FIND_PRUNE[@]}" \) -prune -o -type f -print0
         fi
       done
-    } | grep -v "$GREP_EXCLUDE"
+    } | xargs -0 grep "$@" /dev/null 2>/dev/null
   fi
 }
 
-# Count implementing files for a contract, deduplicated by path.
+# Count implementing files for a contract, deduplicated by path. With a
+# contract namespace, CONTRACT:<namespace>:<id> counts too; references
+# qualified with another repo's namespace do not.
 count_implementations() {
   local id="$1"
   set +o pipefail
-  search_source -l "CONTRACT:${id}" | sort -u | wc -l | tr -d ' '
+  search_source -El "${REF_ERE}${id}" | sort -u | wc -l | tr -d ' '
   set -o pipefail
 }
 
@@ -347,8 +355,8 @@ generate_health() {
   local shadows_tmp
   shadows_tmp="$(mktemp)"
   set +o pipefail
-  search_source -Eho 'CONTRACT:[A-Za-z0-9_-]+\.[0-9]+\.[0-9]+' \
-    | sed -E 's/^CONTRACT://; s/\.[0-9]+\.[0-9]+$//' \
+  search_source -Eho "${REF_ERE}"'[A-Za-z0-9_-]+\.[0-9]+\.[0-9]+' \
+    | sed -E "s#^${REF_ERE}##"'; s/\.[0-9]+\.[0-9]+$//' \
     | sort -u > "$shadows_tmp"
   set -o pipefail
 
@@ -419,7 +427,7 @@ generate_health_report() {
 case "$MODE" in
   --check)
     if [ ! -f "$REGISTRY" ]; then
-      echo "FAIL: $REGISTRY does not exist. Run scripts/compute-registry.sh to generate."
+      echo "FAIL: $REGISTRY does not exist. Generate it: rebar run compute-registry"
       exit 1
     fi
 
@@ -433,7 +441,7 @@ case "$MODE" in
       rm "$tmpfile"
       exit 0
     else
-      echo "STALE: Registry needs regeneration. Run scripts/compute-registry.sh"
+      echo "STALE: Registry needs regeneration: rebar run compute-registry"
       rm "$tmpfile"
       exit 1
     fi

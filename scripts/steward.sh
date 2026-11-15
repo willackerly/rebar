@@ -24,6 +24,10 @@ source "$SCRIPT_DIR/_rebar-config.sh" 2>/dev/null || true
 type _rebar_script >/dev/null 2>&1 || _rebar_script() { echo "$SCRIPT_DIR/$1"; }
 CONTRACTS_DIR=architecture
 type _rebar_contracts_dir >/dev/null 2>&1 && CONTRACTS_DIR=$(_rebar_contracts_dir)
+# Start of a reference to this repo's contracts: CONTRACT:, plus an optional
+# CONTRACT:<namespace>: when .rebarrc sets contract_namespace.
+REF_ERE='CONTRACT:'
+type _rebar_contract_ref_ere >/dev/null 2>&1 && REF_ERE=$(_rebar_contract_ref_ere)
 STATE_DIR="$PROJECT_ROOT/$CONTRACTS_DIR/.state"
 ARCH_DIR="$PROJECT_ROOT/$CONTRACTS_DIR"
 
@@ -90,7 +94,9 @@ scan_contract() {
     completeness="fail"
   fi
 
-  # Implementing files: grep for CONTRACT:<id> across the project
+  # Implementing files: grep for CONTRACT:<id> (or, with a contract
+  # namespace, CONTRACT:<namespace>:<id>) across the project. References
+  # qualified with another repo's namespace are not implementations of ours.
   local impl_files=()
   local test_files=()
 
@@ -98,7 +104,7 @@ scan_contract() {
     local filepath
     filepath="$(echo "$line" | cut -d: -f1)"
     impl_files+=("$filepath")
-  done < <(grep -rn "CONTRACT:${id}" "$PROJECT_ROOT" \
+  done < <(grep -rEn "${REF_ERE}${id}" "$PROJECT_ROOT" \
     --include='*.go' --include='*.ts' --include='*.js' --include='*.py' \
     --include='*.rs' --include='*.java' --include='*.rb' --include='*.c' \
     --include='*.cpp' --include='*.h' --include='*.cs' --include='*.swift' \

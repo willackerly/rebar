@@ -75,6 +75,19 @@ func TryGit(dir string, args ...string) (string, error) {
 	return strings.TrimSpace(string(out)), err
 }
 
+// IsolateGitConfig points git at a throwaway global config (fixed identity,
+// no signing, no hooks) and ignores the system config, for tests that run
+// code which shells out to git itself (e.g. `rebar commit`).
+func IsolateGitConfig(t testing.TB) {
+	t.Helper()
+	dir := t.TempDir()
+	cfg := WriteFile(t, dir, "gitconfig", "[user]\n\tname = t\n\temail = t@example.com\n"+
+		"[commit]\n\tgpgsign = false\n[tag]\n\tgpgsign = false\n[core]\n\thooksPath = /dev/null\n"+
+		"[init]\n\tdefaultBranch = main\n")
+	t.Setenv("GIT_CONFIG_GLOBAL", cfg)
+	t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
+}
+
 // InitRepo returns a new temp directory holding an empty git repository on
 // branch main. It skips the test when git is not installed.
 func InitRepo(t testing.TB) string {

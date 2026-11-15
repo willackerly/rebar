@@ -23,7 +23,7 @@ var (
 var newCmd = &cobra.Command{
 	Use:   "new <project-name> [--description \"...\"]",
 	Short: "Create a new REBAR project from scratch",
-	Long: `Creates a new directory with full REBAR v3.0.0-beta scaffolding.
+	Long: `Creates a new directory with full REBAR scaffolding.
 
   rebar new my-api --description "REST API for document signing with client-side crypto"
   rebar new my-app                # scaffold only, no LLM-generated contracts
@@ -76,7 +76,7 @@ func runNew(cmd *cobra.Command, args []string) error {
 	fmt.Println("  ✓ .rebarrc")
 
 	// .rebar-version
-	os.WriteFile(filepath.Join(root, ".rebar-version"), []byte("v3.0.0-beta\n"), 0644)
+	os.WriteFile(filepath.Join(root, ".rebar-version"), []byte(badgeVersion()+"\n"), 0644)
 	fmt.Println("  ✓ .rebar-version")
 
 	// .gitignore
@@ -105,7 +105,7 @@ build/
 	bootstrapV2Files(root)
 
 	// README.md
-	readme := fmt.Sprintf("# %s\n\n> **rebar %s** | **Tier 1: PARTIAL**\n\n", name, rootCmd.Version)
+	readme := fmt.Sprintf("# %s\n\n> **rebar %s** | **Tier 1: PARTIAL**\n\n", name, badgeVersion())
 	if newDescription != "" {
 		readme += newDescription + "\n\n"
 	}
@@ -191,7 +191,7 @@ Be practical and specific. Don't over-engineer — this is a fresh project.`, na
 			sections := parseLLMSections(response)
 
 			if content, ok := sections["README Content"]; ok {
-				readme := fmt.Sprintf("# %s\n\n> **rebar %s** | **Tier 1: PARTIAL**\n\n%s\n", name, rootCmd.Version, content)
+				readme := fmt.Sprintf("# %s\n\n> **rebar %s** | **Tier 1: PARTIAL**\n\n%s\n", name, badgeVersion(), content)
 				os.WriteFile(filepath.Join(root, "README.md"), []byte(readme), 0644)
 				fmt.Println("  ✓ README.md (AI-generated)")
 			}
@@ -217,7 +217,7 @@ Be practical and specific. Don't over-engineer — this is a fresh project.`, na
 	// Initial commit
 	fmt.Println("\n  Phase 4: Initial Commit")
 	exec.Command("git", "-C", root, "add", "-A").Run()
-	exec.Command("git", "-C", root, "commit", "-m", "feat: initialize project with REBAR v3.0.0-beta").Run()
+	exec.Command("git", "-C", root, "commit", "-m", "feat: initialize project with REBAR "+rootCmd.Version).Run()
 	fmt.Println("  ✓ Initial commit")
 
 	// Final score

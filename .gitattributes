@@ -1,0 +1,8 @@
+# Left out of `git archive`, and so out of release tarballs and
+# setup-rebar.sh source installs: rebar's own working state, not part of an
+# install. (.mcp.json holds a maintainer's absolute paths; inbox/ is peer
+# mail; .claude/ is this repo's agent settings — adopters get theirs from
+# templates/project-bootstrap/.claude/.)
+/.mcp.json export-ignore
+/inbox/ export-ignore
+/.claude/ export-ignore

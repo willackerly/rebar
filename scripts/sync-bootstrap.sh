@@ -7,6 +7,8 @@
 # This script keeps it that way:
 #   - only the files in THIN_FILES exist there
 #   - each .sh is marked `# rebar-thin-wrapper` and execs `rebar`
+# It also keeps the template's architecture/CONTRACT-TEMPLATE.md identical
+# to the root one (`rebar init` copies the root file, `cp -r` the template).
 #
 # (Until v3.0.0-beta.4 the template was a mirror of /scripts/ and this script
 # copied files into it.)
@@ -85,13 +87,25 @@ for base in $THIN_FILES; do
   esac
 done
 
+# Two copies of the contract template: the root one is the source.
+ROOT_TEMPLATE="$PROJECT_ROOT/architecture/CONTRACT-TEMPLATE.md"
+BOOT_TEMPLATE="$PROJECT_ROOT/templates/project-bootstrap/architecture/CONTRACT-TEMPLATE.md"
+if [ -f "$ROOT_TEMPLATE" ] && ! cmp -s "$ROOT_TEMPLATE" "$BOOT_TEMPLATE"; then
+  if [ "$MODE" = "sync" ]; then
+    cp "$ROOT_TEMPLATE" "$BOOT_TEMPLATE"
+    echo "  copied architecture/CONTRACT-TEMPLATE.md into the template"
+  else
+    add_problem "architecture/CONTRACT-TEMPLATE.md differs from the root copy"
+  fi
+fi
+
 if [ "$problems" -eq 0 ]; then
-  echo "check-bootstrap-sync: OK — templates/project-bootstrap/scripts/ holds only thin entry points"
+  echo "check-bootstrap-sync: OK — templates/project-bootstrap/scripts/ holds only thin entry points; CONTRACT-TEMPLATE.md matches the root copy"
   exit 0
 fi
-printf 'check-bootstrap-sync: %s problem(s) in templates/project-bootstrap/scripts/:%b\n' "$problems" "$report"
+printf 'check-bootstrap-sync: %s problem(s) in templates/project-bootstrap/:%b\n' "$problems" "$report"
 if [ "$MODE" = "check" ]; then
   echo ""
-  echo "Run: ./scripts/sync-bootstrap.sh (removes extra files; fix the rest by hand)"
+  echo "Run: ./scripts/sync-bootstrap.sh (removes extra files, copies the contract template; fix the rest by hand)"
 fi
 exit 1

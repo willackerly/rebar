@@ -1,6 +1,6 @@
 # TODO — rebar
 
-**Last synced:** 2026-08-12
+**Last synced:** 2026-11-14
 
 The canonical, vote-shaped backlog lives in [`feedback/INVENTORY.md`](feedback/INVENTORY.md).
 This file holds short-horizon work that's actively in flight or imminent.
@@ -9,13 +9,9 @@ This file holds short-horizon work that's actively in flight or imminent.
 
 ## P0 — In Flight
 
-- [ ] **Hold the clean window to 2026-08-16, then graduate to `v3.0.0`.**
-      This is the last open graduation gate (criterion 1). It requires no
-      work — only that nothing breaks. **Do not land v3 features in this
-      window:** a new P0/P1 against a v3 feature restarts the two-week
-      clock, which is exactly what happened on 2026-08-02. Non-v3 work,
-      adopter support, and peer mail are safe.
-      Scoreboard: [`docs/v3-beta-plan.md`](docs/v3-beta-plan.md) §Graduation.
+- [ ] **Assemble v3.1.0 on `release/v3.1.0-rc`.** Collects #14
+      (self-contained install) and #8 (`contract_namespace`), plus
+      `rebar migrate` and a versioned installer, both in progress.
 
 ## P1 — Imminent
 
@@ -25,6 +21,10 @@ This file holds short-horizon work that's actively in flight or imminent.
       EXIT traps and explicit kills, so the leak path is not obvious —
       needs a real look, not a guess. A leaked poller is cheap to ignore
       and exactly the kind of thing that erodes trust in the watcher.
+      **Root cause found 2026-11-14:** `inbox-watch-lock.test.sh` calls
+      `X="$(arm ...)"`, so `arm`'s `PIDS+=` ran in a subshell and never
+      reached the EXIT cleanup. Fixed in #14 (b9fbb58, on
+      `release/v3.1.0-rc`); close this when that ships.
 - [ ] **A harness-backed watcher does not outlive its task.** Observed
       2026-08-12: `scripts/inbox-watch.sh` armed as a background task was
       reaped when the harness marked the task complete — it released its
@@ -95,6 +95,10 @@ _None currently._
 
 (Move items here when shipped. Trim to last ~10 to stay concise.)
 
+- ✓ 2026-11-14: **Graduated to `v3.0.0`** by project-owner decision —
+  3 of 4 criteria met; criterion 1's clean window was never re-verified
+  and was accepted by the decision (`docs/v3-beta-plan.md` D12). No code
+  change since `v3.0.0-beta.4`.
 - ✓ 2026-08-02: **`v3.0.0-beta.2` tagged + pushed** — contract prefix
   numbering retired (full name is the key), `practices/inbox-protocol.md`
   and `practices/diagram-and-document-assets.md` added

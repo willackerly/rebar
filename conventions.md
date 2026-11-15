@@ -168,6 +168,34 @@ the registry: `CONTRACT-TEMPLATE`, `CONTRACT-SEAM-TEMPLATE`, `CONTRACT-REGISTRY`
 `CONTRACT-REGISTRY.template`, `CONTRACT-GAPS`. Do not name a real contract
 `TEMPLATE`, `REGISTRY`, or `GAPS`.
 
+### Contract namespaces (optional)
+
+A contract ID is unique within its repo. When references travel between
+repos, a repo can name itself with `contract_namespace` in `.rebarrc`
+(letters, digits, `. _ / -`, not starting like an ID.version; Go-module
+style such as `github.com/org/repo`):
+
+```text
+.rebarrc:  contract_namespace = github.com/acme/widgets
+
+CONTRACT:BLOBSTORE.2.1                            →  this repo's BLOBSTORE 2.1
+CONTRACT:github.com/acme/widgets:BLOBSTORE.2.1    →  the same contract, qualified
+CONTRACT:github.com/acme/keys:KEY-ROTATION.1.0    →  another repo's contract
+```
+
+- Both local forms are equivalent to every check: steward, the registry's
+  counts and shadow detection, `check-contract-refs.sh`, `check-registry.sh`
+  and `rebar context developer`.
+- A reference qualified with **another** namespace is never an implementation
+  of, or a broken reference to, a local contract; `check-contract-refs.sh`
+  counts such references and reports the number. Pin the dependency in
+  `CONSUMES.md` as usual.
+- Filenames, contract titles, and `CONSUMES.md` keys stay unnamespaced.
+- Unset (the default), the tooling behaves exactly as before: only the short
+  form is recognized.
+- Relaxation, not migration: setting a namespace never requires rewriting
+  existing short references. Qualify new ones where it helps a reader.
+
 ## Source File Headers
 
 Every source file declares its contract in the first 15 lines:

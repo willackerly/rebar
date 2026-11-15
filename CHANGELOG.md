@@ -42,6 +42,36 @@ All notable changes to rebar. Versioned with [semver](https://semver.org/).
   as the scripts do.
   `check-ground-truth.sh --print` and `REBAR_RCFILE` support it. Design:
   `feedback/2026-11-14-rebar-migrate.md`.
+- **CLI errors are printed.** A failing command printed nothing and exited 1
+  (cobra's printing was off and `main` didn't print), so hints like
+  "rebar install not found (set REBAR_ROOT …)" never reached the user. They now
+  go to stderr as `rebar: <error>`.
+- **`rebar commit` drops manifest entries for staged deletions** (a rename
+  counts as delete + add). They used to stay, so `rebar verify --strict`
+  reported the files as Missing — e.g. after `rebar migrate --apply`.
+- The registry check's hint says `rebar run compute-registry` instead of the
+  project-local `scripts/compute-registry.sh`.
+
+- **Versioned installer.** `setup-rebar.sh [<version>|latest|<branch>]`
+  installs side by side under `~/.rebar/versions/<version>/`, with
+  `~/.rebar/current` pointing at the active one and `~/.rebar/current/bin`
+  on PATH. "latest" (the default) is the highest stable tag (the highest
+  pre-release only while no stable tag exists); `--pre` includes
+  pre-releases. Tags download a
+  prebuilt tarball verified against the release's SHA-256 checksums, and
+  build from source (git + Go) when the release has no assets; branches and
+  full commit SHAs always build from source, replacing the committed darwin/arm64
+  `bin/rebar`. `--pre`, `--no-switch`, `--source`. An existing `~/.rebar` clone is
+  left untouched; versions are added inside it. Design:
+  `feedback/2026-11-14-versioned-installer.md` (from #8).
+- **Release workflow.** Pushing a `v*` tag builds darwin/linux ×
+  amd64/arm64 with `scripts/package-release.sh` and publishes a GitHub
+  Release (a pre-release for suffixed tags) with the tarballs and
+  `rebar_<ver>_checksums.txt`.
+- **`rebar version` can be stamped:** `-ldflags "-X
+  github.com/willackerly/rebar/cli/cmd.Version=<ver>"`; branch builds from
+  the installer report `<branch>@<sha7>`. README badges written by `rebar
+  new` / `rebar adopt` still use the release string.
 - **Adopters carry configuration, not rebar's scripts.** `rebar check`,
   `rebar check --pre-commit|--cold-start` and the new `rebar run <script>`
   run the rebar install's scripts against the project
@@ -69,6 +99,63 @@ All notable changes to rebar. Versioned with [semver](https://semver.org/).
   once per run and is ignored. `rebar status` and `rebar audit --all` show
   the enabled checks. Unset, nothing changes. The registry check was never
   tier-gated (docs said tier 2+); they now say it runs at every tier.
+- **`contract_namespace`** (optional, e.g. `github.com/org/repo`): source
+  may cite this repo's contracts as `CONTRACT:<namespace>:<ID>.<v>` as well
+  as the short form. Steward, compute-registry, check-contract-refs,
+  check-registry and `rebar context developer` treat both alike
+  (check-contract-headers only shows the qualified form in its hint); references
+  qualified with another repo's namespace are counted, never treated as
+  ours. Filenames stay unnamespaced; composes with `contracts_dir`; unset
+  behaves exactly as before. From #8; see
+  `feedback/2026-11-14-contract-namespace.md`.
+- **Fix: the source scanners skipped too much.** check-todos, check-contract-refs,
+  check-registry and compute-registry's non-git fallback dropped any match whose
+  path or line text contained `dist`, `vendor`, `node_modules` or `.git`
+  (a broken reference under `.github/` or in `distance.go`, a TODO mentioning
+  `TODO.md`, every match when the project's own path contained `dist`). They now
+  skip directories by name: `.rebarrc` `source_exclude_dirs` (default
+  `node_modules vendor dist`) plus `.git` and `.claude` (agent worktrees, which
+  were scanned before). `contracts_dir` is normalised (`./docs/specs/` →
+  `docs/specs`); check-registry also scans `*.sh` and `bin/` and skips
+  `CONTRACT-SEAM-TEMPLATE.md`. **Upgrade note:** checks can report findings
+  they used to miss — e.g. TODOs in compiled `dist-esm/` output now block
+  pre-commit; add such directories to `source_exclude_dirs`.
+- **Fix:** `check-registry.sh` stopped silently (exit 1, no ORPHAN line)
+  at the first contract with no implementing file.
+- `sync-bootstrap.sh --check` also keeps the bootstrap template's
+  `CONTRACT-TEMPLATE.md` identical to `architecture/`.
+
+---
+
+## v3.0.0 — 2026-11-14
+
+Graduation of the v3 line. The four annealing betas (`v3.0.0-beta`,
+`-beta.2`, `-beta.3`, `-beta.4`) shipped on `main`, honestly labeled; this
+release drops the pre-release suffix. One fix since `v3.0.0-beta.4`; otherwise
+only version strings, the rebuilt `bin/rebar`, and the recorded decision.
+
+- **`rebar new` projects passed their own compliance check again.** `rebar new`,
+  `rebar init` and `rebar audit --fix` wrote a hardcoded `v3.0.0-beta` into
+  `.rebar-version` while the README badge used the CLI's version, so a fresh
+  project failed `check-compliance.sh` ("Badge says v3.0.0 but .rebar-version
+  says v3.0.0-beta"). All three now write the CLI's version, and the bootstrap
+  template's `.rebar-version` and badge say `v3.0.0`. Broken since beta.3.
+
+**What v3 is:** badges that stop lying by default. Contracts declare their
+maturity (`Status:` stub → verified) and the compliance badge is weighted by
+it; the steward's computed `verified` is renamed `impl-present` so the two
+vocabularies never share a word; a SessionStart hook makes the cold start a
+harness fact; and the field-proven peer-inbox paradigm, Claude Skills, and
+abstract `rebar:` refs ship alongside. Details and upgrade notes are in the
+beta entries below, starting with `v3.0.0-beta`.
+
+**Graduation decision.** Decided by the project owner on 2026-11-14, not
+measured to completion. Of the four criteria in `docs/v3-beta-plan.md`
+§Graduation, criteria 2, 3 and 4 were met on 2026-08-02. Criterion 1 (two
+migrated repos clean for ≥2 weeks) had its repo count met and a clean window
+expected to close 2026-08-16, but it was never re-verified, and beta.3 and
+beta.4 shipped changes after that date. It was accepted by the owner's
+decision, recorded as D12 in the plan's decision log.
 
 ---
 

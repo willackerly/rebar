@@ -44,6 +44,7 @@ fi
 echo "rebar cold-start health — advisory (this hook always exits 0)"
 # Unknown .rebarrc checks_enable names are reported once here, not per check.
 if type _rebar_checks_enable_warn >/dev/null 2>&1; then _rebar_checks_enable_warn 2>&1; fi
+if type _rebar_contract_namespace_warn >/dev/null 2>&1; then _rebar_contract_namespace_warn 2>&1; fi
 
 fail_count=0
 run_count=0

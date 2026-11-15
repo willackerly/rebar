@@ -56,7 +56,7 @@ func runAdopt(cmd *cobra.Command, args []string) error {
 	}
 
 	name := filepath.Base(root)
-	fmt.Printf("\n  Adopting REBAR v3.0.0-beta for: %s\n\n", name)
+	fmt.Printf("\n  Adopting REBAR %s for: %s\n\n", rootCmd.Version, name)
 
 	// Phase 1: Assess current state
 	fmt.Println("  Phase 1: Assessment")
@@ -103,7 +103,7 @@ func runAdopt(cmd *cobra.Command, args []string) error {
 			}
 			lines := strings.SplitN(string(data), "\n", 2)
 			if len(lines) == 2 {
-				badged := lines[0] + "\n\n> **rebar " + rootCmd.Version + "** | **Tier " + fmt.Sprintf("%d: %s", adoptTier, tierLevel) + "**\n" + lines[1]
+				badged := lines[0] + "\n\n> **rebar " + badgeVersion() + "** | **Tier " + fmt.Sprintf("%d: %s", adoptTier, tierLevel) + "**\n" + lines[1]
 				os.WriteFile(readmePath, []byte(badged), 0644)
 				fmt.Println("  ✓ Added rebar badge to README.md")
 				fixed++

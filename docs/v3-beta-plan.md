@@ -4,7 +4,8 @@
 `practice/inbox-watch` + `feedback/reflexive-push-durability`)
 **Started:** 2026-07-04 (supersedes `docs/v3-alpha-plan.md`, started 2026-04-29)
 **Driver:** Will Ackerly + Claude (Fable 5)
-**Status of this plan:** active
+**Status of this plan:** complete — graduated to `v3.0.0` on 2026-11-14 by
+project-owner decision (D12; see §Graduation scoreboard)
 
 ## Why v3 (unchanged from the alpha plan)
 
@@ -43,6 +44,7 @@ judgment call made this session.
 | D9 | **(post-review) Badge weighting counts undeclared live contracts as stub-or-draft once any contract declares.** Supersedes the build-time decision to weight only declared contracts. Same review pass also unified the two `Status:` parsers (bold/bare, case-folded) and moved thresholds to product comparisons. | Adversarial review reproduced badge-laundering by selective declaration, by unbolded/capitalized values, and an integer-floor gap at the >66% threshold — all defeating Cluster 1's purpose. Pre-v3 repos (zero declarations) keep the no-penalty advisory. |
 | D11 | **(Will, 2026-07-04) The beta merges to `main`; the version string, not the branch, carries the anneal state.** `main` tracks the v3 line at `v3.0.0-beta`; the `v2.0.0` tag remains the stable v2 point (a `v2.x` maintenance branch can be cut from it if ever needed). `v3.0.0` final is **earned by the graduation criteria below**, exactly as the beta tag was earned by its checklist. | Adoption and feedback are the goal, and main is where discovery happens. Parallel lines rot (the alpha sat unbuilt for two months while main moved); the resolvers' upstream URLs point at `blob/main/`; every consumer is a swarm repo with escape hatches. "Beta on main" is honest as long as the badge says beta. |
 | D10 | **(post-tag, Will 2026-07-04) Boundary-crossing artifacts reference rebar doctrine by abstract `rebar:<kind>/<name>` refs, not literal paths.** Convention in `conventions.md` §Cross-Repo References; resolvers of record `scripts/rebar-doc.sh` + `rebar doc` (resolution: local → `$REBAR_ROOT` → discovered checkout → upstream URL + ask-hint). Replaces the "(rebar checkout if not vendored)" prose qualifiers in the skills. | Literal paths in shipped artifacts dangle in adopter repos; prose qualifiers were a band-aid. An abstract name plus one documented resolution chain survives vendoring, checkouts, and upstream-only layouts. Literal paths stay correct for files that travel with the adopter set (`scripts/`). |
+| D12 | **(Project owner, 2026-11-14) Graduate to `v3.0.0` now; criterion 1 accepted by decision, not measured.** Criteria 2, 3 and 4 were met on 2026-08-02. Criterion 1's repo count was met (`office180`, `go-tak-server`), but its two-week clean window, expected to close 2026-08-16, was never re-verified, and `v3.0.0-beta.3` (merge-friendly generated files) and `v3.0.0-beta.4` (installer fix) shipped after that date. The criteria text is not amended; this entry records that criterion 1 was accepted by the owner's decision for this release instead of being skipped silently. | The graduation section allows amendment only with a decision-log entry. Recording the waiver keeps the tag honest about how it was earned: the version string says final, and this entry says which criterion was decided rather than measured. Evidence available in this repo at decision time is in the 2026-11-14 scoreboard; the downstream repos' state was not re-checked. |
 
 ## Seven clusters
 
@@ -224,7 +226,21 @@ Then: version strings → `v3.0.0`, CHANGELOG entry, tag, announce via
 the outbox/inbox channels. Criteria may be amended here (with a
 decision-log entry), never silently skipped.
 
-### Scoreboard — updated 2026-08-02 (`v3.0.0-beta.2`)
+### Scoreboard — final, 2026-11-14 (`v3.0.0`, graduated by D12)
+
+Rescored from what this repo can show. `[V]` = read from this repo,
+`[U]` = not re-verified.
+
+| # | Criterion | State |
+|---|---|---|
+| 1 | Two migrated repos, ≥2 wks clean | **Not re-verified — accepted by owner decision (D12).** Count met 2026-08-02 (`office180`, `go-tak-server`, both on `v3.0.0-beta`). The clean window was expected to close 2026-08-16; no rescore was recorded then or since, and neither repo was re-checked for this release `[U]`. In this repo, nothing was filed against a v3 feature after 2026-08-02 `[V]`: the only later `feedback/` item is `2026-11-14-busy-repo-merge-conflicts.md` (virtru-analyze on a `v2.0.0` pin, against the `integrity.json` / registry / `METRICS` machinery, implemented in beta.3), and the last `inbox/` deposit is a 2026-08-03 TDFLite PROPOSAL. Changes shipped after 2026-08-16: beta.3 (#9, #10) and beta.4 (#12, a `setup-rebar.sh` bash 3.2 bug present since beta.2). Whether those reset the clock was never decided. |
+| 2 | Live seat on canonical `inbox-watch.sh` | **MET 2026-08-02** (see below); not re-checked. |
+| 3 | Every v3-feature feedback item dispositioned | **MET 2026-08-02**; still holds `[V]`: the one item filed since is implemented. |
+| 4 | No swarm tooling parses computed `verified` | **MET 2026-08-02, verified by reading**; downstream repos not re-checked `[U]`. |
+
+**Standing: 3 of 4 met; criterion 1 accepted by decision, not measured.**
+
+### Scoreboard — 2026-08-02 (`v3.0.0-beta.2`, superseded)
 
 | # | Criterion | State |
 |---|---|---|
