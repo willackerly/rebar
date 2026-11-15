@@ -26,7 +26,7 @@ All notable changes to rebar. Versioned with [semver](https://semver.org/).
   pre-releases. Tags download a
   prebuilt tarball verified against the release's SHA-256 checksums, and
   build from source (git + Go) when the release has no assets; branches and
-  SHAs always build from source, replacing the committed darwin/arm64
+  full commit SHAs always build from source, replacing the committed darwin/arm64
   `bin/rebar`. `--pre`, `--no-switch`, `--source`. An existing `~/.rebar` clone is
   left untouched; versions are added inside it. Design:
   `feedback/2026-11-14-versioned-installer.md` (from #8).

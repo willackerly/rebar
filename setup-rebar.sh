@@ -175,7 +175,7 @@ list_tags() {
 
 # Prints tag | branch | commit for a ref, or dies.
 classify_ref() {
-  local ref="$1" out re='^[0-9a-f]{7,40}$' semver='^v[0-9]+\.[0-9]+\.[0-9]+'
+  local ref="$1" out full='^[0-9a-f]{40}$' short='^[0-9a-f]{4,39}$' semver='^v[0-9]+\.[0-9]+\.[0-9]+'
   if ! have git; then
     [[ "$ref" =~ $semver ]] || die "git is required to install a branch or commit ($ref)"
     echo tag; return 0
@@ -186,8 +186,11 @@ classify_ref() {
     echo tag
   elif printf '%s\n' "$out" | awk -v r="refs/heads/$ref" '$2 == r {f=1} END {exit !f}'; then
     echo branch
-  elif [[ "$ref" =~ $re ]]; then
+  elif [[ "$ref" =~ $full ]]; then
     echo commit
+  elif [[ "$ref" =~ $short ]]; then
+    # A shallow fetch can name a commit only by its full id.
+    die "'$ref' looks like a short commit SHA; pass the full 40-character commit SHA"
   else
     die "no tag or branch named '$ref' in $REBAR_REPO"
   fi

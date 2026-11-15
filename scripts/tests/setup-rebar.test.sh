@@ -26,6 +26,7 @@
 #   T9  unknown ref → refused
 #   T11 a truncated download (`curl | bash` cut short at any line, or inside
 #       the last line) runs nothing and leaves ~/.rebar as it was
+#   T13 a short commit SHA is refused with a clear error; a full one builds
 #   T12 a re-install whose final move fails, or that is SIGTERMed between
 #       moving the old copy aside and moving the new one in, keeps the old copy
 # Once:
@@ -86,6 +87,7 @@ EOF
   g checkout -q main
 ) || fail "could not build the fake upstream"
 FEAT_SHA="$(g -C "$O" rev-parse --short=7 feat/x)"
+FEAT_FULL="$(g -C "$O" rev-parse feat/x)"
 # An upstream that has published only pre-releases (T1c).
 PREONLY="$TMP/preonly.git"
 g init -q --bare "$PREONLY" && g -C "$O" push -q "$PREONLY" main:main \
@@ -284,6 +286,16 @@ for sh in $BASHES; do
     [ -z "$(leftovers "$H")" ] || fail "T12 [$bv] $mode: left $(leftovers "$H")"
   done
   ok "T12 [$bv] a failed or interrupted swap restores the previous copy"
+
+  # T13 — commits by full SHA only; a short SHA gets a clear error.
+  H13="$TMP/h$n-sha"
+  if out="$(inst "$H13" "$sh" "$FEAT_SHA")"; then fail "T13 [$bv] a short SHA installed"; fi
+  has "$out" "full 40-character commit SHA" "T13 [$bv]"
+  [ ! -e "$H13/.rebar/current" ] || fail "T13 [$bv] short SHA left a current link"
+  out="$(inst "$H13" "$sh" "$FEAT_FULL")" || { echo "$out" | tail -20 >&2; fail "T13 [$bv] full SHA failed"; }
+  [ "$("$H13/.rebar/current/bin/rebar" version)" = "rebar $FEAT_FULL@$FEAT_SHA" ] \
+    || fail "T13 [$bv] full SHA version is '$("$H13/.rebar/current/bin/rebar" version)'"
+  ok "T13 [$bv] short SHA refused with a clear error; full SHA builds"
 done
 
 # T10
