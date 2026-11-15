@@ -21,15 +21,25 @@ All notable changes to rebar. Versioned with [semver](https://semver.org/).
 - **`rebar migrate`** turns an adopter's legacy, possibly customized,
   script copies into `.rebarrc` settings, decided by running them: each
   `compute_metrics()` line of a custom `check-ground-truth.sh` becomes
-  `metric.<key>.*` only if the install computes the same value; registry
-  settings are kept only if `compute-registry.sh --stdout` stays
-  byte-identical (`registry_purpose_style = bytes` when the old cut is
-  needed); other checks must give the same exit status and findings, on the
-  project and on a probe tree. Dry run by default; `--apply` writes
-  `.rebarrc`, deletes only verified copies, adjusts METRICS counts the
-  deletions change, reruns the checks and exits 1 on a regression. It never
-  changes `tier`; checks whose copies ran ungated below the install's tier
-  gate are kept running with a proposed `checks_enable`.
+  `metric.<key>.*` only if the install computes the same value, on the
+  project and on a probe tree built from the metric; registry settings are
+  kept only if `compute-registry.sh --stdout` stays byte-identical
+  (`registry_purpose_style = bytes` when the old cut is needed); other checks
+  must give the same exit status and findings, and the source scanners also
+  on a probe tree with exclusion bait. All probes run in a scratch copy of
+  the project, and a copy that writes files is kept. Dry run by default;
+  `--apply` refuses a dirty work tree (`--allow-dirty`), writes `.rebarrc`
+  atomically, deletes only verified copies (a copy other files call becomes
+  a `# rebar-thin-wrapper` instead, so callers keep working), adjusts METRICS
+  counts the deletions change, reruns the checks and rolls everything back on
+  a regression. It refuses symlinked `scripts/` outside the project and any
+  rebar checkout, ignores `REBAR_*` in the environment, never changes `tier`,
+  and keeps checks whose copies ran ungated below the install's tier gate
+  running with a proposed `checks_enable`. Unmodified copies are recognized
+  from a released-blobs list embedded in the CLI
+  (`scripts/gen-released-blobs.sh`, a release step), so installs without git
+  history work. The CLI now honors `REBAR_PROJECT_ROOT` for repo detection,
+  as the scripts do.
   `check-ground-truth.sh --print` and `REBAR_RCFILE` support it. Design:
   `feedback/2026-11-14-rebar-migrate.md`.
 - **Adopters carry configuration, not rebar's scripts.** `rebar check`,
