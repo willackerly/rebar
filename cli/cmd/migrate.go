@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -10,6 +11,7 @@ import (
 )
 
 var (
+	migrateAllowDirty bool
 	migrateApply      bool
 	migrateRegenerate bool
 	migrateTimeout    time.Duration
@@ -45,18 +47,29 @@ reruns the checks, and exits 1 if one that passed before now fails.`,
 func init() {
 	migrateCmd.Flags().BoolVar(&migrateApply, "apply", false, "write .rebarrc, delete the verified copies and rerun the checks")
 	migrateCmd.Flags().BoolVar(&migrateRegenerate, "regenerate-registry", false, "use the ellipsis purpose style even if the registry changes (default: keep its bytes)")
+	migrateCmd.Flags().BoolVar(&migrateAllowDirty, "allow-dirty", false, "let --apply run with uncommitted or untracked files (their changes can't be undone with git)")
 	migrateCmd.Flags().DurationVar(&migrateTimeout, "timeout", 3*time.Minute, "time limit for each script run")
 	rootCmd.AddCommand(migrateCmd)
 }
 
+// runMigrate prints its own errors: main exits 1 without printing.
 func runMigrate(cmd *cobra.Command, args []string) error {
+	err := migrateMain(cmd)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "rebar migrate:", err)
+	}
+	return err
+}
+
+func migrateMain(cmd *cobra.Command) error {
 	opts := migrate.Options{
 		ProjectRoot:        cfg.RepoRoot,
 		RebarRoot:          findRebarRoot(),
 		RegenerateRegistry: migrateRegenerate,
 		Timeout:            migrateTimeout,
+		Progress:           os.Stderr,
 	}
-	fmt.Fprintln(os.Stderr, "rebar migrate: running the legacy copies and the install's scripts (read-only)...")
+	fmt.Fprintln(os.Stderr, "rebar migrate: probes run in a scratch copy of the project; nothing here changes until --apply")
 	plan, err := migrate.BuildPlan(opts)
 	if err != nil {
 		return err
@@ -75,15 +88,23 @@ func runMigrate(cmd *cobra.Command, args []string) error {
 		fmt.Fprintln(out, "Nothing to migrate.")
 		return nil
 	}
-	results, err := migrate.Apply(plan, opts)
+	ao := migrate.ApplyOptions{AllowDirty: migrateAllowDirty}
+	if exe, err := os.Executable(); err == nil && filepath.Base(exe) == "rebar" {
+		ao.RebarBin = exe
+	}
+	res, err := migrate.Apply(plan, opts, ao)
 	if err != nil {
 		return err
 	}
-	regressed := migrate.RenderChecks(out, results, plan.Tier)
-	fmt.Fprintln(out, "\nApplied. Review with `git status` / `git diff`, then commit (`rebar commit` if the project tracks .rebar/integrity.json).")
-	if regressed {
-		fmt.Fprintln(out, "A check that passed before migration fails now (see above).")
+	migrate.RenderChecks(out, res.Checks, plan.Tier)
+	if res.RolledBack {
+		fmt.Fprintln(out, "\nA check that passed before migration fails now (see above). Every change was rolled back; the project is as it was.")
 		os.Exit(1)
 	}
+	fmt.Fprint(out, "\nApplied. Review with `git status` / `git diff`")
+	if !migrateAllowDirty {
+		fmt.Fprint(out, " (the tree was clean, so `git checkout -- .` undoes it)")
+	}
+	fmt.Fprintln(out, ", then commit (`rebar commit` if the project tracks .rebar/integrity.json).")
 	return nil
 }

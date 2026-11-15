@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha1"
+	_ "embed"
 	"fmt"
 	"os"
 	"os/exec"
@@ -25,19 +26,49 @@ type runResult struct {
 
 func (r runResult) ok() bool { return r.Err == nil && r.Code == 0 }
 
+// steersScripts reports whether an environment variable changes what rebar
+// scripts do: every REBAR_* (tier, contracts dir, checks_enable, impl
+// counts, the project root, the .rebarrc, …), the overrides
+// _rebar_config is called with (CONTRACT_EXTENSIONS), the SKIP_* switches
+// of ci-check, and the locale, which changes sorting.
+func steersScripts(k string) bool {
+	switch {
+	case strings.HasPrefix(k, "REBAR_"), strings.HasPrefix(k, "SKIP_"), strings.HasPrefix(k, "LC_"):
+		return true
+	case k == "CONTRACT_EXTENSIONS", k == "LANG", k == "GIT_DIR", k == "GIT_WORK_TREE", k == "GIT_INDEX_FILE":
+		return true
+	}
+	return false
+}
+
 // scrubbedEnv is the caller's environment without the variables that steer
-// rebar scripts, so every probe states its own.
+// rebar scripts, so a decision never depends on the shell migrate was run
+// from; every probe states its own.
 func scrubbedEnv(extra ...string) []string {
 	var env []string
 	for _, kv := range os.Environ() {
 		k, _, _ := strings.Cut(kv, "=")
-		switch k {
-		case "REBAR_PROJECT_ROOT", "REBAR_RCFILE", "REBAR_TIER", "REBAR_REGISTRY_IMPL_COUNTS", "LC_ALL":
+		if steersScripts(k) {
 			continue
 		}
 		env = append(env, kv)
 	}
 	return append(env, extra...)
+}
+
+// SteeringEnv lists the variables set in the caller's environment that
+// migrate ignores but `rebar check` would honor (REBAR_ROOT, which only
+// locates the install, is left out).
+func SteeringEnv() []string {
+	var out []string
+	for _, kv := range os.Environ() {
+		k, _, _ := strings.Cut(kv, "=")
+		if steersScripts(k) && k != "REBAR_ROOT" && !strings.HasPrefix(k, "LC_") && k != "LANG" {
+			out = append(out, k)
+		}
+	}
+	sort.Strings(out)
+	return out
 }
 
 // run executes `bash args…` in dir with env, a timeout, and stdin closed.
@@ -62,6 +93,8 @@ func run(timeout time.Duration, dir string, env []string, args ...string) runRes
 	var err error
 	select {
 	case err = <-done:
+		// Anything the script left running in the background goes too.
+		_ = syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
 	case <-ctx.Done():
 		_ = syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
 		<-done
@@ -154,29 +187,52 @@ func gitBlobHash(data []byte) string {
 	return fmt.Sprintf("%x", h.Sum(nil))
 }
 
-// releasedBlobs returns the blob hashes rebar has ever shipped for a
-// bootstrap file (templates/project-bootstrap/scripts/<name> or
-// scripts/<name>), from the install's git history. Empty when the install
-// is not a git clone.
+//go:embed released-blobs.txt
+var releasedManifest string
+
+// manifestBlobs indexes released-blobs.txt by file name.
+func manifestBlobs() map[string]map[string]bool {
+	out := map[string]map[string]bool{}
+	for _, line := range strings.Split(releasedManifest, "\n") {
+		f := strings.Fields(line)
+		if len(f) != 2 || strings.HasPrefix(f[0], "#") {
+			continue
+		}
+		if out[f[1]] == nil {
+			out[f[1]] = map[string]bool{}
+		}
+		out[f[1]][f[0]] = true
+	}
+	return out
+}
+
+// releasedBlobs returns the blob ids of every released version of a
+// bootstrap file (scripts/<name>, templates/project-bootstrap/scripts/<name>):
+// the manifest embedded in the CLI (scripts/gen-released-blobs.sh; works for
+// installs without git history, such as installer-made release trees), the
+// install's release history when it is a git clone (tags, main, release
+// branches; not --all, which would count stashes and unmerged branches), and
+// the install's own current files.
 func releasedBlobs(rebarRoot, name string) map[string]bool {
 	out := map[string]bool{}
-	cmd := exec.Command("git", "-C", rebarRoot, "log", "--all", "--format=", "--raw", "--no-abbrev", "--no-renames",
-		"--", "templates/project-bootstrap/scripts/"+name, "scripts/"+name)
-	data, err := cmd.Output()
-	if err != nil {
-		return out
+	for h := range manifestBlobs()[name] {
+		out[h] = true
 	}
-	for _, line := range strings.Split(string(data), "\n") {
-		f := strings.Fields(line)
-		if len(f) >= 5 && strings.HasPrefix(f[0], ":") {
-			for _, h := range f[2:4] {
-				if strings.Trim(h, "0") != "" {
-					out[h] = true
+	args := []string{"-C", rebarRoot, "log", "--format=", "--raw", "--no-abbrev", "--no-renames",
+		"--tags", "--branches=main", "--branches=release/*", "--remotes=origin/main", "--remotes=origin/release/*", "HEAD",
+		"--", "templates/project-bootstrap/scripts/" + name, "scripts/" + name}
+	if data, err := exec.Command("git", args...).Output(); err == nil {
+		for _, line := range strings.Split(string(data), "\n") {
+			f := strings.Fields(line)
+			if len(f) >= 5 && strings.HasPrefix(f[0], ":") {
+				for _, h := range f[2:4] {
+					if strings.Trim(h, "0") != "" {
+						out[h] = true
+					}
 				}
 			}
 		}
 	}
-	// Uncommitted install changes: the working copies count too.
 	for _, p := range []string{filepath.Join(rebarRoot, "scripts", name), filepath.Join(rebarRoot, "templates/project-bootstrap/scripts", name)} {
 		if data, err := os.ReadFile(p); err == nil {
 			out[gitBlobHash(data)] = true
@@ -192,7 +248,7 @@ var (
 )
 
 // facts reduces check output to what it found: the file references it
-// prints and the numbers it reports (not list numbering), each sorted. Two outputs with the same
+// prints (sorted) and the numbers it reports (in order, not list numbering). Two outputs with the same
 // facts and exit status differ only in wording.
 func facts(s string) string {
 	s = ansiRe.ReplaceAllString(s, "")
@@ -200,8 +256,9 @@ func facts(s string) string {
 	paths := pathRe.FindAllString(s, -1)
 	rest := pathRe.ReplaceAllString(s, " ")
 	ints := intRe.FindAllString(rest, -1)
+	// File references may come out in another order; numbers keep theirs,
+	// so "3 errors, 0 warnings" never equals "0 errors, 3 warnings".
 	sort.Strings(paths)
-	sort.Strings(ints)
 	return strings.Join(paths, "\n") + "\x00" + strings.Join(ints, " ")
 }
 
@@ -218,6 +275,10 @@ func compareRuns(legacy, install runResult) (bool, string) {
 	if legacy.Code != install.Code {
 		return false, fmt.Sprintf("exit status %d (legacy) vs %d (install); %s", legacy.Code, install.Code, firstDiff(legacy.Stdout, install.Stdout))
 	}
+	le, ie := stderrOf(legacy), stderrOf(install)
+	if facts(le) != facts(ie) {
+		return false, "stderr differs: " + firstDiff(le, ie)
+	}
 	if legacy.Stdout == install.Stdout {
 		return true, "identical output"
 	}
@@ -227,8 +288,24 @@ func compareRuns(legacy, install runResult) (bool, string) {
 	return false, firstDiff(legacy.Stdout, install.Stdout)
 }
 
-// firstDiff describes the first line where two outputs differ.
-func firstDiff(a, b string) string {
+// stderrOf is a run's stderr without rebar's own notices (deprecation,
+// checks_enable warnings), which only one side prints.
+func stderrOf(r runResult) string {
+	var keep []string
+	for _, l := range strings.Split(r.Stderr, "\n") {
+		if !strings.HasPrefix(l, "rebar:") && !strings.HasPrefix(l, "rebar ") {
+			keep = append(keep, l)
+		}
+	}
+	return strings.Join(keep, "\n")
+}
+
+// firstDiff describes the first line where the copy's and the install's
+// outputs differ.
+func firstDiff(a, b string) string { return firstDiffAs(a, b, "legacy", "install") }
+
+// firstDiffAs is firstDiff with other names for the two sides.
+func firstDiffAs(a, b, la, lb string) string {
 	al := strings.Split(ansiRe.ReplaceAllString(a, ""), "\n")
 	bl := strings.Split(ansiRe.ReplaceAllString(b, ""), "\n")
 	n := 0
@@ -253,7 +330,7 @@ func firstDiff(a, b string) string {
 			y = bl[i]
 		}
 		if x != y {
-			return fmt.Sprintf("%d line(s) differ; first at line %d: legacy %q, install %q", n, i+1, clip(x), clip(y))
+			return fmt.Sprintf("%d line(s) differ; first at line %d: %s %q, %s %q", n, i+1, la, clip(x), lb, clip(y))
 		}
 	}
 	return "outputs differ"

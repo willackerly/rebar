@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 )
@@ -33,7 +34,11 @@ func Render(w io.Writer, p *Plan, applied bool) {
 	if d := p.Deletions(); len(d) > 0 {
 		fmt.Fprintf(w, "Verified, %s:\n", strings.TrimSpace(verb[applied]+" remove or replace"))
 		for _, s := range d {
-			fmt.Fprintf(w, "  %-8s scripts/%s — %s\n", s.Verdict, s.Name, s.Reason)
+			label := s.Verdict.String()
+			if s.Shim {
+				label = "wrap"
+			}
+			fmt.Fprintf(w, "  %-8s scripts/%s — %s\n", label, s.Name, s.Reason)
 			for _, det := range s.Details {
 				fmt.Fprintf(w, "             %s\n", det)
 			}
@@ -64,7 +69,11 @@ func Render(w io.Writer, p *Plan, applied bool) {
 		fmt.Fprintln(w)
 	}
 	if p.RegenRegistry {
-		fmt.Fprintf(w, "CONTRACT-REGISTRY.md: %s be regenerated with the ellipsis purpose style\n\n", strings.TrimSpace(verb[applied]))
+		why := "with the ellipsis purpose style (--regenerate-registry)"
+		if p.RegenReason != "" {
+			why = "because " + p.RegenReason
+		}
+		fmt.Fprintf(w, "CONTRACT-REGISTRY.md: %s %s\n\n", map[bool]string{false: "would be regenerated", true: "regenerated"}[applied], why)
 	}
 	for _, n := range p.Notes {
 		fmt.Fprintf(w, "note: %s\n", n)
@@ -77,7 +86,7 @@ func Render(w io.Writer, p *Plan, applied bool) {
 // CheckResult is a check run after apply.
 type CheckResult struct {
 	Name       string
-	Ran        string // "install" or "legacy copy"
+	Ran        string // "install", "legacy copy" or "wrapper"
 	Tier       int
 	BeforeCode int
 	AfterCode  int
@@ -87,64 +96,134 @@ type CheckResult struct {
 // Regressed reports a check that passed before and fails now.
 func (c CheckResult) Regressed() bool { return c.BeforeCode == 0 && c.AfterCode != 0 }
 
+// ApplyOptions are the knobs only --apply has.
+type ApplyOptions struct {
+	// AllowDirty lets apply run on a work tree with uncommitted changes or
+	// untracked copies (whose deletion git cannot undo).
+	AllowDirty bool
+	// RebarBin is the rebar CLI the wrappers' smoke run puts on PATH ("":
+	// whatever `rebar` PATH has, else no smoke run).
+	RebarBin string
+}
+
+// ApplyResult is what apply did.
+type ApplyResult struct {
+	Checks     []CheckResult
+	RolledBack bool
+}
+
+// backup holds a file's state before apply, for rollback.
+type backup struct {
+	path    string
+	data    []byte
+	mode    os.FileMode
+	existed bool
+}
+
 // Apply writes .rebarrc, removes or replaces the verified copies, edits
 // METRICS, optionally regenerates the registry, then reruns every check
-// that had a legacy copy and returns the results.
-func Apply(p *Plan, opts Options) ([]CheckResult, error) {
+// that had a legacy copy (and each wrapper left for callers). If a check
+// that passed before fails, everything apply changed is put back.
+//
+// It refuses to start on a dirty work tree (unless AllowDirty), when a file
+// changed since the plan was made, or when a target is a symlink or
+// resolves outside the project.
+func Apply(p *Plan, opts Options, ao ApplyOptions) (*ApplyResult, error) {
 	if opts.Timeout == 0 {
 		opts.Timeout = defaultTimeout
 	}
+	defer Cleanup()
+	if err := p.preflight(ao); err != nil {
+		return nil, err
+	}
+
+	var backups []backup
+	save := func(path string) error {
+		b := backup{path: path}
+		if info, err := os.Lstat(path); err == nil {
+			data, err := os.ReadFile(path)
+			if err != nil {
+				return err
+			}
+			b.data, b.mode, b.existed = data, info.Mode().Perm(), true
+		}
+		backups = append(backups, b)
+		return nil
+	}
+	rollback := func() {
+		for i := len(backups) - 1; i >= 0; i-- {
+			b := backups[i]
+			if b.existed {
+				_ = writeAtomic(b.path, b.data, b.mode)
+			} else {
+				_ = os.Remove(b.path)
+			}
+		}
+	}
+	fail := func(err error) (*ApplyResult, error) {
+		rollback()
+		return nil, fmt.Errorf("%v (nothing was changed: apply rolled back)", err)
+	}
+
 	rcPath := filepath.Join(p.Project, ".rebarrc")
 	if !bytes.Equal(p.RC, p.NewRC) {
-		if err := os.WriteFile(rcPath, p.NewRC, 0o644); err != nil {
-			return nil, err
+		if err := save(rcPath); err != nil {
+			return fail(err)
+		}
+		if err := writeAtomic(rcPath, p.NewRC, 0o644); err != nil {
+			return fail(err)
 		}
 	}
 	for _, s := range p.Deletions() {
 		path := filepath.Join(p.Project, "scripts", s.Name)
-		if !inside(p.Project, path) {
-			return nil, fmt.Errorf("refusing to touch %s: outside the project", path)
+		if err := save(path); err != nil {
+			return fail(err)
 		}
 		switch s.Verdict {
 		case Delete:
 			if err := os.Remove(path); err != nil {
-				return nil, err
+				return fail(err)
 			}
 		case Replace:
-			data, err := os.ReadFile(s.ReplaceWith)
-			if err != nil {
-				return nil, err
+			data := s.ReplaceContent
+			if data == nil {
+				var err error
+				if data, err = os.ReadFile(s.ReplaceWith); err != nil {
+					return fail(err)
+				}
 			}
 			mode := os.FileMode(0o644)
 			if strings.HasSuffix(s.Name, ".sh") {
 				mode = 0o755
 			}
-			if err := os.WriteFile(path, data, mode); err != nil {
-				return nil, err
+			if err := writeAtomic(path, data, mode); err != nil {
+				return fail(err)
 			}
-			_ = os.Chmod(path, mode)
 		}
 	}
 	if len(p.MetricsEdits) > 0 {
-		data, err := os.ReadFile(p.MetricsFile)
-		if err != nil {
-			return nil, err
+		if err := save(p.MetricsFile); err != nil {
+			return fail(err)
 		}
-		if err := os.WriteFile(p.MetricsFile, []byte(applyMetricsEdits(string(data), p.MetricsEdits)), 0o644); err != nil {
-			return nil, err
+		if err := writeAtomic(p.MetricsFile, []byte(applyMetricsEdits(string(p.MetricsData), p.MetricsEdits)), 0o644); err != nil {
+			return fail(err)
 		}
 	}
 	env := scrubbedEnv("REBAR_PROJECT_ROOT=" + p.Project)
 	if p.RegenRegistry {
+		reg := filepath.Join(p.Project, firstNonEmpty(rcValue(p.NewRC, "contracts_dir"), "architecture"), "CONTRACT-REGISTRY.md")
+		if err := save(reg); err != nil {
+			return fail(err)
+		}
 		r := run(opts.Timeout, p.Project, env, filepath.Join(p.Install, "scripts", "compute-registry.sh"))
 		if !r.ok() {
-			return nil, fmt.Errorf("regenerating the registry failed: %s%s", r.Stdout, r.Stderr)
+			return fail(fmt.Errorf("regenerating the registry failed: %s%s", r.Stdout, r.Stderr))
 		}
 	}
 
-	var results []CheckResult
+	res := &ApplyResult{}
 	for _, s := range p.Scripts {
-		if s.Check == nil || s.Before == nil {
+		if s.Check == nil || s.Before == nil || s.Writes {
 			continue
 		}
 		tier := p.Tier
@@ -156,19 +235,177 @@ func Apply(p *Plan, opts Options) ([]CheckResult, error) {
 		if s.Verdict == Keep {
 			script, ran = filepath.Join(p.Project, "scripts", s.Name), "legacy copy"
 		}
-		r := run(opts.Timeout, p.Project, append(env, fmt.Sprintf("REBAR_TIER=%d", tier)), append([]string{script}, s.Check...)...)
-		code := r.Code
-		if r.Err != nil {
-			code = -1
+		tierEnv := append(append([]string{}, env...), fmt.Sprintf("REBAR_TIER=%d", tier))
+		r := run(opts.Timeout, p.Project, tierEnv, append([]string{script}, s.Check...)...)
+		res.Checks = append(res.Checks, CheckResult{Name: s.Name, Ran: ran, Tier: tier, BeforeCode: s.Before.Code, AfterCode: codeOf(r), Output: r.Stdout + r.Stderr})
+		if s.Shim {
+			// The wrapper the callers will run, the way they run it.
+			if wenv, ok := wrapperEnv(ao.RebarBin, p.Install, tierEnv); ok {
+				w := run(opts.Timeout, p.Project, wenv, append([]string{filepath.Join(p.Project, "scripts", s.Name)}, s.Check...)...)
+				res.Checks = append(res.Checks, CheckResult{Name: s.Name, Ran: "wrapper scripts/" + s.Name, Tier: tier, BeforeCode: s.Before.Code, AfterCode: codeOf(w), Output: w.Stdout + w.Stderr})
+			}
 		}
-		results = append(results, CheckResult{Name: s.Name, Ran: ran, Tier: tier, BeforeCode: s.Before.Code, AfterCode: code, Output: r.Stdout + r.Stderr})
 	}
-	return results, nil
+	for _, c := range res.Checks {
+		if c.Regressed() {
+			rollback()
+			res.RolledBack = true
+			break
+		}
+	}
+	return res, nil
 }
 
-func inside(root, path string) bool {
-	rel, err := filepath.Rel(root, path)
-	return err == nil && rel != ".." && !strings.HasPrefix(rel, "../") && !filepath.IsAbs(rel)
+func codeOf(r runResult) int {
+	if r.Err != nil {
+		return -1
+	}
+	return r.Code
+}
+
+// wrapperEnv puts a `rebar` (bin, or the one on PATH) first on PATH and
+// points it at this install, for running a thin wrapper as a caller would.
+func wrapperEnv(bin, install string, env []string) ([]string, bool) {
+	if bin == "" {
+		p, err := exec.LookPath("rebar")
+		if err != nil {
+			return nil, false
+		}
+		bin = p
+	}
+	dir, err := os.MkdirTemp("", "rebar-migrate-bin-")
+	if err != nil {
+		return nil, false
+	}
+	if err := os.Symlink(bin, filepath.Join(dir, "rebar")); err != nil {
+		os.RemoveAll(dir)
+		return nil, false
+	}
+	defer func() { cleanupDirs = append(cleanupDirs, dir) }()
+	out := []string{"REBAR_ROOT=" + install}
+	for _, kv := range env {
+		if strings.HasPrefix(kv, "PATH=") {
+			out = append(out, "PATH="+dir+string(os.PathListSeparator)+strings.TrimPrefix(kv, "PATH="))
+			continue
+		}
+		if strings.HasPrefix(kv, "REBAR_PROJECT_ROOT=") || strings.HasPrefix(kv, "REBAR_TIER=") {
+			continue // the wrapper finds the project itself, and its tier in .rebarrc
+		}
+		out = append(out, kv)
+	}
+	return out, true
+}
+
+// cleanupDirs are removed by Cleanup.
+var cleanupDirs []string
+
+// Cleanup removes the temporary directories apply created (Apply calls it).
+func Cleanup() {
+	for _, d := range cleanupDirs {
+		os.RemoveAll(d)
+	}
+	cleanupDirs = nil
+}
+
+// preflight refuses to apply when the plan is stale, a target is unsafe,
+// or (without AllowDirty) the work tree has changes git could not restore.
+func (p *Plan) preflight(ao ApplyOptions) error {
+	if !sameBytes(filepath.Join(p.Project, ".rebarrc"), nilIfEmpty(p.RC)) {
+		return fmt.Errorf(".rebarrc changed since the plan was made; rerun rebar migrate")
+	}
+	if p.MetricsFile != "" && !sameBytes(p.MetricsFile, p.MetricsData) {
+		return fmt.Errorf("%s changed since the plan was made; rerun rebar migrate", filepath.Base(p.MetricsFile))
+	}
+	targets := []string{filepath.Join(p.Project, ".rebarrc")}
+	if p.MetricsFile != "" {
+		targets = append(targets, p.MetricsFile)
+	}
+	for _, s := range p.Deletions() {
+		path := filepath.Join(p.Project, "scripts", s.Name)
+		data, err := os.ReadFile(path)
+		if err != nil || gitBlobHash(data) != s.Hash {
+			return fmt.Errorf("scripts/%s changed since the plan was made; rerun rebar migrate", s.Name)
+		}
+		targets = append(targets, path)
+	}
+	for _, t := range targets {
+		if err := safeTarget(p.Project, p.Install, t); err != nil {
+			return err
+		}
+	}
+	if ao.AllowDirty {
+		return nil
+	}
+	if _, err := gitOut(p.Project, "rev-parse", "--verify", "HEAD"); err != nil {
+		return fmt.Errorf("%s is not a git work tree with commits, so deleted copies could not be restored; commit first or pass --allow-dirty", p.Project)
+	}
+	out, err := gitOut(p.Project, "status", "--porcelain", "--untracked-files=all", "--", ".")
+	if err != nil {
+		return err
+	}
+	if lines := strings.TrimSpace(out); lines != "" {
+		first := strings.Split(lines, "\n")
+		if len(first) > 5 {
+			first = append(first[:5], "…")
+		}
+		return fmt.Errorf("the work tree has uncommitted or untracked files; commit or stash them first so every change apply makes can be reviewed and undone with git (or pass --allow-dirty):\n  %s", strings.Join(first, "\n  "))
+	}
+	return nil
+}
+
+func nilIfEmpty(b []byte) []byte {
+	if len(b) == 0 {
+		return nil
+	}
+	return b
+}
+
+// safeTarget refuses a path apply would write or delete unless it is a
+// regular file (or absent) whose real directory is inside the project and
+// not inside the rebar install.
+func safeTarget(project, install, path string) error {
+	if info, err := os.Lstat(path); err == nil && !info.Mode().IsRegular() {
+		return fmt.Errorf("refusing to touch %s: not a regular file (symlink?)", path)
+	}
+	dir, err := filepath.EvalSymlinks(filepath.Dir(path))
+	if err != nil {
+		return fmt.Errorf("refusing to touch %s: %v", path, err)
+	}
+	if !within(project, dir) {
+		return fmt.Errorf("refusing to touch %s: it resolves to %s, outside the project", path, dir)
+	}
+	if inst, err := filepath.EvalSymlinks(install); err == nil && within(inst, dir) {
+		return fmt.Errorf("refusing to touch %s: it resolves into the rebar install", path)
+	}
+	return nil
+}
+
+// writeAtomic replaces path with data via a temp file and rename in the
+// same directory, so a crash never leaves it half written, and a symlink
+// at path is never followed.
+func writeAtomic(path string, data []byte, mode os.FileMode) error {
+	if info, err := os.Lstat(path); err == nil && info.Mode()&os.ModeSymlink != 0 {
+		return fmt.Errorf("refusing to write through symlink %s", path)
+	}
+	f, err := os.CreateTemp(filepath.Dir(path), "."+filepath.Base(path)+".migrate-")
+	if err != nil {
+		return err
+	}
+	tmp := f.Name()
+	if _, err := f.Write(data); err != nil {
+		f.Close()
+		os.Remove(tmp)
+		return err
+	}
+	if err := f.Close(); err != nil {
+		os.Remove(tmp)
+		return err
+	}
+	if err := os.Chmod(tmp, mode); err != nil {
+		os.Remove(tmp)
+		return err
+	}
+	return os.Rename(tmp, path)
 }
 
 // RenderChecks prints post-apply check results; it returns true when a

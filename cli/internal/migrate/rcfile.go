@@ -117,6 +117,12 @@ func MergeRC(rc []byte, settings []Setting) ([]byte, []Setting) {
 			at := i + j
 			return []byte(text[:at] + body + text[at:]), added
 		}
+		// A block whose end marker was deleted: close it at the end of the
+		// file rather than opening a second one.
+		if !strings.HasSuffix(text, "\n") {
+			text += "\n"
+		}
+		return []byte(text + body + blockEnd + "\n"), added
 	}
 	var b strings.Builder
 	b.WriteString(text)

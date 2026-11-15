@@ -135,11 +135,11 @@ func TestBuildPlanAndApply(t *testing.T) {
 		}
 	}
 
-	results, err := Apply(plan, opts(p, install))
+	res, err := Apply(plan, opts(p, install), ApplyOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, r := range results {
+	for _, r := range res.Checks {
 		if r.Regressed() {
 			t.Fatalf("%s regressed after apply:\n%s", r.Name, r.Output)
 		}
@@ -192,7 +192,7 @@ func TestUntranslatableMetricKeepsCopy(t *testing.T) {
 	if len(plan.MetricsEdits) != 0 {
 		t.Fatalf("nothing deleted, yet METRICS edits: %+v", plan.MetricsEdits)
 	}
-	if _, err := Apply(plan, opts(p, install)); err != nil {
+	if _, err := Apply(plan, opts(p, install), ApplyOptions{}); err != nil {
 		t.Fatal(err)
 	}
 	if !isFile(filepath.Join(p, "scripts", "check-ground-truth.sh")) {
@@ -286,7 +286,7 @@ func TestRegistrySettingsAreDerived(t *testing.T) {
 	if _, ok := acceptedValue(plan.Added, "registry_purpose_style"); ok || !plan.RegenRegistry {
 		t.Fatalf("--regenerate-registry kept the byte cut: %+v", plan.Added)
 	}
-	if _, err := Apply(plan, o); err != nil {
+	if _, err := Apply(plan, o, ApplyOptions{}); err != nil {
 		t.Fatal(err)
 	}
 	reg2, _ := os.ReadFile(filepath.Join(p, "architecture", "CONTRACT-REGISTRY.md"))

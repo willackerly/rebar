@@ -10,6 +10,12 @@
 #   T4  a second run proposes nothing
 #   T5  a project bootstrapped from the pre-#14 template (from git history):
 #       every copy is unmodified, so all go, and checks still pass
+#   T6  a verified copy that a CI script and a pre-commit config call becomes
+#       a thin wrapper; after --apply both callers still work; --apply
+#       refuses a dirty work tree
+#   T7  scripts/ symlinked to a directory outside the project: refused,
+#       nothing there touched
+#   T8  a clone of the rebar repo: refused
 #
 # Builds the CLI from this checkout, so it needs Go (SKIP otherwise).
 # Usage: bash scripts/tests/migrate.test.sh
@@ -103,6 +109,60 @@ out=$(cd "$P" && rebar migrate 2>&1) || fail "T4: second run failed: $out"
 echo "$out" | grep -q 'Nothing to migrate' || fail "T4: second run proposes changes: $out"
 ok "T4 second run proposes nothing"
 
+# ── T6 callers keep working ──
+mkdir -p "$TMP/bin"
+printf '#!/bin/sh\nREBAR_ROOT="%s" exec "%s" "$@"\n' "$ROOT" "$TMP/rebar" > "$TMP/bin/rebar"
+chmod +x "$TMP/bin/rebar"
+C="$TMP/callers"
+mkdir -p "$C/scripts" "$C/src"
+printf 'tier = 3\n' > "$C/.rebarrc"
+printf 'package a\n' > "$C/src/a.go"
+cp "$REBAR_SCRIPTS/check-todos.sh" "$C/scripts/check-todos.sh"
+printf '# a comment migrate does not care about\n' >> "$C/scripts/check-todos.sh"
+printf '#!/usr/bin/env bash\nset -e\n"$(dirname "$0")/check-todos.sh"\n' > "$C/scripts/ci.sh"
+printf 'repos:\n  - repo: local\n    hooks:\n      - id: todos\n        entry: scripts/check-todos.sh\n        language: system\n' > "$C/.pre-commit-config.yaml"
+chmod +x "$C/scripts/"*.sh
+g -C "$C" init -q && g -C "$C" add -A && g -C "$C" commit -qm init
+touch "$C/wip.txt"
+out=$(cd "$C" && PATH="$TMP/bin:$PATH" rebar migrate --apply 2>&1) && fail "T6: --apply ran on a dirty tree: $out"
+echo "$out" | grep -q 'uncommitted or untracked' || fail "T6: no dirty-tree refusal: $out"
+cmp -s "$REBAR_SCRIPTS/check-todos.sh" "$C/scripts/check-todos.sh" && fail "T6: the refused apply changed the copy"
+rm "$C/wip.txt"
+out=$(cd "$C" && PATH="$TMP/bin:$PATH" rebar migrate --apply 2>&1) || fail "T6: --apply failed: $out"
+grep -q '^# rebar-thin-wrapper' "$C/scripts/check-todos.sh" || fail "T6: called copy not replaced by a wrapper: $out"
+echo "$out" | grep -q 'PASS  check-todos via wrapper scripts/check-todos.sh' || fail "T6: wrapper not exercised after apply: $out"
+echo "$out" | grep -q 'CI: .pre-commit-config.yaml:5 runs scripts/check-todos.sh' || fail "T6: no CI note: $out"
+res=$(cd "$C" && PATH="$TMP/bin:$PATH" bash scripts/ci.sh 2>&1) || fail "T6: scripts/ci.sh broke after apply: $res"
+printf '// TODO: probe\n' >> "$C/src/a.go"
+res=$(cd "$C" && PATH="$TMP/bin:$PATH" scripts/check-todos.sh 2>&1) && fail "T6: the wrapper missed a TODO: $res"
+echo "$res" | grep -q 'src/a.go' || fail "T6: wrapper output lacks the finding: $res"
+# A wrapper copied elsewhere (analyze's registry test copies the script into
+# a temp dir) checks the directory it sits in, as the copy did.
+mkdir -p "$TMP/standalone/scripts"
+cp "$C/scripts/check-todos.sh" "$TMP/standalone/scripts/"
+res=$(cd / && PATH="$TMP/bin:$PATH" bash "$TMP/standalone/scripts/check-todos.sh" 2>&1) || fail "T6: copied wrapper failed outside a repo: $res"
+echo "$res" | grep -q 'No source directories found' || fail "T6: copied wrapper checked the wrong project: $res"
+ok "T6 called copies become wrappers and callers still work (also when copied); dirty tree refused"
+
+# ── T7 symlinked scripts/ ──
+S="$TMP/shared-scripts"
+mkdir -p "$S" "$TMP/linked"
+cp "$REBAR_SCRIPTS/check-todos.sh" "$S/"
+printf 'tier = 3\n' > "$TMP/linked/.rebarrc"
+ln -s "$S" "$TMP/linked/scripts"
+g -C "$TMP/linked" init -q && g -C "$TMP/linked" add -A && g -C "$TMP/linked" commit -qm init
+out=$(cd "$TMP/linked" && rebar migrate --apply 2>&1) && fail "T7: symlinked scripts/ not refused: $out"
+echo "$out" | grep -q 'outside the project' || fail "T7: wrong refusal: $out"
+[ -f "$S/check-todos.sh" ] || fail "T7: a file outside the project was deleted"
+ok "T7 symlinked scripts/ is refused"
+
+# ── T8 a rebar clone ──
+if g clone -q --shared "$ROOT" "$TMP/rebar-clone" 2>/dev/null; then
+  out=$(cd "$TMP/rebar-clone" && rebar migrate 2>&1) && fail "T8: a rebar clone was not refused: $out"
+  echo "$out" | grep -qE 'rebar source tree|shares history' || fail "T8: wrong refusal: $out"
+  ok "T8 a rebar clone is refused"
+fi
+
 # ── T5 pre-#14 template ──
 last=$(git -C "$ROOT" rev-list -1 HEAD -- templates/project-bootstrap/scripts/check-todos.sh 2>/dev/null || true)
 if [ -z "$last" ] || ! git -C "$ROOT" cat-file -e "$last^:templates/project-bootstrap/scripts/check-todos.sh" 2>/dev/null; then
@@ -125,9 +185,12 @@ g -C "$F" init -q && g -C "$F" add -A && g -C "$F" commit -qm init
 before=$(cd "$F" && rebar check --pre-commit >/dev/null 2>&1; echo $?)
 out=$(cd "$F" && rebar migrate --apply 2>&1) || fail "T5: --apply failed: $out"
 left=$(cd "$F/scripts" && ls | LC_ALL=C sort | tr '\n' ' ')  # ls order follows the locale
-[ "$left" = "README.md ci-check.sh pre-commit.sh " ] || fail "T5: left in scripts/: $left
+# cold-start-checks.sh stays as a wrapper: the old template's SessionStart
+# hook in .claude/settings.json calls it.
+[ "$left" = "README.md ci-check.sh cold-start-checks.sh pre-commit.sh " ] || fail "T5: left in scripts/: $left
 $out"
 grep -q '^# rebar-thin-wrapper' "$F/scripts/ci-check.sh" || fail "T5: ci-check.sh is not the thin wrapper"
+grep -q '^# rebar-thin-wrapper' "$F/scripts/cold-start-checks.sh" || fail "T5: cold-start-checks.sh is not a thin wrapper"
 grep -q 'rebar migrate' "$F/.rebarrc" && fail "T5: unmodified copies needed settings: $(cat "$F/.rebarrc")"
 after=$(cd "$F" && rebar check --pre-commit >/dev/null 2>&1; echo $?)
 [ "$before" = "$after" ] || fail "T5: rebar check --pre-commit exit $before before, $after after"
