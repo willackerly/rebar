@@ -84,3 +84,33 @@ func TestFindRebarRootVersionedInstall(t *testing.T) {
 		t.Fatalf("versioned: findRebarRoot() = %q, want %q", got, want)
 	}
 }
+
+// .mcp.json must name ask-mcp-server through ~/.rebar/current, not the
+// version directory: on Linux os.Executable() resolves the current symlink,
+// and a recorded versions/<v>/bin path breaks when that version is removed.
+func TestMCPServerPathUsesCurrent(t *testing.T) {
+	base := filepath.Join(t.TempDir(), ".rebar")
+	for _, v := range []string{"v1.0.0", "v2.0.0"} {
+		testutil.WriteExecutable(t, base, "versions/"+v+"/bin/rebar", "#!/bin/sh\n")
+		testutil.WriteExecutable(t, base, "versions/"+v+"/bin/ask-mcp-server", "#!/bin/sh\n")
+	}
+	if err := os.Symlink(filepath.Join("versions", "v1.0.0"), filepath.Join(base, "current")); err != nil {
+		t.Fatal(err)
+	}
+	// The executable as Linux reports it: the resolved version path.
+	got := mcpServerPathFrom(filepath.Join(base, "versions", "v1.0.0", "bin", "rebar"))
+	if want := filepath.Join(base, "current", "bin", "ask-mcp-server"); got != want {
+		t.Fatalf("active version: got %q, want %q", got, want)
+	}
+	// A version that is not current keeps its own path.
+	got = mcpServerPathFrom(filepath.Join(base, "versions", "v2.0.0", "bin", "rebar"))
+	if want := filepath.Join(base, "versions", "v2.0.0", "bin", "ask-mcp-server"); got != want {
+		t.Fatalf("inactive version: got %q, want %q", got, want)
+	}
+	// Outside a versioned install nothing changes.
+	plain := t.TempDir()
+	testutil.WriteExecutable(t, plain, "bin/ask-mcp-server", "#!/bin/sh\n")
+	if got, want := mcpServerPathFrom(filepath.Join(plain, "bin", "rebar")), filepath.Join(plain, "bin", "ask-mcp-server"); got != want {
+		t.Fatalf("checkout: got %q, want %q", got, want)
+	}
+}
