@@ -1810,8 +1810,8 @@ func stripComment(l string) string {
 }
 
 // registryAfterDeletions checks whether removing the copies changes the
-// registry: a copy can carry a CONTRACT: header (old steward.sh has
-// CONTRACT:S1-STEWARD) that the registry counts or lists as a shadow
+// registry: a copy can carry a CONTRACT: header (old steward.sh names the
+// steward contract) that the registry counts or lists as a shadow
 // contract. The deletions are made in the scratch workspace and the
 // install's registry check rerun; if it now reports STALE where it passed,
 // apply regenerates the registry and says why, instead of reporting a
