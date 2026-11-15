@@ -35,6 +35,10 @@ cd ../my-new-project
 > skip this for the 5-minute walkthrough; the contract you write below
 > doesn't need it. If you later run a remote ASK server, pass
 > `--server HOST:PORT` to record it as `ASK_SERVER` in your shell.
+> To install a released rebar instead of using this clone, run
+> `curl -fsSL https://raw.githubusercontent.com/willackerly/rebar/main/setup-rebar.sh | bash`
+> (versions side by side in `~/.rebar/versions/`; see
+> [SETUP.md § Install rebar](SETUP.md#install-rebar)).
 
 ### Step 2: Write your first contract (3 minutes)
 

@@ -95,10 +95,16 @@ cp -r templates/project-bootstrap/. ../my-project/ && cd ../my-project
 # Option B: Use the CLI (builds v2 scaffolding automatically)
 cd my-project && ../rebar/bin/rebar init
 
-# Option C: One-line installer (clones rebar to ~/.rebar, wires PATH)
-curl -fsSL https://raw.githubusercontent.com/willackerly/rebar/v3.0.0-beta.4/setup-rebar.sh | bash
+# Option C: One-line installer (latest stable release → ~/.rebar/versions/, wires PATH)
+curl -fsSL https://raw.githubusercontent.com/willackerly/rebar/main/setup-rebar.sh | bash
+# a specific version:  ... | bash -s -- v3.0.0
+# newest pre-release:  ... | bash -s -- --pre
 # then: rebar new my-project -d "what it does"
 ```
+
+The installer keeps versions side by side under `~/.rebar/versions/` with
+`~/.rebar/current` pointing at the active one; see
+[SETUP.md § Install rebar](SETUP.md#install-rebar).
 
 **What you get:** Contracts linked to code + agent coordination + immediate productivity boost
 **Perfect for:** Solo devs, 1-3 repos, testing the waters

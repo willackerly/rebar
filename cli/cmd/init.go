@@ -413,8 +413,37 @@ func ensureMCPConfig(root string) bool {
 // findMCPServerPath locates the ask-mcp-server executable.
 // Tries: same bin/ as this rebar CLI, then findRebarRoot()/bin/, then PATH.
 func findMCPServerPath() string {
-	if exe, err := os.Executable(); err == nil {
-		candidate := filepath.Join(filepath.Dir(exe), "ask-mcp-server")
+	exe, _ := os.Executable()
+	return mcpServerPathFrom(exe)
+}
+
+// stableBinDir maps <base>/versions/<v>/bin to <base>/current/bin when
+// <base>/current points at that version, so paths recorded in project files
+// (.mcp.json) follow version switches and survive removing old versions. On
+// Linux os.Executable() resolves the current symlink; on macOS it is
+// usually the invoked path already. Any other directory is returned as is.
+func stableBinDir(dir string) string {
+	verDir := filepath.Dir(dir)
+	if filepath.Base(dir) != "bin" || filepath.Base(filepath.Dir(verDir)) != "versions" {
+		return dir
+	}
+	current := filepath.Join(filepath.Dir(filepath.Dir(verDir)), "current")
+	cur, err := filepath.EvalSymlinks(current)
+	if err != nil {
+		return dir
+	}
+	ver, err := filepath.EvalSymlinks(verDir)
+	if err != nil || cur != ver {
+		return dir
+	}
+	return filepath.Join(current, "bin")
+}
+
+// mcpServerPathFrom is findMCPServerPath for a given rebar executable path
+// ("" if unknown).
+func mcpServerPathFrom(exe string) string {
+	if exe != "" {
+		candidate := filepath.Join(stableBinDir(filepath.Dir(exe)), "ask-mcp-server")
 		if _, err := os.Stat(candidate); err == nil {
 			return candidate
 		}
@@ -479,8 +508,9 @@ func ensureAgentsScaffolding(root string) bool {
 	return true
 }
 
-// findRebarRoot locates the rebar framework repo (a source checkout or the
-// setup-rebar.sh install, which is a clone). The marker is
+// findRebarRoot locates the rebar framework repo (a source checkout, a
+// setup-rebar.sh install under ~/.rebar/versions/<ver>/, or a pre-versioned
+// ~/.rebar clone). The marker is
 // templates/project-bootstrap/ plus the scripts/ the CLI runs — only the
 // rebar SOURCE repo has both; DESIGN.md + architecture/ alone also match
 // rebar-adopted projects, which made re-init in an adopted repo copy from
@@ -499,7 +529,8 @@ func findRebarRoot() string {
 	}
 
 	// Relative to the running binary — covers the setup-rebar.sh install
-	// (~/.rebar/bin/rebar → ~/.rebar) and any checkout's bin/rebar.
+	// (~/.rebar/current/bin/rebar resolves to ~/.rebar/versions/<ver>), a
+	// pre-versioned ~/.rebar clone, and any checkout's bin/rebar.
 	if exe, err := os.Executable(); err == nil {
 		if resolved, err := filepath.EvalSymlinks(exe); err == nil {
 			exe = resolved
@@ -517,6 +548,7 @@ func findRebarRoot() string {
 	// Common locations
 	home, _ := os.UserHomeDir()
 	candidates := []string{
+		filepath.Join(home, ".rebar", "current"),
 		filepath.Join(home, ".rebar"),
 		filepath.Join(home, "dev", "rebar"),
 		filepath.Join(home, "src", "rebar"),

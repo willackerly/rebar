@@ -1,0 +1,71 @@
+# Release — build rebar for darwin/linux × amd64/arm64 on a v* tag push and
+# publish a GitHub Release with the tarballs and their SHA-256 checksums.
+#
+# Each tarball is the full tree at the tag plus bin/rebar for one platform
+# (scripts/package-release.sh); setup-rebar.sh downloads and verifies it.
+# Tags with a pre-release suffix (v3.1.0-beta.1) become pre-releases.
+#
+# Third-party actions are pinned by commit SHA (the tag in the comment).
+name: release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # create the Release and upload assets
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: cli/go.mod
+          # No shared module/build cache in the job that publishes assets.
+          cache: false
+
+      - name: Tag matches the CLI's release version
+        # Unstamped builds of this tag (go build, older installers) report
+        # cli/cmd.releaseVersion, so it must equal the tag being published.
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          release="$(sed -n 's/^const releaseVersion = "\(.*\)"$/\1/p' cli/cmd/root.go)"
+          if [ "$release" != "$TAG" ]; then
+            echo "::error file=cli/cmd/root.go::releaseVersion is '$release' but the tag is '$TAG'; bump it and re-tag"
+            exit 1
+          fi
+
+      - name: Test
+        working-directory: cli
+        run: go test ./...
+
+      - name: Package
+        env:
+          TAG: ${{ github.ref_name }}
+        run: scripts/package-release.sh "$TAG" --out dist
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          prerelease=""
+          case "$TAG" in *-*) prerelease="--prerelease" ;; esac
+          gh release create "$TAG" dist/* \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "$TAG" \
+            --generate-notes \
+            --verify-tag \
+            $prerelease

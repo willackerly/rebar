@@ -18,6 +18,26 @@ All notable changes to rebar. Versioned with [semver](https://semver.org/).
 
 ## Unreleased
 
+- **Versioned installer.** `setup-rebar.sh [<version>|latest|<branch>]`
+  installs side by side under `~/.rebar/versions/<version>/`, with
+  `~/.rebar/current` pointing at the active one and `~/.rebar/current/bin`
+  on PATH. "latest" (the default) is the highest stable tag (the highest
+  pre-release only while no stable tag exists); `--pre` includes
+  pre-releases. Tags download a
+  prebuilt tarball verified against the release's SHA-256 checksums, and
+  build from source (git + Go) when the release has no assets; branches and
+  full commit SHAs always build from source, replacing the committed darwin/arm64
+  `bin/rebar`. `--pre`, `--no-switch`, `--source`. An existing `~/.rebar` clone is
+  left untouched; versions are added inside it. Design:
+  `feedback/2026-11-14-versioned-installer.md` (from #8).
+- **Release workflow.** Pushing a `v*` tag builds darwin/linux ×
+  amd64/arm64 with `scripts/package-release.sh` and publishes a GitHub
+  Release (a pre-release for suffixed tags) with the tarballs and
+  `rebar_<ver>_checksums.txt`.
+- **`rebar version` can be stamped:** `-ldflags "-X
+  github.com/willackerly/rebar/cli/cmd.Version=<ver>"`; branch builds from
+  the installer report `<branch>@<sha7>`. README badges written by `rebar
+  new` / `rebar adopt` still use the release string.
 - **Adopters carry configuration, not rebar's scripts.** `rebar check`,
   `rebar check --pre-commit|--cold-start` and the new `rebar run <script>`
   run the rebar install's scripts against the project

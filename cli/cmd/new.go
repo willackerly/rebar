@@ -105,7 +105,7 @@ build/
 	bootstrapV2Files(root)
 
 	// README.md
-	readme := fmt.Sprintf("# %s\n\n> **rebar %s** | **Tier 1: PARTIAL**\n\n", name, rootCmd.Version)
+	readme := fmt.Sprintf("# %s\n\n> **rebar %s** | **Tier 1: PARTIAL**\n\n", name, badgeVersion())
 	if newDescription != "" {
 		readme += newDescription + "\n\n"
 	}
@@ -191,7 +191,7 @@ Be practical and specific. Don't over-engineer — this is a fresh project.`, na
 			sections := parseLLMSections(response)
 
 			if content, ok := sections["README Content"]; ok {
-				readme := fmt.Sprintf("# %s\n\n> **rebar %s** | **Tier 1: PARTIAL**\n\n%s\n", name, rootCmd.Version, content)
+				readme := fmt.Sprintf("# %s\n\n> **rebar %s** | **Tier 1: PARTIAL**\n\n%s\n", name, badgeVersion(), content)
 				os.WriteFile(filepath.Join(root, "README.md"), []byte(readme), 0644)
 				fmt.Println("  ✓ README.md (AI-generated)")
 			}

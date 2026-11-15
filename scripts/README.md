@@ -153,6 +153,7 @@ Pre-commit (fast, <5s)       CI (thorough, <30s)          Full scan (comprehensi
 
 | Script | What it does |
 |--------|--------------|
+| `package-release.sh <version>` | Build the release tarballs (full tree at the ref + `bin/rebar` per platform) and `rebar_<ver>_checksums.txt`; what `.github/workflows/release.yml` runs on a `v*` tag. `--targets`, `--out`, `--ref`, `--repo` |
 | `sync-bootstrap.sh` (+ `--check`) | Keep `templates/project-bootstrap/scripts/` down to the thin entry points; caught by ci-check |
 | `test-e2e-live.sh` | End-to-end smoke against a live LLM. Gated on `claude` CLI; per-repo gates skip cleanly when adopted repos aren't on disk. Includes version triple-check (binary / `.rebar-version` / latest tag), MCP server discovery + tools/list smoke, ASK HTTP server smoke (if running), and 4 live LLM keyword-acceptance queries (rebar:steward, rebar:architect, local-mode, cross-repo). Run after every meaningful update — single command answer to "is this still working?" |
 
