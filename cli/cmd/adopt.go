@@ -56,7 +56,7 @@ func runAdopt(cmd *cobra.Command, args []string) error {
 	}
 
 	name := filepath.Base(root)
-	fmt.Printf("\n  Adopting REBAR v3.0.0-beta for: %s\n\n", name)
+	fmt.Printf("\n  Adopting REBAR %s for: %s\n\n", rootCmd.Version, name)
 
 	// Phase 1: Assess current state
 	fmt.Println("  Phase 1: Assessment")
