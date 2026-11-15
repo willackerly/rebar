@@ -35,6 +35,7 @@
 2b5c7e0b093a7ca2b6c0d27f5257f4a23a7f3d06 rebar-doc.sh
 2bfc826f6d191a1b6ac99699acc9da1a04887e9a sync-bootstrap.sh
 2c837613ec27fb8d91bb9dcfbb7a9c88cfc9af06 pre-commit.sh
+30197f6c50f4d5ac5fdd4b22d0f9eb87d954fbb0 refresh-context.sh
 31c4373b8805580f9a24100153b3819c1586e894 check-ground-truth.sh
 3317602a50fd19524a85437b848dad2e9f03a9b9 check-contract-refs.sh
 332303a080e45d5ad9c18134caabbaae15ea336e check-registry.sh
@@ -120,6 +121,7 @@
 91c5e27698115b539c4db7c2af50db6c40febfbd check-prefix-uniqueness.sh
 92caca697d5174a545001b904ee108a8f465938e compute-registry.sh
 930299f232c8f1063dfff4b800f9a039b1f05667 cold-start-checks.sh
+93561b125c06b5224045f98eee2e4fa5289909d1 test-e2e-live.sh
 943a8290355d7eff5935765efb68b1f9437e4db1 gen-released-blobs.sh
 947b93d8d675a4c49a508982794beb8e84bddf9f check-contract-refs.sh
 95dae56479f32f78ebfd92adda355bff156e8063 ci-check.sh

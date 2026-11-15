@@ -2,7 +2,7 @@
 
 last-synced: 2026-11-15
 <!-- freshness: 2026-11-15 -->
-**Branch:** main — **v3 line, graduated to `v3.0.0`** 2026-11-14 (plan D12); `release/v3.1.0-rc` at `v3.1.0-rc.1`
+**Branch:** main — **v3 line, graduated to `v3.0.0`** 2026-11-14 (plan D12); `release/v3.1.0-rc` at `v3.1.0-rc.2`
 **Tier:** 3 (ENFORCED) — rebar dogfoods its own methodology
 
 ---
@@ -15,7 +15,9 @@ last-synced: 2026-11-15
   re-verified after its expected 2026-08-16 close, and beta.3/beta.4 shipped
   after it. Recorded as D12 + a final scoreboard in `docs/v3-beta-plan.md`.
   No code change since beta.4. Tag `v2.0.0` remains the stable v2 point.
-- **`v3.1.0-rc.1` (2026-11-15) on `release/v3.1.0-rc`** — a pre-release:
+- **`v3.1.0-rc.2` (2026-11-15) on `release/v3.1.0-rc`** — rc.1 plus #27
+  (`refresh-context.sh` exit 141 with many commits since the last sync, found
+  testing rc.1 on virtru-analyze). rc.1 was a pre-release with:
   #14 self-contained install + `checks_enable`, #8 `contract_namespace`, #19
   scanners exclude directories by name, #17 versioned installer + release
   workflow, #20 CLI errors/commit pruning, #21 v3.0.0 merged in, #18
@@ -100,7 +102,7 @@ Ordered roughly by cost.
 
 ## What's Next — proposed go-forward
 
-**Now — test `v3.1.0-rc.1`.** Install it (`… | bash -s -- v3.1.0-rc.1`),
+**Now — test `v3.1.0-rc.2`.** Install it (`… | bash -s -- v3.1.0-rc.2`),
 run UPGRADING.md on a real adopter, fix forward into `release/v3.1.0-rc`.
 
 **Done — `v3.0.0` tagged and released 2026-11-14.** After the release PR merges, tag
