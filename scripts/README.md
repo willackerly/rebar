@@ -77,6 +77,9 @@ ln -sf ../../scripts/pre-commit.sh .git/hooks/pre-commit
 
 ## Configuration
 
+`.rebarrc` keys: [docs/CONFIGURATION.md](../docs/CONFIGURATION.md). Environment
+variables:
+
 | Environment Variable | Default | Purpose |
 |---------------------|---------|---------|
 | `CONTRACT_EXTENSIONS` | `.go .ts .tsx .js .jsx .py .rs` | File extensions to scan |
@@ -166,7 +169,8 @@ Pre-commit (fast, <5s)       CI (thorough, <30s)          Full scan (comprehensi
 
 `/scripts/` is the only copy. Adopting projects don't carry these scripts:
 `rebar check` and `rebar run <script>` run them from the rebar install against
-the project (`REBAR_PROJECT_ROOT`), and the project tailors them in `.rebarrc`.
+the project (`REBAR_PROJECT_ROOT`), and the project tailors them in `.rebarrc`
+([docs/CONFIGURATION.md](../docs/CONFIGURATION.md)).
 `templates/project-bootstrap/scripts/` holds just the two thin entry points
 (`ci-check.sh`, `pre-commit.sh`) that adopters get from
 `cp -r templates/project-bootstrap/.`; `sync-bootstrap.sh --check` (wired into
