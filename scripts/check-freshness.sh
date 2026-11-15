@@ -21,7 +21,16 @@ if [ -z "$MAX_AGE_DAYS" ] && type _rebar_config >/dev/null 2>&1; then
   MAX_AGE_DAYS=$(_rebar_config freshness_max_days _REBAR_NO_ENV 14)
 fi
 MAX_AGE_DAYS="${MAX_AGE_DAYS:-14}"
-TODAY=$(date +%s)
+# Midnight-to-midnight epochs, so ages are whole calendar days. A bare date
+# would make BSD `date -j` fill the time from the current clock.
+day_epoch() {  # day_epoch YYYY-MM-DD → local midnight in epoch seconds, or 0
+  if date --version >/dev/null 2>&1; then
+    date -d "$1" +%s 2>/dev/null || echo 0                                # GNU date (Linux)
+  else
+    date -j -f "%Y-%m-%d %H:%M:%S" "$1 00:00:00" +%s 2>/dev/null || echo 0  # BSD date (macOS)
+  fi
+}
+TODAY=$(day_epoch "$(date +%Y-%m-%d)")
 stale=0
 total=0
 unmarked=0
@@ -74,17 +83,12 @@ while IFS= read -r file; do
   total=$((total + 1))
 
   # Calculate age (portable: works on macOS and Linux)
-  if date --version >/dev/null 2>&1; then
-    # GNU date (Linux)
-    doc_epoch=$(date -d "$date_str" +%s 2>/dev/null || echo 0)
-  else
-    # BSD date (macOS)
-    doc_epoch=$(date -j -f "%Y-%m-%d" "$date_str" +%s 2>/dev/null || echo 0)
-  fi
+  doc_epoch=$(day_epoch "$date_str")
 
   [ "$doc_epoch" -eq 0 ] && continue
 
-  age_days=$(( (TODAY - doc_epoch) / 86400 ))
+  # Round: a DST change between the two dates shifts the difference by an hour.
+  age_days=$(( (TODAY - doc_epoch + 43200) / 86400 ))
 
   if [ "$age_days" -gt "$MAX_AGE_DAYS" ]; then
     echo "STALE ($age_days days): $file — $marker: $date_str"
