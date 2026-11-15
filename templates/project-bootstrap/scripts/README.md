@@ -42,6 +42,15 @@ the full list is in the header of the install's `scripts/ci-check.sh`.
 
 Older adopters copied all of rebar's scripts here. Those copies still run (the
 CLI prefers a project's own full copy and prints a deprecation notice), but they
-no longer receive fixes. To migrate: move any customization into `.rebarrc`,
-replace `ci-check.sh` and `pre-commit.sh` with the two files above, and delete
-the rest.
+no longer receive fixes. To migrate, run:
+
+```bash
+rebar migrate            # dry run: proposed .rebarrc lines, files to delete, files kept and why
+rebar migrate --apply    # write .rebarrc, delete the verified copies, rerun the checks
+```
+
+It runs each copy and the install's script against the project and deletes a
+copy only when the install, with the settings it derived from that copy,
+behaves the same (identical metric values, a byte-identical registry, the same
+check findings). `ci-check.sh` and `pre-commit.sh` become the two files above.
+Copies it cannot verify stay, with the reason; move those by hand.

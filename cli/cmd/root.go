@@ -68,7 +68,8 @@ var rootCmd = &cobra.Command{
     rebar status                             Health dashboard
     rebar verify                             Check file integrity
     rebar check                              Run all enforcement checks
-    rebar run <script>                       Run one of rebar's scripts`,
+    rebar run <script>                       Run one of rebar's scripts
+    rebar migrate [--apply]                  Move legacy script copies into .rebarrc`,
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 		// Skip repo detection for commands that handle their own root
 		name := cmd.Name()
@@ -83,6 +84,12 @@ var rootCmd = &cobra.Command{
 		}
 
 		var err error
+		if repoRoot == "" {
+			// Like the scripts: REBAR_PROJECT_ROOT names the project (the
+			// thin wrappers `rebar migrate` leaves set it, so a copied
+			// wrapper still checks the directory it sits in).
+			repoRoot = os.Getenv("REBAR_PROJECT_ROOT")
+		}
 		if repoRoot == "" {
 			cwd, _ := os.Getwd()
 			repoRoot, err = config.FindRepoRoot(cwd)

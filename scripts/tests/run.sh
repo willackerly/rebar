@@ -34,7 +34,14 @@ while [ $i -lt ${#names[@]} ]; do
     echo "PASS  ${names[$i]}"
   else
     echo "FAIL  ${names[$i]}"
-    sed 's/^/      /' "$LOGS/${names[$i]}.log" | tail -15
+    if [ -n "${GITHUB_ACTIONS:-}" ]; then
+      # CI logs are the only record: show all of it, folded.
+      echo "::group::${names[$i]} log"
+      cat "$LOGS/${names[$i]}.log"
+      echo "::endgroup::"
+    else
+      sed 's/^/      /' "$LOGS/${names[$i]}.log" | tail -15
+    fi
     failed=$((failed + 1))
   fi
   i=$((i + 1))
