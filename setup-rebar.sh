@@ -402,7 +402,10 @@ main() {
     die "$REBAR_DIR exists and is not a directory. Move it aside or use --dir."
   fi
   if [[ -d "$REBAR_DIR" ]]; then
-    if [[ -e "$REBAR_DIR/.git" ]]; then
+    # A pre-versioned install is a rebar clone: a git checkout with rebar's
+    # markers. Any other git repo is foreign.
+    if [[ -e "$REBAR_DIR/.git" && -d "$REBAR_DIR/templates/project-bootstrap" \
+          && -f "$REBAR_DIR/scripts/steward.sh" ]]; then
       LEGACY=1
     elif [[ ! -d "$REBAR_DIR/versions" ]] && [[ -n "$(ls -A "$REBAR_DIR" 2>/dev/null)" ]]; then
       die "$REBAR_DIR exists but is neither a rebar install nor empty. Move it aside or use --dir."

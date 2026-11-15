@@ -27,6 +27,7 @@
 #   T11 a truncated download (`curl | bash` cut short at any line, or inside
 #       the last line) runs nothing and leaves ~/.rebar as it was
 #   T13 a short commit SHA is refused with a clear error; a full one builds
+#   T14 a git repo without rebar's markers is refused like any foreign dir
 #   T12 a re-install whose final move fails, or that is SIGTERMed between
 #       moving the old copy aside and moving the new one in, keeps the old copy
 # Once:
@@ -296,6 +297,17 @@ for sh in $BASHES; do
   [ "$("$H13/.rebar/current/bin/rebar" version)" = "rebar $FEAT_FULL@$FEAT_SHA" ] \
     || fail "T13 [$bv] full SHA version is '$("$H13/.rebar/current/bin/rebar" version)'"
   ok "T13 [$bv] short SHA refused with a clear error; full SHA builds"
+
+  # T14 — a git repo that is not a rebar clone is foreign, like T8.
+  H14="$TMP/h$n-gitdir"
+  mkdir -p "$H14/proj" && g -C "$H14/proj" init -q && echo hi > "$H14/proj/a.txt"
+  exclude_before="$(cksum < "$H14/proj/.git/info/exclude")"
+  if out="$(inst "$H14" "$sh" v9.1.0 --dir "$H14/proj")"; then fail "T14 [$bv] installed into a non-rebar git repo"; fi
+  has "$out" "neither a rebar install nor empty" "T14 [$bv]"
+  [ ! -e "$H14/proj/versions" ] && [ ! -e "$H14/proj/current" ] || fail "T14 [$bv] wrote into the repo"
+  [ "$(cksum < "$H14/proj/.git/info/exclude")" = "$exclude_before" ] || fail "T14 [$bv] edited info/exclude"
+  [ ! -e "$H14/.bashrc" ] || fail "T14 [$bv] wired PATH"
+  ok "T14 [$bv] a non-rebar git repo is refused and untouched"
 done
 
 # T10
