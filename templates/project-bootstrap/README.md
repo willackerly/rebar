@@ -1,6 +1,6 @@
 # My Project
 
-> **rebar v3.0.0** | **Tier 1: PARTIAL** | [What is rebar?](https://github.com/willackerly/rebar)
+> **rebar v3.1.0-rc.1** | **Tier 1: PARTIAL** | [What is rebar?](https://github.com/willackerly/rebar)
 
 **Description:** [Brief description of what this project does]
 
