@@ -83,6 +83,9 @@ if [ "$missing" -gt 0 ]; then
   echo "Every source file must declare which contract it implements:"
   echo "  // ${P}C1-BLOBSTORE.2.1"
   echo "  // Architecture: ${P}S2-API-GATEWAY.1.0"
+  ns=""
+  type _rebar_contract_namespace >/dev/null 2>&1 && ns=$(_rebar_contract_namespace)
+  [ -n "$ns" ] && echo "  // ${P}${ns}:C1-BLOBSTORE.2.1   (namespaced form, contract_namespace = $ns)"
   echo ""
   echo "See architecture/README.md for the full convention."
   exit 1

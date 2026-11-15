@@ -123,3 +123,56 @@ func TestKnownChecksMatchScripts(t *testing.T) {
 		}
 	}
 }
+
+func TestContractNamespace(t *testing.T) {
+	cases := []struct {
+		name, rc, env, want string
+	}{
+		{"unset", "tier = 1\n", "", ""},
+		{"configured", "contract_namespace = github.com/org/repo\n", "", "github.com/org/repo"},
+		{"comment and slash", "contract_namespace = github.com/org/repo/   # ours\n", "", "github.com/org/repo"},
+		{"commented out", "# contract_namespace = github.com/org/repo\n", "", ""},
+		{"invalid ignored", "contract_namespace = org repo\n", "", ""},
+		{"colon ignored", "contract_namespace = org:repo\n", "", ""},
+		{"ID.version lookalike ignored", "contract_namespace = acme.1.2\n", "", ""},
+		{"env trimmed like the bash reader", "", "  github.com/org/repo/  ", "github.com/org/repo"},
+		{"env wins", "contract_namespace = github.com/org/repo\n", "example.com/env", "example.com/env"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			root := t.TempDir()
+			testutil.WriteFile(t, root, ".rebarrc", tc.rc)
+			t.Setenv("REBAR_CONTRACT_NAMESPACE", tc.env)
+			if got := ContractNamespace(root); got != tc.want {
+				t.Fatalf("ContractNamespace = %q, want %q", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestLocalContractRef(t *testing.T) {
+	const ns = "github.com/org/repo"
+	cases := []struct {
+		name, ref, namespace, want string
+		local                      bool
+	}{
+		{"unset keeps short form", "AUTH.1.0", "", "AUTH.1.0", true},
+		{"unset keeps qualified form verbatim", ns + ":AUTH.1.0", "", ns + ":AUTH.1.0", true},
+		{"short form is local", "AUTH.1.0", ns, "AUTH.1.0", true},
+		{"own namespace stripped", ns + ":AUTH.1.0", ns, "AUTH.1.0", true},
+		{"own namespace numbered id", ns + ":C1-AUTH.2.1", ns, "C1-AUTH.2.1", true},
+		{"other namespace is foreign", "github.com/org/other:AUTH.1.0", ns, "", false},
+		{"namespace prefix is not a match", ns + "-fork:AUTH.1.0", ns, "", false},
+		{"trailing colon is not a namespace", "AUTH.1.0:", ns, "AUTH.1.0:", true},
+		{"ID.version before a colon is not a namespace", "MISSING.1.0:see.2", ns, "MISSING.1.0:see.2", true},
+		{"dot is literal", "githubXcom/org/repo:AUTH.1.0", ns, "", false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got, local := LocalContractRef(tc.ref, tc.namespace)
+			if got != tc.want || local != tc.local {
+				t.Fatalf("LocalContractRef(%q, %q) = %q, %v; want %q, %v", tc.ref, tc.namespace, got, local, tc.want, tc.local)
+			}
+		})
+	}
+}
