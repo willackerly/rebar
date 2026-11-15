@@ -57,6 +57,12 @@ var rootCmd = &cobra.Command{
 
 		var err error
 		if repoRoot == "" {
+			// Like the scripts: REBAR_PROJECT_ROOT names the project (the
+			// thin wrappers `rebar migrate` leaves set it, so a copied
+			// wrapper still checks the directory it sits in).
+			repoRoot = os.Getenv("REBAR_PROJECT_ROOT")
+		}
+		if repoRoot == "" {
 			cwd, _ := os.Getwd()
 			repoRoot, err = config.FindRepoRoot(cwd)
 			if err != nil {
