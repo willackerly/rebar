@@ -18,18 +18,24 @@ All notable changes to rebar. Versioned with [semver](https://semver.org/).
 
 ## Unreleased
 
-- **Experimental: native (Go) checks behind `REBAR_CHECK_IMPL=go`.** Draft
-  for 3.2; the default stays `shell` and nothing changes unless the
-  variable is set. With `REBAR_CHECK_IMPL=go`, `rebar check` (all modes)
-  and `rebar run check-todos` use a Go port of check-todos.sh, the first
-  check ported; `rebar run` works for it even without a rebar install. A
-  project's own legacy `scripts/check-todos.sh` still wins. Same output and
-  exit code, except: findings are listed in file-name order (grep -r
-  listed them in directory order), a TODO on a line that is not valid
-  UTF-8 is reported whatever the locale (the script missed it under a
-  UTF-8 locale), and a file containing a NUL byte is skipped (BSD grep
-  reported "Binary file … matches" as an untracked TODO). Proposal and
-  migration plan: `feedback/2026-11-14-go-native-checks.md`.
+- **Experimental: native (Go) checks behind `REBAR_CHECK_IMPL=go`.** First
+  PR of a stack that ends with a Go-binary-only rebar (proposal and plan:
+  `feedback/2026-11-14-go-native-checks.md`). Here the default stays `shell`
+  and nothing changes unless the variable is set. With `REBAR_CHECK_IMPL=go`,
+  `rebar check` (all modes) and `rebar run check-todos` use a Go port of
+  check-todos.sh; `rebar run` works for it even without a rebar install. Only
+  the install's scripts hand off to the binary: a project's own copy of a
+  check runs itself, customizations included, even when it was copied from a
+  script with the hand-off hook. Same output and exit code, except where the
+  script depended on the platform's grep: findings are listed in file-name
+  order (grep -r used directory order); a TODO on a line that is not valid
+  UTF-8 is reported whatever the locale; `.rebarrc source_exclude_dirs`
+  patterns follow GNU grep on macOS too (a pattern with a `/` matches an
+  operand, not a directory below one; a trailing `/` is ignored); a symlinked
+  source directory is scanned on macOS too (BSD grep skipped it); and a file
+  is binary when its first 32 KiB hold a NUL, as macOS grep decides, also on
+  Linux (GNU grep stopped at a later NUL). `config.RCValue` now honors
+  `REBAR_RCFILE`, as the scripts do.
 
 ---
 
