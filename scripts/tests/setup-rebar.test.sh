@@ -216,8 +216,11 @@ for sh in $BASHES; do
 done
 
 # T10
-if [ "$(dir_of go)" != "$(dir_of git)" ] && [ "$(dir_of go)" != /usr/bin ] && [ "$(dir_of go)" != /bin ]; then
-  NOGO="$(dir_of git):$(dir_of curl):/usr/bin:/bin:/usr/sbin:/sbin"
+# Needs a PATH that keeps git/curl/system tools but has no go. Some hosts
+# (GitHub's ubuntu runners) also have go in a system directory, so check the
+# candidate PATH itself rather than guessing from where go was found.
+NOGO="$(dir_of git):$(dir_of curl):/usr/bin:/bin:/usr/sbin:/sbin"
+if ! PATH="$NOGO" command -v go >/dev/null 2>&1; then
   H10="$TMP/h-nogo"
   out="$(IPATH="$NOGO" inst "$H10" bash v9.1.0-beta.10)" || { echo "$out" | tail -20 >&2; fail "T10 prebuilt without Go failed"; }
   [ "$("$H10/.rebar/current/bin/rebar" version)" = "rebar v9.1.0-beta.10" ] || fail "T10 wrong version"
@@ -226,7 +229,7 @@ if [ "$(dir_of go)" != "$(dir_of git)" ] && [ "$(dir_of go)" != /usr/bin ] && [ 
   [ "$(current_of "$H10")" = "versions/v9.1.0-beta.10" ] || fail "T10 failed install moved current"
   ok "T10 without Go: prebuilt installs, source-only tag explains Go is needed, current kept"
 else
-  echo "skip T10: go shares a directory with git/system tools"
+  echo "skip T10: go is on the system PATH here ($(PATH="$NOGO" command -v go)); covered where it isn't (macOS CI)"
 fi
 
 echo "PASS: setup-rebar.sh"
