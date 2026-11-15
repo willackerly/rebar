@@ -58,13 +58,18 @@ Each script is standalone, runs in <5 seconds, and exits 0 (pass) or 1 (fail).
 
 ## Installation
 
-```bash
-# Pre-commit hook (pick one)
-cp scripts/pre-commit.sh .git/hooks/pre-commit     # copy
-ln -sf ../../scripts/pre-commit.sh .git/hooks/pre-commit  # symlink
+Adopting projects don't copy these scripts: `rebar check` and `rebar run
+<script>` run them from the rebar install against the project, and the
+project's `scripts/` holds only the two thin entry points from
+`templates/project-bootstrap/scripts/`. See [SETUP.md](../SETUP.md#install-rebar)
+(and [§ Run rebar in CI](../SETUP.md#run-rebar-in-ci)); projects with older
+copies: [UPGRADING.md](../UPGRADING.md).
 
-# Make all scripts executable
-chmod +x scripts/*.sh
+In this repository:
+
+```bash
+# Pre-commit hook
+ln -sf ../../scripts/pre-commit.sh .git/hooks/pre-commit
 
 # CI pipeline (GitHub Actions example)
 # - run: ./scripts/ci-check.sh --strict

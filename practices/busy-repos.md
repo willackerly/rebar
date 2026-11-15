@@ -59,8 +59,8 @@ The registry then has no `Impl Files` column and no Contract Health section.
 Read them on demand:
 
 ```bash
-scripts/compute-registry.sh --health   # impl counts + zombie/shadow contracts
-scripts/check-registry.sh              # orphan contracts, exits 1 on untracked ones
+rebar run compute-registry --health   # impl counts + zombie/shadow contracts
+rebar run check-registry              # orphan contracts, exits 1 on untracked ones
 ```
 
 For `METRICS`, use floors for counts that most PRs change:
@@ -88,20 +88,25 @@ protected files you changed with `rebar commit`. Don't hand-merge hashes.
 
 ## Adopting in an existing repo
 
-1. Get this version's `compute-registry.sh` and ground-truth engine. With
-   copied scripts, `rebar migrate --apply` moves your customizations into
-   `.rebarrc` and deletes the copies it verified, so the install's current
-   scripts run (with `registry_purpose_style = bytes` if your registry needs
-   the old purpose cut). Otherwise update `scripts/compute-registry.sh`,
-   `scripts/_rebar-config.sh` and the engine of `scripts/check-ground-truth.sh`
-   (below the "do not modify" line) by hand, keeping local customizations.
-2. Add `registry_impl_counts = false` to `.rebarrc` and regenerate the registry
-   once: `scripts/compute-registry.sh`.
-3. Change churning `METRICS` lines to `>=` floors.
-4. Pin the CLI version that keeps the manifest header stable.
-5. Remove `.rebar/integrity.json merge=ours` from `.gitattributes`. It needs a
-   local `merge.ours.driver` setting to do anything, and it never applies to
-   PR merges on GitHub.
+Upgrade with [UPGRADING.md](../UPGRADING.md): install the new version,
+`rebar migrate` your copied scripts, then steps 5, 6 and 9 there cover what
+matters for a busy repo. In short:
+
+1. Land the whole upgrade (migrate, registry, `.rebarrc`, METRICS, manifest)
+   in one PR, merged while few others are open: it regenerates the registry
+   and rewrites `METRICS`, `.rebarrc` and `integrity.json`, so every open
+   branch rebases onto it once.
+2. Set `registry_impl_counts = false` and regenerate the registry
+   (`rebar run compute-registry`) in that same PR, so the purpose-style
+   change and the column drop cost one regeneration, not two.
+3. Turn churning `METRICS` lines into `>=` floors.
+4. Commit with the 3.1 CLI (`rebar commit`): it keeps the manifest header
+   stable and drops the old ratchet `current` lines once. Pin that version in
+   CI ([SETUP.md § Run rebar in CI](../SETUP.md#run-rebar-in-ci)) so no
+   older CLI rewrites them again.
+5. Remove `.rebar/integrity.json merge=ours` from `.gitattributes`. It needs
+   a local `merge.ours.driver` setting to do anything, and it never applies
+   to PR merges on GitHub.
 
 Regression test: `scripts/tests/merge-friendly.test.sh`, and
 `TestBranchesTouchingDifferentFilesMergeCleanly` in `cli/internal/integrity`.
