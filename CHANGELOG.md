@@ -18,6 +18,13 @@ All notable changes to rebar. Versioned with [semver](https://semver.org/).
 
 ## Unreleased
 
+- **The registry's regenerate hint names the CLI:** `<!-- Regenerate: rebar run
+  compute-registry -->` (it said `./scripts/compute-registry.sh`, which adopters
+  no longer have). `compute-registry.sh --check` ignores that comment, as it
+  ignores the old timestamp, so a registry with the old hint stays current and
+  picks up the new one when next regenerated; `rebar migrate` compares
+  registries the same way.
+
 - **Upgrading:** [UPGRADING.md](UPGRADING.md) is the runbook for moving an
   adopting project from v2.0.0 or v3.0.x (install side by side, bump
   `.rebar-version` and the badge, `rebar migrate`, registry, `checks_enable`,

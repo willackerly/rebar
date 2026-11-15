@@ -578,3 +578,16 @@ func TestExcludedDirNames(t *testing.T) {
 		t.Fatal("the default set in another order must need no setting")
 	}
 }
+
+// The registry's header comments aren't content: a legacy copy that prints
+// the pre-3.1 hint (or an old timestamp) still reproduces the registry.
+func TestRegistryBodyIgnoresHeaderComments(t *testing.T) {
+	old := "# Contract Registry\n\n<!-- AUTO-GENERATED -->\n<!-- Generated: 2026-08-03T04:56:31Z -->\n<!-- Regenerate: ./scripts/compute-registry.sh -->\n\n| S1 |\n"
+	cur := "# Contract Registry\n\n<!-- AUTO-GENERATED -->\n<!-- Regenerate: rebar run compute-registry -->\n\n| S1 |\n"
+	if registryBody(old) != registryBody(cur) {
+		t.Fatalf("header-only difference treated as content:\n%q\n%q", registryBody(old), registryBody(cur))
+	}
+	if registryBody(cur) == registryBody(cur+"| S2 |\n") {
+		t.Fatal("a content difference was ignored")
+	}
+}
