@@ -120,3 +120,92 @@ func TestSearch(t *testing.T) {
 		t.Errorf("got %q\nwant %q", got, want)
 	}
 }
+
+func TestFnmatch(t *testing.T) {
+	cases := []struct {
+		pattern, name string
+		want          bool
+	}{
+		{"gen", "gen", true},
+		{"gen", "gen2", false},
+		{"gen*", "generated", true},
+		{"*", "", true},
+		{"*", "a/b", true}, // no FNM_PATHNAME: * crosses /
+		{"s*n", "src/gen", true},
+		{"a*b*c", "aXbYbZc", true},
+		{"a*b*c", "aXbYbZ", false},
+		{"?en", "gen", true},
+		{"?en", "en", false},
+		{"[!x]en", "gen", true},
+		{"[!x]en", "xen", false},
+		{"[^x]en", "gen", true},
+		{"[a-h]en", "gen", true},
+		{"[a-f]en", "gen", false},
+		{"[[:digit:]]*", "2024", true},
+		{"[[:digit:]]*", "v2024", false},
+		{"[[:lower:]]en", "Gen", false},
+		{"[[:upper:]]en", "Gen", true},
+		{"[]]x", "]x", true},
+		{"[!]]x", "ax", true},
+		{"[a-]", "-", true},
+		{`\gen`, "gen", true},
+		{`\*`, "*", true},
+		{`\*`, "a", false},
+		{`[\]]`, "]", true},
+		{"[gen", "[gen", true}, // unclosed bracket: literal
+		{"[gen", "g", false},
+		{`ab\`, `ab\`, true},
+	}
+	for _, tc := range cases {
+		if got := fnmatch(tc.pattern, tc.name); got != tc.want {
+			t.Errorf("fnmatch(%q, %q) = %v, want %v", tc.pattern, tc.name, got, tc.want)
+		}
+	}
+}
+
+func TestFilterExcludeDirPatterns(t *testing.T) {
+	root := t.TempDir()
+	for _, rel := range []string{"src/gen/a.go", "src/x/gen/b.go", "src/keep/c.go", "src/xen/d.go"} {
+		testutil.WriteFile(t, root, rel, "x\n")
+	}
+	cases := []struct {
+		exclude  []string
+		operands []string
+		want     []string
+	}{
+		// Below an operand: by name; a pattern with a slash matches nothing.
+		{[]string{"[!x]en"}, []string{"src"}, []string{"src/keep/c.go", "src/xen/d.go"}},
+		{[]string{"src/gen", "*/gen"}, []string{"src"}, []string{"src/gen/a.go", "src/keep/c.go", "src/x/gen/b.go", "src/xen/d.go"}},
+		{[]string{"gen/"}, []string{"src"}, []string{"src/keep/c.go", "src/xen/d.go"}},
+		// An operand: by its path and every tail after a slash.
+		{[]string{"src/gen"}, []string{"./src/gen", "src/keep"}, []string{"src/keep/c.go"}},
+		{[]string{"x/gen"}, []string{"src/x/gen", "src/keep"}, []string{"src/keep/c.go"}},
+		{[]string{"keep"}, []string{"src/keep/"}, nil},
+		{[]string{".*", "*"}, []string{"."}, nil}, // "." itself is never excluded, its entries are
+	}
+	for _, tc := range cases {
+		f := Filter{ExcludeDirs: tc.exclude}
+		if got := displays(f.Files(root, tc.operands)); !slices.Equal(got, tc.want) {
+			t.Errorf("exclude %q, operands %q: got %v, want %v", tc.exclude, tc.operands, got, tc.want)
+		}
+	}
+}
+
+func TestTextPart(t *testing.T) {
+	text := []byte(strings.Repeat("line\n", BinaryBlock))
+	for _, tc := range []struct {
+		name string
+		data []byte
+		want int
+	}{
+		{"no NUL", text, len(text)},
+		{"NUL first", append([]byte{0}, text...), 0},
+		{"NUL in the block's last byte", append(append([]byte{}, text[:BinaryBlock-1]...), 0), 0},
+		{"NUL just past the block", append(append([]byte{}, text[:BinaryBlock]...), 0, 'x'), BinaryBlock + 2},
+		{"empty", nil, 0},
+	} {
+		if got := len(TextPart(tc.data)); got != tc.want {
+			t.Errorf("%s: TextPart kept %d bytes, want %d", tc.name, got, tc.want)
+		}
+	}
+}

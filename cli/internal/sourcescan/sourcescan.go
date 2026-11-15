@@ -4,9 +4,9 @@
 //
 // The scripts select files with `grep -r --include=*.<ext> --exclude=<name>
 // --exclude-dir=<name>`; Filter reproduces that selection and Search its
-// `-n` output (path:line:text). Where grep implementations disagree, this
-// package picks one behaviour on every platform (see Filter.Files and
-// Search) instead of inheriting the host's grep.
+// `-nI` output (path:line:text). Where grep implementations disagree, this
+// package picks one behaviour on every platform (see Filter, Filter.Files
+// and Search) instead of inheriting the host's grep.
 package sourcescan
 
 import (
@@ -69,8 +69,20 @@ func (s Scope) ExtensionGlobs() []string {
 	return globs
 }
 
-// Filter selects files by base name, like grep's --include, --exclude and
-// --exclude-dir. Patterns are shell globs (path.Match).
+// Filter selects files like grep's --include, --exclude and --exclude-dir.
+// Patterns are fnmatch(3) globs, as grep reads them (see fnmatch): `[!x]`
+// negates, POSIX classes work, `*` also matches `/`.
+//
+// A file or directory met while walking is matched by its name. An operand
+// is matched by its path as given and by every tail of it that follows a
+// `/` (for ./src/gen: src/gen and gen). Trailing slashes on ExcludeDirs
+// patterns are ignored. This is GNU grep's --exclude-dir; BSD grep (macOS)
+// differs in three ways, where this package follows GNU:
+//   - below an operand it also matches the path from the operand, `*`
+//     crossing `/`: `src/gen` or `*/gen` skips src/gen while walking src;
+//   - it matches an operand only by its whole path or its last component
+//     (`src/gen` does not exclude the operand ./src/gen);
+//   - it keeps a pattern's trailing slash, so `gen/` matches nothing.
 type Filter struct {
 	// Include, when non-empty, admits only files matching one of them.
 	Include []string
@@ -95,8 +107,9 @@ type File struct {
 // grep 2>/dev/null does.
 //
 // Symbolic links met while walking are skipped, as grep -r does. An
-// operand that is a symlink is followed, as GNU grep does (BSD grep skips
-// it).
+// operand that is a symlink to a directory is followed, as GNU grep -r
+// does; BSD grep -r (macOS) skips it, so a symlinked source directory was
+// not scanned there.
 func (f Filter) Files(base string, operands []string) []File {
 	var files []File
 	for _, op := range operands {
@@ -115,8 +128,7 @@ func (f Filter) Files(base string, operands []string) []File {
 			}
 			continue
 		}
-		// grep matches an operand by the name it was given ("." never).
-		if f.excludesDir(filepath.Base(filepath.Clean(op))) {
+		if f.excludesOperand(op) {
 			continue
 		}
 		files = append(files, f.walk(p, display)...)
@@ -169,15 +181,40 @@ func (f Filter) admitsFile(name string) bool {
 	return len(f.Include) == 0 || matchAny(f.Include, name)
 }
 
+// excludesDir reports whether a directory met while walking, by name, is
+// excluded.
 func (f Filter) excludesDir(name string) bool {
-	return matchAny(f.ExcludeDirs, name)
+	return slices.ContainsFunc(f.ExcludeDirs, func(p string) bool {
+		return fnmatch(dirPattern(p), name)
+	})
+}
+
+// excludesOperand reports whether a directory operand is excluded: some
+// ExcludeDirs pattern matches its path as given (cleaned) or a tail of it
+// after a `/`. "." is never excluded.
+func (f Filter) excludesOperand(op string) bool {
+	p := filepath.ToSlash(filepath.Clean(op))
+	if p == "." {
+		return false
+	}
+	tails := []string{p}
+	for i := 0; i+1 < len(p); i++ {
+		if p[i] == '/' && p[i+1] != '/' {
+			tails = append(tails, p[i+1:])
+		}
+	}
+	return slices.ContainsFunc(f.ExcludeDirs, func(pat string) bool {
+		return slices.ContainsFunc(tails, func(tail string) bool { return fnmatch(dirPattern(pat), tail) })
+	})
+}
+
+// dirPattern drops an --exclude-dir pattern's trailing slashes.
+func dirPattern(p string) string {
+	return trimTrailingSlashes(p)
 }
 
 func matchAny(patterns []string, name string) bool {
-	return slices.ContainsFunc(patterns, func(p string) bool {
-		ok, err := path.Match(p, name)
-		return err == nil && ok
-	})
+	return slices.ContainsFunc(patterns, func(p string) bool { return fnmatch(p, name) })
 }
 
 // trimTrailingSlashes drops trailing slashes from an operand ("src/" →
@@ -187,6 +224,29 @@ func trimTrailingSlashes(op string) string {
 		op = op[:len(op)-1]
 	}
 	return op
+}
+
+// BinaryBlock is how much of a file grep -I inspects for a NUL byte when
+// it decides whether the file is binary (the first buffer it reads, in GNU
+// and BSD grep alike).
+const BinaryBlock = 32 << 10
+
+// TextPart returns the part of a file's contents that is searched: nothing
+// when its first BinaryBlock bytes hold a NUL (a binary file, which grep -I
+// skips), else all of it.
+//
+// That is BSD grep's rule. GNU grep agrees on the first block, but when it
+// meets a NUL further in it stops searching the file, so it misses lines in
+// and after the block holding that NUL, which are reported here.
+func TextPart(data []byte) []byte {
+	head := data
+	if len(head) > BinaryBlock {
+		head = head[:BinaryBlock]
+	}
+	if bytes.IndexByte(head, 0) >= 0 {
+		return nil
+	}
+	return data
 }
 
 // Line is a matching line of a file.
@@ -207,16 +267,16 @@ func (l Line) String() string {
 // Search returns the lines of files for which match is true, in file
 // order. Matching is on bytes, independent of the locale: grep under a
 // UTF-8 locale skips lines (BSD) or whole files (GNU) that are not valid
-// UTF-8. Binary files, those containing a NUL byte, are skipped, as GNU
-// grep does (BSD grep prints "Binary file ... matches" instead).
+// UTF-8. Binary files are skipped (see TextPart).
 // Unreadable files are skipped.
 func Search(files []File, match func(text string) bool) []Line {
 	var lines []Line
 	for _, f := range files {
 		data, err := os.ReadFile(f.Path)
-		if err != nil || bytes.IndexByte(data, 0) >= 0 {
+		if err != nil {
 			continue
 		}
+		data = TextPart(data)
 		n := 0
 		for len(data) > 0 {
 			n++
