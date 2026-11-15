@@ -53,6 +53,13 @@ jobs:
         working-directory: cli
         run: go test ./...
 
+      # A release branch must list its own scripts in released-blobs.txt, or
+      # the release workflow's go test fails on the tag. Catch it on the push
+      # that makes the list stale (a PR merged after release prep), not at tag time.
+      - name: released-blobs current
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/heads/release/')
+        run: scripts/gen-released-blobs.sh --check
+
       - name: ci-check
         run: |
           export PATH="${{ matrix.path_prefix }}$PATH"

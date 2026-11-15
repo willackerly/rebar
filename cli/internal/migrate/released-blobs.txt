@@ -102,6 +102,7 @@
 7a94e7f14aefe01cab3093d30f1483b13df96525 cold-start-checks.sh
 7c91a0632cc4f88df154db0691d10dfb1a18fe19 cold-start-checks.sh
 7cee3100e12db5dc20c1ad186d926e4630bba88f check-freshness.sh
+7d9dda0710afa0b437ba87300d0d371834ed2e1a README.md
 7de071855beeae01da39a4430af3924d70c4e908 check-compliance.sh
 7f7e6c5d92cf5e4410a1c975724e86a2caec37e6 check-contract-headers.sh
 7fa21e7daa512c3fc9caf7fba011207af7c6d5fa check-contract-headers.sh
@@ -153,6 +154,7 @@ ac687c3368cf17dda1a1b7e8dcba35042fa8b89a check-compliance.sh
 ad5f9a335e2698bd6f04799d7506f7308f6fa4bb check-freshness.sh
 ad9a6c0a70d9b67ded895995535ef03c9f412dca ci-check.sh
 b19f1d11acdb0843fc38035d17b18a75dc526630 check-contract-refs.sh
+b19f30cc824fd492042a57402bd88b0b86927931 check-compliance.sh
 b249ca7ce88f5df4c8647c0cc7d9ca0f9b193f3f ci-check.sh
 b2deaeac34986bd800e6f4d97b85c2552645cbb5 check-contract-refs.sh
 b5259555c7bfcad49432ce3f84411179157f73fb README.md
