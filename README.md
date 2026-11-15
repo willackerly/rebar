@@ -1,8 +1,8 @@
 # rebar
 
-> **rebar v3.1.0-rc.1** | **Tier 3: ENFORCED**
+> **rebar v3.1.0-rc.2** | **Tier 3: ENFORCED**
 
-[![rebar v3.1.0-rc.1](https://img.shields.io/badge/rebar-v3.1.0--rc.1-orange)](DESIGN.md)
+[![rebar v3.1.0-rc.2](https://img.shields.io/badge/rebar-v3.1.0--rc.2-orange)](DESIGN.md)
 [![Tier 3: Enforced](https://img.shields.io/badge/tier-3_enforced-brightgreen)](DESIGN.md)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 

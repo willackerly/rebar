@@ -18,6 +18,15 @@ All notable changes to rebar. Versioned with [semver](https://semver.org/).
 
 ## Unreleased
 
+_Nothing yet._
+
+---
+
+## v3.1.0-rc.2 — 2026-11-15
+
+Second release candidate for 3.1.0, still a **pre-release** (default "latest"
+stays `v3.0.0`). One fix found by testing rc.1 on a real adopter:
+
 - **`refresh-context.sh` no longer dies with exit 141** in a repo with many
   commits since QUICKCONTEXT was last synced. It listed them with
   `git log | head -20` under `pipefail`, so git got SIGPIPE and `set -e` ended
