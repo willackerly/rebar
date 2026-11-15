@@ -72,7 +72,9 @@ else
   echo ""
   echo "Commits since last sync:"
   COMMIT_COUNT=$(git log --since="$LAST_SYNCED" --oneline 2>/dev/null | wc -l | tr -d ' ')
-  git log --since="$LAST_SYNCED" --oneline 2>/dev/null | head -20
+  # -n 20, not `| head -20`: with more commits than head reads, git log gets
+  # SIGPIPE and, under pipefail, set -e ended the script with exit 141.
+  git log -n 20 --since="$LAST_SYNCED" --oneline 2>/dev/null || true
 
   if [[ "$COMMIT_COUNT" -gt 20 ]]; then
     echo "  ... and $((COMMIT_COUNT - 20)) more"

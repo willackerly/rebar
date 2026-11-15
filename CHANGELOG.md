@@ -18,7 +18,11 @@ All notable changes to rebar. Versioned with [semver](https://semver.org/).
 
 ## Unreleased
 
-_Nothing yet._
+- **`refresh-context.sh` no longer dies with exit 141** in a repo with many
+  commits since QUICKCONTEXT was last synced. It listed them with
+  `git log | head -20` under `pipefail`, so git got SIGPIPE and `set -e` ended
+  the script; it now uses `git log -n 20`. `test-e2e-live.sh` dropped the same
+  pattern (`git for-each-ref --count=1`, `find -print -quit`).
 
 ---
 
