@@ -129,7 +129,7 @@ func TestBuildPlanAndApply(t *testing.T) {
 	if scriptPlan(plan, "deploy.sh") != nil {
 		t.Fatal("deploy.sh is the project's own script, not a legacy copy")
 	}
-	for _, want := range []string{"metric.go_files.paths = src", "metric.shell_scripts.max_depth", "shell_scripts = 3 → 2", "tier: the project is tier 1"} {
+	for _, want := range []string{"metric.go_files.paths = src", "metric.shell_scripts.max_depth", "shell_scripts = 3 → 2", "tier: the project is tier 1", "+ checks_enable = check-ground-truth"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("dry run output lacks %q:\n%s", want, out)
 		}

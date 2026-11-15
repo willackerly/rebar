@@ -27,7 +27,9 @@ All notable changes to rebar. Versioned with [semver](https://semver.org/).
   needed); other checks must give the same exit status and findings, on the
   project and on a probe tree. Dry run by default; `--apply` writes
   `.rebarrc`, deletes only verified copies, adjusts METRICS counts the
-  deletions change, reruns the checks and exits 1 on a regression.
+  deletions change, reruns the checks and exits 1 on a regression. It never
+  changes `tier`; checks whose copies ran ungated below the install's tier
+  gate are kept running with a proposed `checks_enable`.
   `check-ground-truth.sh --print` and `REBAR_RCFILE` support it. Design:
   `feedback/2026-11-14-rebar-migrate.md`.
 - **Adopters carry configuration, not rebar's scripts.** `rebar check`,

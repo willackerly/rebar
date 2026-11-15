@@ -148,7 +148,7 @@ func Apply(p *Plan, opts Options) ([]CheckResult, error) {
 			continue
 		}
 		tier := p.Tier
-		if s.MinTier > tier {
+		if s.MinTier > tier && !s.Enabled {
 			tier = s.MinTier
 		}
 		script := filepath.Join(p.Install, "scripts", s.Name)

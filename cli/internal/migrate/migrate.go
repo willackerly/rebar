@@ -61,6 +61,9 @@ type ScriptPlan struct {
 	MinTier int
 	// LegacyGated is true when the copy has its own tier gate.
 	LegacyGated bool
+	// Enabled is true when checks_enable keeps the install's script running
+	// below its tier.
+	Enabled bool
 	// Before is the copy's check result before migration.
 	Before *runResult
 }
@@ -232,6 +235,7 @@ func BuildPlan(opts Options) (*Plan, error) {
 
 	m.reverify()
 	m.keepDependencies()
+	m.tierGates()
 	m.plan.NewRC, m.plan.Added = MergeRC(rc, m.accepted)
 	m.metricsEdits()
 	m.notes()
@@ -1202,19 +1206,59 @@ func applyMetricsEdits(data string, edits []MetricsEdit) string {
 	return strings.Join(lines, "\n")
 }
 
+// tierGates keeps migrated checks running where the copies ran. A copy
+// without a tier gate ran at any tier; the install's script may only run
+// from tier 2 or 3. migrate never changes the tier: it proposes
+// `checks_enable` for those checks (or says what to add when the project
+// already sets checks_enable).
+func (m *migrator) tierGates() {
+	p := m.plan
+	enabled := map[string]bool{}
+	existing, has := RCValue(m.rc, "checks_enable")
+	for _, n := range strings.Fields(existing + " " + os.Getenv("REBAR_CHECKS_ENABLE")) {
+		enabled[strings.TrimSuffix(n, ".sh")] = true
+	}
+	var need []string
+	for _, sp := range p.Scripts {
+		name := strings.TrimSuffix(sp.Name, ".sh")
+		if sp.Verdict != Delete || sp.Check == nil || sp.MinTier <= p.Tier || sp.LegacyGated {
+			continue
+		}
+		if enabled[name] {
+			sp.Enabled = true
+			continue
+		}
+		need = append(need, name)
+	}
+	if len(need) == 0 {
+		return
+	}
+	list := strings.Join(need, " ")
+	if has {
+		p.Notes = append(p.Notes, fmt.Sprintf(
+			"tier: the project is tier %d; the install runs %s only from a higher tier, where the copies ran at any tier. "+
+				"Add them to the existing checks_enable line to keep them running (rebar migrate does not edit existing lines or the tier).", p.Tier, list))
+		return
+	}
+	for _, sp := range p.Scripts {
+		for _, n := range need {
+			if strings.TrimSuffix(sp.Name, ".sh") == n {
+				sp.Enabled = true
+			}
+		}
+	}
+	m.accepted = append(m.accepted, Setting{Key: "checks_enable", Value: list, Source: "tier gates: the copies ran at any tier"})
+	p.Notes = append(p.Notes, fmt.Sprintf(
+		"tier: the project is tier %d and the install runs %s only from a higher tier, where the copies ran at any tier. "+
+			"rebar migrate leaves the tier alone and proposes `checks_enable = %s` so they keep running; drop that line to let the tier decide.",
+		p.Tier, list, list))
+}
+
 // notes adds the findings that need a person: tier gates that would turn
 // a migrated check into a SKIP, other files that still call deleted copies,
 // and the integrity manifest.
 func (m *migrator) notes() {
 	p := m.plan
-	for _, sp := range p.Scripts {
-		if sp.Verdict == Delete && sp.Check != nil && sp.MinTier > p.Tier && !sp.LegacyGated {
-			p.Notes = append(p.Notes, fmt.Sprintf(
-				"tier: the project is tier %d and the install runs %s only from tier %d, so `rebar check` will SKIP it where the copy ran at any tier. "+
-					"rebar migrate leaves the tier alone: raise `tier` in .rebarrc, or run `REBAR_TIER=%d rebar run %s` where you need it.",
-				p.Tier, strings.TrimSuffix(sp.Name, ".sh"), sp.MinTier, sp.MinTier, strings.TrimSuffix(sp.Name, ".sh")))
-		}
-	}
 	gone := map[string]bool{}
 	var replaced []string
 	for _, sp := range p.Scripts {

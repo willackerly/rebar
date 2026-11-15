@@ -125,11 +125,14 @@ final metric settings; `key = N` lines that matched before are set to the
 new value, and `>=` floors above it are lowered. `distinct` metrics touched
 by the deletions are flagged for a look after apply instead.
 
-**Tier.** migrate never changes `tier`. When a migrated check has an install
-tier gate above the project's tier and the copy had none (analyze is tier 1;
-the install's ground truth is tier 3), the report says `rebar check` will
-SKIP it and how to run it anyway. Post-apply checks run at
-`max(project tier, script gate)` and say so.
+**Tier.** migrate never changes `tier`. A copy without its own tier gate
+ran at any tier (the override runs it as is); the install's script may only
+run from tier 2 or 3 (analyze is tier 1; the install's ground truth is tier
+3). For such checks migrate proposes `checks_enable = <names>` (#14's answer
+to its Q1), so they keep running exactly where they ran, and says so in a
+note; dropping the line lets the tier decide. If the project already has a
+`checks_enable` line, migrate does not edit it and tells you which names to
+add. Copies with their own gate (the v3 template's) need nothing.
 
 ### Output and apply
 
@@ -151,7 +154,7 @@ appends inside the existing block.
 `check-ground-truth.sh` with 13 metrics, `compute-registry.sh`,
 `check-todos.sh`, `check-contract-refs.sh`, `refresh-context.sh`; tier 1):
 
-- Dry run (201 s): `git status` clean afterwards. All **13 metrics
+- Dry run (178 s): `git status` clean afterwards. All **13 metrics
   translated, each with the same value** from the install (sdk_languages 2,
   mcp_servers 6, helm_mcp_servers 4, helm_support_services 2, go_modules 17,
   mcp_shared_packages 7, contract_files 71, contract_ids 56,
@@ -163,12 +166,12 @@ appends inside the existing block.
   findings on the project and the probe tree. Kept: `check-contract-refs.sh`
   (probe tree: the install ignores refs under `.github/`, see Findings) and
   `refresh-context.sh` (different version, exit 141 vs 1).
-- `--apply` (196 s): `.rebarrc` block written, three copies deleted,
-  `shell_scripts = 16 → 13`; post-apply checks all as before (ground truth
-  run at tier 3 and reported as such). Then `rebar check --pre-commit` exit
-  0 (ground truth SKIPs at tier 1, as reported), `rebar run compute-registry
-  --check` "Registry is current", `REBAR_TIER=3 rebar run
-  check-ground-truth` all 13 OK, `git diff architecture/` empty.
+- `--apply` (174 s): `.rebarrc` block written (including
+  `checks_enable = check-ground-truth`: analyze is tier 1 and its copy ran
+  ungated), three copies deleted, `shell_scripts = 16 → 13`; post-apply
+  checks all as before. Then `rebar check --pre-commit` exit 0 with all 13
+  metrics OK at tier 1, `rebar run compute-registry --check` "Registry is
+  current", `git diff architecture/` empty.
 - Second run (40 s): "Nothing to migrate".
 - Against #14's hand-written appendix the generated `.rebarrc` has the
   same 13 metric groups line for line; it omits `registry_purpose_style =
@@ -246,7 +249,7 @@ the copy stays, the expressible metric moves to `.rebarrc`.
   other callers are listed, not edited.
 - *Install without git history* (tarball): provenance can't be checked, so
   the unprobeable copies are kept with that reason; probed ones still go.
-- *Speed.* The virtru-analyze dry run takes ~3.5 minutes: each registry
+- *Speed.* The virtru-analyze dry run takes ~3 minutes: each registry
   run is ~2.5 s and the subset search tries up to 11 settings combinations
   (stdout and `--health` in parallel); the legacy `check-contract-refs.sh`
   loops in bash over every probe hit. Install runs are cached per settings.
@@ -276,9 +279,11 @@ the copy stays, the expressible metric moves to `.rebarrc`.
 4. **Unmodified-but-older checks whose output changed upstream** are kept
    (the copy and install differ). [Lean: keep; an `--accept-upstream` flag
    if adopters hit it.]
-5. **Tier.** Analyze needs ground truth at tier 1; #14 Q1 proposed
-   `checks_enable =`. migrate reports the gap and doesn't change tier.
-   [Lean: land `checks_enable` with the v4 override removal.]
+5. **Propose `checks_enable` or only report?** Proposing it keeps behavior
+   identical (analyze's ground truth keeps running at tier 1) without touching
+   `tier`, and it is visible in the dry run. The alternative is a note only,
+   which silently turns those checks into SKIPs after migration. [Lean:
+   propose, as implemented.]
 6. **Integrity manifest.** Projects with `.rebar/integrity.json` must
    `rebar commit` the deletions. [Lean: report only; migrate does not
    commit.]
