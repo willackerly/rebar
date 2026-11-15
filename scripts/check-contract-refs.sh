@@ -54,7 +54,10 @@ if [ -n "$NAMESPACE" ]; then
   NS_ERE="${NAMESPACE//./\\.}"
 fi
 
-# Find all CONTRACT: references in source files
+# Find all CONTRACT: references in source files. node_modules/, vendor/,
+# dist/ and .git/ directories are skipped by name; filtering the match lines
+# with grep -v also dropped .github/, distance.go, and any line whose text
+# mentioned those words.
 while IFS= read -r line; do
   file=$(echo "$line" | cut -d: -f1)
   lineno=$(echo "$line" | cut -d: -f2)
@@ -84,7 +87,8 @@ while IFS= read -r line; do
   fi
 done < <(grep -rnE "$SEARCH_ERE" \
   "${INCLUDES[@]}" \
-  . 2>/dev/null | grep -v "node_modules\|vendor\|dist\|\.git")
+  --exclude-dir=node_modules --exclude-dir=vendor --exclude-dir=dist --exclude-dir=.git \
+  . 2>/dev/null)
 
 echo ""
 echo "Checked $total contract references, $broken broken."

@@ -71,11 +71,15 @@ for contract in "$ARCH_DIR"/CONTRACT-*.md; do
 
   # Search for references in source code. No match is the case this loop
   # exists to report, so neither grep may end the script under pipefail.
+  # Skip node_modules/, vendor/, dist/, .git/ by directory name and the
+  # contracts dir by path prefix. (Filtering match lines by substring also
+  # dropped .github/, distance.go and lines mentioning those words.)
   ref_count=$( { grep -rEn "${REF_ERE}${id}" \
     --include="*.go" --include="*.ts" --include="*.tsx" --include="*.js" --include="*.jsx" \
     --include="*.py" --include="*.rs" --include="*.mjs" --include="*.cjs" \
+    --exclude-dir=node_modules --exclude-dir=vendor --exclude-dir=dist --exclude-dir=.git \
     . 2>/dev/null || true; } \
-    | { grep -v "node_modules\|vendor\|dist\|\.git\|${ARCH_DIR%/}/" || true; } \
+    | { grep -v "^\./${ARCH_DIR%/}/" || true; } \
     | wc -l | tr -d ' ')
 
   if [ "$ref_count" -eq 0 ]; then

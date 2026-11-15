@@ -45,20 +45,22 @@ if [ ${#DIRS[@]} -eq 0 ]; then
 fi
 
 # Count untracked TODOs (exclude TRACKED-TASK lines and comments about the system)
+# node_modules/, vendor/ and dist/ are skipped by directory name: filtering
+# the match lines by substring also let a TODO in distance.go, or on a line
+# mentioning those words, past the gate.
+EXCLUDES=(--exclude-dir=node_modules --exclude-dir=vendor --exclude-dir=dist)
 untracked=$(grep -rn "TODO:" \
-  "${INCLUDES[@]}" \
+  "${INCLUDES[@]}" "${EXCLUDES[@]}" \
   "${DIRS[@]}" 2>/dev/null \
   | grep -v "TRACKED-TASK:" \
   | grep -v "TODO\.md" \
   | grep -v "check-todos" \
-  | grep -v "node_modules\|vendor\|dist" \
   || true)
 
 # Count tracked tasks (informational)
 tracked=$(grep -rn "TRACKED-TASK:" \
-  "${INCLUDES[@]}" \
+  "${INCLUDES[@]}" "${EXCLUDES[@]}" \
   "${DIRS[@]}" 2>/dev/null \
-  | grep -v "node_modules\|vendor\|dist" \
   || true)
 
 tracked_count=$(echo "$tracked" | grep -c . 2>/dev/null || echo 0)
