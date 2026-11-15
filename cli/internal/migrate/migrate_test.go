@@ -320,3 +320,62 @@ git grep -l "CONTRACT:${id}" -- '*.go' '*.ts' '*.sh' | grep -v "^architecture/"
 		t.Fatalf("candidates = %v\nwant %v", got, want)
 	}
 }
+
+// A copy that prints implementing-file counts (the pre-3.1 default):
+// migrate follows the new default (counts off) and regenerates the registry,
+// unless the project set registry_impl_counts = true itself.
+func TestRegistryImplCountsFollowNewDefault(t *testing.T) {
+	install := installRoot(t)
+	src, err := os.ReadFile(filepath.Join(install, "scripts", "compute-registry.sh"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	legacy := string(src)
+	for old, repl := range map[string]string{
+		"\nIMPL_COUNTS=false\n": "\nIMPL_COUNTS=true\n",
+		"_rebar_config registry_impl_counts REBAR_REGISTRY_IMPL_COUNTS false)": "_rebar_config registry_impl_counts REBAR_REGISTRY_IMPL_COUNTS true)",
+		"  true|1|yes|on) IMPL_COUNTS=true ;;\n  *) IMPL_COUNTS=false ;;":      "  false|0|no|off) IMPL_COUNTS=false ;;\n  *) IMPL_COUNTS=true ;;",
+	} {
+		if !strings.Contains(legacy, old) {
+			t.Skipf("install compute-registry.sh changed shape (%q)", old)
+		}
+		legacy = strings.Replace(legacy, old, repl, 1)
+	}
+	setup := func(rc string) string {
+		p := testutil.InitRepo(t)
+		testutil.WriteFile(t, p, ".rebarrc", rc)
+		testutil.WriteFile(t, p, "architecture/CONTRACT-S1-AUTH.1.0.md", "# Auth\n\n**Status:** active\n\n## Purpose\n\nAuthenticates.\n")
+		testutil.WriteFile(t, p, "src/auth.go", "// CONTRACT"+":S1-AUTH.1.0\npackage src\n")
+		testutil.WriteExecutable(t, p, "scripts/compute-registry.sh", legacy)
+		testutil.Git(t, p, "add", "-A")
+		testutil.Run(t, p, "bash", "scripts/compute-registry.sh")
+		testutil.Git(t, p, "add", "-A")
+		testutil.Git(t, p, "commit", "-q", "-m", "init")
+		return p
+	}
+
+	p := setup("tier = 2\n")
+	plan, err := BuildPlan(opts(p, install))
+	if err != nil {
+		t.Fatal(err)
+	}
+	reg := scriptPlan(plan, "compute-registry.sh")
+	if reg == nil || reg.Verdict != Delete {
+		t.Fatalf("registry copy not verified: %+v", reg)
+	}
+	if _, ok := acceptedValue(plan.Added, "registry_impl_counts"); ok {
+		t.Fatalf("migrate turned implementing-file counts back on: %+v", plan.Added)
+	}
+	if !plan.RegenRegistry || !strings.Contains(strings.Join(reg.Details, "\n"), "off by default") {
+		t.Fatalf("registry not marked for regeneration / change not reported: regen=%v details=%v", plan.RegenRegistry, reg.Details)
+	}
+
+	p = setup("tier = 2\nregistry_impl_counts = true\n")
+	plan, err = BuildPlan(opts(p, install))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if reg := scriptPlan(plan, "compute-registry.sh"); reg == nil || reg.Verdict != Delete || plan.RegenRegistry {
+		t.Fatalf("opted-in counts: want the copy deleted with no regeneration, got %+v regen=%v", reg, plan.RegenRegistry)
+	}
+}

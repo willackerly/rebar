@@ -33,6 +33,14 @@ repo-specific moves into `.rebarrc`, and `rebar migrate` converts existing
 copied (even customized) scripts, verified by running them. Upgrade steps:
 [UPGRADING.md](UPGRADING.md).
 
+- **Implementing-file counts are off by default** (`.rebarrc`
+  `registry_impl_counts`, now `false`): the committed registry has no
+  `Impl Files` column and no Contract Health section, because any PR that adds
+  a `CONTRACT:` header changes them and two such PRs merge into a wrong count.
+  `rebar run compute-registry --health` prints them. **Upgrade note:** a
+  registry with counts reports STALE once — regenerate it (UPGRADING.md step
+  5), or set `registry_impl_counts = true` to keep them. `rebar migrate`
+  follows the new default and regenerates unless the project opted in.
 - **The registry's regenerate hint names the CLI:** `<!-- Regenerate: rebar run
   compute-registry -->` (it said `./scripts/compute-registry.sh`, which adopters
   no longer have). `compute-registry.sh --check` ignores that comment, as it

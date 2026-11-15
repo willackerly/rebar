@@ -15,11 +15,11 @@
 # that regenerate it from the same contracts produce identical bytes and merge
 # cleanly. Implementing-file counts and the Contract Health section are derived
 # from source code, so any PR that adds or removes a CONTRACT: header changes
-# them. Busy repos should keep them out of the committed file:
+# them, and two such PRs merge into a wrong count. Since 3.1 they are left out
+# of the committed file by default; read them with --health. A repo that wants
+# them in the file sets:
 #
-#   .rebarrc:  registry_impl_counts = false    (env: REBAR_REGISTRY_IMPL_COUNTS)
-#
-# and read them with --health (or scripts/check-registry.sh) instead.
+#   .rebarrc:  registry_impl_counts = true    (env: REBAR_REGISTRY_IMPL_COUNTS)
 #
 # Exit code: 0 = success/current, 1 = stale (--check mode)
 
@@ -35,7 +35,7 @@ CONTRACTS_DIR=architecture
 MODE="${1:-generate}"
 
 # Settings from .rebarrc (see the helpers below for what each one does).
-IMPL_COUNTS=true
+IMPL_COUNTS=false
 SCOPE_PREFIXES=""
 PURPOSE_HEADING=""
 PURPOSE_STYLE=ellipsis
@@ -45,7 +45,7 @@ REF_ERE='CONTRACT:'   # with contract_namespace: CONTRACT:(<namespace>:)?
 if [ -f "$SCRIPT_DIR/_rebar-config.sh" ]; then
   # shellcheck source=scripts/_rebar-config.sh
   source "$SCRIPT_DIR/_rebar-config.sh"
-  IMPL_COUNTS=$(_rebar_config registry_impl_counts REBAR_REGISTRY_IMPL_COUNTS true)
+  IMPL_COUNTS=$(_rebar_config registry_impl_counts REBAR_REGISTRY_IMPL_COUNTS false)
   SCOPE_PREFIXES=$(_rebar_config registry_scope_prefixes _REBAR_NO_ENV "")
   PURPOSE_HEADING=$(_rebar_config registry_purpose_heading _REBAR_NO_ENV "")
   PURPOSE_STYLE=$(_rebar_config registry_purpose_style _REBAR_NO_ENV ellipsis)
@@ -57,8 +57,8 @@ fi
 ARCH_DIR="$PROJECT_ROOT/$CONTRACTS_DIR"
 REGISTRY="$ARCH_DIR/CONTRACT-REGISTRY.md"
 case "$IMPL_COUNTS" in
-  false|0|no|off) IMPL_COUNTS=false ;;
-  *) IMPL_COUNTS=true ;;
+  true|1|yes|on) IMPL_COUNTS=true ;;
+  *) IMPL_COUNTS=false ;;
 esac
 
 # ─── Helpers ────────────────────────────────────────────────────────────────

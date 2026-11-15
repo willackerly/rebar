@@ -40,7 +40,8 @@ make_project() {
   P="$TMP/$1"
   local cdir="$2"
   mkdir -p "$P/$cdir" "$P/src"
-  printf 'tier = 3\n%b' "$3" > "$P/.rebarrc"
+  # Impl counts on: this test checks what the counts include.
+  printf 'tier = 3\nregistry_impl_counts = true\n%b' "$3" > "$P/.rebarrc"
   local id
   for id in S1-FOO.1.0 C2-BAR.1.0; do
     printf '# %s\n\n**Status:** active\n\n## Purpose\n\n%s does things.\n\n## Why this exists\n\nReason.\n\n## Who needs this\n\nUs.\n\n## Scenarios\n\nOne.\n\n## Interfaces\n\n## Behavioral Contracts\n\n## Error Handling\n\n## Test Requirements\n\n## Implementing Files\n' \

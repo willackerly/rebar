@@ -162,7 +162,7 @@ _rebar_skip() {
 
 # Read a key from .rebarrc, with an env override and a default.
 # Usage: _rebar_config <key> <ENV_VAR> <default>
-#   value=$(_rebar_config registry_impl_counts REBAR_REGISTRY_IMPL_COUNTS true)
+#   value=$(_rebar_config registry_impl_counts REBAR_REGISTRY_IMPL_COUNTS false)
 _rebar_config() {
   local key="$1" env_var="$2" default="$3"
   if [ -n "${!env_var:-}" ]; then

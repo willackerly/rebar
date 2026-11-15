@@ -780,6 +780,19 @@ func (m *migrator) registry() *ScriptPlan {
 			sp.Details = append(sp.Details, "registry_purpose_style = bytes was needed: the copy cuts purposes at 80 bytes. Kept so the registry does not change; rerun with --regenerate-registry to switch to the ellipsis style instead")
 		}
 	}
+	// Implementing-file counts are off by default since 3.1 (they churn and
+	// mis-merge under parallel PRs). A copy that printed them would need
+	// registry_impl_counts = true to reproduce its bytes; follow the new
+	// default instead and regenerate, unless the project opted in already
+	// (then the key is set and never proposed).
+	for i, s := range chosen {
+		if s.Key == "registry_impl_counts" && s.Value == "true" {
+			chosen = append(chosen[:i:i], chosen[i+1:]...)
+			m.plan.RegenRegistry = true
+			sp.Details = append(sp.Details, "the copy's registry has implementing-file counts; since 3.1 they are off by default, so CONTRACT-REGISTRY.md is regenerated without them (a one-time registry diff). To keep them, set registry_impl_counts = true in .rebarrc and run migrate again")
+			break
+		}
+	}
 	if hasHealth && !res.health {
 		h := m.runInstall(m.work, name, chosen, "--health")
 		sp.Details = append(sp.Details, "--health (advisory, not committed) still differs: "+firstDiff(wantHealth.Stdout, h.Stdout))
@@ -907,7 +920,8 @@ func registryCandidates(src string, rc []byte) []Setting {
 			add("registry_purpose_heading", h)
 		}
 	}
-	add("registry_impl_counts", "false")
+	// Counts are off by default since 3.1; a copy that printed them needs them on.
+	add("registry_impl_counts", "true")
 	var globs []string
 	for _, m := range pathspecRe.FindAllStringSubmatch(src, -1) {
 		if m[1] != "architecture/" {

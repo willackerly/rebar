@@ -26,7 +26,7 @@ run() { run_in "$P" "$@"; }
 
 P="$TMP/project"
 mkdir -p "$P/specs" "$P/architecture" "$P/src"
-printf 'tier = 3\ncontracts_dir = specs   # contracts live here\n' > "$P/.rebarrc"
+printf 'tier = 3\ncontracts_dir = specs   # contracts live here\nregistry_impl_counts = true\n' > "$P/.rebarrc"
 contract() {  # contract <dir> <ID.ver>
   printf '# %s\n\n**Status:** active\n\n## Purpose\n\n%s does things.\n\n## Why this exists\n\nReason.\n\n## Who needs this\n\nUs.\n\n## Scenarios\n\nOne.\n' \
     "$2" "$2" > "$P/$1/CONTRACT-$2.md"
