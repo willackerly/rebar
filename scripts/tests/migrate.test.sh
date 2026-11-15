@@ -113,6 +113,14 @@ F="$TMP/fresh"
 mkdir -p "$F"
 git -C "$ROOT" archive "$last^" templates/project-bootstrap | tar -x -C "$TMP" \
   && cp -R "$TMP/templates/project-bootstrap/." "$F/" || fail "T5: extracting the old template"
+# The old template's check-freshness.sh can report an age one day short when
+# the clock ticks mid-run (fixed in the install), so its output would differ
+# from the install's at random and migrate would rightly keep it. Date the
+# markers today: no ages are printed and the outputs are deterministic.
+today=$(date +%Y-%m-%d)
+for md in $(grep -rlE '(freshness|last-synced): [0-9]{4}-[0-9]{2}-[0-9]{2}' "$F" --include='*.md'); do
+  sed -E "s/(freshness|last-synced): [0-9]{4}-[0-9]{2}-[0-9]{2}/\1: $today/" "$md" > "$md.tmp" && mv "$md.tmp" "$md"
+done
 g -C "$F" init -q && g -C "$F" add -A && g -C "$F" commit -qm init
 before=$(cd "$F" && rebar check --pre-commit >/dev/null 2>&1; echo $?)
 out=$(cd "$F" && rebar migrate --apply 2>&1) || fail "T5: --apply failed: $out"
