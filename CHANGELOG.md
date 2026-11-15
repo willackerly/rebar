@@ -18,6 +18,31 @@ All notable changes to rebar. Versioned with [semver](https://semver.org/).
 
 ## Unreleased
 
+_Nothing yet._
+
+---
+
+## v3.1.0-rc.1 — 2026-11-15
+
+First release candidate for 3.1.0, a **pre-release**: the installer's default
+"latest" stays on `v3.0.0`; install it with an explicit version
+(`curl -fsSL https://raw.githubusercontent.com/willackerly/rebar/v3.1.0-rc.1/setup-rebar.sh | bash -s -- v3.1.0-rc.1`)
+or `--pre`. The theme is **adopters carry configuration, not rebar's
+scripts**: the checks run from a versioned, self-contained install, everything
+repo-specific moves into `.rebarrc`, and `rebar migrate` converts existing
+copied (even customized) scripts, verified by running them. Upgrade steps:
+[UPGRADING.md](UPGRADING.md).
+
+- **The registry's regenerate hint names the CLI:** `<!-- Regenerate: rebar run
+  compute-registry -->` (it said `./scripts/compute-registry.sh`, which adopters
+  no longer have). `compute-registry.sh --check` ignores that comment, as it
+  ignores the old timestamp, so a registry with the old hint stays current and
+  picks up the new one when next regenerated; `rebar migrate` compares
+  registries the same way.
+- **The source scanners skip binary files** (`grep -I`). A matching binary was
+  reported as "Binary file … matches" and read as a reference or a TODO — a
+  built `bin/rebar` that embeds `CONTRACT:` strings made the registry STALE.
+
 - **Upgrading:** [UPGRADING.md](UPGRADING.md) is the runbook for moving an
   adopting project from v2.0.0 or v3.0.x (install side by side, bump
   `.rebar-version` and the badge, `rebar migrate`, registry, `checks_enable`,

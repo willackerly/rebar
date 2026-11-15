@@ -129,4 +129,15 @@ echo "$health" | grep -q '^| S1-FOO | 4 |' \
   || fail "T6: grep -r fallback outside git does not count all 4 files"
 echo "ok T6: counts cover tracked files only; non-git fallback still counts"
 
+# --- T7: the regenerate hint names the CLI, and an old hint isn't STALE -------
+R7="$TMP/t7"
+new_repo "$R7" false
+grep -q '^<!-- Regenerate: rebar run compute-registry -->' "$R7/architecture/CONTRACT-REGISTRY.md" \
+  || fail "T7: registry hint does not name rebar run compute-registry"
+sed 's|^<!-- Regenerate: .*-->|<!-- Regenerate: ./scripts/compute-registry.sh -->|' \
+  "$R7/architecture/CONTRACT-REGISTRY.md" > "$TMP/t7.md" && mv "$TMP/t7.md" "$R7/architecture/CONTRACT-REGISTRY.md"
+( cd "$R7" && scripts/compute-registry.sh --check >/dev/null ) \
+  || fail "T7: a registry with the pre-3.1 hint is reported STALE"
+echo "ok T7: new regenerate hint; a registry with the old hint is still current"
+
 echo "PASS: merge-friendly generated files"

@@ -734,7 +734,7 @@ func (m *migrator) registry() *ScriptPlan {
 		}
 		got := m.runInstall(m.work, name, s, "--stdout")
 		wg.Wait()
-		r.stdout = got.Err == nil && got.Code == 0 && got.Stdout == want.Stdout
+		r.stdout = got.Err == nil && got.Code == 0 && registryBody(got.Stdout) == registryBody(want.Stdout)
 		r.health = hasHealth && h.Code == wantHealth.Code && h.Stdout == wantHealth.Stdout
 		return r
 	}
@@ -2162,4 +2162,19 @@ func (m *migrator) substringHint(name, src string, cands []Setting) string {
 	ex := extra[0]
 	return fmt.Sprintf("on a probe tree the install finds everything the copy does plus %d finding(s) the copy's substring filters (%s) drop, e.g. %s — rebar now excludes directories by name (#19). If that is the copy's only customization beyond settings, set source_dirs / source_extensions / source_exclude_dirs and delete it",
 		len(extra), strings.Join(lits, ", "), ex)
+}
+
+// registryBody drops the registry's header comments that aren't content —
+// the timestamp older versions wrote and the regenerate hint (which named
+// ./scripts/compute-registry.sh before 3.1) — as compute-registry.sh --check
+// does, so a copy that differs only there still reproduces the registry.
+func registryBody(s string) string {
+	var b strings.Builder
+	for _, line := range strings.SplitAfter(s, "\n") {
+		if strings.HasPrefix(line, "<!-- Generated:") || strings.HasPrefix(line, "<!-- Regenerate:") {
+			continue
+		}
+		b.WriteString(line)
+	}
+	return b.String()
 }

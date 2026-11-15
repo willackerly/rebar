@@ -45,9 +45,9 @@ done
 # prefix. No match is the case this script reports, so never fail.
 refs_to() {
   {
-    grep -rEn "${REF_ERE}$1" "${INCLUDE_ARGS[@]}" "${EXCLUDE_ARGS[@]}" . 2>/dev/null || true
+    grep -rEnI "${REF_ERE}$1" "${INCLUDE_ARGS[@]}" "${EXCLUDE_ARGS[@]}" . 2>/dev/null || true
     if [ -d bin ]; then
-      grep -rEn "${REF_ERE}$1" "${EXCLUDE_ARGS[@]}" ./bin 2>/dev/null || true
+      grep -rEnI "${REF_ERE}$1" "${EXCLUDE_ARGS[@]}" ./bin 2>/dev/null || true
     fi
   } | awk -v p="./$ARCH_DIR/" 'index($0, p) != 1' | sort -u
 }
