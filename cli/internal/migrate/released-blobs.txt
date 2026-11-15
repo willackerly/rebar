@@ -45,6 +45,7 @@
 3c6bdcef943a72fa67f471cd961d2713e8fc8915 ci-check.sh
 3f8dc34e7bda1e37760df58c1cff9ed1db0dec63 check-compliance.sh
 434673d8d7a251497b36ee69e88b9eaabe9a315c check-ground-truth.sh
+43657b3c3469251216cd5ca07e641fefa6633322 compute-registry.sh
 462e54b822e407698e66fda9406eedbde7157499 check-contract-refs.sh
 47e7fa246d28c80c35c839a011d841183693e012 check-doc-refs.sh
 47f3754d9418427a7e3f4b7566a2018853a07b19 test-e2e-live.sh

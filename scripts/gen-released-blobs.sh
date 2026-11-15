@@ -10,6 +10,12 @@
 # and the template's scripts/README.md at every release tag and release
 # branch.
 #
+# It also stores the content of every released version of the source
+# scanners (check-todos, check-contract-refs, check-contract-headers,
+# check-freshness) in cli/internal/migrate/released/<blob id>, so migrate can
+# tell a copy that differs from a release only in settings (directories,
+# extensions) from a real customization, without git history.
+#
 # Run at release time, after tagging:  scripts/gen-released-blobs.sh
 # Check it is current:                 scripts/gen-released-blobs.sh --check
 # (cli/internal/migrate's tests fail when a local tag is missing from it.)
@@ -43,8 +49,22 @@ generate() {
     | LC_ALL=C sort -u
 }
 
+SCANNERS="check-todos.sh check-contract-refs.sh check-contract-headers.sh check-freshness.sh"
+DIR="$ROOT/cli/internal/migrate/released"
+
+scanner_blobs() {
+  local n
+  for n in $SCANNERS; do
+    awk -v n="$n" '$2 == n { print $1 }' "$1"
+  done
+}
+
 if [ "${1:-}" = "--check" ]; then
-  if diff -q <(generate) "$OUT" >/dev/null 2>&1; then
+  missing=0
+  for h in $(scanner_blobs "$OUT"); do
+    [ -f "$DIR/$h" ] || missing=1
+  done
+  if [ $missing -eq 0 ] && diff -q <(generate) "$OUT" >/dev/null 2>&1; then
     echo "OK: released-blobs.txt is current"
     exit 0
   fi
@@ -52,4 +72,9 @@ if [ "${1:-}" = "--check" ]; then
   exit 1
 fi
 generate > "$OUT"
-echo "wrote $(grep -vc '^#' "$OUT") blobs to ${OUT#"$ROOT"/}"
+rm -rf "$DIR"
+mkdir -p "$DIR"
+for h in $(scanner_blobs "$OUT"); do
+  git -C "$ROOT" cat-file blob "$h" > "$DIR/$h"
+done
+echo "wrote $(grep -vc '^#' "$OUT") blobs to ${OUT#"$ROOT"/} and $(ls "$DIR" | wc -l | tr -d ' ') scanner sources to ${DIR#"$ROOT"/}"

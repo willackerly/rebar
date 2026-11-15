@@ -3,8 +3,10 @@
 # settings, deletes only copies it verified, and is idempotent.
 #
 #   T1  dry run changes nothing (git status stays clean)
-#   T2  a customized check-todos.sh becomes source_dirs / source_extensions;
-#       after --apply the install's check still finds a TODO in a custom root
+#   T2  a check-todos.sh customized only in settings (the v2 template with
+#       other roots and types) becomes source_dirs / source_extensions, with
+#       the #19 behaviour change reported; after --apply the install's check
+#       still finds a TODO in a custom root
 #   T3  a metric the schema cannot express keeps check-ground-truth.sh, and
 #       is reported with its value; the expressible one moves to .rebarrc
 #   T4  a second run proposes nothing
@@ -87,7 +89,11 @@ ok "T1 dry run changes nothing"
 # ── T2 / T3 proposals ──
 echo "$out" | grep -q '+ source_dirs *= lib tools' || fail "T2: source_dirs not proposed: $out"
 echo "$out" | grep -q '+ source_extensions *= go sh' || fail "T2: source_extensions not proposed: $out"
-echo "$out" | grep -q 'delete   scripts/check-todos.sh' || fail "T2: check-todos.sh not verified: $out"
+# The copy's `grep -v "node_modules\|vendor\|dist"` drops lines by substring;
+# the install excludes directories by name (#19). The copy is otherwise the
+# v2 template plus settings, so it goes, with the change reported.
+echo "$out" | grep -q 'delete   scripts/check-todos.sh — customized only in settings' || fail "T2: check-todos.sh not recognized as settings-only: $out"
+echo "$out" | grep -q 'impact on this project: none' || fail "T2: no impact report: $out"
 echo "$out" | grep -q 'kept      sh_lines = 2 — untranslatable' || fail "T3: untranslatable metric not reported with its value: $out"
 echo "$out" | grep -q 'keep     scripts/check-ground-truth.sh' || fail "T3: ground truth copy not kept: $out"
 echo "$out" | grep -q '+ metric.lib_files.paths *= lib' || fail "T3: expressible metric not proposed: $out"
@@ -153,6 +159,7 @@ ln -s "$S" "$TMP/linked/scripts"
 g -C "$TMP/linked" init -q && g -C "$TMP/linked" add -A && g -C "$TMP/linked" commit -qm init
 out=$(cd "$TMP/linked" && rebar migrate --apply 2>&1) && fail "T7: symlinked scripts/ not refused: $out"
 echo "$out" | grep -q 'outside the project' || fail "T7: wrong refusal: $out"
+[ "$(echo "$out" | grep -c 'outside the project')" = 1 ] || fail "T7: the error is printed more than once: $out"
 [ -f "$S/check-todos.sh" ] || fail "T7: a file outside the project was deleted"
 ok "T7 symlinked scripts/ is refused"
 

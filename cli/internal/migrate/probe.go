@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha1"
-	_ "embed"
+	"embed"
 	"fmt"
 	"os"
 	"os/exec"
@@ -189,6 +189,21 @@ func gitBlobHash(data []byte) string {
 
 //go:embed released-blobs.txt
 var releasedManifest string
+
+//go:embed released
+var releasedSources embed.FS
+
+// releasedSource is the content of a released scanner version: embedded in
+// the CLI, else from the install's git history (nil when neither has it).
+func releasedSource(rebarRoot, blob string) []byte {
+	if data, err := releasedSources.ReadFile("released/" + blob); err == nil {
+		return data
+	}
+	if data, err := exec.Command("git", "-C", rebarRoot, "cat-file", "blob", blob).Output(); err == nil && gitBlobHash(data) == blob {
+		return data
+	}
+	return nil
+}
 
 // manifestBlobs indexes released-blobs.txt by file name.
 func manifestBlobs() map[string]map[string]bool {

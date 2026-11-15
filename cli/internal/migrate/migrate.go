@@ -146,8 +146,8 @@ var readOnlyChecks = map[string][]string{
 // Settings the install reads in place of a check's hard-coded values, and
 // the probe-tree content that exercises the check's scan scope.
 var settingKeys = map[string][]string{
-	"check-todos.sh":            {"source_dirs", "source_extensions"},
-	"check-contract-refs.sh":    {"source_extensions", "contracts_dir"},
+	"check-todos.sh":            {"source_dirs", "source_extensions", "source_exclude_dirs"},
+	"check-contract-refs.sh":    {"source_extensions", "contracts_dir", "source_exclude_dirs"},
 	"check-contract-headers.sh": {"source_dirs", "source_extensions"},
 	"check-freshness.sh":        {"freshness_max_days"},
 }
@@ -164,10 +164,11 @@ var wrapperNames = map[string]bool{"ci-check.sh": true, "pre-commit.sh": true}
 
 // Defaults the install uses when a key is unset (scripts/*.sh).
 var installDefaults = map[string]string{
-	"source_dirs":        "src internal cmd client packages lib app",
-	"source_extensions":  "go ts tsx js py rs jsx",
-	"contracts_dir":      "architecture",
-	"freshness_max_days": "14",
+	"source_dirs":         "src internal cmd client packages lib app",
+	"source_extensions":   "go ts tsx js py rs jsx",
+	"contracts_dir":       "architecture",
+	"freshness_max_days":  "14",
+	"source_exclude_dirs": "node_modules vendor dist",
 }
 
 type migrator struct {
@@ -973,17 +974,39 @@ func (m *migrator) check(name string) *ScriptPlan {
 		}
 	}
 	pristine := releasedBlobs(m.opts.RebarRoot, name)[gitBlobHash(src)]
-	if !ok && pristine {
-		// Byte-identical to a released version: there is no customization
-		// to keep, and the difference is what upgrading rebar changes. The
-		// post-apply rerun still rolls everything back if it turns a pass
-		// into a failure.
+	release := ""
+	if !ok && !pristine && scans {
+		release = m.settingsOnly(name, string(src), before, cands)
+	}
+	if !ok && (pristine || release != "") {
+		// A released version (byte for byte, or once its settings are
+		// applied): there is no customization to keep, and the difference
+		// is what upgrading rebar changes. The post-apply rerun still rolls
+		// everything back if it turns a pass into a failure.
 		sp.Verdict, sp.Upstream = Delete, true
-		sp.Reason = "unmodified rebar copy; the install's version differs only by upstream changes (" + how + ")"
+		if pristine {
+			sp.Reason = "unmodified rebar copy; the install's version differs only by upstream changes (" + how + ")"
+		} else {
+			for i := range cands {
+				cands[i].Source = "scripts/" + name
+			}
+			m.accepted = append(m.accepted, cands...)
+			sp.Reason = "customized only in settings: behaves like rebar's released version " + release[:12]
+			if len(cands) > 0 {
+				sp.Reason += " with " + describeSettings(cands, "")
+			}
+			sp.Reason += "; the install's version differs only by upstream changes"
+		}
+		sp.Details = append(sp.Details, m.upstreamImpact(name, string(src), before, args)...)
 		return sp
 	}
 	if !ok {
 		sp.Reason = "behaves differently from the install's: " + how
+		if scans {
+			if hint := m.substringHint(name, string(src), cands); hint != "" {
+				sp.Details = append(sp.Details, hint)
+			}
+		}
 		return sp
 	}
 	if !scans && !pristine {
@@ -1025,48 +1048,111 @@ func (m *migrator) settingCandidates(name, src string) []Setting {
 		if _, ok := acceptedValue(m.accepted, k); ok {
 			continue
 		}
-		v := ""
-		switch k {
-		case "source_dirs":
-			if mm := loopDirsRe.FindStringSubmatch(src); mm != nil {
-				v = strings.Join(strings.Fields(mm[1]), " ")
-			} else if mm := dirsArrayRe.FindStringSubmatch(src); mm != nil {
-				v = strings.Join(strings.Fields(mm[1]), " ")
-			} else {
-				for _, mm := range defaultVarRe.FindAllStringSubmatch(src, -1) {
-					if mm[1] == "SOURCE_DIRS" {
-						v = mm[2]
-					}
-				}
-			}
-		case "source_extensions":
-			var exts []string
-			for _, mm := range includeRe.FindAllStringSubmatch(src, -1) {
-				exts = appendUnique(exts, mm[1])
-			}
-			v = strings.Join(exts, " ")
-			if v == "" {
-				for _, mm := range defaultVarRe.FindAllStringSubmatch(src, -1) {
-					if mm[1] == "SOURCE_EXTENSIONS" {
-						v = mm[2]
-					}
-				}
-			}
-		case "contracts_dir":
-			if mm := archArgRe.FindStringSubmatch(src); mm != nil {
-				v = strings.TrimSuffix(mm[1], "/")
-			}
-		case "freshness_max_days":
-			if mm := maxAgeRe.FindStringSubmatch(src); mm != nil {
-				v = mm[1]
-			}
-		}
-		if v != "" && v != installDefaults[k] && ValidValue(v) {
+		v := rawSetting(name, k, src)
+		if v != "" && !sameSetting(k, v, installDefaults[k]) && ValidValue(v) {
 			out = append(out, Setting{Key: k, Value: v})
 		}
 	}
 	return out
 }
+
+// sameSetting compares setting values; list-valued exclusions as sets.
+func sameSetting(k, a, b string) bool {
+	if k != "source_exclude_dirs" {
+		return a == b
+	}
+	fa, fb := strings.Fields(a), strings.Fields(b)
+	if len(fa) != len(fb) {
+		return false
+	}
+	set := map[string]bool{}
+	for _, x := range fa {
+		set[x] = true
+	}
+	for _, x := range fb {
+		if !set[x] {
+			return false
+		}
+	}
+	return true
+}
+
+// rawSetting extracts the value a legacy copy hard-codes for a setting the
+// install reads from .rebarrc ("" when it has none).
+func rawSetting(name, k, src string) string {
+	switch k {
+	case "source_dirs":
+		if mm := loopDirsRe.FindStringSubmatch(src); mm != nil {
+			return strings.Join(strings.Fields(mm[1]), " ")
+		}
+		if mm := dirsArrayRe.FindStringSubmatch(src); mm != nil {
+			return strings.Join(strings.Fields(mm[1]), " ")
+		}
+		for _, mm := range defaultVarRe.FindAllStringSubmatch(src, -1) {
+			if mm[1] == "SOURCE_DIRS" {
+				return mm[2]
+			}
+		}
+	case "source_extensions":
+		var exts []string
+		for _, mm := range includeRe.FindAllStringSubmatch(src, -1) {
+			exts = appendUnique(exts, mm[1])
+		}
+		if len(exts) > 0 {
+			return strings.Join(exts, " ")
+		}
+		for _, mm := range defaultVarRe.FindAllStringSubmatch(src, -1) {
+			if mm[1] == "SOURCE_EXTENSIONS" {
+				return mm[2]
+			}
+		}
+	case "contracts_dir":
+		if mm := archArgRe.FindStringSubmatch(src); mm != nil {
+			return strings.TrimSuffix(mm[1], "/")
+		}
+	case "freshness_max_days":
+		if mm := maxAgeRe.FindStringSubmatch(src); mm != nil {
+			return mm[1]
+		}
+	case "source_exclude_dirs":
+		return strings.Join(excludedDirNames(name, src), " ")
+	}
+	return ""
+}
+
+// excludedDirNames reads the directories a copy leaves out: --exclude-dir
+// values, and the plain-word alternatives of its `grep -v` line filters
+// (`grep -v "node_modules\|vendor\|dist"`), which old copies used to mean
+// directory names. File names (TODO.md), the script's own name and the
+// TRACKED-TASK marker are not directories; .git and .claude are always
+// excluded by the install.
+func excludedDirNames(name, src string) []string {
+	self := strings.TrimSuffix(name, ".sh")
+	var out []string
+	add := func(d string) {
+		d = strings.Trim(d, "/")
+		if d == "" || d == ".git" || d == ".claude" || d == self || strings.Contains(d, "TRACKED-TASK") {
+			return
+		}
+		out = appendUnique(out, d)
+	}
+	for _, mm := range excludeArgs.FindAllStringSubmatch(src, -1) {
+		if strings.HasPrefix(mm[0], "--exclude-dir") {
+			add(mm[1])
+		}
+	}
+	for _, mm := range grepVRe.FindAllStringSubmatch(src, -1) {
+		for _, alt := range strings.Split(grepVPattern(mm), `\|`) {
+			alt = strings.ReplaceAll(alt, `\.`, ".")
+			if dirWordRe.MatchString(alt) {
+				add(alt)
+			}
+		}
+	}
+	return out
+}
+
+var dirWordRe = regexp.MustCompile(`^\.?[A-Za-z0-9_-]+/?$`)
 
 func acceptedValue(s []Setting, key string) (string, bool) {
 	for _, x := range s {
@@ -1096,6 +1182,16 @@ func (m *migrator) probeTree(name, content string, s, cands []Setting) (bool, st
 // buildProbeTree lays out the probe tree for a check once (its directories
 // and extensions cover every candidate setting) and runs the legacy copy on it.
 func (m *migrator) buildProbeTree(name, content string, cands []Setting) *probeTreeRun {
+	data, err := os.ReadFile(m.legacyPath(name))
+	if err != nil {
+		return &probeTreeRun{err: err}
+	}
+	return m.buildProbeTreeWith(name, content, cands, data)
+}
+
+// buildProbeTreeWith lays out the same tree as buildProbeTree and runs
+// script (another version of the check) on it as the copy would run.
+func (m *migrator) buildProbeTreeWith(name, content string, cands []Setting, script []byte) *probeTreeRun {
 	t := &probeTreeRun{}
 	root, err := os.MkdirTemp(m.tmp, "probe-")
 	if err != nil {
@@ -1226,7 +1322,11 @@ func (m *migrator) buildProbeTree(name, content string, cands []Setting) *probeT
 	}
 	// The copy runs from the probe tree's scripts/, with the project's
 	// _rebar-config.sh and .rebarrc, as it would at home.
-	if err := copyFile(m.legacyPath(name), filepath.Join(root, "scripts", name)); err != nil {
+	if err := os.MkdirAll(filepath.Join(root, "scripts"), 0o755); err != nil {
+		t.err = err
+		return t
+	}
+	if err := os.WriteFile(filepath.Join(root, "scripts", name), script, 0o755); err != nil {
 		t.err = err
 		return t
 	}
@@ -1859,4 +1959,207 @@ func (m *migrator) rcFile(extra []Setting) string {
 	p := filepath.Join(m.tmp, "rebarrc-"+gitBlobHash(rc))
 	_ = os.WriteFile(p, rc, 0o644)
 	return p
+}
+
+// settingsOnly reports whether a scanner copy is a released version with
+// only its settings changed: some released version of the script, with the
+// copy's directories, extensions and contracts dir written into it, gives
+// the same findings as the copy on the project and on the probe tree. It
+// returns that version's blob id ("" when none does).
+func (m *migrator) settingsOnly(name, src string, before runResult, cands []Setting) string {
+	vals := map[string]string{}
+	for _, k := range []string{"source_dirs", "source_extensions", "contracts_dir", "freshness_max_days"} {
+		if v := rawSetting(name, k, src); v != "" {
+			vals[k] = v
+		}
+	}
+	content := probeContent[name]
+	legacyTree, ok := m.trees[name]
+	if !ok {
+		legacyTree = m.buildProbeTree(name, content, cands)
+		m.trees[name] = legacyTree
+	}
+	if legacyTree.err != nil {
+		return ""
+	}
+	for _, h := range sortedKeys(releasedBlobs(m.opts.RebarRoot, name)) {
+		rel := releasedSource(m.opts.RebarRoot, h)
+		if rel == nil {
+			continue
+		}
+		// The version runs from outside the tree it checks (working
+		// directory and REBAR_PROJECT_ROOT set to it), so both runs scan
+		// the same files, the copy's own text included.
+		dir, err := os.MkdirTemp(m.tmp, "release-")
+		if err != nil {
+			return ""
+		}
+		ref := filepath.Join(dir, "scripts", name)
+		if err := os.MkdirAll(filepath.Dir(ref), 0o755); err != nil {
+			return ""
+		}
+		if err := os.WriteFile(ref, []byte(applySettings(string(rel), vals)), 0o755); err != nil {
+			return ""
+		}
+		args := readOnlyChecks[name]
+		r := run(m.opts.Timeout, m.work, scrubbedEnv("REBAR_PROJECT_ROOT="+m.work, "REBAR_TIER=3"), append([]string{ref}, args...)...)
+		m.noteWrites("")
+		if same, _ := compareRuns(before, r); !same {
+			continue
+		}
+		pr := run(m.opts.Timeout, legacyTree.root, scrubbedEnv("REBAR_PROJECT_ROOT="+legacyTree.root, "REBAR_TIER=3"), append([]string{ref}, args...)...)
+		if same, _ := compareRuns(legacyTree.legacy, pr); same {
+			return h
+		}
+	}
+	return ""
+}
+
+// applySettings writes setting values into an old version of a check: its
+// directory loop or SOURCE_DIRS default, its --include list or
+// SOURCE_EXTENSIONS default, its ARCH_DIR default, its max-age default.
+func applySettings(src string, vals map[string]string) string {
+	if v, ok := vals["source_dirs"]; ok {
+		if loc := loopDirsRe.FindStringSubmatchIndex(src); loc != nil {
+			src = src[:loc[2]] + v + src[loc[3]:]
+		}
+		src = regexp.MustCompile(`(?m)^(\s*SOURCE_DIRS=)"[^"$]*"`).ReplaceAllString(src, `${1}"`+v+`"`)
+	}
+	if v, ok := vals["source_extensions"]; ok {
+		var inc []string
+		for _, e := range strings.Fields(v) {
+			inc = append(inc, `--include="*.`+strings.TrimPrefix(e, ".")+`"`)
+		}
+		src = includeRunRe.ReplaceAllStringFunc(src, func(run string) string {
+			// Keep the line continuation the run ended with, if any.
+			tail := " "
+			if m := continuationRe.FindString(run); m != "" {
+				tail = " " + m
+			}
+			return strings.Join(inc, " ") + tail
+		})
+		src = regexp.MustCompile(`(?m)^(\s*SOURCE_EXTENSIONS=)"[^"$]*"`).ReplaceAllString(src, `${1}"`+v+`"`)
+	}
+	if v, ok := vals["contracts_dir"]; ok {
+		src = regexp.MustCompile(`(ARCH_DIR="?\$\{1:-)[A-Za-z0-9_./-]+(\})`).ReplaceAllString(src, "${1}"+v+"${2}")
+	}
+	if v, ok := vals["freshness_max_days"]; ok {
+		src = regexp.MustCompile(`(?i)((?:max[_a-z]*|days)="?\$\{1:-)[0-9]+(\})`).ReplaceAllString(src, "${1}"+v+"${2}")
+	}
+	return src
+}
+
+// includeRunRe matches a run of --include="*.ext" arguments, across line
+// continuations.
+var continuationRe = regexp.MustCompile(`\\\n[ \t]*$`)
+
+var includeRunRe = regexp.MustCompile(`(?:--include=["']?\*\.[A-Za-z0-9]+["']?[ \t]*(?:\\\n[ \t]*)?)+`)
+
+func sortedKeys(m map[string]bool) []string {
+	var out []string
+	for k := range m {
+		out = append(out, k)
+	}
+	sort.Strings(out)
+	return out
+}
+
+// upstreamImpact lists what the install (with the accepted settings)
+// reports on the project that the copy did not, so the user sees the
+// effect of deleting the copy before --apply.
+func (m *migrator) upstreamImpact(name, src string, before runResult, args []string) []string {
+	after := m.runInstall(m.work, name, nil, args...)
+	extra := extraFindings(before.Stdout, after.Stdout)
+	why := "upstream change"
+	if lits := filterLiterals(src); len(lits) > 0 {
+		why = "upstream change (#19): directories are excluded by name, not by substring, and TODO.md / the script itself by file name; add directory names to source_exclude_dirs to exclude more"
+	}
+	if len(extra) == 0 {
+		same := "same findings"
+		if facts(before.Stdout) != facts(after.Stdout) {
+			same += "; " + firstDiffAs(before.Stdout, after.Stdout, "copy", "install")
+		}
+		return []string{"impact on this project: none (" + same + "); on a probe tree the install also reports what the copy's filters dropped — " + why}
+	}
+	shown := extra
+	if len(shown) > 10 {
+		shown = append(append([]string{}, shown[:10]...), fmt.Sprintf("… %d more", len(extra)-10))
+	}
+	return []string{fmt.Sprintf("impact on this project: the install reports %d finding(s) the copy did not (%s): %s",
+		len(extra), why, strings.Join(shown, ", "))}
+}
+
+// extraFindings lists file references in b that a lacks.
+func extraFindings(a, b string) []string {
+	have := map[string]bool{}
+	for _, p := range pathRe.FindAllString(ansiRe.ReplaceAllString(a, ""), -1) {
+		have[p] = true
+	}
+	var out []string
+	for _, p := range pathRe.FindAllString(ansiRe.ReplaceAllString(b, ""), -1) {
+		if !have[p] {
+			out = appendUnique(out, p)
+		}
+	}
+	sort.Strings(out)
+	return out
+}
+
+// filterLiterals are the plain-text alternatives of a copy's grep -v
+// line filters.
+func filterLiterals(src string) []string {
+	var out []string
+	for _, mm := range grepVRe.FindAllStringSubmatch(src, -1) {
+		for _, alt := range strings.Split(grepVPattern(mm), `\|`) {
+			alt = strings.ReplaceAll(strings.ReplaceAll(alt, `\.`, "."), "\\", "")
+			if alt != "" && !strings.Contains(alt, "TRACKED-TASK") {
+				out = appendUnique(out, alt)
+			}
+		}
+	}
+	return out
+}
+
+// substringHint explains a kept scanner copy whose findings on the probe
+// tree are a strict subset of the install's, with every extra one dropped
+// by one of the copy's substring filters: the difference is the #19 fix,
+// and the rest is for a person to judge.
+func (m *migrator) substringHint(name, src string, cands []Setting) string {
+	t, ok := m.trees[name]
+	if !ok || t.err != nil {
+		return ""
+	}
+	inst := m.runInstall(t.root, name, cands)
+	if missing := extraFindings(inst.Stdout, t.legacy.Stdout); len(missing) > 0 {
+		return "" // the copy finds things the install does not: a real difference
+	}
+	extra := extraFindings(t.legacy.Stdout, inst.Stdout)
+	lits := filterLiterals(src)
+	if len(extra) == 0 || len(lits) == 0 {
+		return ""
+	}
+	var lines []string
+	for _, l := range strings.Split(ansiRe.ReplaceAllString(inst.Stdout, ""), "\n") {
+		for _, p := range extra {
+			if strings.Contains(l, p) {
+				lines = append(lines, l)
+				break
+			}
+		}
+	}
+	for _, l := range lines {
+		hit := false
+		for _, lit := range lits {
+			if strings.Contains(l, lit) {
+				hit = true
+				break
+			}
+		}
+		if !hit {
+			return ""
+		}
+	}
+	ex := extra[0]
+	return fmt.Sprintf("on a probe tree the install finds everything the copy does plus %d finding(s) the copy's substring filters (%s) drop, e.g. %s — rebar now excludes directories by name (#19). If that is the copy's only customization beyond settings, set source_dirs / source_extensions / source_exclude_dirs and delete it",
+		len(extra), strings.Join(lits, ", "), ex)
 }

@@ -52,13 +52,9 @@ func init() {
 	rootCmd.AddCommand(migrateCmd)
 }
 
-// runMigrate prints its own errors: main exits 1 without printing.
+// runMigrate's errors are printed by Execute ("rebar: <err>").
 func runMigrate(cmd *cobra.Command, args []string) error {
-	err := migrateMain(cmd)
-	if err != nil {
-		fmt.Fprintln(os.Stderr, "rebar migrate:", err)
-	}
-	return err
+	return migrateMain(cmd)
 }
 
 func migrateMain(cmd *cobra.Command) error {

@@ -3,6 +3,7 @@ package migrate
 import (
 	"bytes"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -440,5 +441,140 @@ func TestIntegrityNote(t *testing.T) {
 	}
 	if !strings.Contains(render(plan), "stage the changes (`git add -A`) and run `rebar commit`, which rehashes the changed files and prunes the entries of deleted ones") {
 		t.Fatalf("integrity note:\n%s", render(plan))
+	}
+}
+
+// v2CheckTodos is a released check-todos.sh that hard-codes its
+// directories and --include list (the v2 template), from the embedded
+// released sources.
+func v2CheckTodos(t *testing.T) string {
+	t.Helper()
+	for _, h := range sortedKeys(manifestBlobs()["check-todos.sh"]) {
+		src := string(releasedSource("", h))
+		if strings.Contains(src, "for d in src internal cmd client packages lib app; do") && !strings.Contains(src, "_rebar-config") {
+			return src
+		}
+	}
+	t.Skip("no v2 check-todos.sh among the released sources")
+	return ""
+}
+
+func TestApplySettings(t *testing.T) {
+	src := v2CheckTodos(t)
+	got := applySettings(src, map[string]string{"source_dirs": "lib tools", "source_extensions": "go sh"})
+	if !strings.Contains(got, "for d in lib tools; do") {
+		t.Fatalf("directories not applied:\n%s", got)
+	}
+	if strings.Contains(got, `--include="*.ts"`) || strings.Count(got, `--include="*.go" --include="*.sh"`) != 2 {
+		t.Fatalf("extensions not applied:\n%s", got)
+	}
+	if out, err := exec.Command("bash", "-n", testutil.WriteExecutable(t, t.TempDir(), "x.sh", got)).CombinedOutput(); err != nil {
+		t.Fatalf("not valid bash: %v\n%s", err, out)
+	}
+}
+
+// A copy that differs from a released version only in its settings (and
+// wording) is that version plus settings: it goes, with the behaviour
+// change on this project reported (#19 excludes directories by name, so a
+// TODO in lib/distance.go, dropped by the copy's `grep -v dist`, now counts).
+func TestCustomizedOnlyInSettings(t *testing.T) {
+	install := installRoot(t)
+	src := v2CheckTodos(t)
+	copySrc := strings.ReplaceAll(src, "for d in src internal cmd client packages lib app; do", "for directory in lib tools; do")
+	copySrc = strings.ReplaceAll(copySrc, `[ -d "$d" ] && DIRS+=("$d")`, `[ -d "$directory" ] && DIRS+=("$directory")`)
+	copySrc = strings.ReplaceAll(copySrc, `--include="*.jsx" \`, `--include="*.jsx" --include="*.sh" \`)
+	copySrc = strings.Replace(copySrc, "# check-todos.sh", "# check-todos.sh — adapted for this repo;", 1)
+	if copySrc == src || !strings.Contains(copySrc, `--include="*.sh"`) {
+		t.Skip("released v2 check-todos.sh changed shape")
+	}
+	p := testutil.InitRepo(t)
+	testutil.WriteFile(t, p, ".rebarrc", "tier = 3\n")
+	testutil.WriteFile(t, p, "lib/a.go", "package lib\n")
+	testutil.WriteFile(t, p, "tools/x.sh", "#!/bin/sh\n")
+	testutil.WriteExecutable(t, p, "scripts/check-todos.sh", copySrc)
+	commitAll(t, p)
+
+	plan, err := BuildPlan(opts(p, install))
+	if err != nil {
+		t.Fatal(err)
+	}
+	sp := scriptPlan(plan, "check-todos.sh")
+	if sp.Verdict != Delete || !strings.Contains(sp.Reason, "customized only in settings") {
+		t.Fatalf("settings-only copy not recognized:\n%s", render(plan))
+	}
+	for _, want := range []string{"+ source_dirs       = lib tools", "+ source_extensions = go ts tsx js py rs jsx sh", "impact on this project: none"} {
+		if !strings.Contains(render(plan), want) {
+			t.Fatalf("plan lacks %q:\n%s", want, render(plan))
+		}
+	}
+	if _, err := Apply(plan, opts(p, install), ApplyOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	if isFile(filepath.Join(p, "scripts", "check-todos.sh")) {
+		t.Fatal("settings-only copy not deleted")
+	}
+
+	// With a TODO the copy's substring filter hid, the plan lists it, and
+	// apply rolls back because the check would start failing.
+	p2 := testutil.InitRepo(t)
+	testutil.WriteFile(t, p2, ".rebarrc", "tier = 3\n")
+	testutil.WriteFile(t, p2, "lib/distance.go", "package lib // TODO"+": measure\n")
+	testutil.WriteExecutable(t, p2, "scripts/check-todos.sh", copySrc)
+	commitAll(t, p2)
+	plan, err = BuildPlan(opts(p2, install))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(render(plan), "impact on this project: the install reports 1 finding(s) the copy did not (upstream change (#19)") ||
+		!strings.Contains(render(plan), "lib/distance.go:1") {
+		t.Fatalf("impact not reported:\n%s", render(plan))
+	}
+	res, err := Apply(plan, opts(p2, install), ApplyOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !res.RolledBack || !isFile(filepath.Join(p2, "scripts", "check-todos.sh")) {
+		t.Fatalf("passing→failing change not rolled back: %+v", res.Checks)
+	}
+}
+
+// A real customization stays, and when the only difference on the probe
+// tree is what its substring filter drops, the reason says so.
+func TestSubstringFilterHint(t *testing.T) {
+	install := installRoot(t)
+	src := v2CheckTodos(t)
+	// A real customization: an extra counter line in the output.
+	copySrc := strings.Replace(src, `echo "OK: 0 untracked TODOs.`, `echo "scanned: ${#DIRS[@]} dirs"; echo "OK: 0 untracked TODOs.`, 1)
+	if copySrc == src {
+		t.Skip("released v2 check-todos.sh changed shape")
+	}
+	p := testutil.InitRepo(t)
+	testutil.WriteFile(t, p, ".rebarrc", "tier = 3\n")
+	testutil.WriteFile(t, p, "src/a.go", "package a\n")
+	testutil.WriteExecutable(t, p, "scripts/check-todos.sh", copySrc)
+	commitAll(t, p)
+	plan, err := BuildPlan(opts(p, install))
+	if err != nil {
+		t.Fatal(err)
+	}
+	sp := scriptPlan(plan, "check-todos.sh")
+	if sp.Verdict != Keep {
+		t.Fatalf("real customization deleted:\n%s", render(plan))
+	}
+	if !strings.Contains(strings.Join(sp.Details, "\n"), "the copy's substring filters") {
+		t.Fatalf("no substring hint:\n%s", render(plan))
+	}
+}
+
+// Old substring filters map to source_exclude_dirs only for words that
+// name directories; the install default needs no setting.
+func TestExcludedDirNames(t *testing.T) {
+	src := "grep -v \"TRACKED-TASK:\" | grep -v \"TODO\\.md\" | grep -v \"check-todos\" | grep -v \"node_modules\\|vendor\\|dist\\|build\\|\\.git\"\n" +
+		"grep -rn x --exclude-dir=\"third_party\" .\n"
+	if got := strings.Join(excludedDirNames("check-todos.sh", src), " "); got != "third_party node_modules vendor dist build" {
+		t.Fatalf("excludedDirNames = %q", got)
+	}
+	if !sameSetting("source_exclude_dirs", "dist vendor node_modules", installDefaults["source_exclude_dirs"]) {
+		t.Fatal("the default set in another order must need no setting")
 	}
 }
