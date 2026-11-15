@@ -95,9 +95,10 @@ cp -r templates/project-bootstrap/. ../my-project/ && cd ../my-project
 # Option B: Use the CLI (builds v2 scaffolding automatically)
 cd my-project && ../rebar/bin/rebar init
 
-# Option C: One-line installer (latest release → ~/.rebar/versions/, wires PATH)
+# Option C: One-line installer (latest stable release → ~/.rebar/versions/, wires PATH)
 curl -fsSL https://raw.githubusercontent.com/willackerly/rebar/main/setup-rebar.sh | bash
-# a specific version:  ... | bash -s -- v3.0.0-beta.4
+# a specific version:  ... | bash -s -- v3.0.0
+# newest pre-release:  ... | bash -s -- --pre
 # then: rebar new my-project -d "what it does"
 ```
 

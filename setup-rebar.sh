@@ -21,11 +21,14 @@
 #
 # Usage (curl pipe):
 #   curl -fsSL https://raw.githubusercontent.com/willackerly/rebar/main/setup-rebar.sh | bash
-#   curl -fsSL https://raw.githubusercontent.com/willackerly/rebar/main/setup-rebar.sh | bash -s -- v3.0.0-beta.4
+#   curl -fsSL https://raw.githubusercontent.com/willackerly/rebar/main/setup-rebar.sh | bash -s -- v3.0.0
 #
 # Usage (local):
-#   ./setup-rebar.sh [<version>|latest|<branch>|<sha>] [--source] [--no-switch]
-#                    [--server HOST:PORT] [--dir PATH]
+#   ./setup-rebar.sh [<version>|latest|<branch>|<full-sha>] [--pre] [--source]
+#                    [--no-switch] [--server HOST:PORT] [--dir PATH]
+#
+# "latest" (the default) is the highest stable tag; --pre includes
+# pre-releases. With no stable tag at all, latest is the highest pre-release.
 #
 # An existing pre-versioned ~/.rebar (a plain git clone, the layout before
 # this installer) is left untouched; versions/ and current are added next to
@@ -46,11 +49,13 @@ usage() {
 rebar installer (versioned)
 
 Usage:
-  $0 [<version>] [--source] [--no-switch] [--server HOST:PORT] [--dir PATH]
+  $0 [<version>] [--pre] [--source] [--no-switch] [--server HOST:PORT] [--dir PATH]
   $0 --help
 
-  <version>     a release tag (v3.0.0-beta.4), "latest" (default: the highest
-                release tag, pre-releases included), a branch, or a commit SHA
+  <version>     a release tag (v3.0.0), "latest" (the default: the highest
+                stable tag, or the highest pre-release if there is no stable
+                one), a branch, or a full 40-character commit SHA
+  --pre         with "latest": include pre-releases (v3.1.0-rc.1 over v3.0.0)
   --ref REF     same as <version> (kept for older docs)
   --source      build from source even if a prebuilt release exists
   --no-switch   install side by side but leave ~/.rebar/current where it is
@@ -115,11 +120,12 @@ sha256_of() {
   fi
 }
 
-# Highest semver tag on stdin (one per line). Pre-releases count and rank
-# below their release (v3.0.0-beta.10 > v3.0.0-beta.2, v3.0.0 > v3.0.0-rc.1).
-# Lines that are not vMAJOR.MINOR.PATCH[-PRE] are ignored.
+# Highest semver tag on stdin (one per line); with "stable", pre-releases
+# are skipped. Pre-releases rank below their release (v3.0.0-beta.10 >
+# v3.0.0-beta.2, v3.0.0 > v3.0.0-rc.1). Lines that are not
+# vMAJOR.MINOR.PATCH[-PRE] are ignored.
 semver_max() {
-  awk '
+  awk -v stable="${1:-}" '
     function isnum(s) { return s ~ /^[0-9]+$/ }
     function cmp_pre(a, b,   na, nb, A, B, i) {
       if (a == b) return 0
@@ -146,6 +152,7 @@ semver_max() {
       return cmp_pre(pa, pb)
     }
     /^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$/ {
+      if (stable != "" && index($0, "-")) next
       if (best == "" || cmp($0, best) > 0) best = $0
     }
     END { if (best != "") print best }
@@ -156,9 +163,9 @@ list_tags() {
   if have git; then
     git ls-remote --tags --refs "$REBAR_REPO" 'v*' | sed 's#.*refs/tags/##'
   elif [[ -n "$SLUG" ]] && have curl; then
-    # GitHub's /releases/latest skips pre-releases (all of rebar's, so far)
-    # and /releases misses tags that never got a Release; the tags list has
-    # every tag. 100 is the page cap — plenty for rebar's history.
+    # /releases misses tags that never got a Release (v3.0.0-beta.2 to
+    # beta.4); the tags list has every tag. 100 is the page cap — plenty for
+    # rebar's history.
     curl -fsSL "https://api.github.com/repos/${SLUG}/tags?per_page=100" \
       | sed -n 's/.*"name": *"\([^"]*\)".*/\1/p'
   else
@@ -315,6 +322,7 @@ main() {
   VERSION="${REBAR_REF:-}"
   FROM_SOURCE=0
   SWITCH=1
+  PRE=0
   GO_PKG="github.com/willackerly/rebar/cli/cmd"
 
   if [[ -t 1 ]]; then
@@ -335,6 +343,7 @@ main() {
       --ref=*)     VERSION="${1#--ref=}"; shift ;;
       --source)    FROM_SOURCE=1; shift ;;
       --no-switch) SWITCH=0; shift ;;
+      --pre)       PRE=1; shift ;;
       --rebar-end-of-script)
                    [[ $# -eq 1 ]] || die "--rebar-end-of-script must come last"; COMPLETE=1; shift ;;
       -h|--help)   usage; exit 0 ;;
@@ -354,10 +363,20 @@ main() {
   # ── Resolve what to install ──────────────────────────────────────────────────
 
   if [[ -z "$VERSION" || "$VERSION" == "latest" ]]; then
-    log "Resolving the latest rebar release (pre-releases included)…"
-    VERSION="$(list_tags | semver_max)" || die "could not list the tags of $REBAR_REPO"
+    tags="$(list_tags)" || die "could not list the tags of $REBAR_REPO"
+    if [[ "$PRE" -eq 1 ]]; then
+      VERSION="$(printf '%s\n' "$tags" | semver_max)"
+      [[ -n "$VERSION" ]] && log "Latest (pre-releases included): $VERSION"
+    else
+      VERSION="$(printf '%s\n' "$tags" | semver_max stable)"
+      if [[ -n "$VERSION" ]]; then
+        log "Latest: $VERSION"
+      else
+        VERSION="$(printf '%s\n' "$tags" | semver_max)"
+        [[ -n "$VERSION" ]] && log "Latest: $VERSION (no stable release yet; highest pre-release)"
+      fi
+    fi
     [[ -n "$VERSION" ]] || die "found no release tags in $REBAR_REPO; pass a version explicitly"
-    log "Latest: $VERSION"
     KIND=tag
   else
     # "3.0.0" → "v3.0.0" when only the v-prefixed tag exists.

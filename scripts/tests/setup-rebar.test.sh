@@ -8,9 +8,12 @@
 #
 # Run once per distinct bash found (/bin/bash — 3.2 on macOS — and the bash
 # on PATH):
-#   T1  no version → latest tag, pre-releases included (v9.1.0-beta.10 beats
-#       beta.2, v9.0.10 and a non-semver tag); prebuilt tarball, checksum OK;
-#       current → it; ~/.bashrc gets $REBAR_DIR/current/bin
+#   T1  no version → highest stable tag (v9.1.0 beats v9.0.10, and is chosen
+#       over the higher pre-release v9.2.0-beta.10 and a non-semver tag);
+#       prebuilt tarball, checksum OK; current → it; ~/.bashrc gets
+#       $REBAR_DIR/current/bin
+#   T1b --pre → highest tag including pre-releases (v9.2.0-beta.10 beats beta.2)
+#   T1c an upstream with only pre-releases → latest falls back to the highest
 #   T2  explicit version with no release assets → source fallback, stamped
 #       version; current switches; PATH line not duplicated
 #   T3  "9.0.10" resolves to v9.0.10; --no-switch leaves current alone
@@ -78,25 +81,29 @@ EOF
   g add -A && g commit -qm one
   g tag v9.0.0 && g tag v9.0.10
   echo two > two.txt && g add two.txt && g commit -qm two
-  g tag v9.1.0-beta.2 && g tag -a -m "annotated" v9.1.0-beta.10 && g tag vnext
+  g tag -a -m "annotated" v9.1.0 && g tag v9.2.0-beta.2 && g tag v9.2.0-beta.10 && g tag vnext
   g checkout -qb feat/x && echo x > x.txt && g add x.txt && g commit -qm x
   g checkout -q main
 ) || fail "could not build the fake upstream"
 FEAT_SHA="$(g -C "$O" rev-parse --short=7 feat/x)"
+# An upstream that has published only pre-releases (T1c).
+PREONLY="$TMP/preonly.git"
+g init -q --bare "$PREONLY" && g -C "$O" push -q "$PREONLY" main:main \
+  && g -C "$PREONLY" tag v9.5.0-rc.1 main || fail "could not build the pre-release-only upstream"
 
-# ── Fake GitHub Releases: only v9.1.0-beta.10 has assets ─────────────────────
+# ── Fake GitHub Releases: only v9.1.0 has assets ─────────────────────
 GOOS_HOST="$(go env GOOS)"; GOARCH_HOST="$(go env GOARCH)"
 export GOCACHE="$TMP/gocache" GOPATH="$TMP/gopath" GOTOOLCHAIN=local GOPROXY=off GOFLAGS=""
-"$PACKAGE" v9.1.0-beta.10 --repo "$O" --ref v9.1.0-beta.10 \
-  --out "$TMP/releases/v9.1.0-beta.10" --targets "$GOOS_HOST/$GOARCH_HOST" >/dev/null \
+"$PACKAGE" v9.1.0 --repo "$O" --ref v9.1.0 \
+  --out "$TMP/releases/v9.1.0" --targets "$GOOS_HOST/$GOARCH_HOST" >/dev/null \
   || fail "package-release.sh failed against the fake upstream"
-ASSET="rebar_9.1.0-beta.10_${GOOS_HOST}_${GOARCH_HOST}.tar.gz"
-[ -f "$TMP/releases/v9.1.0-beta.10/$ASSET" ] || fail "package-release.sh wrote no $ASSET"
-grep -q "  $ASSET\$" "$TMP/releases/v9.1.0-beta.10/rebar_9.1.0-beta.10_checksums.txt" \
+ASSET="rebar_9.1.0_${GOOS_HOST}_${GOARCH_HOST}.tar.gz"
+[ -f "$TMP/releases/v9.1.0/$ASSET" ] || fail "package-release.sh wrote no $ASSET"
+grep -q "  $ASSET\$" "$TMP/releases/v9.1.0/rebar_9.1.0_checksums.txt" \
   || fail "checksums file does not list $ASSET"
 mkdir -p "$TMP/badrel"
-cp -R "$TMP/releases/v9.1.0-beta.10" "$TMP/badrel/"
-printf 'tampered' >> "$TMP/badrel/v9.1.0-beta.10/$ASSET"
+cp -R "$TMP/releases/v9.1.0" "$TMP/badrel/"
+printf 'tampered' >> "$TMP/badrel/v9.1.0/$ASSET"
 ok "package-release.sh: $ASSET + checksums from the fake upstream"
 
 # ── Runner ───────────────────────────────────────────────────────────────────
@@ -111,7 +118,7 @@ inst() {
   mkdir -p "$home"
   env -i HOME="$home" PATH="${IPATH:-$TPATH}" SHELL=/bin/bash TMPDIR="$TMP" \
     GOCACHE="$GOCACHE" GOPATH="$GOPATH" GOTOOLCHAIN=local GOPROXY=off \
-    REBAR_REPO="$O" REBAR_RELEASE_URL="$RELURL" \
+    REBAR_REPO="${IREPO:-$O}" REBAR_RELEASE_URL="$RELURL" \
     "$sh" "$INSTALLER" "$@" 2>&1
 }
 has() { printf '%s\n' "$1" | grep -qF -- "$2" || { printf '%s\n' "$1" | tail -20 >&2; fail "$3: missing '$2'"; }; }
@@ -119,14 +126,14 @@ current_of() { readlink "$1/.rebar/current"; }
 leftovers() { ls -A "$1/.rebar/versions" | grep '^\.' || true; }
 
 # mv shims for T12: when the installer moves its staged tree onto
-# versions/v9.1.0-beta.10, fail (shim-fail) or SIGTERM the installer (shim-term).
+# versions/v9.1.0, fail (shim-fail) or SIGTERM the installer (shim-term).
 REALMV="$(command -v mv)"
 for mode in fail term; do
   mkdir -p "$TMP/shim-$mode"
   if [ "$mode" = fail ]; then act='echo "mv: simulated failure" >&2; exit 1'; else act='kill -TERM $PPID; exit 1'; fi
   cat > "$TMP/shim-$mode/mv" <<EOF
 #!/bin/sh
-case "\$1" in */.incoming.*) case "\$2" in */versions/v9.1.0-beta.10) $act ;; esac ;; esac
+case "\$1" in */.incoming.*) case "\$2" in */versions/v9.1.0) $act ;; esac ;; esac
 exec "$REALMV" "\$@"
 EOF
   chmod +x "$TMP/shim-$mode/mv"
@@ -148,20 +155,32 @@ for sh in $BASHES; do
 
   # T1
   out="$(inst "$H" "$sh")" || { echo "$out" | tail -20 >&2; fail "T1 [$bv] latest install failed"; }
-  has "$out" "Latest: v9.1.0-beta.10" "T1 [$bv]"
+  has "$out" "Latest: v9.1.0" "T1 [$bv]"
   has "$out" "Checksum OK" "T1 [$bv]"
-  [ "$(current_of "$H")" = "versions/v9.1.0-beta.10" ] || fail "T1 [$bv] current is $(current_of "$H")"
-  [ "$("$H/.rebar/current/bin/rebar" version)" = "rebar v9.1.0-beta.10" ] || fail "T1 [$bv] wrong version"
+  [ "$(current_of "$H")" = "versions/v9.1.0" ] || fail "T1 [$bv] current is $(current_of "$H")"
+  [ "$("$H/.rebar/current/bin/rebar" version)" = "rebar v9.1.0" ] || fail "T1 [$bv] wrong version"
   [ -f "$H/.rebar/current/scripts/steward.sh" ] || fail "T1 [$bv] tarball tree is incomplete"
   grep -q '^method=prebuilt' "$H/.rebar/current/.rebar-install" || fail "T1 [$bv] not a prebuilt install"
   grep -qF "$H/.rebar/current/bin" "$H/.bashrc" || fail "T1 [$bv] PATH not wired to current/bin"
-  ok "T1 [$bv] latest = v9.1.0-beta.10 (pre-release), prebuilt + checksum, current, PATH"
+  ok "T1 [$bv] latest = v9.1.0 (stable over v9.2.0-beta.10), prebuilt + checksum, current, PATH"
+
+  # T1b
+  out="$(inst "$TMP/h$n-pre" "$sh" --pre)" || { echo "$out" | tail -20 >&2; fail "T1b [$bv] --pre failed"; }
+  has "$out" "Latest (pre-releases included): v9.2.0-beta.10" "T1b [$bv]"
+  [ "$("$TMP/h$n-pre/.rebar/current/bin/rebar" version)" = "rebar v9.2.0-beta.10" ] || fail "T1b [$bv] wrong version"
+  ok "T1b [$bv] --pre = v9.2.0-beta.10"
+
+  # T1c
+  out="$(IREPO="$PREONLY" inst "$TMP/h$n-preonly" "$sh")" || { echo "$out" | tail -20 >&2; fail "T1c [$bv] failed"; }
+  has "$out" "no stable release yet" "T1c [$bv]"
+  [ "$(current_of "$TMP/h$n-preonly")" = "versions/v9.5.0-rc.1" ] || fail "T1c [$bv] current is $(current_of "$TMP/h$n-preonly")"
+  ok "T1c [$bv] only pre-releases upstream → latest = v9.5.0-rc.1"
 
   # T2
   out="$(inst "$H" "$sh" v9.0.0)" || { echo "$out" | tail -20 >&2; fail "T2 [$bv] failed"; }
   has "$out" "has no prebuilt assets" "T2 [$bv]"
   has "$out" "Falling back to a source build" "T2 [$bv]"
-  has "$out" "current: v9.1.0-beta.10 → v9.0.0" "T2 [$bv]"
+  has "$out" "current: v9.1.0 → v9.0.0" "T2 [$bv]"
   [ "$("$H/.rebar/current/bin/rebar" version)" = "rebar v9.0.0" ] || fail "T2 [$bv] source build not stamped"
   [ "$(grep -cF "$H/.rebar/current/bin" "$H/.bashrc")" = "1" ] || fail "T2 [$bv] PATH line duplicated"
   ok "T2 [$bv] no assets → source fallback, stamped v9.0.0, current switched"
@@ -180,23 +199,23 @@ for sh in $BASHES; do
   ok "T4 [$bv] branch feat/x → versions/feat-x, rebar feat/x@$FEAT_SHA"
 
   # T5
-  out="$(inst "$H" "$sh" v9.1.0-beta.10 --source)" || { echo "$out" | tail -20 >&2; fail "T5 [$bv] failed"; }
-  has "$out" "Replacing the existing v9.1.0-beta.10" "T5 [$bv]"
-  grep -q '^method=source' "$H/.rebar/versions/v9.1.0-beta.10/.rebar-install" || fail "T5 [$bv] not rebuilt"
-  [ "$("$H/.rebar/current/bin/rebar" version)" = "rebar v9.1.0-beta.10" ] || fail "T5 [$bv] wrong version"
+  out="$(inst "$H" "$sh" v9.1.0 --source)" || { echo "$out" | tail -20 >&2; fail "T5 [$bv] failed"; }
+  has "$out" "Replacing the existing v9.1.0" "T5 [$bv]"
+  grep -q '^method=source' "$H/.rebar/versions/v9.1.0/.rebar-install" || fail "T5 [$bv] not rebuilt"
+  [ "$("$H/.rebar/current/bin/rebar" version)" = "rebar v9.1.0" ] || fail "T5 [$bv] wrong version"
   [ -z "$(leftovers "$H")" ] || fail "T5 [$bv] left $(leftovers "$H") in versions/"
-  [ "$(ls "$H/.rebar/versions" | tr '\n' ' ')" = "feat-x v9.0.0 v9.0.10 v9.1.0-beta.10 " ] \
+  [ "$(ls "$H/.rebar/versions" | tr '\n' ' ')" = "feat-x v9.0.0 v9.0.10 v9.1.0 " ] \
     || fail "T5 [$bv] versions: $(ls "$H/.rebar/versions" | tr '\n' ' ')"
   ok "T5 [$bv] --source re-install replaces in place; four versions side by side"
 
   # T6
   H6="$TMP/h$n-mismatch"
-  if out="$(RELURL="file://$TMP/badrel" inst "$H6" "$sh" v9.1.0-beta.10)"; then
+  if out="$(RELURL="file://$TMP/badrel" inst "$H6" "$sh" v9.1.0)"; then
     fail "T6 [$bv] a tampered tarball was installed"
   fi
   has "$out" "checksum mismatch for $ASSET" "T6 [$bv]"
   case "$out" in *"source build"*) fail "T6 [$bv] fell back to source after a mismatch" ;; esac
-  [ ! -e "$H6/.rebar/versions/v9.1.0-beta.10" ] && [ ! -e "$H6/.rebar/current" ] \
+  [ ! -e "$H6/.rebar/versions/v9.1.0" ] && [ ! -e "$H6/.rebar/current" ] \
     || fail "T6 [$bv] something was installed"
   [ -z "$(leftovers "$H6")" ] || fail "T6 [$bv] left $(leftovers "$H6")"
   ok "T6 [$bv] checksum mismatch refused, nothing installed or left behind"
@@ -207,12 +226,12 @@ for sh in $BASHES; do
   g clone -q "$O" "$H7/.rebar" || fail "T7 clone"
   printf 'export PATH="%s/.rebar/bin:$PATH"\n' "$H7" > "$H7/.bashrc"
   head_before="$(g -C "$H7/.rebar" rev-parse HEAD)"
-  out="$(inst "$H7" "$sh" v9.1.0-beta.10)" || { echo "$out" | tail -20 >&2; fail "T7 [$bv] failed"; }
+  out="$(inst "$H7" "$sh" v9.1.0)" || { echo "$out" | tail -20 >&2; fail "T7 [$bv] failed"; }
   has "$out" "is a pre-versioned rebar clone" "T7 [$bv]"
   [ -z "$(g -C "$H7/.rebar" status --porcelain)" ] || fail "T7 [$bv] clone is dirty: $(g -C "$H7/.rebar" status --porcelain)"
   [ "$(g -C "$H7/.rebar" rev-parse HEAD)" = "$head_before" ] || fail "T7 [$bv] clone HEAD moved"
   [ -x "$H7/.rebar/bin/install" ] || fail "T7 [$bv] clone files touched"
-  [ "$(current_of "$H7")" = "versions/v9.1.0-beta.10" ] || fail "T7 [$bv] current not set"
+  [ "$(current_of "$H7")" = "versions/v9.1.0" ] || fail "T7 [$bv] current not set"
   legacy_line="$(grep -nF "$H7/.rebar/bin:" "$H7/.bashrc" | cut -d: -f1)"
   new_line="$(grep -nF "$H7/.rebar/current/bin" "$H7/.bashrc" | cut -d: -f1)"
   [ -n "$new_line" ] && [ "$new_line" -gt "$legacy_line" ] \
@@ -222,7 +241,7 @@ for sh in $BASHES; do
   # T8
   H8="$TMP/h$n-other"
   mkdir -p "$H8/.rebar" && echo mine > "$H8/.rebar/notes.txt"
-  if out="$(inst "$H8" "$sh" v9.1.0-beta.10)"; then fail "T8 [$bv] installed into a foreign dir"; fi
+  if out="$(inst "$H8" "$sh" v9.1.0)"; then fail "T8 [$bv] installed into a foreign dir"; fi
   has "$out" "neither a rebar install nor empty" "T8 [$bv]"
   [ "$(ls -A "$H8/.rebar")" = "notes.txt" ] || fail "T8 [$bv] foreign dir modified"
   ok "T8 [$bv] foreign ~/.rebar refused and untouched"
@@ -247,7 +266,7 @@ for sh in $BASHES; do
     case "$cut" in n*) head -n "${cut#n}" "$INSTALLER" ;; c*) head -c "${cut#c}" "$INSTALLER" ;; esac > "$TMP/trunc.sh"
     out="$(env -i HOME="$H" PATH="$TPATH" SHELL=/bin/bash TMPDIR="$TMP" GOCACHE="$GOCACHE" GOPATH="$GOPATH" \
       GOTOOLCHAIN=local GOPROXY=off REBAR_REPO="$O" REBAR_RELEASE_URL="$RELURL" \
-      "$sh" -s -- v9.1.0-beta.10 < "$TMP/trunc.sh" 2>&1)"
+      "$sh" -s -- v9.1.0 < "$TMP/trunc.sh" 2>&1)"
     case "$out" in *"Installing rebar"*|*"Replacing"*) echo "$out" | tail -5 >&2; fail "T11 [$bv] truncated at $cut ran an install" ;; esac
     [ "$(state)" = "$before" ] || fail "T11 [$bv] truncated at $cut changed ~/.rebar: $(state)"
   done
@@ -255,13 +274,13 @@ for sh in $BASHES; do
 
   # T12 — re-installing a version that fails between moving the old copy
   # aside and moving the new one in (mv fails / SIGTERM) keeps the old copy.
-  echo keep > "$H/.rebar/versions/v9.1.0-beta.10/MARKER"
+  echo keep > "$H/.rebar/versions/v9.1.0/MARKER"
   for mode in fail term; do
-    out="$(IPATH="$TMP/shim-$mode:$TPATH" inst "$H" "$sh" v9.1.0-beta.10)" \
+    out="$(IPATH="$TMP/shim-$mode:$TPATH" inst "$H" "$sh" v9.1.0)" \
       && fail "T12 [$bv] $mode: the install should have failed"
-    [ -f "$H/.rebar/versions/v9.1.0-beta.10/MARKER" ] \
-      || { echo "$out" | tail -5 >&2; fail "T12 [$bv] $mode: the previous v9.1.0-beta.10 was lost"; }
-    [ "$("$H/.rebar/current/bin/rebar" version)" = "rebar v9.1.0-beta.10" ] || fail "T12 [$bv] $mode: current broken"
+    [ -f "$H/.rebar/versions/v9.1.0/MARKER" ] \
+      || { echo "$out" | tail -5 >&2; fail "T12 [$bv] $mode: the previous v9.1.0 was lost"; }
+    [ "$("$H/.rebar/current/bin/rebar" version)" = "rebar v9.1.0" ] || fail "T12 [$bv] $mode: current broken"
     [ -z "$(leftovers "$H")" ] || fail "T12 [$bv] $mode: left $(leftovers "$H")"
   done
   ok "T12 [$bv] a failed or interrupted swap restores the previous copy"
@@ -274,11 +293,11 @@ done
 NOGO="$(dir_of git):$(dir_of curl):/usr/bin:/bin:/usr/sbin:/sbin"
 if ! PATH="$NOGO" command -v go >/dev/null 2>&1; then
   H10="$TMP/h-nogo"
-  out="$(IPATH="$NOGO" inst "$H10" bash v9.1.0-beta.10)" || { echo "$out" | tail -20 >&2; fail "T10 prebuilt without Go failed"; }
-  [ "$("$H10/.rebar/current/bin/rebar" version)" = "rebar v9.1.0-beta.10" ] || fail "T10 wrong version"
+  out="$(IPATH="$NOGO" inst "$H10" bash v9.1.0)" || { echo "$out" | tail -20 >&2; fail "T10 prebuilt without Go failed"; }
+  [ "$("$H10/.rebar/current/bin/rebar" version)" = "rebar v9.1.0" ] || fail "T10 wrong version"
   if out="$(IPATH="$NOGO" inst "$H10" bash v9.0.0)"; then fail "T10 built without Go?"; fi
   has "$out" "Go is required" "T10"
-  [ "$(current_of "$H10")" = "versions/v9.1.0-beta.10" ] || fail "T10 failed install moved current"
+  [ "$(current_of "$H10")" = "versions/v9.1.0" ] || fail "T10 failed install moved current"
   ok "T10 without Go: prebuilt installs, source-only tag explains Go is needed, current kept"
 else
   echo "skip T10: go is on the system PATH here ($(PATH="$NOGO" command -v go)); covered where it isn't (macOS CI)"

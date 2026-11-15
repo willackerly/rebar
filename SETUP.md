@@ -20,13 +20,16 @@ parts to adopt.
 curl -fsSL https://raw.githubusercontent.com/willackerly/rebar/main/setup-rebar.sh | bash
 ```
 
-That installs the latest release (pre-releases included) and puts
+That installs the latest stable release (the highest `vX.Y.Z` tag, ignoring
+pre-releases such as `v3.1.0-rc.1`; if no stable tag exists yet it takes the
+highest pre-release) and puts
 `~/.rebar/current/bin` (`rebar`, `ask`, `ask-mcp-server`) on your PATH via your
 shell RC. Variants:
 
 | Command | Installs |
 |---------|----------|
-| `… \| bash -s -- v3.0.0-beta.4` | that release |
+| `… \| bash -s -- v3.0.0` | that release |
+| `… \| bash -s -- --pre` | the newest tag, pre-releases included |
 | `… \| bash -s -- main` | a branch, built from source; `rebar version` says `main@<sha>` |
 | `… \| bash -s -- v3.1.0 --no-switch` | side by side, without changing the active version |
 | `… \| bash -s -- v3.1.0 --source` | from source even if a prebuilt download exists |

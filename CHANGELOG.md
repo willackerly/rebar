@@ -21,11 +21,13 @@ All notable changes to rebar. Versioned with [semver](https://semver.org/).
 - **Versioned installer.** `setup-rebar.sh [<version>|latest|<branch>]`
   installs side by side under `~/.rebar/versions/<version>/`, with
   `~/.rebar/current` pointing at the active one and `~/.rebar/current/bin`
-  on PATH. "latest" (the default) includes pre-releases. Tags download a
+  on PATH. "latest" (the default) is the highest stable tag (the highest
+  pre-release only while no stable tag exists); `--pre` includes
+  pre-releases. Tags download a
   prebuilt tarball verified against the release's SHA-256 checksums, and
   build from source (git + Go) when the release has no assets; branches and
   SHAs always build from source, replacing the committed darwin/arm64
-  `bin/rebar`. `--no-switch`, `--source`. An existing `~/.rebar` clone is
+  `bin/rebar`. `--pre`, `--no-switch`, `--source`. An existing `~/.rebar` clone is
   left untouched; versions are added inside it. Design:
   `feedback/2026-11-14-versioned-installer.md` (from #8).
 - **Release workflow.** Pushing a `v*` tag builds darwin/linux ×
