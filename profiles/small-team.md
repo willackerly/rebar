@@ -56,7 +56,7 @@ Contract changes need review. This is 5 minutes of setup that prevents accidenta
 METRICS becomes generated, not maintained:
 ```bash
 # CI generates METRICS after tests pass
-scripts/check-ground-truth.sh  # or compute-metrics.sh when available
+rebar run check-ground-truth   # METRICS keys declared as metric.<key>.* in .rebarrc
 ```
 
 ### Auto-Generated QUICKCONTEXT Section

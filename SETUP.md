@@ -17,22 +17,25 @@ parts to adopt.
 ## Install rebar
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/willackerly/rebar/main/setup-rebar.sh | bash
+curl -fsSL https://raw.githubusercontent.com/willackerly/rebar/v3.1.0/setup-rebar.sh | bash -s -- v3.1.0
 ```
 
-That installs the latest stable release (the highest `vX.Y.Z` tag, ignoring
-pre-releases such as `v3.1.0-rc.1`; if no stable tag exists yet it takes the
-highest pre-release) and puts
-`~/.rebar/current/bin` (`rebar`, `ask`, `ask-mcp-server`) on your PATH via your
-shell RC. Variants:
+That installs v3.1.0 and puts `~/.rebar/current/bin` (`rebar`, `ask`,
+`ask-mcp-server`) on your PATH via your shell RC; open a new terminal (or
+source the RC) and check with `rebar version`. Fetch `setup-rebar.sh` from the
+tag you install, as above: the copy on `main` is whatever `main` holds. With no
+version argument the installer takes the latest stable release (the highest
+`vX.Y.Z` tag, ignoring pre-releases such as `v3.1.0-rc.1`; if no stable tag
+exists yet, the highest pre-release). Variants (`…` is the `curl` part):
 
 | Command | Installs |
 |---------|----------|
-| `… \| bash -s -- v3.0.0` | that release |
+| `… \| bash -s -- v3.1.0` | that release |
 | `… \| bash -s -- --pre` | the newest tag, pre-releases included |
 | `… \| bash -s -- main` | a branch, built from source; `rebar version` says `main@<sha>` |
 | `… \| bash -s -- v3.1.0 --no-switch` | side by side, without changing the active version |
 | `… \| bash -s -- v3.1.0 --source` | from source even if a prebuilt download exists |
+| `… \| bash -s -- v3.1.0 --dir /opt/rebar` | under `/opt/rebar` instead of `~/.rebar` (CI) |
 
 Each version is a complete rebar tree in `~/.rebar/versions/<version>/`;
 `~/.rebar/current` is a symlink to the active one, so switching never edits
@@ -40,9 +43,38 @@ your RC again (`ln -sfn versions/<version> ~/.rebar/current` switches by
 hand; `rm -rf ~/.rebar/versions/<version>` removes one). Releases with
 prebuilt assets download as a tarball verified against the release's SHA-256
 checksums (a mismatch aborts); releases without assets, branches and commits
-(by full 40-character SHA) build from source, which needs `git` and Go. Branch names are made
-path-safe for the directory (`feat/x` → `versions/feat-x`); if two refs map to
-the same name, the second install is refused rather than replacing the first.
+(by full 40-character SHA) build from source, which needs `git` and Go. Branch
+names are made path-safe for the directory (`feat/x` → `versions/feat-x`); if
+two refs map to the same name, the second install is refused rather than
+replacing the first. `./setup-rebar.sh --help` lists every option.
+
+The CLI runs the scripts of the tree it belongs to, so `rebar check` always
+uses the checks of the version you run. Upgrading a project that already uses
+rebar: [UPGRADING.md](UPGRADING.md).
+
+### Testing a release candidate
+
+Release candidates are tags like `v3.1.0-rc.1`. Until 3.1 is merged to
+`main`, `main`'s `setup-rebar.sh` is the old installer, which takes no version
+argument, so use the installer from the candidate's own tag:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/willackerly/rebar/v3.1.0-rc.1/setup-rebar.sh \
+  | bash -s -- v3.1.0-rc.1 --no-switch
+~/.rebar/versions/v3.1.0-rc.1/bin/rebar version     # rebar v3.1.0-rc.1
+```
+
+`--no-switch` keeps your current version active (except on a first versioned
+install, which always becomes current), so you can try the candidate by path
+on one project, then switch with
+`ln -sfn versions/v3.1.0-rc.1 ~/.rebar/current`. Then follow
+[QUICKSTART.md](QUICKSTART.md) for a new project or
+[UPGRADING.md](UPGRADING.md) for an existing one, and report problems as
+issues on the repository.
+
+Name the candidate explicitly: without a version the installer takes the latest
+*stable* release, so a candidate is only picked by `--pre` (the newest tag,
+pre-releases included).
 
 **Upgrading from a `~/.rebar` clone** (what the installer made before versioned installs): the
 installer leaves the clone as it is — not moved, not updated — and adds
@@ -51,6 +83,100 @@ later in your RC, so it wins; `.mcp.json` files and `REBAR_ROOT` that point at
 the clone keep working until you re-run `rebar init` or change them. If
 `REBAR_ROOT` is set, the CLI runs that tree's scripts, not
 `~/.rebar/current`'s; unset it to use the installed version.
+
+## Run rebar in CI
+
+A project's checks run from the rebar install (`rebar check` executes the
+install's `scripts/` against the project), so CI needs a complete rebar tree
+at the version you pin, not just the `rebar` binary.
+
+**GitHub Actions, with the installer:**
+
+```yaml
+      - uses: actions/checkout@v4
+      - name: Install rebar
+        env:
+          REBAR_VERSION: v3.1.0
+        run: |
+          curl -fsSL "https://raw.githubusercontent.com/willackerly/rebar/${REBAR_VERSION}/setup-rebar.sh" \
+            | bash -s -- "$REBAR_VERSION" --dir "$RUNNER_TEMP/rebar"
+          echo "$RUNNER_TEMP/rebar/current/bin" >> "$GITHUB_PATH"
+      - name: rebar checks
+        run: rebar check            # or ./scripts/ci-check.sh
+```
+
+The release's prebuilt tarball needs only `curl`, `tar` and `shasum` or
+`sha256sum`. A tag without prebuilt assets falls back to a source build, which
+needs `git` and Go (add `actions/setup-go`). The checks themselves need `jq`
+and `git`. The installer also appends a PATH line to the runner's shell RC,
+which is harmless there.
+
+**How the CLI finds its scripts.** In order (`findRebarRoot` in
+`cli/cmd/init.go`), the first directory that holds both
+`templates/project-bootstrap/` and `scripts/steward.sh` wins:
+
+1. `$REBAR_ROOT`
+2. the directory above the running binary, after resolving symlinks
+   (`~/.rebar/current/bin/rebar` → `~/.rebar/versions/<v>/`)
+3. the current directory (working on rebar itself)
+4. `~/.rebar/current`, `~/.rebar`, `~/dev/rebar`, `~/src/rebar`, `~/code/rebar`
+
+If none matches, `rebar check` fails (`rebar: ci-check.sh not found in the
+project or a rebar install`) and `rebar check --pre-commit` prints
+`pre-commit.sh not found … skipping` and **exits 0** (a commit hook must not
+block on a missing install). A CI step that runs `--pre-commit` without an
+install therefore passes without checking anything.
+
+**The trap: pinned binary, no tree.** A wrapper that builds only the `rebar`
+binary from a pinned commit into a cache directory (virtru-analyze's
+`scripts/rebar.sh` did) worked while the project carried copies of rebar's
+scripts. Under 3.1 that binary finds no `scripts/` beside it; it falls through
+to `~/.rebar/current` (a different version on a laptop, nothing on a CI
+runner). Keep the whole tree of the pinned commit and build the binary into
+it:
+
+```bash
+#!/usr/bin/env bash
+# scripts/rebar.sh — run the rebar version this repository pins, with that
+# version's own scripts. Usage: scripts/rebar.sh check | run <script> | ...
+set -euo pipefail
+
+REBAR_PIN="v3.1.0"                          # a release tag
+REBAR_PIN_COMMIT="<commit the tag points at>" # git rev-parse 'v3.1.0^{commit}' in a clone
+REBAR_REPOSITORY="${REBAR_REPOSITORY:-https://github.com/willackerly/rebar.git}"
+ROOT="${REBAR_CACHE_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/rebar}/$REBAR_PIN"
+
+if [ ! -x "$ROOT/bin/rebar" ] || [ "$(cat "$ROOT/.pinned-commit" 2>/dev/null)" != "$REBAR_PIN_COMMIT" ]; then
+  tmp="$(mktemp -d "${TMPDIR:-/tmp}/rebar-pin.XXXXXX")"
+  trap 'rm -rf "$tmp"' EXIT
+  git -C "$tmp" init -q src
+  git -C "$tmp/src" fetch -q --depth 1 "$REBAR_REPOSITORY" "refs/tags/$REBAR_PIN"
+  [ "$(git -C "$tmp/src" rev-parse 'FETCH_HEAD^{commit}')" = "$REBAR_PIN_COMMIT" ] \
+    || { echo "rebar $REBAR_PIN does not point at $REBAR_PIN_COMMIT" >&2; exit 1; }
+  # The whole tree, not just the CLI: rebar check runs the tree's scripts/.
+  mkdir "$tmp/tree"
+  git -C "$tmp/src" archive FETCH_HEAD | tar -x -C "$tmp/tree"
+  (cd "$tmp/tree/cli" && CGO_ENABLED=0 go build -trimpath -o ../bin/rebar .)
+  echo "$REBAR_PIN_COMMIT" > "$tmp/tree/.pinned-commit"
+  mkdir -p "$(dirname "$ROOT")" && rm -rf "$ROOT" && mv "$tmp/tree" "$ROOT"
+fi
+
+export REBAR_ROOT="$ROOT"
+export PATH="$ROOT/bin:$PATH"   # nested `rebar` calls get the same version
+exec "$ROOT/bin/rebar" "$@"
+```
+
+The binary would find `$ROOT` through its own `../` anyway; `REBAR_ROOT` makes
+the choice explicit and wins over a stray `~/.rebar`. The project's
+`scripts/ci-check.sh` and `scripts/pre-commit.sh`, and the wrappers
+`rebar migrate` leaves for copies that other files call, run whatever `rebar`
+is on PATH. So a project script that CI runs directly should call the pinned
+wrapper (`scripts/rebar.sh run check-todos`), not those files, unless the CI
+job puts the pinned `bin/` on PATH. In CI, cache
+`$REBAR_CACHE_DIR` between runs if the build time matters. Without Go on the
+runner, use the installer instead:
+`setup-rebar.sh "$REBAR_PIN" --dir "$ROOT_BASE" --no-switch`, then run
+`"$ROOT_BASE/versions/$REBAR_PIN/bin/rebar"`.
 
 ## Step 1: Pick Your Profiles
 
@@ -70,12 +196,34 @@ Profiles have two dimensions — pick one from each:
 Your profiles tell you which files to copy, which sections to customize,
 and which enforcement tier to configure.
 
-## Step 2: Copy the Core Files
+## Step 2: Scaffold the Project
+
+With rebar installed, let the CLI lay down the files:
 
 ```bash
-# From the rebar directory:
+cd /path/to/your/project
+rebar adopt --tier 1          # scaffolding only; the default --tier 2 also asks an LLM to propose contracts
+ln -sf ../../scripts/pre-commit.sh .git/hooks/pre-commit
+rebar run compute-registry    # writes architecture/CONTRACT-REGISTRY.md
+```
+
+For a new repository, `rebar new my-project -d "what it does"` does the same
+in a fresh directory and makes the first commit (see
+[QUICKSTART.md](QUICKSTART.md)). Either way the project gets `.rebarrc`,
+`.rebar-version`, a README badge, the Cold Start Quad, `CLAUDE.md`,
+`architecture/` with the contract template, the role agents, `.mcp.json`,
+`.claude/` (SessionStart hook and skills), and `scripts/` with two entry
+points, `ci-check.sh` and `pre-commit.sh`, which run `rebar check`. Existing
+files are left alone; the badge is added to an existing README.
+
+**Copying by hand** instead works from the install tree, which holds the same
+templates (`~/.rebar/current`; any rebar checkout works too). The copied
+`scripts/` entry points call `rebar`, so rebar must still be on your PATH:
+
+```bash
 PROJECT=/path/to/your/project
-BOOTSTRAP=templates/project-bootstrap
+R=~/.rebar/current
+BOOTSTRAP="$R/templates/project-bootstrap"
 
 # The Cold Start Quad (required)
 cp "$BOOTSTRAP/README.md"        "$PROJECT/README.md"
@@ -85,60 +233,56 @@ cp "$BOOTSTRAP/AGENTS.md"        "$PROJECT/AGENTS.md"
 
 # Claude Code config (required for Claude Code users)
 cp "$BOOTSTRAP/CLAUDE.md"        "$PROJECT/CLAUDE.md"
+cp -r "$BOOTSTRAP/.claude"       "$PROJECT/.claude"
 
-# Metrics ground truth (recommended)
+# Metrics ground truth (recommended); declare how each key is computed
+# with metric.<key>.* lines in .rebarrc
 cp "$BOOTSTRAP/METRICS.md"       "$PROJECT/METRICS"
 
-# Methodology (required — the philosophy)
-cp DESIGN.md            "$PROJECT/DESIGN.md"
-
 # Contract system (required)
-cp -r architecture/          "$PROJECT/architecture/"
-
-# Agent orchestration (recommended)
-# Copies the role-AGENT.md *templates* from the rebar repo. To populate
-# your project's per-role agent skeletons (architect, product, englead,
-# steward, merger, featurerequest), run `bin/ask init` from inside
-# $PROJECT after this copy completes. (`rebar new` and `rebar adopt`
-# call this automatically.)
-cp -r agents/                "$PROJECT/agents/"
+mkdir -p "$PROJECT/architecture"
+cp "$BOOTSTRAP/architecture/CONTRACT-TEMPLATE.md" "$PROJECT/architecture/"
 
 # Cross-repo federation (optional — only if your project depends on
 # contracts from other rebar repos). CHARTER §1.6. Adding entries to
 # CONSUMES.md activates `rebar contract drift-check` as a required CI
-# check via scripts/check-compliance.sh. Single-repo projects skip.
-cp "$BOOTSTRAP/CONSUMES.md"  "$PROJECT/CONSUMES.md"  # then edit or delete
+# check via check-compliance. Single-repo projects skip.
+cp "$BOOTSTRAP/CONSUMES.md"      "$PROJECT/CONSUMES.md"  # then edit or delete
 
-# Practice reference guides (recommended)
-cp -r practices/             "$PROJECT/practices/"
-
-# Enforcement entry points and conventions (recommended).
-# The checks themselves run from the rebar install (`rebar check`,
-# `rebar run <script>`); the project gets only ci-check.sh + pre-commit.sh,
-# and tailors the checks in .rebarrc.
-cp -r "$BOOTSTRAP/scripts/"  "$PROJECT/scripts/"
-cp conventions.md            "$PROJECT/conventions.md"
-# State directory for steward
-mkdir -p "$PROJECT/architecture/.state"
-touch "$PROJECT/architecture/.state/.gitkeep"
+# Enforcement entry points (recommended). The checks run from the rebar
+# install; the project gets ci-check.sh + pre-commit.sh and tailors the
+# checks in .rebarrc.
+cp -r "$BOOTSTRAP/scripts"       "$PROJECT/scripts"
 
 # Tier configuration (set your enforcement level)
-cp "$BOOTSTRAP/.rebarrc"     "$PROJECT/.rebarrc"  2>/dev/null || true
+cp "$BOOTSTRAP/.rebarrc"         "$PROJECT/.rebarrc"
 
-# Version tracking (so you know which rebar you adopted)
-echo "v3.0.0" > "$PROJECT/.rebar-version"
+# Version tracking: .rebar-version and the README badge must name the same
+# version (check-compliance)
+V=$(rebar version | awk '{print $2}')
+echo "$V" > "$PROJECT/.rebar-version"
+sed -i.bak "s/^> \*\*rebar v[^*]*\*\*/> **rebar $V**/" "$PROJECT/README.md" && rm "$PROJECT/README.md.bak"
 
 mkdir -p "$PROJECT/.github"
-cp .github/pull_request_template.md "$PROJECT/.github/" 2>/dev/null || true
-chmod +x "$PROJECT/scripts/"*.sh
+cp "$R/.github/pull_request_template.md" "$PROJECT/.github/" 2>/dev/null || true
 
 # CRITICAL: Install pre-commit hook — without this, nothing is enforced
 ln -sf ../../scripts/pre-commit.sh "$PROJECT/.git/hooks/pre-commit"
+
+# Role agents (architect, product, englead, steward, merger, featurerequest)
+cd "$PROJECT" && ask init
 ```
 
-**The hook installation is not optional.** Scripts without hooks are decorative —
-your repo can have `check-todos.sh` and `check-freshness.sh` for weeks with
-zero enforcement if the hook isn't linked. Verify with: `ls -la .git/hooks/pre-commit`
+rebar's methodology and reference docs (`DESIGN.md`, `conventions.md`,
+`practices/`, `architecture/README.md`, the subagent templates in `agents/`)
+ship with every install; read them there (`~/.rebar/current/DESIGN.md`,
+`~/.rebar/current/practices/`) rather than copying them. Copies link to files elsewhere in the rebar repository, which
+`check-doc-refs` then reports as broken in your project (allowlist them in
+`.rebar/doc-refs-allow.txt` if you copy them anyway).
+
+**The hook installation is not optional.** Checks without a hook are decorative —
+a repo can go weeks with zero enforcement if the hook isn't linked. Verify
+with: `ls -la .git/hooks/pre-commit`
 
 If you already have `README.md`, `AGENTS.md`, or `CLAUDE.md`, diff the
 templates against yours and merge the sections you're missing.
@@ -154,10 +298,11 @@ The universal first-read. Every agent, every session, no exceptions.
 
 1. **Rebar badge** — First line after `# Title` MUST be the rebar badge:
    ```markdown
-   > **rebar v3.0.0** | **Tier 2: ADOPTED**
+   > **rebar v3.1.0** | **Tier 2: ADOPTED**
    ```
-   This is validated by `scripts/check-compliance.sh`. Update version when you
-   upgrade rebar. Update tier when you change `.rebarrc`.
+   This is validated by `check-compliance` (part of `rebar check`) against
+   `.rebar-version`. Update both when you upgrade rebar
+   ([UPGRADING.md](UPGRADING.md)). Update the tier when you change `.rebarrc`.
 2. **Project name & description** — Replace `<PROJECT_NAME>`
 3. **Architecture overview** — Briefly describe the contract structure
 4. **Quick Start** — How to get the project running
@@ -205,7 +350,7 @@ Claude Code-specific configuration.
 ### architecture/ (10 min)
 
 1. **Define your first contracts** — Start with the most important interfaces
-2. **Generate CONTRACT-REGISTRY.md** — Run `scripts/compute-registry.sh`
+2. **Generate CONTRACT-REGISTRY.md** — `git add` your contracts and source, then run `rebar run compute-registry` (again after adding or changing contracts; it counts implementing files git tracks)
 3. **Convention** — Decide on your ID prefixes (S, C, I, P or your own)
 
 ### agents/ (10 min, optional)
@@ -218,7 +363,7 @@ Claude Code-specific configuration.
 
 ```bash
 # Confirm Cold Start Quad exists
-ls README.md QUICKCONTEXT.md TODO.md AGENTS.md CLAUDE.md DESIGN.md
+ls README.md QUICKCONTEXT.md TODO.md AGENTS.md CLAUDE.md
 
 # Confirm architecture directory
 ls architecture/CONTRACT-REGISTRY.md
@@ -227,19 +372,18 @@ ls architecture/CONTRACT-REGISTRY.md
 grep -rn "<PROJECT_NAME>\|<pkg-manager>\|YYYY-MM-DD" \
   README.md QUICKCONTEXT.md TODO.md AGENTS.md CLAUDE.md
 
-# Confirm no untracked TODOs
-grep -rn "TODO:" --include="*.ts" --include="*.go" --include="*.py" src/ || echo "Clean"
-
-# Confirm steward script
-[ -x scripts/steward.sh ] && echo "Steward: ready" || echo "Steward: not found or not executable"
+# Run the checks the hook and CI run (stage first: check-doc-refs only
+# accepts links to files git tracks)
+git add -A
+rebar check --pre-commit
+rebar check
 
 # Confirm steward agent
 [ -f agents/steward/AGENT.md ] && echo "Steward agent: ready" || echo "Steward agent: not found"
 
-# Confirm ground truth script has at least one metric defined
-# (remove the no-op line and uncomment at least one metric)
-grep -q 'echo "' scripts/check-ground-truth.sh && echo "Ground truth: metrics defined" \
-  || echo "Ground truth: customize compute_metrics() in scripts/check-ground-truth.sh"
+# Ground truth: METRICS keys are computed from metric.<key>.* lines in .rebarrc
+# (it runs at tier 3, or at any tier with `checks_enable = check-ground-truth`)
+rebar run check-ground-truth
 
 # Test the agent experience: start a new Claude Code session
 ```
@@ -277,8 +421,8 @@ regenerate via `rebar init`. Rebar does not auto-gitignore it.
 ## Step 5: Commit
 
 ```bash
-git add README.md QUICKCONTEXT.md TODO.md AGENTS.md CLAUDE.md DESIGN.md
-git add architecture/ agents/ .rebar/integrity.json .rebarrc
+git status        # review what rebar added (.rebar/salt stays untracked)
+git add -A
 rebar commit -m "docs: adopt contract-driven rebar methodology
 
 Add Cold Start Quad (README, QUICKCONTEXT, TODO, AGENTS), Claude Code

@@ -18,6 +18,15 @@ All notable changes to rebar. Versioned with [semver](https://semver.org/).
 
 ## Unreleased
 
+- **Upgrading:** [UPGRADING.md](UPGRADING.md) is the runbook for moving an
+  adopting project from v2.0.0 or v3.0.x (install side by side, bump
+  `.rebar-version` and the badge, `rebar migrate`, registry, `checks_enable`,
+  integrity manifest, CI, verify). Install a release candidate with its own
+  tag's installer:
+  `curl -fsSL https://raw.githubusercontent.com/willackerly/rebar/v3.1.0-rc.1/setup-rebar.sh | bash -s -- v3.1.0-rc.1`
+  ([SETUP.md § Testing a release candidate](SETUP.md#testing-a-release-candidate)).
+  CI must install a full rebar tree, not just the binary
+  ([SETUP.md § Run rebar in CI](SETUP.md#run-rebar-in-ci)).
 - **`rebar migrate`** turns an adopter's legacy, possibly customized,
   script copies into `.rebarrc` settings, decided by running them: each
   `compute_metrics()` line of a custom `check-ground-truth.sh` becomes
