@@ -90,7 +90,7 @@ while IFS= read -r line; do
     echo "        Expected: $expected"
     broken=$((broken + 1))
   fi
-done < <(grep -rnE "$SEARCH_ERE" \
+done < <(grep -rnEI "$SEARCH_ERE" \
   "${INCLUDES[@]}" \
   . 2>/dev/null)
 

@@ -24,6 +24,9 @@ All notable changes to rebar. Versioned with [semver](https://semver.org/).
   ignores the old timestamp, so a registry with the old hint stays current and
   picks up the new one when next regenerated; `rebar migrate` compares
   registries the same way.
+- **The source scanners skip binary files** (`grep -I`). A matching binary was
+  reported as "Binary file … matches" and read as a reference or a TODO — a
+  built `bin/rebar` that embeds `CONTRACT:` strings made the registry STALE.
 
 - **Upgrading:** [UPGRADING.md](UPGRADING.md) is the runbook for moving an
   adopting project from v2.0.0 or v3.0.x (install side by side, bump

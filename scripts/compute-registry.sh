@@ -192,7 +192,9 @@ set +f
 
 search_source() {
   if [ "$IN_GIT" = true ]; then
-    git -C "$PROJECT_ROOT" grep "$@" -- "${GIT_PATHSPECS[@]}" 2>/dev/null
+    # -I: skip binary files. grep reports a matching binary (e.g. a built
+    # bin/rebar) as "Binary file … matches", which read as a reference.
+    git -C "$PROJECT_ROOT" grep -I "$@" -- "${GIT_PATHSPECS[@]}" 2>/dev/null
   else
     {
       if [ ${#FIND_NAMES[@]} -gt 0 ]; then
@@ -204,7 +206,7 @@ search_source() {
           find "$PROJECT_ROOT/$dir" \( "${FIND_PRUNE[@]}" \) -prune -o -type f -print0
         fi
       done
-    } | xargs -0 grep "$@" /dev/null 2>/dev/null
+    } | xargs -0 grep -I "$@" /dev/null 2>/dev/null
   fi
 }
 
