@@ -1,8 +1,11 @@
 // Package testutil holds helpers shared by rebar's Go tests: writing files
-// into temp trees and running git in throwaway repositories.
+// into temp trees, running commands (git in throwaway repositories, rebar's
+// scripts in an environment free of rebar settings), and locating the rebar
+// checkout the tests run in.
 package testutil
 
 import (
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -98,4 +101,63 @@ func InitRepo(t testing.TB) string {
 	dir := t.TempDir()
 	Git(t, dir, "init", "-q", "-b", "main")
 	return dir
+}
+
+// IsolatedEnv is the test process's environment without rebar's settings
+// (REBAR_*, _REBAR_*), plus extra, so a developer's REBAR_TIER,
+// REBAR_CHECK_IMPL or REBAR_RCFILE cannot leak into a fixture run.
+func IsolatedEnv(extra ...string) []string {
+	var env []string
+	for _, kv := range os.Environ() {
+		if strings.HasPrefix(kv, "REBAR_") || strings.HasPrefix(kv, "_REBAR_") {
+			continue
+		}
+		env = append(env, kv)
+	}
+	return append(env, extra...)
+}
+
+// RunEnv runs name in dir with exactly env and returns its untrimmed
+// combined output and exit code. A non-zero exit is a result, not a test
+// failure; failing to start the command is.
+func RunEnv(t testing.TB, dir string, env []string, name string, args ...string) (string, int) {
+	t.Helper()
+	cmd := exec.Command(name, args...)
+	cmd.Dir = dir
+	cmd.Env = env
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) {
+			return string(out), exitErr.ExitCode()
+		}
+		t.Fatalf("%s %s: %v", name, strings.Join(args, " "), err)
+	}
+	return string(out), 0
+}
+
+// Tags spells the TODO tags in fixture bodies: @todo becomes the untracked
+// tag and @tracked the tracked one, so that rebar's own check-todos,
+// scanning the test sources, does not count the fixtures.
+var Tags = strings.NewReplacer("@todo", "TO"+"DO:", "@tracked", "TRACKED"+"-TASK:")
+
+// RebarSource returns the root of the rebar checkout the test runs in (the
+// directory holding scripts/_rebar-config.sh above the working directory),
+// and skips the test when there is none.
+func RebarSource(t testing.TB) string {
+	t.Helper()
+	dir, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for {
+		if _, err := os.Stat(filepath.Join(dir, "scripts", "_rebar-config.sh")); err == nil {
+			return dir
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			t.Skip("rebar scripts not found above the test directory")
+		}
+		dir = parent
+	}
 }

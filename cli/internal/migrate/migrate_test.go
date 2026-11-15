@@ -20,11 +20,7 @@ import (
 
 func installRoot(t *testing.T) string {
 	t.Helper()
-	root, err := filepath.Abs("../../..")
-	if err != nil || !isFile(filepath.Join(root, "scripts", "check-ground-truth.sh")) {
-		t.Skip("rebar scripts not found next to the CLI source")
-	}
-	return root
+	return testutil.RebarSource(t)
 }
 
 const legacyGroundTruth = `#!/usr/bin/env bash
