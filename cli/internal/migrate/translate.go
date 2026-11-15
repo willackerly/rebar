@@ -256,6 +256,7 @@ func (t *Translator) Translate() []Translation {
 	}
 	assigned := map[string]string{} // var → command it was assigned from
 	var out []Translation
+	var unmodelled []string
 	for _, line := range logicalLines(body) {
 		if m := cdRe.FindStringSubmatch(line); m != nil {
 			toks, err := lex(m[1], t.vars)
@@ -265,6 +266,9 @@ func (t *Translator) Translate() []Translation {
 			t.cdElsewhere = true
 			continue
 		}
+		if line == ":" || line == "true" || localDeclRe.MatchString(line) {
+			continue
+		}
 		if m := echoMetricRe.FindStringSubmatch(line); m != nil {
 			key, val := m[1], strings.TrimSpace(m[2])
 			def, err := t.translateValue(val, assigned)
@@ -272,17 +276,31 @@ func (t *Translator) Translate() []Translation {
 				err = def.valid()
 			}
 			if err != nil {
-				out = append(out, Translation{Key: key, Err: err})
+				out = append(out, Translation{Key: key, Err: fmt.Errorf("%s", strings.NewReplacer(rootMarker, "$ROOT", `\x00ROOT\x00`, "$ROOT").Replace(err.Error()))})
 			} else {
 				out = append(out, Translation{Key: key, Def: def})
 			}
 			continue
 		}
 		if m := assignRe.FindStringSubmatch(line); m != nil {
-			v := strings.Trim(strings.TrimSpace(m[2]), `"`)
-			if strings.HasPrefix(v, "$(") {
-				assigned[m[1]] = v
+			v := strings.TrimSpace(m[2])
+			if strings.HasPrefix(v, `"`) && strings.HasSuffix(v, `"`) && len(v) >= 2 {
+				v = v[1 : len(v)-1]
 			}
+			if strings.HasPrefix(v, "$(") && matchParen(v, 1) == len(v)-1 {
+				assigned[m[1]] = v
+				continue
+			}
+		}
+		unmodelled = append(unmodelled, line)
+	}
+	// Anything else (if/case/loops, && / ||, set, export, a reassignment
+	// from something other than a command) may change what the echoed
+	// values are; translating around it would silently drop that logic.
+	if len(unmodelled) > 0 {
+		reason := fmt.Errorf("compute_metrics() has a statement migrate does not model (%q), which could change any value", clip(strings.ReplaceAll(unmodelled[0], "\n", " ")))
+		for i := range out {
+			out[i] = Translation{Key: out[i].Key, Err: reason}
 		}
 	}
 	return out
@@ -318,6 +336,14 @@ func (t *Translator) translateCommand(cmd string, vars map[string]string, depth 
 			args, err := words(toks[1:])
 			if err != nil {
 				return nil, fmt.Errorf("helper %s: %v", toks[0].text, err)
+			}
+			for _, a := range toks[1:] {
+				if a.glob {
+					return nil, fmt.Errorf("helper %s: unquoted glob %q", toks[0].text, a.text)
+				}
+				if a.kind != tWord {
+					return nil, fmt.Errorf("helper %s: call is not a plain command", toks[0].text)
+				}
 			}
 			bound := map[string]string{}
 			for k, v := range vars {
@@ -487,6 +513,13 @@ func (t *Translator) translatePipeline(toks []token) (*MetricDef, error) {
 		if err != nil {
 			return nil, err
 		}
+		if w[0] != "ls" {
+			for _, t := range st {
+				if t.glob {
+					return nil, fmt.Errorf("unquoted glob %q: the shell expands it before %s sees it", t.text, w[0])
+				}
+			}
+		}
 		// LC_ALL=C sort -u: an environment prefix doesn't change counting.
 		for len(w) > 1 && envPrefixRe.MatchString(w[0]) {
 			w = w[1:]
@@ -511,7 +544,11 @@ func (t *Translator) translatePipeline(toks []token) (*MetricDef, error) {
 	case "grep":
 		def, err = t.translateGrepR(sw[0][1:])
 	case "ls":
-		def, err = t.translateLs(sw[0][1:])
+		var unq []bool
+		for _, tk := range stages[0][len(stages[0])-len(sw[0])+1:] {
+			unq = append(unq, tk.glob)
+		}
+		def, err = t.translateLs(sw[0][1:], unq)
 	default:
 		return nil, fmt.Errorf("unsupported command %q (find, grep -rl and ls are understood)", sw[0][0])
 	}
@@ -521,7 +558,7 @@ func (t *Translator) translatePipeline(toks []token) (*MetricDef, error) {
 
 	// Filters between the source and wc -l.
 	sedRE := ""
-	dedupe := false
+	dedupe, sorted := false, false
 	for _, w := range sw[1:last] {
 		switch {
 		case isBasename(w):
@@ -538,9 +575,16 @@ func (t *Translator) translatePipeline(toks []token) (*MetricDef, error) {
 				return nil, err
 			}
 			sedRE = re
-		case isSortUnique(w):
+		case strings.Join(w, " ") == "sort -u":
 			dedupe = true
-		case len(w) == 1 && (w[0] == "sort" || w[0] == "cat"):
+		case len(w) == 1 && w[0] == "uniq":
+			// uniq drops adjacent repeats only: a dedupe after a sort.
+			if !sorted {
+				return nil, fmt.Errorf("uniq without a sort before it removes adjacent repeats only")
+			}
+			dedupe = true
+		case len(w) == 1 && w[0] == "sort":
+			sorted = true
 		default:
 			return nil, fmt.Errorf("unsupported pipeline stage %q", strings.Join(w, " "))
 		}
@@ -582,11 +626,6 @@ func isBasename(w []string) bool {
 		return true
 	}
 	return false
-}
-
-func isSortUnique(w []string) bool {
-	s := strings.Join(w, " ")
-	return s == "sort -u" || s == "uniq" || s == "sort | uniq"
 }
 
 // sedCapture accepts `sed [-E|-r] 's/RE/\1/'` and returns RE as an ERE.
@@ -1041,12 +1080,12 @@ func grepContains(a []string) (string, bool, error) {
 	if a[len(a)-2] != "{}" {
 		return "", false, fmt.Errorf("grep in -exec does not end with {}")
 	}
-	flags, pat, err := grepFlags(a[1 : len(a)-2])
+	flags, pats, rest, err := grepFlags(a[1 : len(a)-2])
 	if err != nil {
 		return "", false, err
 	}
-	if len(pat) != 1 {
-		return "", false, fmt.Errorf("grep in -exec needs exactly one pattern")
+	if len(pats) == 0 || len(rest) != 0 {
+		return "", false, fmt.Errorf("grep in -exec needs patterns and {} only")
 	}
 	if !flags["l"] && !flags["q"] {
 		return "", false, fmt.Errorf("grep in -exec without -l or -q counts lines, not files")
@@ -1054,13 +1093,13 @@ func grepContains(a []string) (string, bool, error) {
 	if flags["q"] && a[len(a)-1] == "+" {
 		return "", false, fmt.Errorf("grep -q with {} + tests a batch, not a file")
 	}
-	return grepERE(flags, pat[0]), flags["l"], nil
+	return grepPatternsERE(flags, pats), flags["l"], nil
 }
 
 // grepFlags splits grep arguments into single-letter flags and operands.
-func grepFlags(args []string) (map[string]bool, []string, error) {
+func grepFlags(args []string) (map[string]bool, []string, []string, error) {
 	flags := map[string]bool{}
-	var operands []string
+	var operands, patterns []string
 	for i := 0; i < len(args); i++ {
 		a := args[i]
 		if a == "--" {
@@ -1072,28 +1111,46 @@ func grepFlags(args []string) (map[string]bool, []string, error) {
 			continue
 		}
 		if a == "-e" && i+1 < len(args) {
-			operands = append(operands, args[i+1])
+			patterns = append(patterns, args[i+1])
 			i++
 			continue
 		}
 		if strings.HasPrefix(a, "-") && len(a) > 1 && !strings.HasPrefix(a, "--") {
 			for _, c := range a[1:] {
 				if !strings.ContainsRune("lqEFsrRI", c) {
-					return nil, nil, fmt.Errorf("unsupported grep flag -%c", c)
+					return nil, nil, nil, fmt.Errorf("unsupported grep flag -%c", c)
 				}
 				flags[string(c)] = true
 			}
 			continue
 		}
 		if strings.HasPrefix(a, "--") {
-			return nil, nil, fmt.Errorf("unsupported grep option %s", a)
+			return nil, nil, nil, fmt.Errorf("unsupported grep option %s", a)
 		}
 		operands = append(operands, a)
 	}
 	if flags["I"] {
-		return nil, nil, fmt.Errorf("grep -I (skip binary files) is not expressible")
+		return nil, nil, nil, fmt.Errorf("grep -I (skip binary files) is not expressible")
 	}
-	return flags, operands, nil
+	// Without -e the first operand is the pattern; with -e every operand
+	// is a path.
+	if len(patterns) == 0 && len(operands) > 0 {
+		patterns, operands = operands[:1], operands[1:]
+	}
+	return flags, patterns, operands, nil
+}
+
+// grepPatternsERE joins grep patterns (each matched alone by grep) into one
+// ERE alternation.
+func grepPatternsERE(flags map[string]bool, pats []string) string {
+	if len(pats) == 1 {
+		return grepERE(flags, pats[0])
+	}
+	parts := make([]string, len(pats))
+	for i, p := range pats {
+		parts[i] = "(" + grepERE(flags, p) + ")"
+	}
+	return strings.Join(parts, "|")
 }
 
 func grepERE(flags map[string]bool, pat string) string {
@@ -1109,18 +1166,18 @@ func grepERE(flags map[string]bool, pat string) string {
 
 // translateGrepR reads `grep -rl [-E] [--include=G]… [--exclude-dir=D]… PATTERN PATH…`.
 func (t *Translator) translateGrepR(args []string) (*MetricDef, error) {
-	flags, ops, err := grepFlags(args)
+	flags, pats, paths, err := grepFlags(args)
 	if err != nil {
 		return nil, err
 	}
 	if !(flags["r"] || flags["R"]) || !flags["l"] {
 		return nil, fmt.Errorf("only `grep -rl PATTERN PATH…` is understood")
 	}
-	if len(ops) < 2 {
+	if len(pats) == 0 || len(paths) == 0 {
 		return nil, fmt.Errorf("grep -rl needs a pattern and a path")
 	}
-	def := &MetricDef{Type: "files", Contains: grepERE(flags, ops[0])}
-	for _, p := range ops[1:] {
+	def := &MetricDef{Type: "files", Contains: grepPatternsERE(flags, pats)}
+	for _, p := range paths {
 		rel, err := t.rel(p)
 		if err != nil {
 			return nil, err
@@ -1140,32 +1197,50 @@ func (t *Translator) translateGrepR(args []string) (*MetricDef, error) {
 }
 
 // translateLs reads `ls [-1] [-d] DIR/GLOB…` with every GLOB in one DIR.
-func (t *Translator) translateLs(args []string) (*MetricDef, error) {
+// unquoted[i] tells whether args[i] was left for the shell to expand.
+// `ls DIR` or `ls DIR/` (no glob) lists DIR's entries, files and
+// directories alike, which no metric type expresses; `ls DIR/*/` without -d
+// lists the contents of each match. Both are refused.
+func (t *Translator) translateLs(args []string, unquoted []bool) (*MetricDef, error) {
 	def := &MetricDef{Type: "files", MaxDepth: "1"}
+	dashD := false
+	for _, a := range args {
+		if a == "-d" {
+			dashD = true
+		}
+	}
 	dirsOnly := false
 	dir := ""
-	for _, a := range args {
+	for i, a := range args {
 		switch a {
-		case "-1":
-			continue
-		case "-d":
+		case "-1", "-d":
 			continue
 		}
 		if strings.HasPrefix(a, "-") {
 			return nil, fmt.Errorf("unsupported ls flag %s", a)
 		}
-		if strings.HasSuffix(a, "/") {
-			dirsOnly = true
-			a = strings.TrimSuffix(a, "/")
-		}
+		slash := strings.HasSuffix(a, "/")
+		a = strings.TrimSuffix(a, "/")
 		pfx := ""
 		if strings.HasPrefix(a, rootMarker) {
 			pfx, a = rootMarker, strings.TrimPrefix(a, rootMarker)
 		}
-		i := strings.LastIndex(a, "/")
+		j := strings.LastIndex(a, "/")
 		d, glob := ".", a
-		if i >= 0 {
-			d, glob = a[:i], a[i+1:]
+		if j >= 0 {
+			d, glob = a[:j], a[j+1:]
+		}
+		if !strings.ContainsAny(glob, "*?[") {
+			return nil, fmt.Errorf("ls %s lists entries of any kind, or of a directory; not expressible", strings.ReplaceAll(args[i], rootMarker, "$ROOT"))
+		}
+		if !unquoted[i] {
+			return nil, fmt.Errorf("ls of a quoted glob %q lists nothing (the shell does not expand it)", glob)
+		}
+		if slash {
+			if !dashD {
+				return nil, fmt.Errorf("ls GLOB/ without -d lists each directory's contents")
+			}
+			dirsOnly = true
 		}
 		rel, err := t.rel(pfx + d)
 		if err != nil {
@@ -1185,7 +1260,13 @@ func (t *Translator) translateLs(args []string) (*MetricDef, error) {
 		def.Type = "dirs"
 		def.MinDepth = "1"
 	} else {
-		def.Notes = append(def.Notes, "ls GLOB counted as files; a directory matching the glob would have listed its contents before")
+		def.Notes = append(def.Notes, "ls GLOB counted as files (a directory matching the glob would have listed its contents)")
+	}
+	for _, n := range def.Names {
+		if strings.HasPrefix(n, "*") || strings.HasPrefix(n, "?") {
+			def.Notes = append(def.Notes, "the shell's glob skips dotfiles, find -name does not")
+			break
+		}
 	}
 	return def, nil
 }

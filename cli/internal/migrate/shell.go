@@ -28,6 +28,9 @@ type token struct {
 	// with any is not translatable.
 	unknown []string
 	subst   bool // contains $(…), `…`, $((…)) or $'…'
+	// glob is set when the word has an unquoted * ? or [, which the shell
+	// would expand against the working directory before the command runs.
+	glob bool
 }
 
 // rootMarker stands for the project root in a word: a root variable
@@ -168,6 +171,9 @@ func lexWord(src string, i int, vars map[string]string) (token, int, error) {
 		case '$', '`':
 			i = expandDollar(src, i, vars, &b, &w)
 		default:
+			if c == '*' || c == '?' || c == '[' {
+				w.glob = true
+			}
 			b.WriteByte(c)
 			i++
 		}
@@ -290,7 +296,9 @@ func splitPipeline(toks []token) ([][]token, error) {
 		case tOp:
 			return nil, fmt.Errorf("unsupported shell operator %q", t.text)
 		case tRedir:
-			if !strings.HasPrefix(t.text, "2>") {
+			// Only discarding stderr leaves the counted output alone; 2>&1
+			// would count error lines.
+			if t.text != "2>/dev/null" {
 				return nil, fmt.Errorf("unsupported redirection %q", t.text)
 			}
 		default:
@@ -365,8 +373,13 @@ func cleanRel(p string) string {
 func breToERE(re string) string {
 	var b strings.Builder
 	inBracket := false
+	// atStart: a * here is literal in BRE (start of the expression, after
+	// ^, or right after an opening \( group).
+	atStart := true
 	for i := 0; i < len(re); i++ {
 		c := re[i]
+		wasStart := atStart
+		atStart = false
 		if inBracket {
 			b.WriteByte(c)
 			if c == ']' {
@@ -396,6 +409,9 @@ func breToERE(re string) string {
 			switch d := re[i]; d {
 			case '(', ')', '{', '}', '|', '+', '?':
 				b.WriteByte(d)
+				if d == '(' || d == '|' {
+					atStart = true
+				}
 			default:
 				b.WriteByte('\\')
 				b.WriteByte(d)
@@ -404,12 +420,15 @@ func breToERE(re string) string {
 			b.WriteByte('\\')
 			b.WriteByte(c)
 		case '*':
-			// A leading * (or one after ^ or an opening group) is literal in BRE.
-			out := b.String()
-			if out == "" || strings.HasSuffix(out, "^") || strings.HasSuffix(out, "(") {
+			if wasStart {
 				b.WriteString(`\*`)
 			} else {
 				b.WriteByte(c)
+			}
+		case '^':
+			b.WriteByte(c)
+			if wasStart {
+				atStart = true
 			}
 		default:
 			b.WriteByte(c)

@@ -258,3 +258,41 @@ func TestLexAndRelPath(t *testing.T) {
 		}
 	}
 }
+
+// S1: translations that equal the original only on some trees are refused
+// by the translator or caught on the probe tree.
+func TestTranslatorFalsePositives(t *testing.T) {
+	got := translateOne(t, `REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+compute_metrics() {
+  echo "adr_entries=$(ls "$REPO_ROOT/docs/adr/" | wc -l | tr -d ' ')"
+  echo "both=$(grep -rl -e alpha -e beta "$REPO_ROOT/src" | wc -l)"
+  echo "errs=$(find "$REPO_ROOT/src" -type f 2>&1 | wc -l)"
+  echo "uniq=$(find "$REPO_ROOT/src" -type f -exec basename {} \; | uniq | wc -l)"
+  echo "glob=$(find "$REPO_ROOT/src" -type f -name *.go | wc -l)"
+  echo "sorted=$(find "$REPO_ROOT/src" -type f -exec basename {} \; | sort | uniq | wc -l)"
+}`)
+	for _, k := range []string{"adr_entries", "errs", "uniq", "glob"} {
+		if got[k].Err == nil {
+			t.Errorf("%s: translated to %s, want a refusal", k, settingsText(k, got[k].Def))
+		}
+	}
+	if tr := got["both"]; tr.Err != nil || settingsText("both", tr.Def) != "metric.both.paths = src\nmetric.both.contains = (alpha)|(beta)\n" {
+		t.Errorf("grep -e -e: %v %v", tr.Err, tr.Def)
+	}
+	if tr := got["sorted"]; tr.Err != nil || tr.Def.Distinct == "" {
+		t.Errorf("sort | uniq should be a distinct count: %+v", tr)
+	}
+
+	// An unmodelled statement around the values refuses every metric.
+	got = translateOne(t, `compute_metrics() {
+  n=$(find src -type f -name '*.go' | wc -l)
+  if [ -d vendor ]; then n=0; fi
+  echo "go_files=$n"
+}`)
+	if got["go_files"].Err == nil || !strings.Contains(got["go_files"].Err.Error(), "does not model") {
+		t.Fatalf("if around a metric: %+v", got["go_files"])
+	}
+	if breToERE(`x(*`) != `x\(*` {
+		t.Errorf("breToERE(x(*) = %q", breToERE(`x(*`))
+	}
+}
