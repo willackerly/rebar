@@ -53,12 +53,17 @@ jobs:
         working-directory: cli
         run: go test ./...
 
-      # A release branch must list its own scripts in released-blobs.txt, or
-      # the release workflow's go test fails on the tag. Catch it on the push
-      # that makes the list stale (a PR merged after release prep), not at tag time.
-      - name: released-blobs current
+      # The release workflow's go test fails on a tag whose scripts are missing
+      # from released-blobs.txt. Apply the same test to the head of a release
+      # branch, via a throwaway local v* tag, so a merge that leaves the list
+      # stale fails here instead of at tag time. (Not `gen-released-blobs.sh
+      # --check`: the list may hold extra blobs from refs this clone lacks.)
+      - name: released-blobs cover the release branch
         if: github.event_name == 'push' && startsWith(github.ref, 'refs/heads/release/')
-        run: scripts/gen-released-blobs.sh --check
+        working-directory: cli
+        run: |
+          git tag v0.0.0-ci-head HEAD
+          go test ./internal/migrate -run '^TestReleasedManifestCoversLocalTags$' -count=1
 
       - name: ci-check
         run: |
