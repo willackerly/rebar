@@ -63,6 +63,7 @@
 4ebf2c4c6f562f83441f7976e9a13612c517a378 check-todos.sh
 4edc31f1623a81ddc39395329ebeca05d021cf55 check-contract-headers.sh
 50010a1b927ae3cfafdba26ee2ff734e7a446840 steward.sh
+50b4622dbbc4b8d70895b814613f36ab348b2ec2 compute-registry.sh
 50e4577df4a9cc24c19db963d5562c72d33ce644 check-compliance.sh
 52bb6df3121ca245219a12db6f9a9ed26bb665ef test-e2e-live.sh
 540b8cfb4d358bac6052f284773b5f9b09472720 pre-commit.sh
@@ -178,6 +179,7 @@ d77a8ce61d25b172458ccf0ed9912e943d3ab834 cold-start-checks.sh
 dc77440e1be29005ea2e4986e830deb8cdffee38 compute-registry.sh
 dd683013e2b28a36e747940737a865b138ad50c2 gen-released-blobs.sh
 ddb7f417a3116ae966d88d49e485a43f7419e83e check-prefix-uniqueness.sh
+df991c88ff62cce52f046b755b13ef7539cb8535 _rebar-config.sh
 e32d91a5f820bc63f57493c50fa1afd5ab907e4d compute-registry.sh
 e3ab7358835d2f7103649209fc4829e9e56adcdd ci-check.sh
 e544a65100391f5620c9c2caf70c6372cf65e220 compute-registry.sh

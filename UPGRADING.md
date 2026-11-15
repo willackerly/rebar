@@ -197,20 +197,18 @@ Then check:
 rebar run compute-registry --check     # "OK: Registry is current."
 ```
 
-The registry counts implementing files that git tracks; after adding
-contracts or source files, `git add` them before regenerating.
+Since 3.1 the committed registry leaves out implementing-file counts and the
+Contract Health section by default (they change in every PR that adds a
+`CONTRACT:` header); `rebar migrate` follows that default and regenerates. To
+keep them in the file, set `registry_impl_counts = true` in `.rebarrc` before
+migrating. Read them any time with `rebar run compute-registry --health`; it
+counts implementing files that git tracks, so `git add` new files first.
 
 ## 6. Busy repos: keep churn out of committed files
 
-If several PRs are open at once (see [practices/busy-repos.md](practices/busy-repos.md)):
-
-```ini
-# .rebarrc — drop the Impl Files column and Contract Health section
-registry_impl_counts = false
-```
-
-then `rebar run compute-registry` once. Read the counts on demand with
-`rebar run compute-registry --health`.
+If several PRs are open at once (see [practices/busy-repos.md](practices/busy-repos.md)),
+make sure the registry stays free of implementing-file counts: that is the
+default since 3.1, so only check you haven't set `registry_impl_counts = true`.
 
 In `METRICS`, turn counts that most PRs change into floors:
 

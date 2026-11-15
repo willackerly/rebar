@@ -52,7 +52,7 @@ REBAR_VERSION=3.0.0-beta
 # freshness_max_days = 14
 
 # Contract registry (architecture/CONTRACT-REGISTRY.md).
-# registry_impl_counts     = false              # keep churny counts out (busy repos)
+# registry_impl_counts     = true               # add Impl Files + Contract Health (off by default: they churn)
 # registry_scope_prefixes  = SDK- MCP-           # strip before Services/Components/... classification
 # registry_purpose_heading = Purpose|Why this exists
 # registry_purpose_style   = ellipsis           # escape | and cut to 77 chars + ...

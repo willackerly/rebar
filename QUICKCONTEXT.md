@@ -74,8 +74,8 @@ last-synced: 2026-11-15
 
 - **Quiet 2026-08-12 → 2026-11-14**, then beta.3 (#9, #10) from
   virtru-analyze's busy-repo feedback
-  (`feedback/2026-11-14-busy-repo-merge-conflicts.md`). Queued from it:
-  flip the `registry_impl_counts` default to `false` in 3.1.
+  (`feedback/2026-11-14-busy-repo-merge-conflicts.md`); its queued
+  `registry_impl_counts` default flip landed in `v3.1.0-rc.1`.
 
 - **Watcher re-armed 2026-08-12** with own-sender suppression
   (`--self`, default = repo dir name). Two stale pre-fix watchers on
@@ -107,8 +107,8 @@ run UPGRADING.md on a real adopter, fix forward into `release/v3.1.0-rc`.
 the merge commit and announce (action 1).
 
 **Next — v3.1.0 on `release/v3.1.0-rc`.** #14, #8, `rebar migrate` and a
-versioned installer (see Current State). Also queued for 3.1: flip the
-`registry_impl_counts` default to `false`.
+versioned installer (see Current State). The `registry_impl_counts`
+default flip (to `false`) is in `v3.1.0-rc.1`.
 
 **Also staged for v3.1+:**
 1. **`rebar watch` as a shipped command** (`_atlas` slice 1) — kills the
