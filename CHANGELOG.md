@@ -38,8 +38,12 @@ All notable changes to rebar. Versioned with [semver](https://semver.org/).
   running with a proposed `checks_enable`. Unmodified copies are recognized
   from a released-blobs list embedded in the CLI
   (`scripts/gen-released-blobs.sh`, a release step), so installs without git
-  history work. The CLI now honors `REBAR_PROJECT_ROOT` for repo detection,
-  as the scripts do.
+  history work. A scanner copy that is a released version plus settings
+  (its directories, extensions) is migrated even though the install now
+  excludes directories by name (#19), with the newly reported findings
+  listed before `--apply`; old substring filters map to
+  `source_exclude_dirs`. The CLI now honors `REBAR_PROJECT_ROOT` for repo
+  detection, as the scripts do.
   `check-ground-truth.sh --print` and `REBAR_RCFILE` support it. Design:
   `feedback/2026-11-14-rebar-migrate.md`.
 - **CLI errors are printed.** A failing command printed nothing and exited 1

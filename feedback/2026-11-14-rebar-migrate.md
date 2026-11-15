@@ -137,7 +137,32 @@ install reads from `.rebarrc` (`source_dirs`, `source_extensions`,
 smallest-subset search keeps the needed ones. After all scripts are
 decided, every probe-verified check is rerun with the final settings, since
 `source_dirs` accepted for `check-todos` also changes
-`check-contract-headers`.
+`check-contract-headers`. Old line filters such as
+`grep -v "node_modules\|vendor\|dist"` meant directory names; their
+plain-word alternatives (and `--exclude-dir` values) become
+`source_exclude_dirs`, which needs no line when it equals the install's
+default (`node_modules vendor dist`; `.git` and `.claude` are always
+excluded), so derived settings never widen what #19 excludes.
+
+**Customized only in settings.** Since #19 the install's scanners exclude
+directories by name (`--exclude-dir`) and `TODO.md` / the script itself by
+file name, where old copies dropped every finding line containing
+`dist`, `vendor`, `TODO.md`… A copy carrying those substring filters can
+never match the install on the probe tree, even when its only
+customization is its directory list. So, when a scanner copy differs from
+the install, migrate writes the copy's directories, extensions, contracts
+dir and max age into every released version of that script (sources
+embedded in the CLI by `gen-released-blobs.sh`, or from git history), and
+compares the copy with each on the project and on the probe tree. If one
+behaves the same (findings and counts; wording may differ), the copy is
+*that release plus settings*: it is treated like an unmodified copy whose
+output changed upstream — deleted with its settings, the post-apply rerun
+rolling everything back if a pass turns into a failure — and the plan lists
+the findings the install reports on the project that the copy did not, with
+the reason (#19) and the remedy (`source_exclude_dirs`). Otherwise the copy
+is a real customization and stays; when its probe-tree findings are a strict
+subset of the install's and every extra one is dropped by one of its
+substring filters, the keep reason says so.
 
 **Dependencies and callers.** A copy that a kept copy references (by file
 name) is kept too, so the install suite's fallback to the kept copy doesn't
@@ -272,6 +297,18 @@ symlink-refusing writes; unwritable values filtered before they are
 claimed; progress lines; a block missing its end marker is closed; a
 script's background children killed; an interrupted run removes its
 scratch copy.
+
+## After merging the 3.1 rc (#19)
+
+`migrate.test.sh` T2 started keeping its customized `check-todos.sh`: #19
+made the install exclude directories by name, and the copy's substring
+filters drop findings the install now reports — the exclusion probe tree
+working as intended, but leaving every copy with the old filters unable to
+migrate (virtru-analyze's included). The "customized only in settings" rule
+above resolves it; T2 now expects the settings-only verdict and the impact
+note, and `TestCustomizedOnlyInSettings` (fails on 7d0efa4, passes now),
+`TestSubstringFilterHint`, `TestApplySettings` and `TestExcludedDirNames`
+cover it.
 
 ## Tests
 
