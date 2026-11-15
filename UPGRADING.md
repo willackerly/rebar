@@ -237,7 +237,8 @@ and are ignored. `rebar status` shows the enabled checks.
 
 ## 8. Optional settings
 
-All default to the old behavior; set them only if you need them. See the
+All default to the old behavior; set them only if you need them. Every key
+is described in [docs/CONFIGURATION.md](docs/CONFIGURATION.md), with
 commented examples in the template
 [`.rebarrc`](templates/project-bootstrap/.rebarrc).
 

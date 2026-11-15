@@ -95,7 +95,8 @@ afterwards. Versions live side by side; options, CI, and release candidates:
 [SETUP.md § Install rebar](SETUP.md#install-rebar),
 [§ Testing a release candidate](SETUP.md#testing-a-release-candidate),
 [§ Run rebar in CI](SETUP.md#run-rebar-in-ci). Upgrading a project that
-already uses rebar: [UPGRADING.md](UPGRADING.md).
+already uses rebar: [UPGRADING.md](UPGRADING.md). Tailoring the checks to a
+project (`.rebarrc`): [docs/CONFIGURATION.md](docs/CONFIGURATION.md).
 
 ## 🚀 **Try It** (5 minutes)
 *Just want to see what rebar is about?*

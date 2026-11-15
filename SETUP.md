@@ -209,7 +209,8 @@ rebar run compute-registry    # writes architecture/CONTRACT-REGISTRY.md
 
 For a new repository, `rebar new my-project -d "what it does"` does the same
 in a fresh directory and makes the first commit (see
-[QUICKSTART.md](QUICKSTART.md)). Either way the project gets `.rebarrc`,
+[QUICKSTART.md](QUICKSTART.md)). Either way the project gets `.rebarrc`
+([settings reference](docs/CONFIGURATION.md)),
 `.rebar-version`, a README badge, the Cold Start Quad, `CLAUDE.md`,
 `architecture/` with the contract template, the role agents, `.mcp.json`,
 `.claude/` (SessionStart hook and skills), and `scripts/` with two entry

@@ -37,7 +37,7 @@ in it, then link the hook the same way. Already using an older rebar? See
 > featurerequest), `.mcp.json`, a Claude Code SessionStart hook, and
 > `scripts/ci-check.sh` + `scripts/pre-commit.sh`. Those two only call
 > `rebar check`: the checks themselves run from your rebar install, and the
-> project tailors them in `.rebarrc`. `-d "what it does"` additionally asks an
+> project tailors them in `.rebarrc` ([every setting](docs/CONFIGURATION.md)). `-d "what it does"` additionally asks an
 > LLM to draft the README and first contracts.
 
 ### Step 2: Write your first contract (3 minutes)
