@@ -101,8 +101,15 @@ var rootCmd = &cobra.Command{
 	SilenceErrors: true,
 }
 
+// Execute runs the CLI. Cobra's own error printing is off (SilenceErrors),
+// so the error is printed here, once, on stderr; without this a failing
+// command (e.g. "rebar install not found (set REBAR_ROOT …)") exited 1 silently.
 func Execute() error {
-	return rootCmd.Execute()
+	err := rootCmd.Execute()
+	if err != nil {
+		fmt.Fprintln(rootCmd.ErrOrStderr(), "rebar:", err)
+	}
+	return err
 }
 
 func init() {
