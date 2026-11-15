@@ -1,8 +1,8 @@
 # rebar
 
-> **rebar v3.0.0** | **Tier 3: ENFORCED**
+> **rebar v3.1.0-rc.2** | **Tier 3: ENFORCED**
 
-[![rebar v3.0.0](https://img.shields.io/badge/rebar-v3.0.0-green)](DESIGN.md)
+[![rebar v3.1.0-rc.2](https://img.shields.io/badge/rebar-v3.1.0--rc.2-orange)](DESIGN.md)
 [![Tier 3: Enforced](https://img.shields.io/badge/tier-3_enforced-brightgreen)](DESIGN.md)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
@@ -74,37 +74,41 @@ ask product "Does this contract match our user stories?"
 
 **Setup time** depends on your profile (see [SETUP.md](SETUP.md)):
 solo dev ~15 min, small team ~45 min, department ~2 hours. The substrate
-is plain text — markdown, bash, grep, jq — plus optional Go and Python
-binaries (`rebar` CLI, ASK CLI, MCP server) when you want them. The 5-minute
-[QUICKSTART](QUICKSTART.md) gets you a working contract without any
-binaries built; everything else is opt-in.
+is plain text — markdown, bash, grep, jq — run by the `rebar` CLI. The one-line installer
+downloads a prebuilt release (or builds it with Go when a release has none);
+the ASK CLI and MCP server come with it. The 5-minute [QUICKSTART](QUICKSTART.md) gets you a working
+contract; everything else is opt-in.
 
 ---
 
 # Getting Started: Choose Your Path
 
+## Installation
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/willackerly/rebar/v3.1.0/setup-rebar.sh | bash -s -- v3.1.0
+```
+
+Installs rebar under `~/.rebar/versions/v3.1.0/` and puts
+`~/.rebar/current/bin` (`rebar`, `ask`) on your PATH; open a new terminal
+afterwards. Versions live side by side; options, CI, and release candidates:
+[SETUP.md § Install rebar](SETUP.md#install-rebar),
+[§ Testing a release candidate](SETUP.md#testing-a-release-candidate),
+[§ Run rebar in CI](SETUP.md#run-rebar-in-ci). Upgrading a project that
+already uses rebar: [UPGRADING.md](UPGRADING.md). Tailoring the checks to a
+project (`.rebarrc`): [docs/CONFIGURATION.md](docs/CONFIGURATION.md).
+
 ## 🚀 **Try It** (5 minutes)
 *Just want to see what rebar is about?*
 
-**Solo developer quickstart:**
+**Solo developer quickstart** (after [installing](#installation)):
 ```bash
-# Option A: Copy templates
-git clone https://github.com/willackerly/rebar.git && cd rebar
-cp -r templates/project-bootstrap/. ../my-project/ && cd ../my-project
+rebar new my-project -d "what it does"   # new repo, scaffolded and committed
+cd my-project
 
-# Option B: Use the CLI (builds v2 scaffolding automatically)
-cd my-project && ../rebar/bin/rebar init
-
-# Option C: One-line installer (latest stable release → ~/.rebar/versions/, wires PATH)
-curl -fsSL https://raw.githubusercontent.com/willackerly/rebar/main/setup-rebar.sh | bash
-# a specific version:  ... | bash -s -- v3.0.0
-# newest pre-release:  ... | bash -s -- --pre
-# then: rebar new my-project -d "what it does"
+# or, in an existing repo:
+rebar adopt --tier 1
 ```
-
-The installer keeps versions side by side under `~/.rebar/versions/` with
-`~/.rebar/current` pointing at the active one; see
-[SETUP.md § Install rebar](SETUP.md#install-rebar).
 
 **What you get:** Contracts linked to code + agent coordination + immediate productivity boost
 **Perfect for:** Solo devs, 1-3 repos, testing the waters
@@ -325,10 +329,11 @@ later. See `feedback/2026-04-21-...`, `2026-04-22-...`, and
 Every rebar repo declares its version and tier at the top of README.md:
 
 ```markdown
-> **rebar v3.0.0** | **Tier 2: ADOPTED**
+> **rebar v3.1.0** | **Tier 2: ADOPTED**
 ```
 
-This is validated by `scripts/check-compliance.sh` and the Steward. It tells
+This is validated by `check-compliance` (run by `rebar check`) against the
+project's `.rebar-version`, and by the Steward. It tells
 anyone looking at your repo: "this project speaks rebar, here's what's enforced."
 
 ---

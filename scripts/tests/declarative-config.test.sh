@@ -10,6 +10,8 @@
 #   T4  source_dirs / source_extensions reach check-todos
 #   T5  a project copy of a check still runs, with a deprecation notice;
 #       thin wrappers are never picked
+#   T6  check-ground-truth.sh --print prints values at any tier, with no
+#       METRICS; REBAR_RCFILE replaces the project's .rebarrc (rebar migrate)
 #
 # Usage: bash scripts/tests/declarative-config.test.sh
 # Override the scripts under test with REBAR_SCRIPTS_DIR.
@@ -136,5 +138,18 @@ printf '#!/usr/bin/env bash\n# rebar-thin-wrapper\nexec rebar check\n' > "$P/scr
 path="$( cd / && REBAR_PROJECT_ROOT="$P" bash -c "source '$SRC/_rebar-config.sh'; _rebar_script ci-check.sh" 2>/dev/null )"
 [ "$path" = "$(cd "$SRC" && pwd -P)/ci-check.sh" ] || fail "T5: thin wrapper picked ($path)"
 ok "T5: project copies run with a deprecation notice; thin wrappers are skipped"
+
+# T6 — --print and REBAR_RCFILE, as rebar migrate uses them.
+rm -f "$P/scripts/check-ground-truth.sh" "$P/scripts/ci-check.sh"
+mv "$P/METRICS" "$P/METRICS.off"
+out="$( cd / && REBAR_TIER=1 REBAR_PROJECT_ROOT="$P" "$SRC/check-ground-truth.sh" --print 2>&1 )" \
+  || { echo "$out"; fail "T6: --print exited non-zero"; }
+printf '%s\n' "$out" | grep -qx 'test_files=2' || { echo "$out"; fail "T6: --print lacks test_files=2"; }
+printf '%s\n' "$out" | grep -qx 'sdks=2' || { echo "$out"; fail "T6: --print lacks sdks=2"; }
+printf 'metric.only_this.paths = api\nmetric.only_this.names = main.go\n' > "$TMP/alt.rc"
+out="$( cd / && REBAR_RCFILE="$TMP/alt.rc" REBAR_PROJECT_ROOT="$P" "$SRC/check-ground-truth.sh" --print 2>&1 )"
+[ "$out" = "only_this=1" ] || { echo "$out"; fail "T6: REBAR_RCFILE not used instead of .rebarrc"; }
+mv "$P/METRICS.off" "$P/METRICS"
+ok "T6: --print ignores tier and METRICS; REBAR_RCFILE replaces .rebarrc"
 
 echo "PASS: declarative .rebarrc config"

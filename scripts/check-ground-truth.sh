@@ -15,14 +15,25 @@
 # exact counts, two PRs that each add a test both edit the same line, so they
 # conflict or, if both write the same number, leave main's count wrong.
 #
-# Usage: ./scripts/check-ground-truth.sh
+# Usage: ./scripts/check-ground-truth.sh [--print]
+#   --print  print each declared metric's computed value as key=value and
+#            exit 0 (no METRICS comparison, no tier gate; used by
+#            `rebar migrate`)
 # Exit: 0 = all claims match, 1 = drift detected
 
 set -euo pipefail
 
+PRINT_ONLY=false
+[ "${1:-}" = "--print" ] && PRINT_ONLY=true
+
 # Tier gate: ground truth is Tier 3 only (skip for Tier 1-2)
 SCRIPT_DIR_GT="$(cd "$(dirname "$0")" && pwd)"
-[ -f "$SCRIPT_DIR_GT/_rebar-config.sh" ] && source "$SCRIPT_DIR_GT/_rebar-config.sh" && _rebar_skip 3 check-ground-truth && exit 0
+if [ -f "$SCRIPT_DIR_GT/_rebar-config.sh" ]; then
+  source "$SCRIPT_DIR_GT/_rebar-config.sh"
+  if ! $PRINT_ONLY && _rebar_skip 3 check-ground-truth; then
+    exit 0
+  fi
+fi
 
 REPO_ROOT="${REBAR_PROJECT_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}"
 # METRICS or METRICS.md — the template ships .md and `rebar audit`
@@ -63,7 +74,7 @@ exit_code=0
 #   metric.contract_ids.names  = CONTRACT-*.md
 #   metric.contract_ids.exclude_names = CONTRACT-TEMPLATE.md CONTRACT-REGISTRY.md
 #   metric.contract_ids.distinct = ^CONTRACT-(.*)\.[0-9]+\.[0-9]+\.md$
-RC_FILE="$REPO_ROOT/.rebarrc"
+RC_FILE="${REBAR_RCFILE:-$REPO_ROOT/.rebarrc}"
 
 metric_names() {
   [ -f "$RC_FILE" ] || return 0
@@ -142,6 +153,11 @@ compute_metrics() {
     echo "$name=$(count_metric "$name")"
   done
 }
+
+if $PRINT_ONLY; then
+  compute_metrics
+  exit 0
+fi
 
 # ── Verification engine (do not modify below this line) ──
 

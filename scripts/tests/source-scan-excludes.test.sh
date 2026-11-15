@@ -124,3 +124,22 @@ for sub in plain dist-tools/proj foo.github.io/proj; do
   done
 done
 ok "compute-registry's non-git fallback prunes by path, not by substring"
+
+# Binary files are skipped: grep reports a matching binary as "Binary file …
+# matches", which the scanners read as a reference or a TODO (seen when a
+# built bin/rebar embedded CONTRACT: strings).
+B="$TMP/binary"
+mkdir -p "$B/architecture" "$B/bin" "$B/src"
+printf '# S1\n**Status:** active\n## Purpose\nx\n' > "$B/architecture/CONTRACT-S1-BIN.1.0.md"
+printf '\000\001%s:S9-GHOST.1.0 TODO: binary\000' CONTRACT > "$B/bin/tool"
+printf '\000%s:S9-GHOST.1.0 TODO: binary\000' CONTRACT > "$B/src/blob.go"
+printf '// %s:S1-BIN.1.0\n' CONTRACT > "$B/src/ok.go"
+health=$(run_in "$B" compute-registry.sh --health)
+echo "$health" | grep -q 'Binary file' && fail "compute-registry read a binary file as a reference: $health"
+echo "$health" | grep -q 'S9-GHOST' && fail "compute-registry counted a reference inside a binary: $health"
+echo "$health" | grep -qF '| S1-BIN | 1 |' || fail "compute-registry lost the real reference: $health"
+out=$(run_in "$B" check-contract-refs.sh)
+echo "$out" | grep -q 'S9-GHOST\|Binary file' && fail "check-contract-refs read a binary: $out"
+printf 'source_dirs = src bin\n' > "$B/.rebarrc"
+out=$(run_in "$B" check-todos.sh) || fail "check-todos counted a TODO inside a binary: $out"
+ok "binary files are skipped by the source scanners"

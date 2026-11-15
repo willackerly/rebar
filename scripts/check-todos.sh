@@ -56,14 +56,14 @@ EXCLUDES=(--exclude=TODO.md --exclude=check-todos.sh)
 for dir in $EXCLUDE_DIRS; do
   EXCLUDES+=("--exclude-dir=$dir")
 done
-untracked=$(grep -rn "TODO:" \
+untracked=$(grep -rnI "TODO:" \
   "${INCLUDES[@]}" "${EXCLUDES[@]}" \
   "${DIRS[@]}" 2>/dev/null \
   | grep -v "TRACKED-TASK:" \
   || true)
 
 # Count tracked tasks (informational)
-tracked=$(grep -rn "TRACKED-TASK:" \
+tracked=$(grep -rnI "TRACKED-TASK:" \
   "${INCLUDES[@]}" "${EXCLUDES[@]}" \
   "${DIRS[@]}" 2>/dev/null \
   || true)

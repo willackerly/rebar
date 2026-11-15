@@ -11,7 +11,10 @@ is nothing to sync.
 | `pre-commit.sh` | `rebar check --pre-commit` (TODOs, contract refs, ground truth) | git pre-commit hook |
 
 Both are marked `# rebar-thin-wrapper`; the CLI never runs a marked file
-itself. Calling `rebar check` directly from CI works just as well.
+itself. Calling `rebar check` directly from CI works just as well. Either way
+CI needs a full rebar install of the version you pin, not just the `rebar`
+binary, because the checks run from the install's `scripts/`:
+https://github.com/willackerly/rebar/blob/main/SETUP.md#run-rebar-in-ci
 
 ## Wire the hook
 
@@ -42,6 +45,17 @@ the full list is in the header of the install's `scripts/ci-check.sh`.
 
 Older adopters copied all of rebar's scripts here. Those copies still run (the
 CLI prefers a project's own full copy and prints a deprecation notice), but they
-no longer receive fixes. To migrate: move any customization into `.rebarrc`,
-replace `ci-check.sh` and `pre-commit.sh` with the two files above, and delete
-the rest.
+no longer receive fixes. To migrate, run:
+
+```bash
+rebar migrate            # dry run: proposed .rebarrc lines, files to delete, files kept and why
+rebar migrate --apply    # write .rebarrc, delete the verified copies, rerun the checks
+```
+
+It runs each copy and the install's script against the project and deletes a
+copy only when the install, with the settings it derived from that copy,
+behaves the same (identical metric values, a byte-identical registry, the same
+check findings). `ci-check.sh` and `pre-commit.sh` become the two files above.
+Copies it cannot verify stay, with the reason; move those by hand. The full
+upgrade runbook (version files, registry, integrity manifest, CI):
+https://github.com/willackerly/rebar/blob/main/UPGRADING.md

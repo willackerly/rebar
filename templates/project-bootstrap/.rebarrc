@@ -1,4 +1,5 @@
 # Rebar configuration for this project
+# Reference for every key: https://github.com/willackerly/rebar/blob/main/docs/CONFIGURATION.md
 #
 # Tier controls which checks are enforced:
 #   1 = Partial  — contract refs + TODOs only (solo dev / early adoption)
@@ -14,14 +15,6 @@ REBAR_TIER=1
 # Names are the check scripts without .sh; unknown names are warned about
 # and ignored. Env override: REBAR_CHECKS_ENABLE.
 # checks_enable = check-ground-truth check-contract-headers
-
-# Version compatibility
-REBAR_VERSION=3.0.0-beta
-
-# Optional: Override specific check behaviors
-# REBAR_SKIP_CHECKS="check-freshness"
-# REBAR_TODO_STRICT=true
-# REBAR_CONTRACT_STRICT=false
 
 # ── Repo-specific settings ───────────────────────────────────────────────
 # rebar's checks run from the rebar install (`rebar check`); this file is
@@ -52,7 +45,7 @@ REBAR_VERSION=3.0.0-beta
 # freshness_max_days = 14
 
 # Contract registry (architecture/CONTRACT-REGISTRY.md).
-# registry_impl_counts     = false              # keep churny counts out (busy repos)
+# registry_impl_counts     = true               # add Impl Files + Contract Health (off by default: they churn)
 # registry_scope_prefixes  = SDK- MCP-           # strip before Services/Components/... classification
 # registry_purpose_heading = Purpose|Why this exists
 # registry_purpose_style   = ellipsis           # escape | and cut to 77 chars + ...

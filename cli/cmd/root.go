@@ -11,7 +11,7 @@ import (
 
 // releaseVersion is the release string of this source tree. Bump it with
 // each release; the release workflow refuses a tag that disagrees with it.
-const releaseVersion = "v3.0.0"
+const releaseVersion = "v3.1.0-rc.2"
 
 // Version is what `rebar version` reports. Release builds and setup-rebar.sh
 // source builds stamp it with
@@ -68,7 +68,8 @@ var rootCmd = &cobra.Command{
     rebar status                             Health dashboard
     rebar verify                             Check file integrity
     rebar check                              Run all enforcement checks
-    rebar run <script>                       Run one of rebar's scripts`,
+    rebar run <script>                       Run one of rebar's scripts
+    rebar migrate [--apply]                  Move legacy script copies into .rebarrc`,
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 		// Skip repo detection for commands that handle their own root
 		name := cmd.Name()
@@ -83,6 +84,12 @@ var rootCmd = &cobra.Command{
 		}
 
 		var err error
+		if repoRoot == "" {
+			// Like the scripts: REBAR_PROJECT_ROOT names the project (the
+			// thin wrappers `rebar migrate` leaves set it, so a copied
+			// wrapper still checks the directory it sits in).
+			repoRoot = os.Getenv("REBAR_PROJECT_ROOT")
+		}
 		if repoRoot == "" {
 			cwd, _ := os.Getwd()
 			repoRoot, err = config.FindRepoRoot(cwd)

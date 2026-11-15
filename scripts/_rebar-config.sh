@@ -14,6 +14,7 @@
 #   _rebar_project_root — the repo the scripts check (REBAR_PROJECT_ROOT or ../)
 #   _rebar_script  — path of a helper script, preferring the project's own copy
 #   _rebar_contracts_dir — where the contracts live (.rebarrc contracts_dir)
+#   _rebar_rc_file — the .rebarrc to read (REBAR_RCFILE or <project>/.rebarrc)
 #   _rebar_contract_namespace — this repo's contract namespace (.rebarrc contract_namespace), "" if unset
 #   _rebar_contract_ref_ere — ERE for the start of a reference to this repo's contracts
 #   _rebar_contract_namespace_warn — warn once per run about an invalid contract_namespace
@@ -64,6 +65,12 @@ _rebar_script() {
   echo "$script_dir/$name"
 }
 
+# The .rebarrc the readers below use: REBAR_RCFILE if set (`rebar migrate`
+# uses it to try settings before writing them), else <project>/.rebarrc.
+_rebar_rc_file() {
+  echo "${REBAR_RCFILE:-$(_rebar_project_root)/.rebarrc}"
+}
+
 _rebar_tier() {
   # 1. Environment variable (highest priority)
   if [ -n "${REBAR_TIER:-}" ]; then
@@ -73,7 +80,7 @@ _rebar_tier() {
 
   # 2. .rebarrc file (project-level config)
   local rc_file
-  rc_file="$(_rebar_project_root)/.rebarrc"
+  rc_file="$(_rebar_rc_file)"
   if [ -f "$rc_file" ]; then
     local tier
     tier=$(grep '^tier' "$rc_file" 2>/dev/null | head -1 | sed 's/.*=[[:space:]]*//' | tr -d ' ')
@@ -156,7 +163,7 @@ _rebar_skip() {
 
 # Read a key from .rebarrc, with an env override and a default.
 # Usage: _rebar_config <key> <ENV_VAR> <default>
-#   value=$(_rebar_config registry_impl_counts REBAR_REGISTRY_IMPL_COUNTS true)
+#   value=$(_rebar_config registry_impl_counts REBAR_REGISTRY_IMPL_COUNTS false)
 _rebar_config() {
   local key="$1" env_var="$2" default="$3"
   if [ -n "${!env_var:-}" ]; then
@@ -165,7 +172,7 @@ _rebar_config() {
   fi
 
   local rc_file value=""
-  rc_file="$(_rebar_project_root)/.rebarrc"
+  rc_file="$(_rebar_rc_file)"
   if [ -f "$rc_file" ]; then
     value=$(grep "^${key}[[:space:]]*=" "$rc_file" 2>/dev/null | head -1 \
       | sed 's/^[^=]*=[[:space:]]*//; s/[[:space:]]*#.*$//; s/[[:space:]]*$//')

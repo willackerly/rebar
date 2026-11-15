@@ -30,6 +30,88 @@ All notable changes to rebar. Versioned with [semver](https://semver.org/).
   UTF-8 locale), and a file containing a NUL byte is skipped (BSD grep
   reported "Binary file … matches" as an untracked TODO). Proposal and
   migration plan: `feedback/2026-11-14-go-native-checks.md`.
+
+---
+
+## v3.1.0-rc.2 — 2026-11-15
+
+Second release candidate for 3.1.0, still a **pre-release** (default "latest"
+stays `v3.0.0`). One fix found by testing rc.1 on a real adopter:
+
+- **`refresh-context.sh` no longer dies with exit 141** in a repo with many
+  commits since QUICKCONTEXT was last synced. It listed them with
+  `git log | head -20` under `pipefail`, so git got SIGPIPE and `set -e` ended
+  the script; it now uses `git log -n 20`. `test-e2e-live.sh` dropped the same
+  pattern (`git for-each-ref --count=1`, `find -print -quit`).
+
+---
+
+## v3.1.0-rc.1 — 2026-11-15
+
+First release candidate for 3.1.0, a **pre-release**: the installer's default
+"latest" stays on `v3.0.0`; install it with an explicit version
+(`curl -fsSL https://raw.githubusercontent.com/willackerly/rebar/v3.1.0-rc.1/setup-rebar.sh | bash -s -- v3.1.0-rc.1`)
+or `--pre`. The theme is **adopters carry configuration, not rebar's
+scripts**: the checks run from a versioned, self-contained install, everything
+repo-specific moves into `.rebarrc`, and `rebar migrate` converts existing
+copied (even customized) scripts, verified by running them. Upgrade steps:
+[UPGRADING.md](UPGRADING.md).
+
+- **Implementing-file counts are off by default** (`.rebarrc`
+  `registry_impl_counts`, now `false`): the committed registry has no
+  `Impl Files` column and no Contract Health section, because any PR that adds
+  a `CONTRACT:` header changes them and two such PRs merge into a wrong count.
+  `rebar run compute-registry --health` prints them. **Upgrade note:** a
+  registry with counts reports STALE once — regenerate it (UPGRADING.md step
+  5), or set `registry_impl_counts = true` to keep them. `rebar migrate`
+  follows the new default and regenerates unless the project opted in.
+- **The registry's regenerate hint names the CLI:** `<!-- Regenerate: rebar run
+  compute-registry -->` (it said `./scripts/compute-registry.sh`, which adopters
+  no longer have). `compute-registry.sh --check` ignores that comment, as it
+  ignores the old timestamp, so a registry with the old hint stays current and
+  picks up the new one when next regenerated; `rebar migrate` compares
+  registries the same way.
+- **The source scanners skip binary files** (`grep -I`). A matching binary was
+  reported as "Binary file … matches" and read as a reference or a TODO — a
+  built `bin/rebar` that embeds `CONTRACT:` strings made the registry STALE.
+
+- **Upgrading:** [UPGRADING.md](UPGRADING.md) is the runbook for moving an
+  adopting project from v2.0.0 or v3.0.x (install side by side, bump
+  `.rebar-version` and the badge, `rebar migrate`, registry, `checks_enable`,
+  integrity manifest, CI, verify). Install a release candidate with its own
+  tag's installer:
+  `curl -fsSL https://raw.githubusercontent.com/willackerly/rebar/v3.1.0-rc.1/setup-rebar.sh | bash -s -- v3.1.0-rc.1`
+  ([SETUP.md § Testing a release candidate](SETUP.md#testing-a-release-candidate)).
+  CI must install a full rebar tree, not just the binary
+  ([SETUP.md § Run rebar in CI](SETUP.md#run-rebar-in-ci)).
+- **`rebar migrate`** turns an adopter's legacy, possibly customized,
+  script copies into `.rebarrc` settings, decided by running them: each
+  `compute_metrics()` line of a custom `check-ground-truth.sh` becomes
+  `metric.<key>.*` only if the install computes the same value, on the
+  project and on a probe tree built from the metric; registry settings are
+  kept only if `compute-registry.sh --stdout` stays byte-identical
+  (`registry_purpose_style = bytes` when the old cut is needed); other checks
+  must give the same exit status and findings, and the source scanners also
+  on a probe tree with exclusion bait. All probes run in a scratch copy of
+  the project, and a copy that writes files is kept. Dry run by default;
+  `--apply` refuses a dirty work tree (`--allow-dirty`), writes `.rebarrc`
+  atomically, deletes only verified copies (a copy other files call becomes
+  a `# rebar-thin-wrapper` instead, so callers keep working), adjusts METRICS
+  counts the deletions change, reruns the checks and rolls everything back on
+  a regression. It refuses symlinked `scripts/` outside the project and any
+  rebar checkout, ignores `REBAR_*` in the environment, never changes `tier`,
+  and keeps checks whose copies ran ungated below the install's tier gate
+  running with a proposed `checks_enable`. Unmodified copies are recognized
+  from a released-blobs list embedded in the CLI
+  (`scripts/gen-released-blobs.sh`, a release step), so installs without git
+  history work. A scanner copy that is a released version plus settings
+  (its directories, extensions) is migrated even though the install now
+  excludes directories by name (#19), with the newly reported findings
+  listed before `--apply`; old substring filters map to
+  `source_exclude_dirs`. The CLI now honors `REBAR_PROJECT_ROOT` for repo
+  detection, as the scripts do.
+  `check-ground-truth.sh --print` and `REBAR_RCFILE` support it. Design:
+  `feedback/2026-11-14-rebar-migrate.md`.
 - **CLI errors are printed.** A failing command printed nothing and exited 1
   (cobra's printing was off and `main` didn't print), so hints like
   "rebar install not found (set REBAR_ROOT …)" never reached the user. They now
