@@ -179,8 +179,26 @@ _rebar_config() {
 _rebar_contracts_dir() {
   local dir
   dir=$(_rebar_config contracts_dir REBAR_CONTRACTS_DIR architecture)
-  dir="${dir%/}"
+  dir=$(_rebar_norm_dir "$dir")
   echo "${dir:-architecture}"
+}
+
+# _rebar_norm_dir DIR — a relative directory without leading ./ or trailing /
+# (./docs/specs/ → docs/specs), so scripts can match it as a path prefix.
+_rebar_norm_dir() {
+  local d="$1"
+  while [ "${d#./}" != "$d" ]; do d="${d#./}"; done
+  while [ "$d" != "/" ] && [ "${d%/}" != "$d" ]; do d="${d%/}"; done
+  echo "$d"
+}
+
+# Directory names the source scanners (check-todos, check-contract-refs,
+# check-registry) skip anywhere in the tree: .rebarrc `source_exclude_dirs`
+# (default: node_modules vendor dist), plus .git and .claude (agent
+# worktrees hold stale copies of the source; see conventions.md) always.
+# Matched by name with grep --exclude-dir, never by substring.
+_rebar_source_exclude_dirs() {
+  echo "$(_rebar_config source_exclude_dirs _REBAR_NO_ENV "node_modules vendor dist") .git .claude"
 }
 
 # This repo's contract namespace: .rebarrc `contract_namespace` (env

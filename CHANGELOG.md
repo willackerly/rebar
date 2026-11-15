@@ -54,6 +54,18 @@ All notable changes to rebar. Versioned with [semver](https://semver.org/).
   ours. Filenames stay unnamespaced; composes with `contracts_dir`; unset
   behaves exactly as before. From #8; see
   `feedback/2026-11-14-contract-namespace.md`.
+- **Fix: the source scanners skipped too much.** check-todos, check-contract-refs,
+  check-registry and compute-registry's non-git fallback dropped any match whose
+  path or line text contained `dist`, `vendor`, `node_modules` or `.git`
+  (a broken reference under `.github/` or in `distance.go`, a TODO mentioning
+  `TODO.md`, every match when the project's own path contained `dist`). They now
+  skip directories by name: `.rebarrc` `source_exclude_dirs` (default
+  `node_modules vendor dist`) plus `.git` and `.claude` (agent worktrees, which
+  were scanned before). `contracts_dir` is normalised (`./docs/specs/` →
+  `docs/specs`); check-registry also scans `*.sh` and `bin/` and skips
+  `CONTRACT-SEAM-TEMPLATE.md`. **Upgrade note:** checks can report findings
+  they used to miss — e.g. TODOs in compiled `dist-esm/` output now block
+  pre-commit; add such directories to `source_exclude_dirs`.
 - **Fix:** `check-registry.sh` stopped silently (exit 1, no ORPHAN line)
   at the first contract with no implementing file.
 - `sync-bootstrap.sh --check` also keeps the bootstrap template's

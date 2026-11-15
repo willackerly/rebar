@@ -169,20 +169,24 @@ fi
 #                          (default: node_modules vendor dist)
 set -f
 GIT_PATHSPECS=()
-GREP_INCLUDES=()
+FIND_NAMES=()   # outside git: find -name tests for the file globs
 GREP_DIRS=()
 for glob in $IMPL_GLOBS; do
   GIT_PATHSPECS+=("$glob")
   case "$glob" in
     */) GREP_DIRS+=("${glob%/}") ;;
-    *)  GREP_INCLUDES+=("--include=$glob") ;;
+    *)  FIND_NAMES+=(${FIND_NAMES[@]+-o} -name "$glob") ;;
   esac
 done
 GIT_PATHSPECS+=(":(exclude)$CONTRACTS_DIR/")
-GREP_EXCLUDE="\\.git\\|$CONTRACTS_DIR/"
+# Outside git, prune the contracts dir by path and excluded directories (plus
+# .git and agent worktrees under .claude) by name. Filtering grep's output
+# by substring dropped .github/, distance.go and, when the project's own path
+# contained one of the words, every match.
+FIND_PRUNE=(-path "$PROJECT_ROOT/$CONTRACTS_DIR" -o -name .git -o -name .claude)
 for dir in $EXCLUDE_DIRS; do
   GIT_PATHSPECS+=(":(exclude,glob)**/$dir/**")
-  GREP_EXCLUDE="$dir\\|$GREP_EXCLUDE"
+  FIND_PRUNE+=(-o -name "$dir")
 done
 set +f
 
@@ -191,16 +195,16 @@ search_source() {
     git -C "$PROJECT_ROOT" grep "$@" -- "${GIT_PATHSPECS[@]}" 2>/dev/null
   else
     {
-      if [ ${#GREP_INCLUDES[@]} -gt 0 ]; then
-        grep -r "$@" "$PROJECT_ROOT" "${GREP_INCLUDES[@]}" 2>/dev/null
+      if [ ${#FIND_NAMES[@]} -gt 0 ]; then
+        find "$PROJECT_ROOT" \( "${FIND_PRUNE[@]}" \) -prune -o -type f \( "${FIND_NAMES[@]}" \) -print0
       fi
       local dir
       for dir in ${GREP_DIRS[@]+"${GREP_DIRS[@]}"}; do
         if [ -d "$PROJECT_ROOT/$dir" ]; then
-          grep -r "$@" "$PROJECT_ROOT/$dir" 2>/dev/null
+          find "$PROJECT_ROOT/$dir" \( "${FIND_PRUNE[@]}" \) -prune -o -type f -print0
         fi
       done
-    } | grep -v "$GREP_EXCLUDE"
+    } | xargs -0 grep "$@" /dev/null 2>/dev/null
   fi
 }
 
