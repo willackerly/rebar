@@ -289,7 +289,20 @@ install_source() {
   return 0
 }
 
-cleanup() { rm -rf "${TMP:-}" "${STAGE:-}" "${REPLACED:-}"; }
+# EXIT trap. A version moved aside for replacement ($REPLACED) is deleted
+# only once its successor is in place; if the swap never completed (mv
+# failed, or a signal landed between the two moves) it goes back.
+cleanup() {
+  if [[ -n "${REPLACED:-}" && -e "$REPLACED" && -n "${TARGET:-}" && ! -e "$TARGET" ]]; then
+    if mv "$REPLACED" "$TARGET"; then
+      warn "install did not complete; restored the previous $(basename "$TARGET")"
+    else
+      warn "install did not complete; the previous copy is at $REPLACED"
+      REPLACED=""
+    fi
+  fi
+  rm -rf "${TMP:-}" "${STAGE:-}" "${REPLACED:-}"
+}
 
 # Everything that acts lives in main, called on the last line, so a
 # truncated download (`curl | bash` cut short) defines functions at most and
@@ -398,7 +411,12 @@ main() {
   TMP="$(mktemp -d "${TMPDIR:-/tmp}/rebar-install.XXXXXX")"
   STAGE="$REBAR_DIR/versions/.incoming.$$"
   REPLACED="$REBAR_DIR/versions/.replaced.$$"
+  TARGET="$REBAR_DIR/versions/$NAME"
   trap cleanup EXIT
+  # Turn signals into a normal exit so the EXIT trap (and its restore) runs.
+  trap 'exit 129' HUP
+  trap 'exit 130' INT
+  trap 'exit 143' TERM
 
   # ── Install ──────────────────────────────────────────────────────────────────
 
@@ -430,7 +448,6 @@ repo=$REBAR_REPO
 installed=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 EOF
 
-  TARGET="$REBAR_DIR/versions/$NAME"
   if [[ -e "$TARGET" ]]; then
     log "Replacing the existing $NAME"
     mv "$TARGET" "$REPLACED"

@@ -23,6 +23,8 @@
 #   T9  unknown ref → refused
 #   T11 a truncated download (`curl | bash` cut short at any line, or inside
 #       the last line) runs nothing and leaves ~/.rebar as it was
+#   T12 a re-install whose final move fails, or that is SIGTERMed between
+#       moving the old copy aside and moving the new one in, keeps the old copy
 # Once:
 #   T10 without Go: a prebuilt tag installs; a source-only tag explains Go is needed
 #
@@ -115,6 +117,20 @@ inst() {
 has() { printf '%s\n' "$1" | grep -qF -- "$2" || { printf '%s\n' "$1" | tail -20 >&2; fail "$3: missing '$2'"; }; }
 current_of() { readlink "$1/.rebar/current"; }
 leftovers() { ls -A "$1/.rebar/versions" | grep '^\.' || true; }
+
+# mv shims for T12: when the installer moves its staged tree onto
+# versions/v9.1.0-beta.10, fail (shim-fail) or SIGTERM the installer (shim-term).
+REALMV="$(command -v mv)"
+for mode in fail term; do
+  mkdir -p "$TMP/shim-$mode"
+  if [ "$mode" = fail ]; then act='echo "mv: simulated failure" >&2; exit 1'; else act='kill -TERM $PPID; exit 1'; fi
+  cat > "$TMP/shim-$mode/mv" <<EOF
+#!/bin/sh
+case "\$1" in */.incoming.*) case "\$2" in */versions/v9.1.0-beta.10) $act ;; esac ;; esac
+exec "$REALMV" "\$@"
+EOF
+  chmod +x "$TMP/shim-$mode/mv"
+done
 
 BASHES="/bin/bash"
 other="$(command -v bash)"
@@ -236,6 +252,19 @@ for sh in $BASHES; do
     [ "$(state)" = "$before" ] || fail "T11 [$bv] truncated at $cut changed ~/.rebar: $(state)"
   done
   ok "T11 [$bv] $(echo $cuts | wc -w | tr -d ' ') truncated copies of the script ran nothing"
+
+  # T12 — re-installing a version that fails between moving the old copy
+  # aside and moving the new one in (mv fails / SIGTERM) keeps the old copy.
+  echo keep > "$H/.rebar/versions/v9.1.0-beta.10/MARKER"
+  for mode in fail term; do
+    out="$(IPATH="$TMP/shim-$mode:$TPATH" inst "$H" "$sh" v9.1.0-beta.10)" \
+      && fail "T12 [$bv] $mode: the install should have failed"
+    [ -f "$H/.rebar/versions/v9.1.0-beta.10/MARKER" ] \
+      || { echo "$out" | tail -5 >&2; fail "T12 [$bv] $mode: the previous v9.1.0-beta.10 was lost"; }
+    [ "$("$H/.rebar/current/bin/rebar" version)" = "rebar v9.1.0-beta.10" ] || fail "T12 [$bv] $mode: current broken"
+    [ -z "$(leftovers "$H")" ] || fail "T12 [$bv] $mode: left $(leftovers "$H")"
+  done
+  ok "T12 [$bv] a failed or interrupted swap restores the previous copy"
 done
 
 # T10
