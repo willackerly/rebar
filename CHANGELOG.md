@@ -48,7 +48,8 @@ All notable changes to rebar. Versioned with [semver](https://semver.org/).
 - **`contract_namespace`** (optional, e.g. `github.com/org/repo`): source
   may cite this repo's contracts as `CONTRACT:<namespace>:<ID>.<v>` as well
   as the short form. Steward, compute-registry, check-contract-refs,
-  check-registry and `rebar context developer` treat both alike; references
+  check-registry and `rebar context developer` treat both alike
+  (check-contract-headers only shows the qualified form in its hint); references
   qualified with another repo's namespace are counted, never treated as
   ours. Filenames stay unnamespaced; composes with `contracts_dir`; unset
   behaves exactly as before. From #8; see

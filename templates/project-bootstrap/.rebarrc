@@ -33,7 +33,8 @@ REBAR_VERSION=3.0.0-beta
 # design docs either way.
 # contracts_dir = architecture
 
-# This repo's contract namespace (letters, digits, . _ / -). When set, source
+# This repo's contract namespace (letters, digits, . _ / -; not shaped like
+# an ID.version such as acme.1.2). When set, source
 # may cite a contract here as CONTRACT:<namespace>:<ID>.<v> as well as the
 # short CONTRACT:<ID>.<v>; a ref qualified with another namespace points at
 # another repo and is not checked here. Filenames stay unnamespaced. Leave

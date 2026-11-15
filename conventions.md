@@ -172,7 +172,8 @@ the registry: `CONTRACT-TEMPLATE`, `CONTRACT-SEAM-TEMPLATE`, `CONTRACT-REGISTRY`
 
 A contract ID is unique within its repo. When references travel between
 repos, a repo can name itself with `contract_namespace` in `.rebarrc`
-(letters, digits, `. _ / -`; Go-module style such as `github.com/org/repo`):
+(letters, digits, `. _ / -`, not starting like an ID.version; Go-module
+style such as `github.com/org/repo`):
 
 ```text
 .rebarrc:  contract_namespace = github.com/acme/widgets

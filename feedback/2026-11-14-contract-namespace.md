@@ -4,8 +4,8 @@
 and eab6c56, ttschampel), rebuilt on the self-contained install
 (`feedback/2026-11-14-self-contained-install.md`, #14), 2026-11-14
 **Type:** feature (propose-then-ship; implementation in the same branch)
-**Status:** implemented on `feat/contract-namespace` (stacked on
-`feat/thin-adoption-scripts`); open questions below
+**Status:** implemented on `f/namespace-no-scripts` (PR #8, on
+`release/v3.1.0-rc`); open questions below
 
 ## Problem
 
@@ -32,9 +32,14 @@ reported broken. `rebar context developer` turned it into the glob
 
 Read by `_rebar_contract_namespace` (bash) and `config.ContractNamespace`
 (Go), with #14's rules (first line wins, `#` comment, env override).
-Allowed characters: letters, digits, `. _ / -`. A trailing `/` is dropped.
-Anything else (a space, a `:`) is ignored with a warning on stderr and
-treated as unset, so a typo cannot widen the match patterns.
+Allowed characters: letters, digits, `. _ / -`, and the value must not
+start like a contract ID.version (`acme.1.2`), the same rule that keeps
+`CONTRACT:MISSING.1.0:see.2` a short reference. Surrounding whitespace and
+a trailing `/` are dropped (env and `.rebarrc` alike, in bash and Go).
+Anything else (a space, a `:`) is ignored and treated as unset, so a typo
+cannot widen the match patterns; the warning prints once per run
+(`_REBAR_NAMESPACE_VALIDATED`, exported by ci-check / pre-commit /
+cold-start).
 
 ### Reference grammar
 
@@ -47,7 +52,7 @@ treated as unset, so a typo cannot widen the match patterns.
 Filenames (`CONTRACT-BLOBSTORE.2.1.md`), contract titles and `CONSUMES.md`
 keys stay unnamespaced.
 
-### Who honors it
+### Where it applies
 
 | Path | Change |
 |---|---|
@@ -56,9 +61,9 @@ keys stay unnamespaced.
 | `compute-registry.sh` | implementing counts and shadow detection use the ERE; a qualified shadow is reported by its bare ID |
 | `check-contract-refs.sh` | own-qualified refs are checked like short ones; foreign ones are rewritten out, counted and reported (`Namespace …: N cross-repo reference(s) … not checked`) |
 | `check-registry.sh` | orphan search uses the ERE |
-| `check-contract-headers.sh` | presence check already accepted both; the failure hint shows the qualified form |
+| `check-contract-headers.sh` | not namespace-aware (a presence check accepts both forms); its failure hint shows the qualified form |
 | `cli/internal/config` | `ContractNamespace`, `LocalContractRef` |
-| `rebar context developer` | strips our namespace, skips foreign refs |
+| `rebar context developer` | strips our namespace, skips foreign refs, reads every reference on a line, globs under `contracts_dir` |
 | prefix-uniqueness, jtbd, version-bump, integrity scanner, `rebar contract` | keyed on filenames or `CONSUMES.md`; unchanged |
 
 Composes with `contracts_dir`: the two settings are independent and the
@@ -95,7 +100,12 @@ test runs them together.
   a namespace the foreign ref is rewritten out before extraction.
 - *`CONTRACT:ID.1.0: description`.* The qualified-form test requires
   `<ns>:<ID>.<digit>`, so a trailing colon is not taken for a namespace
-  (Go test `trailing colon is not a namespace`).
+  (Go test `trailing colon is not a namespace`). And a would-be namespace
+  that starts like an ID.version is not one, so
+  `CONTRACT:MISSING.1.0:see.2 section` is still reported BROKEN rather than
+  counted cross-repo (review of #8; bash T8, Go `ID.version before a colon`).
+- *Dot in the namespace.* Escaped in every ERE: `githubXcom/acme/widgets:`
+  is foreign when the namespace is `github.com/acme/widgets` (bash T8).
 - *Namespace that prefixes another* (`…/repo` vs `…/repo-fork`). The ERE
   requires `<ns>:` exactly; Go compares the whole namespace. Tested.
 - *Self-reference (agreement 06).* Test fixtures and Go tests build
