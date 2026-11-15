@@ -35,21 +35,6 @@
 
 set -euo pipefail
 
-REBAR_REPO="${REBAR_REPO:-https://github.com/willackerly/rebar.git}"
-REBAR_DIR="${REBAR_DIR:-$HOME/.rebar}"
-ASK_SERVER="${ASK_SERVER:-}"
-VERSION="${REBAR_REF:-}"
-FROM_SOURCE=0
-SWITCH=1
-GO_PKG="github.com/willackerly/rebar/cli/cmd"
-
-if [[ -t 1 ]]; then
-  RED=$'\033[0;31m'; GREEN=$'\033[0;32m'; YELLOW=$'\033[1;33m'
-  BLUE=$'\033[0;34m'; NC=$'\033[0m'
-else
-  RED=''; GREEN=''; YELLOW=''; BLUE=''; NC=''
-fi
-
 log()  { printf '%s[rebar]%s %s\n' "$BLUE"   "$NC" "$*"; }
 warn() { printf '%s[rebar]%s %s\n' "$YELLOW" "$NC" "$*" >&2; }
 ok()   { printf '%s[rebar]%s %s\n' "$GREEN"  "$NC" "$*"; }
@@ -97,22 +82,6 @@ Next steps after install:
 EOF
 }
 
-while [[ $# -gt 0 ]]; do
-  case "$1" in
-    --server)    [[ $# -ge 2 ]] || die "--server needs a value"; ASK_SERVER="$2"; shift 2 ;;
-    --server=*)  ASK_SERVER="${1#--server=}"; shift ;;
-    --dir)       [[ $# -ge 2 ]] || die "--dir needs a value"; REBAR_DIR="$2"; shift 2 ;;
-    --dir=*)     REBAR_DIR="${1#--dir=}"; shift ;;
-    --ref)       [[ $# -ge 2 ]] || die "--ref needs a value"; VERSION="$2"; shift 2 ;;
-    --ref=*)     VERSION="${1#--ref=}"; shift ;;
-    --source)    FROM_SOURCE=1; shift ;;
-    --no-switch) SWITCH=0; shift ;;
-    -h|--help)   usage; exit 0 ;;
-    -*)          usage >&2; die "unknown option: $1" ;;
-    *)           VERSION="$1"; shift ;;
-  esac
-done
-
 # ── Helpers ──────────────────────────────────────────────────────────────────
 
 # owner/repo when REBAR_REPO is on github.com, else empty.
@@ -127,12 +96,6 @@ github_slug() {
   s="${s%/}"
   printf '%s\n' "${s%.git}"
 }
-
-SLUG="$(github_slug)"
-if [[ -z "${REBAR_RELEASE_URL:-}" && -n "$SLUG" ]]; then
-  REBAR_RELEASE_URL="https://github.com/${SLUG}/releases/download"
-fi
-REBAR_RELEASE_URL="${REBAR_RELEASE_URL:-}"
 
 fetch() {  # fetch <url> <out>
   if have curl; then
@@ -238,69 +201,6 @@ detect_platform() {  # prints <os> <arch> (Go names), or nothing if unsupported
   echo "$os $arch"
 }
 
-# ── Resolve what to install ──────────────────────────────────────────────────
-
-if [[ -z "$VERSION" || "$VERSION" == "latest" ]]; then
-  log "Resolving the latest rebar release (pre-releases included)…"
-  VERSION="$(list_tags | semver_max)" || die "could not list the tags of $REBAR_REPO"
-  [[ -n "$VERSION" ]] || die "found no release tags in $REBAR_REPO; pass a version explicitly"
-  log "Latest: $VERSION"
-  KIND=tag
-else
-  # "3.0.0" → "v3.0.0" when only the v-prefixed tag exists.
-  if [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9] ]] && have git \
-     && git ls-remote --tags --refs "$REBAR_REPO" "refs/tags/v$VERSION" | grep -q .; then
-    VERSION="v$VERSION"
-  fi
-  KIND="$(classify_ref "$VERSION")"
-fi
-
-# Directory name: tags as-is; branches and SHAs made path-safe
-# (feat/foo → feat-foo).
-NAME="$(printf '%s' "$VERSION" | sed 's/[^A-Za-z0-9._-]/-/g; s/^[.-]*//')"
-[[ -n "$NAME" && "$NAME" != "current" ]] || die "cannot use '$VERSION' as a version name"
-
-# ── Prepare $REBAR_DIR ───────────────────────────────────────────────────────
-
-LEGACY=0
-if [[ -e "$REBAR_DIR" && ! -d "$REBAR_DIR" ]]; then
-  die "$REBAR_DIR exists and is not a directory. Move it aside or use --dir."
-fi
-if [[ -d "$REBAR_DIR" ]]; then
-  if [[ -e "$REBAR_DIR/.git" ]]; then
-    LEGACY=1
-  elif [[ ! -d "$REBAR_DIR/versions" ]] && [[ -n "$(ls -A "$REBAR_DIR" 2>/dev/null)" ]]; then
-    die "$REBAR_DIR exists but is neither a rebar install nor empty. Move it aside or use --dir."
-  fi
-  if [[ -e "$REBAR_DIR/current" && ! -L "$REBAR_DIR/current" ]]; then
-    die "$REBAR_DIR/current exists and is not a symlink; refusing to replace it."
-  fi
-fi
-mkdir -p "$REBAR_DIR/versions"
-REBAR_DIR="$(cd "$REBAR_DIR" && pwd)"
-
-if [[ "$LEGACY" -eq 1 ]]; then
-  warn "$REBAR_DIR is a pre-versioned rebar clone. Leaving it as is:"
-  warn "  versions/ and current/ go inside it; the clone itself is not updated."
-  warn "  Projects whose .mcp.json or REBAR_ROOT point at $REBAR_DIR keep using the clone."
-  if have git; then
-    exclude="$(git -C "$REBAR_DIR" rev-parse --git-path info/exclude 2>/dev/null || true)"
-    if [[ -n "$exclude" ]]; then
-      case "$exclude" in /*) ;; *) exclude="$REBAR_DIR/$exclude" ;; esac
-      mkdir -p "$(dirname "$exclude")"
-      for pat in /versions/ /current; do
-        grep -qxF "$pat" "$exclude" 2>/dev/null || printf '%s\n' "$pat" >> "$exclude"
-      done
-    fi
-  fi
-fi
-
-TMP="$(mktemp -d "${TMPDIR:-/tmp}/rebar-install.XXXXXX")"
-STAGE="$REBAR_DIR/versions/.incoming.$$"
-REPLACED="$REBAR_DIR/versions/.replaced.$$"
-cleanup() { rm -rf "$TMP" "$STAGE" "$REPLACED"; }
-trap cleanup EXIT
-
 # ── Prebuilt release ─────────────────────────────────────────────────────────
 
 # Returns 1 when there is nothing to download (no assets, unsupported
@@ -389,28 +289,139 @@ install_source() {
   return 0
 }
 
-# ── Install ──────────────────────────────────────────────────────────────────
+cleanup() { rm -rf "${TMP:-}" "${STAGE:-}" "${REPLACED:-}"; }
 
-METHOD=""
-COMMIT=""
-log "Installing rebar $VERSION → $REBAR_DIR/versions/$NAME"
-if [[ "$KIND" == "tag" && "$FROM_SOURCE" -eq 0 ]] && install_prebuilt "$VERSION"; then
-  :
-else
-  if [[ "$KIND" == "tag" && "$FROM_SOURCE" -eq 0 ]]; then
-    log "Falling back to a source build."
+# Everything that acts lives in main, called on the last line, so a
+# truncated download (`curl | bash` cut short) defines functions at most and
+# runs nothing. The end-of-script marker must arrive intact as the last
+# argument, so a cut inside the final line cannot run main either.
+main() {
+  REBAR_REPO="${REBAR_REPO:-https://github.com/willackerly/rebar.git}"
+  REBAR_DIR="${REBAR_DIR:-$HOME/.rebar}"
+  ASK_SERVER="${ASK_SERVER:-}"
+  VERSION="${REBAR_REF:-}"
+  FROM_SOURCE=0
+  SWITCH=1
+  GO_PKG="github.com/willackerly/rebar/cli/cmd"
+
+  if [[ -t 1 ]]; then
+    RED=$'\033[0;31m'; GREEN=$'\033[0;32m'; YELLOW=$'\033[1;33m'
+    BLUE=$'\033[0;34m'; NC=$'\033[0m'
+  else
+    RED=''; GREEN=''; YELLOW=''; BLUE=''; NC=''
   fi
-  install_source "$VERSION" "$KIND"
-fi
 
-[[ -x "$STAGE/bin/rebar" ]] || die "install produced no bin/rebar"
-"$STAGE/bin/rebar" version >/dev/null 2>&1 \
-  || die "$STAGE/bin/rebar does not run on this machine"
-if [[ ! -d "$STAGE/templates/project-bootstrap" || ! -f "$STAGE/scripts/steward.sh" ]]; then
-  warn "$VERSION lacks templates/project-bootstrap/ or scripts/steward.sh; the CLI may not find its scripts"
-fi
+  COMPLETE=0
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --server)    [[ $# -ge 2 ]] || die "--server needs a value"; ASK_SERVER="$2"; shift 2 ;;
+      --server=*)  ASK_SERVER="${1#--server=}"; shift ;;
+      --dir)       [[ $# -ge 2 ]] || die "--dir needs a value"; REBAR_DIR="$2"; shift 2 ;;
+      --dir=*)     REBAR_DIR="${1#--dir=}"; shift ;;
+      --ref)       [[ $# -ge 2 ]] || die "--ref needs a value"; VERSION="$2"; shift 2 ;;
+      --ref=*)     VERSION="${1#--ref=}"; shift ;;
+      --source)    FROM_SOURCE=1; shift ;;
+      --no-switch) SWITCH=0; shift ;;
+      --rebar-end-of-script)
+                   [[ $# -eq 1 ]] || die "--rebar-end-of-script must come last"; COMPLETE=1; shift ;;
+      -h|--help)   usage; exit 0 ;;
+      -*)          usage >&2; die "unknown option: $1" ;;
+      *)           VERSION="$1"; shift ;;
+    esac
+  done
+  # Run as `main "$@" --rebar-end-of-script` from the script's last line only.
+  [[ "$COMPLETE" -eq 1 ]] || die "setup-rebar.sh is incomplete (download cut short?); not running it"
 
-cat > "$STAGE/.rebar-install" <<EOF
+  SLUG="$(github_slug)"
+  if [[ -z "${REBAR_RELEASE_URL:-}" && -n "$SLUG" ]]; then
+    REBAR_RELEASE_URL="https://github.com/${SLUG}/releases/download"
+  fi
+  REBAR_RELEASE_URL="${REBAR_RELEASE_URL:-}"
+
+  # ── Resolve what to install ──────────────────────────────────────────────────
+
+  if [[ -z "$VERSION" || "$VERSION" == "latest" ]]; then
+    log "Resolving the latest rebar release (pre-releases included)…"
+    VERSION="$(list_tags | semver_max)" || die "could not list the tags of $REBAR_REPO"
+    [[ -n "$VERSION" ]] || die "found no release tags in $REBAR_REPO; pass a version explicitly"
+    log "Latest: $VERSION"
+    KIND=tag
+  else
+    # "3.0.0" → "v3.0.0" when only the v-prefixed tag exists.
+    if [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9] ]] && have git \
+       && git ls-remote --tags --refs "$REBAR_REPO" "refs/tags/v$VERSION" | grep -q .; then
+      VERSION="v$VERSION"
+    fi
+    KIND="$(classify_ref "$VERSION")"
+  fi
+
+  # Directory name: tags as-is; branches and SHAs made path-safe
+  # (feat/foo → feat-foo).
+  NAME="$(printf '%s' "$VERSION" | sed 's/[^A-Za-z0-9._-]/-/g; s/^[.-]*//')"
+  [[ -n "$NAME" && "$NAME" != "current" ]] || die "cannot use '$VERSION' as a version name"
+
+  # ── Prepare $REBAR_DIR ───────────────────────────────────────────────────────
+
+  LEGACY=0
+  if [[ -e "$REBAR_DIR" && ! -d "$REBAR_DIR" ]]; then
+    die "$REBAR_DIR exists and is not a directory. Move it aside or use --dir."
+  fi
+  if [[ -d "$REBAR_DIR" ]]; then
+    if [[ -e "$REBAR_DIR/.git" ]]; then
+      LEGACY=1
+    elif [[ ! -d "$REBAR_DIR/versions" ]] && [[ -n "$(ls -A "$REBAR_DIR" 2>/dev/null)" ]]; then
+      die "$REBAR_DIR exists but is neither a rebar install nor empty. Move it aside or use --dir."
+    fi
+    if [[ -e "$REBAR_DIR/current" && ! -L "$REBAR_DIR/current" ]]; then
+      die "$REBAR_DIR/current exists and is not a symlink; refusing to replace it."
+    fi
+  fi
+  mkdir -p "$REBAR_DIR/versions"
+  REBAR_DIR="$(cd "$REBAR_DIR" && pwd)"
+
+  if [[ "$LEGACY" -eq 1 ]]; then
+    warn "$REBAR_DIR is a pre-versioned rebar clone. Leaving it as is:"
+    warn "  versions/ and current/ go inside it; the clone itself is not updated."
+    warn "  Projects whose .mcp.json or REBAR_ROOT point at $REBAR_DIR keep using the clone."
+    if have git; then
+      exclude="$(git -C "$REBAR_DIR" rev-parse --git-path info/exclude 2>/dev/null || true)"
+      if [[ -n "$exclude" ]]; then
+        case "$exclude" in /*) ;; *) exclude="$REBAR_DIR/$exclude" ;; esac
+        mkdir -p "$(dirname "$exclude")"
+        for pat in /versions/ /current; do
+          grep -qxF "$pat" "$exclude" 2>/dev/null || printf '%s\n' "$pat" >> "$exclude"
+        done
+      fi
+    fi
+  fi
+
+  TMP="$(mktemp -d "${TMPDIR:-/tmp}/rebar-install.XXXXXX")"
+  STAGE="$REBAR_DIR/versions/.incoming.$$"
+  REPLACED="$REBAR_DIR/versions/.replaced.$$"
+  trap cleanup EXIT
+
+  # ── Install ──────────────────────────────────────────────────────────────────
+
+  METHOD=""
+  COMMIT=""
+  log "Installing rebar $VERSION → $REBAR_DIR/versions/$NAME"
+  if [[ "$KIND" == "tag" && "$FROM_SOURCE" -eq 0 ]] && install_prebuilt "$VERSION"; then
+    :
+  else
+    if [[ "$KIND" == "tag" && "$FROM_SOURCE" -eq 0 ]]; then
+      log "Falling back to a source build."
+    fi
+    install_source "$VERSION" "$KIND"
+  fi
+
+  [[ -x "$STAGE/bin/rebar" ]] || die "install produced no bin/rebar"
+  "$STAGE/bin/rebar" version >/dev/null 2>&1 \
+    || die "$STAGE/bin/rebar does not run on this machine"
+  if [[ ! -d "$STAGE/templates/project-bootstrap" || ! -f "$STAGE/scripts/steward.sh" ]]; then
+    warn "$VERSION lacks templates/project-bootstrap/ or scripts/steward.sh; the CLI may not find its scripts"
+  fi
+
+  cat > "$STAGE/.rebar-install" <<EOF
 version=$VERSION
 kind=$KIND
 commit=$COMMIT
@@ -419,64 +430,64 @@ repo=$REBAR_REPO
 installed=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 EOF
 
-TARGET="$REBAR_DIR/versions/$NAME"
-if [[ -e "$TARGET" ]]; then
-  log "Replacing the existing $NAME"
-  mv "$TARGET" "$REPLACED"
-fi
-mv "$STAGE" "$TARGET"
-
-PREVIOUS=""
-if [[ -L "$REBAR_DIR/current" ]]; then
-  PREVIOUS="$(readlink "$REBAR_DIR/current")"
-fi
-if [[ "$SWITCH" -eq 1 || -z "$PREVIOUS" ]]; then
-  [[ "$SWITCH" -eq 1 ]] || warn "no current version yet; making $NAME current despite --no-switch"
-  ln -sfn "versions/$NAME" "$REBAR_DIR/current"
-  SWITCHED=1
-else
-  SWITCHED=0
-fi
-
-INSTALLED_VERSION="$("$TARGET/bin/rebar" version 2>/dev/null | head -1)"
-
-# ── PATH wiring ──────────────────────────────────────────────────────────────
-# Run through the symlink so bin/install records $REBAR_DIR/current/bin (it
-# uses the logical `pwd`), which stays valid across version switches.
-
-if [[ "$SWITCHED" -eq 1 && -x "$REBAR_DIR/current/bin/install" ]]; then
-  install_args=()
-  [[ -n "$ASK_SERVER" ]] && install_args+=(--server "$ASK_SERVER")
-  log "Running $REBAR_DIR/current/bin/install ${install_args[*]:-}"
-  # ${arr[@]+...}: bash 3.2 treats an empty "${arr[@]}" as unbound under set -u.
-  # bin/install picks the RC file from $SHELL, which `env -i` and some CI
-  # shells leave unset.
-  SHELL="${SHELL:-/bin/sh}" "$REBAR_DIR/current/bin/install" ${install_args[@]+"${install_args[@]}"}
-fi
-
-# ── Report ───────────────────────────────────────────────────────────────────
-
-ok "Installed $INSTALLED_VERSION at $TARGET ($METHOD)"
-if [[ "$SWITCHED" -eq 1 ]]; then
-  if [[ -n "$PREVIOUS" && "$PREVIOUS" != "versions/$NAME" ]]; then
-    ok "current: ${PREVIOUS#versions/} → $NAME"
-  else
-    ok "current: $NAME"
+  TARGET="$REBAR_DIR/versions/$NAME"
+  if [[ -e "$TARGET" ]]; then
+    log "Replacing the existing $NAME"
+    mv "$TARGET" "$REPLACED"
   fi
-else
-  ok "current stays at ${PREVIOUS#versions/} (--no-switch). Switch with: ln -sfn versions/$NAME $REBAR_DIR/current"
-fi
-log "Installed versions: $(cd "$REBAR_DIR/versions" && ls -1 | tr '\n' ' ')"
+  mv "$STAGE" "$TARGET"
 
-on_path="$(command -v rebar 2>/dev/null || true)"
-if [[ -n "$on_path" && "$on_path" != "$REBAR_DIR/current/bin/rebar" ]]; then
-  warn "this shell runs rebar from $on_path; open a new terminal (or source your RC) to pick up $REBAR_DIR/current/bin"
-fi
-if [[ -n "${REBAR_ROOT:-}" ]]; then
-  warn "REBAR_ROOT=$REBAR_ROOT is set; the CLI runs that tree's scripts, not $REBAR_DIR/current's"
-fi
+  PREVIOUS=""
+  if [[ -L "$REBAR_DIR/current" ]]; then
+    PREVIOUS="$(readlink "$REBAR_DIR/current")"
+  fi
+  if [[ "$SWITCH" -eq 1 || -z "$PREVIOUS" ]]; then
+    [[ "$SWITCH" -eq 1 ]] || warn "no current version yet; making $NAME current despite --no-switch"
+    ln -sfn "versions/$NAME" "$REBAR_DIR/current"
+    SWITCHED=1
+  else
+    SWITCHED=0
+  fi
 
-cat <<EOF
+  INSTALLED_VERSION="$("$TARGET/bin/rebar" version 2>/dev/null | head -1)"
+
+  # ── PATH wiring ──────────────────────────────────────────────────────────────
+  # Run through the symlink so bin/install records $REBAR_DIR/current/bin (it
+  # uses the logical `pwd`), which stays valid across version switches.
+
+  if [[ "$SWITCHED" -eq 1 && -x "$REBAR_DIR/current/bin/install" ]]; then
+    install_args=()
+    [[ -n "$ASK_SERVER" ]] && install_args+=(--server "$ASK_SERVER")
+    log "Running $REBAR_DIR/current/bin/install ${install_args[*]:-}"
+    # ${arr[@]+...}: bash 3.2 treats an empty "${arr[@]}" as unbound under set -u.
+    # bin/install picks the RC file from $SHELL, which `env -i` and some CI
+    # shells leave unset.
+    SHELL="${SHELL:-/bin/sh}" "$REBAR_DIR/current/bin/install" ${install_args[@]+"${install_args[@]}"}
+  fi
+
+  # ── Report ───────────────────────────────────────────────────────────────────
+
+  ok "Installed $INSTALLED_VERSION at $TARGET ($METHOD)"
+  if [[ "$SWITCHED" -eq 1 ]]; then
+    if [[ -n "$PREVIOUS" && "$PREVIOUS" != "versions/$NAME" ]]; then
+      ok "current: ${PREVIOUS#versions/} → $NAME"
+    else
+      ok "current: $NAME"
+    fi
+  else
+    ok "current stays at ${PREVIOUS#versions/} (--no-switch). Switch with: ln -sfn versions/$NAME $REBAR_DIR/current"
+  fi
+  log "Installed versions: $(cd "$REBAR_DIR/versions" && ls -1 | tr '\n' ' ')"
+
+  on_path="$(command -v rebar 2>/dev/null || true)"
+  if [[ -n "$on_path" && "$on_path" != "$REBAR_DIR/current/bin/rebar" ]]; then
+    warn "this shell runs rebar from $on_path; open a new terminal (or source your RC) to pick up $REBAR_DIR/current/bin"
+  fi
+  if [[ -n "${REBAR_ROOT:-}" ]]; then
+    warn "REBAR_ROOT=$REBAR_ROOT is set; the CLI runs that tree's scripts, not $REBAR_DIR/current's"
+  fi
+
+  cat <<EOF
 
 ${BLUE}Next steps:${NC}
   • Open a new terminal (or source your shell RC) so PATH picks up rebar
@@ -489,3 +500,6 @@ ${BLUE}Versions:${NC}
 
 ${BLUE}Docs:${NC} https://github.com/${SLUG:-willackerly/rebar}/blob/${COMMIT:-$VERSION}/QUICKSTART.md
 EOF
+}
+
+main "$@" --rebar-end-of-script

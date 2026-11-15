@@ -21,6 +21,8 @@
 #       versions/ + current added and git-excluded, new PATH line wins
 #   T8  a non-rebar, non-empty ~/.rebar → refused
 #   T9  unknown ref → refused
+#   T11 a truncated download (`curl | bash` cut short at any line, or inside
+#       the last line) runs nothing and leaves ~/.rebar as it was
 # Once:
 #   T10 without Go: a prebuilt tag installs; a source-only tag explains Go is needed
 #
@@ -213,6 +215,27 @@ for sh in $BASHES; do
   if out="$(inst "$H" "$sh" no-such-ref)"; then fail "T9 [$bv] unknown ref installed"; fi
   has "$out" "no tag or branch named 'no-such-ref'" "T9 [$bv]"
   ok "T9 [$bv] unknown ref refused"
+
+  # T11 — `curl | bash` cut short must run nothing: every line-count prefix,
+  # and every byte cut inside the last line (dropping only its newline is fine).
+  state() { echo "$(current_of "$H") | $(ls -A "$H/.rebar/versions" | tr '\n' ' ') | $("$H/.rebar/current/bin/rebar" version) | $(cksum < "$H/.bashrc")"; }
+  before="$(state)"
+  lines="$(wc -l < "$INSTALLER" | tr -d ' ')"
+  bytes="$(wc -c < "$INSTALLER" | tr -d ' ')"
+  last="$(tail -n 1 "$INSTALLER" | wc -c | tr -d ' ')"
+  cuts=""
+  i=1; while [ "$i" -lt "$lines" ]; do cuts="$cuts n$i"; i=$((i + 17)); done
+  cuts="$cuts n$((lines - 1))"
+  k=2; while [ "$k" -lt "$last" ]; do cuts="$cuts c$((bytes - k))"; k=$((k + 1)); done
+  for cut in $cuts; do
+    case "$cut" in n*) head -n "${cut#n}" "$INSTALLER" ;; c*) head -c "${cut#c}" "$INSTALLER" ;; esac > "$TMP/trunc.sh"
+    out="$(env -i HOME="$H" PATH="$TPATH" SHELL=/bin/bash TMPDIR="$TMP" GOCACHE="$GOCACHE" GOPATH="$GOPATH" \
+      GOTOOLCHAIN=local GOPROXY=off REBAR_REPO="$O" REBAR_RELEASE_URL="$RELURL" \
+      "$sh" -s -- v9.1.0-beta.10 < "$TMP/trunc.sh" 2>&1)"
+    case "$out" in *"Installing rebar"*|*"Replacing"*) echo "$out" | tail -5 >&2; fail "T11 [$bv] truncated at $cut ran an install" ;; esac
+    [ "$(state)" = "$before" ] || fail "T11 [$bv] truncated at $cut changed ~/.rebar: $(state)"
+  done
+  ok "T11 [$bv] $(echo $cuts | wc -w | tr -d ' ') truncated copies of the script ran nothing"
 done
 
 # T10
