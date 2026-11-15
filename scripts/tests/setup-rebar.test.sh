@@ -28,9 +28,14 @@
 #       the last line) runs nothing and leaves ~/.rebar as it was
 #   T13 a short commit SHA is refused with a clear error; a full one builds
 #   T14 a git repo without rebar's markers is refused like any foreign dir
+#   T15 two refs that map to one directory (feat/x, feat-x): the second is refused
+#   T16 an install of a version another install holds the lock for is refused
 #   T12 a re-install whose final move fails, or that is SIGTERMed between
 #       moving the old copy aside and moving the new one in, keeps the old copy
 # Once:
+#   T17 HOME unset → clear error
+#   T18 credentials in REBAR_REPO never reach output or .rebar-install
+#   T19 an unreachable release server is reported as such, then source build
 #   T10 without Go: a prebuilt tag installs; a source-only tag explains Go is needed
 #
 # Usage: bash scripts/tests/setup-rebar.test.sh
@@ -85,6 +90,7 @@ EOF
   echo two > two.txt && g add two.txt && g commit -qm two
   g tag -a -m "annotated" v9.1.0 && g tag v9.2.0-beta.2 && g tag v9.2.0-beta.10 && g tag vnext
   g checkout -qb feat/x && echo x > x.txt && g add x.txt && g commit -qm x
+  g checkout -qb feat-x main && echo y > y.txt && g add y.txt && g commit -qm y
   g checkout -q main
 ) || fail "could not build the fake upstream"
 FEAT_SHA="$(g -C "$O" rev-parse --short=7 feat/x)"
@@ -189,7 +195,8 @@ for sh in $BASHES; do
   ok "T2 [$bv] no assets → source fallback, stamped v9.0.0, current switched"
 
   # T3
-  out="$(inst "$H" "$sh" 9.0.10 --no-switch)" || { echo "$out" | tail -20 >&2; fail "T3 [$bv] failed"; }
+  out="$(inst "$H" "$sh" 9.0.10 --no-switch --server 127.0.0.1:7232)" || { echo "$out" | tail -20 >&2; fail "T3 [$bv] failed"; }
+  has "$out" "--server was not applied" "T3 [$bv]"
   [ "$(current_of "$H")" = "versions/v9.0.0" ] || fail "T3 [$bv] --no-switch moved current"
   [ "$("$H/.rebar/versions/v9.0.10/bin/rebar" version)" = "rebar v9.0.10" ] || fail "T3 [$bv] v9.0.10 missing"
   ok "T3 [$bv] 9.0.10 → v9.0.10 side by side, --no-switch keeps current"
@@ -200,6 +207,20 @@ for sh in $BASHES; do
   [ "$("$H/.rebar/current/bin/rebar" version)" = "rebar feat/x@$FEAT_SHA" ] \
     || fail "T4 [$bv] branch version is '$("$H/.rebar/current/bin/rebar" version)'"
   ok "T4 [$bv] branch feat/x → versions/feat-x, rebar feat/x@$FEAT_SHA"
+
+  # T15 — branch feat-x maps to the same directory as feat/x: refused.
+  if out="$(inst "$H" "$sh" feat-x)"; then fail "T15 [$bv] feat-x replaced feat/x"; fi
+  has "$out" "already holds 'feat/x', not 'feat-x'" "T15 [$bv]"
+  [ "$("$H/.rebar/versions/feat-x/bin/rebar" version)" = "rebar feat/x@$FEAT_SHA" ] || fail "T15 [$bv] feat/x install changed"
+  ok "T15 [$bv] a second ref mapping to versions/feat-x is refused"
+
+  # T16 — a concurrent install of the same version is refused.
+  mkdir "$H/.rebar/versions/.lock-v9.0.0" && echo 4242 > "$H/.rebar/versions/.lock-v9.0.0/pid"
+  if out="$(inst "$H" "$sh" v9.0.0)"; then fail "T16 [$bv] ran despite the lock"; fi
+  has "$out" "another install of v9.0.0 is running (pid 4242)" "T16 [$bv]"
+  [ -f "$H/.rebar/versions/.lock-v9.0.0/pid" ] || fail "T16 [$bv] removed someone else's lock"
+  rm -rf "$H/.rebar/versions/.lock-v9.0.0"
+  ok "T16 [$bv] an install of a locked version is refused, the lock kept"
 
   # T5
   out="$(inst "$H" "$sh" v9.1.0 --source)" || { echo "$out" | tail -20 >&2; fail "T5 [$bv] failed"; }
@@ -326,5 +347,32 @@ if ! PATH="$NOGO" command -v go >/dev/null 2>&1; then
 else
   echo "skip T10: go is on the system PATH here ($(PATH="$NOGO" command -v go)); covered where it isn't (macOS CI)"
 fi
+
+# T17 — HOME unset: a clear error instead of "unbound variable".
+out="$(env -i PATH="$TPATH" REBAR_REPO="$O" REBAR_RELEASE_URL="$RELURL" bash "$INSTALLER" v9.1.0 2>&1)" \
+  && fail "T17 installed without HOME"
+has "$out" "HOME is not set; pass --dir PATH" "T17"
+ok "T17 HOME unset → clear error"
+
+# T18 — credentials in REBAR_REPO stay out of output and the install record.
+# git rewrites the credentialed URL to the local upstream (insteadOf).
+SECRET_REPO="https://user:s3cret-token@example.invalid/rebar.git"
+H18="$TMP/h-cred"
+mkdir -p "$H18"
+out="$(env -i HOME="$H18" PATH="$TPATH" SHELL=/bin/bash TMPDIR="$TMP" GOCACHE="$GOCACHE" GOPATH="$GOPATH" \
+  GOTOOLCHAIN=local GOPROXY=off GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0="url.$O.insteadOf" \
+  GIT_CONFIG_VALUE_0="$SECRET_REPO" REBAR_REPO="$SECRET_REPO" REBAR_RELEASE_URL="$RELURL" \
+  bash "$INSTALLER" v9.0.0 2>&1)" || { echo "$out" | tail -20 >&2; fail "T18 install failed"; }
+case "$out" in *s3cret*) fail "T18 the token appeared in the output" ;; esac
+grep -q s3cret "$H18/.rebar/current/.rebar-install" && fail "T18 the token was recorded"
+grep -qF 'repo=https://***@example.invalid/rebar.git' "$H18/.rebar/current/.rebar-install" || fail "T18 repo not recorded redacted"
+ok "T18 credentials in REBAR_REPO are redacted"
+
+# T19 — a release server that cannot be reached is not "no prebuilt assets".
+out="$(RELURL="https://127.0.0.1:9" inst "$TMP/h-unreachable" bash v9.1.0)" || { echo "$out" | tail -20 >&2; fail "T19 failed"; }
+has "$out" "could not check https://127.0.0.1:9/v9.1.0 for prebuilt assets" "T19"
+case "$out" in *"has no prebuilt assets"*) fail "T19 reported an unreachable server as missing assets" ;; esac
+has "$out" "Falling back to a source build" "T19"
+ok "T19 unreachable release server → named error, then source build"
 
 echo "PASS: setup-rebar.sh"

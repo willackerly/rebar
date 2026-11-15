@@ -102,15 +102,47 @@ github_slug() {
   printf '%s\n' "${s%.git}"
 }
 
-fetch() {  # fetch <url> <out>
+# curl/wget flags: HTTPS only (redirects too), TLS 1.2+, bounded connect.
+# file:// is allowed only when the URL itself is file:// (the
+# REBAR_RELEASE_URL override, used by the test suite).
+CURL_HTTPS=(--proto '=https' --proto-redir '=https' --tlsv1.2 --connect-timeout 20 --retry 2)
+
+# fetch <url> <out> → 0 downloaded, 2 not found (HTTP 404 or a missing
+# file:// path), 1 any other failure, described in $FETCH_ERR.
+fetch() {
+  local url="$1" out="$2" code rc
+  FETCH_ERR=""
   if have curl; then
-    curl -fsSL --retry 2 -o "$2" "$1" 2>/dev/null
+    case "$url" in
+      file://*) code="$(curl -sS --proto '=file' -o "$out" -w '%{http_code}' "$url" 2>"$TMP/fetch.err")" && rc=0 || rc=$? ;;
+      *)        code="$(curl -sSL "${CURL_HTTPS[@]}" -o "$out" -w '%{http_code}' "$url" 2>"$TMP/fetch.err")" && rc=0 || rc=$? ;;
+    esac
+    if [[ "$rc" -eq 0 ]]; then
+      case "$code" in
+        2??|000) return 0 ;;
+        404)     return 2 ;;
+        *)       FETCH_ERR="HTTP $code"; return 1 ;;
+      esac
+    fi
+    [[ "$rc" -eq 37 ]] && return 2   # FILE_COULDNT_READ_FILE
+    FETCH_ERR="$(head -1 "$TMP/fetch.err" 2>/dev/null)"
+    FETCH_ERR="${FETCH_ERR:-curl exit $rc}"
+    return 1
   elif have wget; then
-    wget -q -O "$2" "$1"
-  else
+    wget -q --https-only -O "$out" "$url" 2>"$TMP/fetch.err" && return 0 || rc=$?
+    # 8: the server answered with an error status; wget -q does not say
+    # which, and a missing asset is by far the likeliest.
+    [[ "$rc" -eq 8 ]] && return 2
+    FETCH_ERR="wget exit $rc"
     return 1
   fi
+  FETCH_ERR="neither curl nor wget is installed"
+  return 1
 }
+
+# REBAR_REPO with any user:password@ (or token@) removed, for messages and
+# the install record.
+redact() { printf '%s' "$1" | sed -E 's#(://)[^/@]+@#\1***@#'; }
 
 sha256_of() {
   if have sha256sum; then
@@ -161,12 +193,12 @@ semver_max() {
 
 list_tags() {
   if have git; then
-    git ls-remote --tags --refs "$REBAR_REPO" 'v*' | sed 's#.*refs/tags/##'
+    git ls-remote --tags --refs -- "$REBAR_REPO" 'v*' | sed 's#.*refs/tags/##'
   elif [[ -n "$SLUG" ]] && have curl; then
     # /releases misses tags that never got a Release (v3.0.0-beta.2 to
     # beta.4); the tags list has every tag. 100 is the page cap — plenty for
     # rebar's history.
-    curl -fsSL "https://api.github.com/repos/${SLUG}/tags?per_page=100" \
+    curl -fsSL "${CURL_HTTPS[@]}" "https://api.github.com/repos/${SLUG}/tags?per_page=100" \
       | sed -n 's/.*"name": *"\([^"]*\)".*/\1/p'
   else
     die "need git (or curl and a github.com REBAR_REPO) to resolve \"latest\"; pass a version"
@@ -180,8 +212,8 @@ classify_ref() {
     [[ "$ref" =~ $semver ]] || die "git is required to install a branch or commit ($ref)"
     echo tag; return 0
   fi
-  out="$(git ls-remote "$REBAR_REPO" "refs/tags/$ref" "refs/heads/$ref")" \
-    || die "cannot reach $REBAR_REPO"
+  out="$(git ls-remote -- "$REBAR_REPO" "refs/tags/$ref" "refs/heads/$ref")" \
+    || die "cannot reach $REPO_SHOWN"
   if printf '%s\n' "$out" | awk -v r="refs/tags/$ref" '$2 == r {f=1} END {exit !f}'; then
     echo tag
   elif printf '%s\n' "$out" | awk -v r="refs/heads/$ref" '$2 == r {f=1} END {exit !f}'; then
@@ -192,7 +224,7 @@ classify_ref() {
     # A shallow fetch can name a commit only by its full id.
     die "'$ref' looks like a short commit SHA; pass the full 40-character commit SHA"
   else
-    die "no tag or branch named '$ref' in $REBAR_REPO"
+    die "no tag or branch named '$ref' in $REPO_SHOWN"
   fi
 }
 
@@ -234,8 +266,13 @@ install_prebuilt() {
   sums="rebar_${vn}_checksums.txt"
 
   log "Looking for a prebuilt $tag ($os/$arch)…"
-  if ! fetch "$REBAR_RELEASE_URL/$tag/$sums" "$TMP/$sums"; then
+  local st=0
+  fetch "$REBAR_RELEASE_URL/$tag/$sums" "$TMP/$sums" || st=$?
+  if [[ "$st" -eq 2 ]]; then
     log "Release $tag has no prebuilt assets."
+    return 1
+  elif [[ "$st" -ne 0 ]]; then
+    warn "could not check $REBAR_RELEASE_URL/$tag for prebuilt assets ($FETCH_ERR)"
     return 1
   fi
   expected="$(awk -v f="$asset" '$2 == f || $2 == "*" f { print $1; exit }' "$TMP/$sums")"
@@ -244,7 +281,7 @@ install_prebuilt() {
     return 1
   fi
   fetch "$REBAR_RELEASE_URL/$tag/$asset" "$TMP/$asset" \
-    || die "$asset is listed in $sums but could not be downloaded. Retry, or use --source."
+    || die "$asset is listed in $sums but could not be downloaded (${FETCH_ERR:-not found}). Retry, or use --source."
   actual="$(sha256_of "$TMP/$asset")"
   if [[ "$actual" != "$expected" ]]; then
     die "checksum mismatch for $asset: expected $expected, got $actual. Refusing to install."
@@ -253,7 +290,7 @@ install_prebuilt() {
 
   # Called from an `if`, where set -e is off: check each step.
   mkdir -p "$TMP/unpack" || die "cannot create $TMP/unpack"
-  tar -xzf "$TMP/$asset" -C "$TMP/unpack" || die "cannot unpack $asset"
+  tar -xzf "$TMP/$asset" --no-same-owner -C "$TMP/unpack" || die "cannot unpack $asset"
   [[ -d "$TMP/unpack/${asset%.tar.gz}" ]] || die "$asset does not contain ${asset%.tar.gz}/"
   mv "$TMP/unpack/${asset%.tar.gz}" "$STAGE" || die "cannot move the unpacked tree to $STAGE"
   METHOD="prebuilt ($asset)"
@@ -273,15 +310,15 @@ install_source() {
     *)      want="$ref" ;;
   esac
 
-  log "Fetching ${ref} from ${REBAR_REPO}…"
+  log "Fetching ${ref} from ${REPO_SHOWN}…"
   git init -q "$TMP/src"
-  git -C "$TMP/src" fetch -q --depth 1 "$REBAR_REPO" "$want" \
-    || die "could not fetch $ref from $REBAR_REPO"
+  git -C "$TMP/src" fetch -q --depth 1 -- "$REBAR_REPO" "$want" \
+    || die "could not fetch $ref from $REPO_SHOWN"
   COMMIT="$(git -C "$TMP/src" rev-parse 'FETCH_HEAD^{commit}')"
 
   # Same tree a release tarball carries: the committed files, no .git.
   mkdir -p "$STAGE"
-  git -C "$TMP/src" archive --format=tar "$COMMIT" | tar -x -C "$STAGE"
+  git -C "$TMP/src" archive --format=tar "$COMMIT" | tar -x --no-same-owner -C "$STAGE"
   [[ -d "$STAGE/cli" ]] || die "$ref has no cli/ to build"
 
   if [[ "$kind" == "tag" ]]; then
@@ -295,14 +332,29 @@ install_source() {
   ( cd "$STAGE/cli" && CGO_ENABLED=0 go build -trimpath \
       -ldflags "-s -w -X ${GO_PKG}.Version=${stamp}" -o ../bin/rebar . ) \
     || die "go build failed for $ref"
-  METHOD="source ($REBAR_REPO@${COMMIT:0:12})"
+  METHOD="source ($REPO_SHOWN@${COMMIT:0:12})"
   return 0
+}
+
+# Point $REBAR_DIR/current at versions/<name> by renaming a new symlink over
+# the old one, so there is no moment without a current. GNU mv spells "treat
+# the target as a file" -T, BSD/macOS mv -h; plain ln -sfn is the fallback.
+switch_current() {
+  local tmp="$REBAR_DIR/.current.$$"
+  rm -f "$tmp"
+  ln -s "versions/$1" "$tmp"
+  if mv -T "$tmp" "$REBAR_DIR/current" 2>/dev/null || mv -h "$tmp" "$REBAR_DIR/current" 2>/dev/null; then
+    return 0
+  fi
+  rm -f "$tmp"
+  ln -sfn "versions/$1" "$REBAR_DIR/current"
 }
 
 # EXIT trap. A version moved aside for replacement ($REPLACED) is deleted
 # only once its successor is in place; if the swap never completed (mv
 # failed, or a signal landed between the two moves) it goes back.
 cleanup() {
+  [[ -n "${LOCK:-}" ]] && rm -rf "$LOCK"
   if [[ -n "${REPLACED:-}" && -e "$REPLACED" && -n "${TARGET:-}" && ! -e "$TARGET" ]]; then
     if mv "$REPLACED" "$TARGET"; then
       warn "install did not complete; restored the previous $(basename "$TARGET")"
@@ -312,6 +364,8 @@ cleanup() {
     fi
   fi
   rm -rf "${TMP:-}" "${STAGE:-}" "${REPLACED:-}"
+  [[ -n "${REBAR_DIR:-}" ]] && rm -f "$REBAR_DIR/.current.$$"
+  return 0
 }
 
 # Everything that acts lives in main, called on the last line, so a
@@ -320,7 +374,7 @@ cleanup() {
 # argument, so a cut inside the final line cannot run main either.
 main() {
   REBAR_REPO="${REBAR_REPO:-https://github.com/willackerly/rebar.git}"
-  REBAR_DIR="${REBAR_DIR:-$HOME/.rebar}"
+  REBAR_DIR="${REBAR_DIR:-}"
   ASK_SERVER="${ASK_SERVER:-}"
   VERSION="${REBAR_REF:-}"
   FROM_SOURCE=0
@@ -356,6 +410,11 @@ main() {
   done
   # Run as `main "$@" --rebar-end-of-script` from the script's last line only.
   [[ "$COMPLETE" -eq 1 ]] || die "setup-rebar.sh is incomplete (download cut short?); not running it"
+  if [[ -z "$REBAR_DIR" ]]; then
+    [[ -n "${HOME:-}" ]] || die "HOME is not set; pass --dir PATH (or set REBAR_DIR)"
+    REBAR_DIR="$HOME/.rebar"
+  fi
+  REPO_SHOWN="$(redact "$REBAR_REPO")"
 
   SLUG="$(github_slug)"
   if [[ -z "${REBAR_RELEASE_URL:-}" && -n "$SLUG" ]]; then
@@ -366,7 +425,7 @@ main() {
   # ── Resolve what to install ──────────────────────────────────────────────────
 
   if [[ -z "$VERSION" || "$VERSION" == "latest" ]]; then
-    tags="$(list_tags)" || die "could not list the tags of $REBAR_REPO"
+    tags="$(list_tags)" || die "could not list the tags of $REPO_SHOWN"
     if [[ "$PRE" -eq 1 ]]; then
       VERSION="$(printf '%s\n' "$tags" | semver_max)"
       [[ -n "$VERSION" ]] && log "Latest (pre-releases included): $VERSION"
@@ -379,12 +438,12 @@ main() {
         [[ -n "$VERSION" ]] && log "Latest: $VERSION (no stable release yet; highest pre-release)"
       fi
     fi
-    [[ -n "$VERSION" ]] || die "found no release tags in $REBAR_REPO; pass a version explicitly"
+    [[ -n "$VERSION" ]] || die "found no release tags in $REPO_SHOWN; pass a version explicitly"
     KIND=tag
   else
     # "3.0.0" → "v3.0.0" when only the v-prefixed tag exists.
     if [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9] ]] && have git \
-       && git ls-remote --tags --refs "$REBAR_REPO" "refs/tags/v$VERSION" | grep -q .; then
+       && git ls-remote --tags --refs -- "$REBAR_REPO" "refs/tags/v$VERSION" | grep -q .; then
       VERSION="v$VERSION"
     fi
     KIND="$(classify_ref "$VERSION")"
@@ -443,6 +502,24 @@ main() {
   trap 'exit 130' INT
   trap 'exit 143' TERM
 
+  # One install per version directory at a time (mkdir is atomic). A lock
+  # left by a killed install names its pid; remove it by hand.
+  if ! mkdir "$REBAR_DIR/versions/.lock-$NAME" 2>/dev/null; then
+    die "another install of $NAME is running (pid $(cat "$REBAR_DIR/versions/.lock-$NAME/pid" 2>/dev/null || echo '?')); if not, remove $REBAR_DIR/versions/.lock-$NAME"
+  fi
+  LOCK="$REBAR_DIR/versions/.lock-$NAME"
+  echo $$ > "$LOCK/pid"
+
+  # Branch names are made path-safe, so two refs can share a directory
+  # (feat/x and feat-x both → versions/feat-x). Refuse to replace a
+  # different ref's install.
+  if [[ -f "$TARGET/.rebar-install" ]]; then
+    held="$(sed -n 's/^version=//p' "$TARGET/.rebar-install")"
+    if [[ -n "$held" && "$held" != "$VERSION" ]]; then
+      die "versions/$NAME already holds '$held', not '$VERSION' (both map to that name). Remove $TARGET first, or use --dir for a separate install base."
+    fi
+  fi
+
   # ── Install ──────────────────────────────────────────────────────────────────
 
   METHOD=""
@@ -469,7 +546,7 @@ version=$VERSION
 kind=$KIND
 commit=$COMMIT
 method=$METHOD
-repo=$REBAR_REPO
+repo=$REPO_SHOWN
 installed=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 EOF
 
@@ -485,7 +562,7 @@ EOF
   fi
   if [[ "$SWITCH" -eq 1 || -z "$PREVIOUS" ]]; then
     [[ "$SWITCH" -eq 1 ]] || warn "no current version yet; making $NAME current despite --no-switch"
-    ln -sfn "versions/$NAME" "$REBAR_DIR/current"
+    switch_current "$NAME"
     SWITCHED=1
   else
     SWITCHED=0
@@ -497,7 +574,11 @@ EOF
   # Run through the symlink so bin/install records $REBAR_DIR/current/bin (it
   # uses the logical `pwd`), which stays valid across version switches.
 
-  if [[ "$SWITCHED" -eq 1 && -x "$REBAR_DIR/current/bin/install" ]]; then
+  if [[ "$SWITCHED" -eq 0 && -n "$ASK_SERVER" ]]; then
+    warn "--server was not applied: --no-switch skips bin/install. Apply it with: $REBAR_DIR/current/bin/install --server $ASK_SERVER"
+  elif [[ "$SWITCHED" -eq 1 && -z "${HOME:-}" ]]; then
+    warn "HOME is not set, so PATH was not wired; add $REBAR_DIR/current/bin to PATH yourself"
+  elif [[ "$SWITCHED" -eq 1 && -x "$REBAR_DIR/current/bin/install" ]]; then
     install_args=()
     [[ -n "$ASK_SERVER" ]] && install_args+=(--server "$ASK_SERVER")
     log "Running $REBAR_DIR/current/bin/install ${install_args[*]:-}"
