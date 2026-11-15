@@ -40,7 +40,9 @@ your RC again (`ln -sfn versions/<version> ~/.rebar/current` switches by
 hand; `rm -rf ~/.rebar/versions/<version>` removes one). Releases with
 prebuilt assets download as a tarball verified against the release's SHA-256
 checksums (a mismatch aborts); releases without assets, branches and commits
-(by full 40-character SHA) build from source, which needs `git` and Go.
+(by full 40-character SHA) build from source, which needs `git` and Go. Branch names are made
+path-safe for the directory (`feat/x` → `versions/feat-x`); if two refs map to
+the same name, the second install is refused rather than replacing the first.
 
 **Upgrading from a `~/.rebar` clone** (what the installer made before versioned installs): the
 installer leaves the clone as it is — not moved, not updated — and adds

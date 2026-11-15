@@ -37,14 +37,14 @@ could not be applied:
 | # | Problem in 708ba42 | Evidence | Here |
 |---|--------------------|----------|------|
 | 1 | Downloads assets that don't exist, and nothing would ever publish them | [M] no assets, no CI (above) | release workflow + `scripts/package-release.sh` |
-| 2 | "latest" from `/releases/latest`, which skips pre-releases — every rebar release is one | [M] `curl -s -o /dev/null -w '%{http_code}' https://api.github.com/repos/willackerly/rebar/releases/latest` → `404` | highest semver tag from `git ls-remote --tags` (tags API without git); pre-releases included |
+| 2 | "latest" from `/releases/latest`, which skips pre-releases — every rebar release was one when #8 was written | [M] at the time: `curl -s -o /dev/null -w '%{http_code}' https://api.github.com/repos/willackerly/rebar/releases/latest` → `404` | highest stable semver tag from `git ls-remote --tags` (tags API without git); `--pre` includes pre-releases |
 | 3 | ldflags target `cli/cmd.Version`, which didn't exist: the version was a literal in the root command, so `-X` was silently ignored | [M] a beta.4 source build with `-X …Version=…` still prints `rebar v3.0.0-beta.4` | `cli/cmd.Version` variable, defaulting to `releaseVersion` |
 | 4 | `"${install_args[@]}"` with an empty array — the bash 3.2 `set -u` crash fixed in #12 | [V] same line #12 fixed | `${arr[@]+…}` guard; tests run under /bin/bash 3.2 |
 | 5 | `trap 'rm -rf "$tmp"' EXIT` inside a function with `local tmp`: at exit `$tmp` is out of scope, so under `set -u` a *successful* prebuilt install exits 1 and leaks its temp dir | [M] minimal repro under bash 3.2 and 5.3: `tmp: unbound variable`, `exit=1` | one script-level temp dir and trap |
 | 6 | Runs `versions/<v>/bin/install`, so the RC gets a version-specific PATH; flipping `current` never changes which rebar runs | [V] `bin/install` records `$(cd "$(dirname "$0")" && pwd)` | `bin/install` runs through `current/`, whose logical path it records |
 | 7 | Any download failure falls back to source; no checksum at all | [V] | SHA-256 verification; a mismatch is fatal |
 | 8 | `mkdir -p versions/<v>` up front, clone into `versions/<v>/.src`, `cp -r .src/.` over it: a failed install leaves a half-populated version, a `.git`, and a stray `.src` | [V] | stage in `versions/.incoming.$$`, verify, then `mv` into place |
-| 9 | `git clone --branch <sha>` cannot fetch a commit | [V] | `git fetch --depth 1 <repo> <ref>` handles tags, branches and SHAs |
+| 9 | `git clone --branch <sha>` cannot fetch a commit | [V] | `git fetch --depth 1 <repo> <ref>` handles tags, branches and full SHAs (short SHAs are refused with a clear error: a shallow fetch cannot resolve them) |
 | 10 | Ignores the committed arm64 `bin/rebar` (a branch install keeps it if the build is skipped) and an existing `~/.rebar` clone (writes `versions/` into it, dirtying it) | [V] | every install builds or downloads `bin/rebar`; clone handled below |
 
 ## Design
@@ -77,7 +77,7 @@ method, repo, time), for "which rebar is this, really?".
 |---------|------|-------|
 | tag, release has assets | download `rebar_<ver>_<os>_<arch>.tar.gz`, check it against `rebar_<ver>_checksums.txt`, unpack | curl/wget, tar, shasum/sha256sum |
 | tag, no assets (every release today) | source build | git, Go |
-| branch or SHA | source build | git, Go |
+| branch or full commit SHA | source build | git, Go |
 | `--source` | source build | git, Go |
 
 A source build is `git archive` of the ref plus `go build` with the same
@@ -112,12 +112,16 @@ for scripts/templates — was rejected:
 
 ### "latest"
 
-Highest semver tag from `git ls-remote --tags --refs <repo> 'v*'`
-(without git: the GitHub tags API, first 100). Pre-releases count and rank
-below their release (`v3.0.0-beta.10` > `v3.0.0-beta.2`, `v3.0.0` >
-`v3.0.0-rc.1`); non-semver tags are ignored. Neither releases endpoint works:
-`/releases/latest` excludes pre-releases (404 today) and `/releases` misses
-tags that never got a Release (would answer v3.0.0-beta, three behind).
+The highest **stable** semver tag from `git ls-remote --tags --refs <repo>
+'v*'` (without git: the GitHub tags API, first 100); while no stable tag
+exists, the highest pre-release. `--pre` takes the highest tag of any kind.
+Pre-releases rank below their release (`v3.0.0-beta.10` > `v3.0.0-beta.2`,
+`v3.0.0` > `v3.0.0-rc.1`); non-semver tags are ignored. The first version of
+this installer included pre-releases by default, which was right while every
+rebar release was one; with v3.0.0 out, a `v3.1.0-rc.1` would have become
+every default install (#17 review). Neither releases endpoint is used:
+`/releases/latest` excludes tags without a Release, and `/releases` misses
+tags that never got one (v3.0.0-beta.2 to beta.4).
 
 ### PATH and switching
 
@@ -211,19 +215,38 @@ it: setup-rebar.sh <v> --no-switch`. ~40 lines of Go plus tests. See Q3.
   `env -i` with both bashes so this class stays covered.
 - *`set -e` inside an `if`.* `install_prebuilt` runs as an `if` condition,
   where `set -e` is off; each step there ends in `|| die`.
+- *Truncated download.* `curl | bash` cut short used to execute a prefix:
+  cut after "Replacing the existing <ver>", it moved the installed version
+  aside and the EXIT trap deleted it (#17 review). Everything now runs in
+  `main`, called on the last line with an end-of-script marker main
+  requires, so a cut anywhere runs nothing (T11 replays 60+ cuts).
 - *Interrupted install.* Work happens in `versions/.incoming.$$` and moves
   into place; the EXIT trap removes it. A re-install moves the old copy to
-  `.replaced.$$` first, so `current` points at a complete tree throughout
-  except for one `mv`. Tests assert nothing starting with `.` is left in
-  `versions/`.
+  `.replaced.$$` first; if the new copy never lands (mv fails, HUP/INT/TERM
+  between the two moves) the trap moves the old copy back (T12). `current`
+  is switched by renaming a new symlink over it. One install per version
+  at a time (`versions/.lock-<name>`). Tests assert nothing starting with
+  `.` is left in `versions/`.
+- *Name collisions.* Branch names are made path-safe, so `feat/x` and
+  `feat-x` share `versions/feat-x`; the second install is refused, naming
+  the ref already there (T15). An injective encoding (`feat%2Fx`) was
+  rejected for readability; collisions need two near-identical branch
+  names.
+- *Foreign directories.* Only a git checkout with rebar's install markers
+  counts as a pre-versioned clone; any other non-empty directory, git or
+  not, is refused untouched (T8, T14).
+- *Transport.* Release downloads are HTTPS-only (redirects too), TLS 1.2+,
+  with a connect timeout; a 404 means "no assets", any other failure is
+  named before the source fallback (T19). Credentials in `REBAR_REPO` are
+  redacted from output and `.rebar-install` (T18).
 - *Linux `.mcp.json` paths.* `rebar init` records the ask-mcp-server path
   from `os.Executable()`. On macOS that is the invoked path
   (`~/.rebar/current/bin/…`), which survives switches [M: `rebar new` from
   a versioned install wrote `"command": "$HOME/.rebar/current/bin/ask-mcp-server"`]. On Linux it is the
   resolved `/proc/self/exe` (`versions/<v>/bin/…`), which breaks when that
-  version is removed. [V, not measured on Linux] Follow-up: prefer
-  `$REBAR_DIR/current/bin` when the executable lives under
-  `versions/*/bin` (Q6).
+  version is removed. Fixed: `stableBinDir` maps `<base>/versions/<v>/bin`
+  to `<base>/current/bin` when `current` points there
+  (`TestMCPServerPathUsesCurrent` feeds it the resolved Linux form).
 - *Disk.* ~7 MB per version unpacked (measured: 6.7M); nothing prunes old versions.
   `rm -rf ~/.rebar/versions/<v>` is documented; a prune flag can come later.
 - *Smallest input (agreement 06).* Zero tags → "found no release tags";
@@ -240,31 +263,42 @@ it: setup-rebar.sh <v> --no-switch`. ~40 lines of Go plus tests. See Q3.
    (`cd cli && go build -o ../bin/rebar .`) and `.gitignore` it.
    [Lean: yes, in the release after the first one with assets — relaxation:
    keep it until then so existing clone users don't lose a working binary.]
-2. **Strip dev-only files from the tarball?** It is the full tree,
-   including `feedback/`, `docs/`, `.claude-memory-commits/`, rebar's own
-   `.rebar/` and `.mcp.json`. `export-ignore` in `.gitattributes` would
-   drop them from both tarballs and source installs. [Lean: not yet; size is
-   fine and `rebar doc` resolves into the install, so "unused" needs
-   measuring first.]
+2. **Strip more dev-only files from the tarball?** `.gitattributes` now
+   export-ignores `/.mcp.json` (a maintainer's absolute paths), `/inbox/`
+   and `/.claude/`. `feedback/` and `docs/` stay (`rebar doc
+   rebar:feedback/...` resolves into the install); `.claude-memory-commits/`
+   and rebar's own `.rebar/` could go. [Lean: leave the rest until someone
+   measures what installs actually read.]
 3. **Pinned-version switching** as above. [Lean: yes, as a separate PR,
    keyed on a new `.rebarrc: rebar_version`, never on `.rebar-version`;
    no automatic install.]
-4. **Should "latest" require a published Release** (skip bare tags)? Today
-   that would answer v3.0.0-beta, so not until releases are routine.
+4. **Should "latest" require a published Release** (skip bare tags)? Not
+   until releases with assets are routine (v3.0.0-beta.2 to beta.4 never got
+   one).
    [Lean: no; revisit if a stray tag ever ships.]
 5. **Sign release assets** (GitHub artifact attestations or cosign
    keyless)? [Lean: add `actions/attest-build-provenance` in a follow-up;
    verification stays optional in the installer until `gh attestation
    verify` can be assumed.]
-6. **`.mcp.json` should point through `current`** on every platform (red
-   team, Linux). [Lean: yes, small Go follow-up with a test.]
+6. ~~`.mcp.json` should point through `current`~~ — done in this branch
+   (#17 review).
 7. **A `rebar versions` / `rebar use <v>` command** instead of `ln -sfn`?
    [Lean: not until someone asks; the symlink is the interface and
    `setup-rebar.sh` already lists versions.]
+8. **Reproducible tarballs?** Today each tarball is re-tarred from an
+   extracted `git archive` with the host tar, so bytes vary with mtime,
+   owner and tar flavor (GNU vs bsdtar spell sorting/owner/mtime flags
+   differently); the binary itself is `-trimpath`. [Lean: worth doing when
+   signing lands (Q5): append the binary to `git archive` output with fixed
+   mtime/owner and `gzip -n` rather than re-tarring.]
+9. **Split the release job** into build (read-only token) and publish
+   (`contents: write`)? [Lean: yes when signing lands; one job is fine
+   while the only privileged step is `gh release create`. setup-go's cache
+   is already off in this job.]
 
 ## What still needs a human
 
-- **Push a real tag** (e.g. v3.0.0-beta.5, after bumping `releaseVersion`)
+- **Push a real tag** (the next one after v3.0.0, after bumping `releaseVersion`)
   to exercise the workflow on GitHub; until then the prebuilt path is proven
   only against locally built assets served over `file://`.
 - **Repository settings:** Actions enabled, and workflow permissions allow
@@ -309,5 +343,14 @@ it: setup-rebar.sh <v> --no-switch`. ~40 lines of Go plus tests. See Q3.
 
 ## Disposition
 
-Implemented on `feat/versioned-installer`, stacked on #14. Open questions
+Implemented on `feat/versioned-installer`, stacked on #14.
+
+#17 review ("merge after fixes"), addressed in follow-up commits: truncated
+downloads run nothing (blocker); a failed swap restores the replaced copy;
+"latest" is stable-first with `--pre`; full SHAs only; only rebar clones
+count as legacy installs; `.mcp.json` goes through `current`; transport,
+redaction, locking, atomic `current`, collision, HOME and `--server` nits.
+Declined for now: injective directory names (collisions are refused
+instead), reproducible tarballs (Q8), a split release job (Q9). The
+evidence below predates v3.0.0, when `latest` meant v3.0.0-beta.4. Open questions
 await maintainer triage; close into `feedback/processed/` once answered.
