@@ -32,7 +32,8 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: cli/go.mod
-          cache-dependency-path: cli/go.sum
+          # No shared module/build cache in the job that publishes assets.
+          cache: false
 
       - name: Tag matches the CLI's release version
         # Unstamped builds of this tag (go build, older installers) report
