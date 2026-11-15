@@ -15,7 +15,11 @@
 #   T4  steward lists qualified implementations, not foreign references
 #   T5  the same with contracts_dir = specs
 #   T6  unset: qualified refs stay invisible, exactly as before namespaces
-#   T7  an invalid namespace is ignored with a warning
+#   T7  an invalid namespace (bad characters, or shaped like ID.version) is
+#       ignored with one warning per run; env whitespace is trimmed
+#   T8  look-alikes are foreign: an unescaped dot (githubXcom/...) and a
+#       namespace prefix (<ns>-fork:); CONTRACT:<ID>.<v>:<word>.<digit> is a
+#       short ref, so a missing one is still BROKEN
 #
 # Usage: bash scripts/tests/contract-namespace.test.sh
 # Override the scripts under test with REBAR_SCRIPTS_DIR.
@@ -26,7 +30,7 @@ set -uo pipefail
 . "$(dirname "$0")/lib.sh"
 rebar_tmpdir contract-ns
 run() { run_in "$P" "$@"; }
-unset REBAR_CONTRACT_NAMESPACE REBAR_CONTRACTS_DIR REBAR_TIER
+unset REBAR_CONTRACT_NAMESPACE REBAR_CONTRACTS_DIR REBAR_TIER _REBAR_NAMESPACE_VALIDATED
 
 NS=github.com/acme/widgets
 M=CONTRACT   # references are built from parts so rebar's own scans skip them
@@ -113,6 +117,37 @@ printf 'tier = 3\ncontract_namespace = acme widgets\n' > "$P/.rebarrc"
 out="$(run check-contract-refs.sh)" || { echo "$out"; fail "T7: refs"; }
 printf '%s\n' "$out" | grep -q "ignoring contract_namespace 'acme widgets'" || { echo "$out"; fail "T7: no warning"; }
 printf '%s\n' "$out" | grep -q 'Checked 1 contract references' || { echo "$out"; fail "T7: not treated as unset"; }
-ok "T7: invalid namespace ignored"
+count_warnings() { printf '%s\n' "$1" | grep -c "ignoring contract_namespace" || true; }
+[ "$(count_warnings "$out")" = 1 ] || { echo "$out"; fail "T7: one script should warn once"; }
+out="$(run ci-check.sh)"
+[ "$(count_warnings "$out")" = 1 ] || { echo "$out" | grep -n 'ignoring contract_namespace'; fail "T7: ci-check should warn once per run"; }
+printf 'tier = 3\ncontract_namespace = acme.1.2\n' > "$P/.rebarrc"
+out="$(run check-contract-refs.sh)" || { echo "$out"; fail "T7: ID.version-like refs"; }
+printf '%s\n' "$out" | grep -q "ignoring contract_namespace 'acme.1.2'" || { echo "$out"; fail "T7: ID.version-like namespace accepted"; }
+printf 'tier = 3\n' > "$P/.rebarrc"
+out="$(REBAR_CONTRACT_NAMESPACE="  $NS  " run check-contract-refs.sh)" || { echo "$out"; fail "T7: env refs"; }
+printf '%s\n' "$out" | grep -q 'ignoring' && { echo "$out"; fail "T7: padded env value rejected"; }
+printf '%s\n' "$out" | grep -q "Namespace $NS: 2 cross-repo" || { echo "$out"; fail "T7: padded env value not trimmed"; }
+ok "T7: invalid namespace ignored, warned once; env trimmed"
+
+# T8 — look-alikes, in the namespaced project.
+P="$TMP/ns"
+printf '// %s:%s:%s\npackage src\n' "$M" githubXcom/acme/widgets C2-BAR.1.0 > "$P/src/dot.go"
+printf '// %s:%s:%s\npackage src\n' "$M" "$NS-fork" C2-BAR.1.0 > "$P/src/fork.go"
+( cd "$P" && g add src/dot.go src/fork.go )   # compute-registry searches tracked files
+out="$(run check-contract-refs.sh)" || { echo "$out"; fail "T8: look-alikes reported broken"; }
+printf '%s\n' "$out" | grep -q 'Checked 2 contract references, 0 broken' || { echo "$out"; fail "T8: look-alike counted local"; }
+printf '%s\n' "$out" | grep -q "Namespace $NS: 4 cross-repo" || { echo "$out"; fail "T8: look-alikes not foreign"; }
+out="$(run compute-registry.sh --health)"
+printf '%s\n' "$out" | grep -q '| C2-BAR | 1 |' || { echo "$out"; fail "T8: look-alike counted as implementation"; }
+run steward.sh >/dev/null || fail "T8: steward"
+out="$(jq -r '.impl_gate.implementing_files[]' "$P/architecture/.state/C2-BAR.1.0.json")"
+[ "$(printf '%s\n' "$out" | grep -c .)" = 1 ] || { echo "$out"; fail "T8: steward counted a look-alike"; }
+( cd "$P" && g rm -q -f src/dot.go src/fork.go )
+printf '// %s:%s:see.2 section\n' "$M" MISSING.1.0 > "$P/src/missing.go"
+out="$(run check-contract-refs.sh)" && { echo "$out"; fail "T8: missing short ref before a colon passed"; }
+printf '%s\n' "$out" | grep -q 'Expected: architecture/CONTRACT-MISSING.1.0.md' || { echo "$out"; fail "T8: MISSING not reported"; }
+rm "$P/src/missing.go"
+ok "T8: look-alikes are foreign; ID.version before a colon stays local"
 
 echo "PASS: contract_namespace"

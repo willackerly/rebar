@@ -44,7 +44,10 @@ crossrepo=0
 # Without a namespace, look for the short form only (unchanged behavior).
 # With one, also find qualified references; each line is then rewritten so
 # this repo's CONTRACT:<namespace>: becomes CONTRACT: and any other
-# namespace becomes CROSSREF: (skipped below, counted in $crossrepo).
+# namespace becomes CROSSREF: (skipped below, counted in $crossrepo). A
+# would-be namespace that starts like <ID>.<v> is not one: in
+# <ID>.<v>:see.2 the reference is <ID>.<v>, so short refs are
+# masked (CONTRACT~) while foreign ones are rewritten.
 SEARCH_ERE='CONTRACT:[A-Za-z0-9_-]*\.[0-9]*\.[0-9]*'
 if [ -n "$NAMESPACE" ]; then
   SEARCH_ERE='CONTRACT:([A-Za-z0-9._/-]+:)?[A-Za-z0-9_-]*\.[0-9]*\.[0-9]*'
@@ -59,7 +62,9 @@ while IFS= read -r line; do
   if [ -n "$NAMESPACE" ]; then
     line=$(printf '%s\n' "$line" | sed -E \
       -e "s#CONTRACT:${NS_ERE}:#CONTRACT:#g" \
-      -e 's#CONTRACT:([A-Za-z0-9._/-]+:[A-Za-z0-9][A-Za-z0-9_-]*\.[0-9])#CROSSREF:\1#g')
+      -e 's#CONTRACT:([A-Za-z0-9_-]+\.[0-9]+\.[0-9]+)#CONTRACT~\1#g' \
+      -e 's#CONTRACT:([A-Za-z0-9._/-]+:[A-Za-z0-9][A-Za-z0-9_-]*\.[0-9])#CROSSREF:\1#g' \
+      -e 's#CONTRACT~#CONTRACT:#g')
     n=$(printf '%s\n' "$line" | awk '{ n += gsub(/CROSSREF:/, "") } END { print n + 0 }')
     crossrepo=$((crossrepo + n))
   fi

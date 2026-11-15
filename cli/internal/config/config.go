@@ -228,8 +228,20 @@ func (c *Config) CheckTier(name string) int {
 }
 
 // contractNamespaceRE is the character set a contract namespace may use
-// (e.g. github.com/org/repo). Mirrors _rebar_contract_namespace.
-var contractNamespaceRE = regexp.MustCompile(`^[A-Za-z0-9._/-]+$`)
+// (e.g. github.com/org/repo); idVersionRE is the start of a contract
+// ID.version (S1-FOO.1.0), which a namespace must not look like, or the
+// reference <ID>.<v>:see.2 would read as qualified. Mirrors
+// _rebar_contract_namespace_valid in scripts/_rebar-config.sh.
+var (
+	contractNamespaceRE = regexp.MustCompile(`^[A-Za-z0-9._/-]+$`)
+	idVersionRE         = regexp.MustCompile(`^[A-Za-z0-9_-]+\.[0-9]+\.[0-9]+`)
+)
+
+// validContractNamespace reports whether ns may be a contract namespace,
+// for the configured value and for namespaces parsed from references alike.
+func validContractNamespace(ns string) bool {
+	return contractNamespaceRE.MatchString(ns) && !idVersionRE.MatchString(ns)
+}
 
 // qualifiedRefRE splits a namespace-qualified reference body
 // (<namespace>:<ID>.<major>...) into namespace and the rest.
@@ -247,8 +259,8 @@ func ContractNamespace(repoRoot string) string {
 		ns = RCValue(repoRoot, "contract_namespace")
 	}
 	ns = strings.TrimSuffix(strings.TrimSpace(ns), "/")
-	if ns != "" && !contractNamespaceRE.MatchString(ns) {
-		fmt.Fprintf(os.Stderr, "rebar: ignoring contract_namespace %q (allowed: letters, digits, . _ / -)\n", ns)
+	if ns != "" && !validContractNamespace(ns) {
+		fmt.Fprintf(os.Stderr, "rebar: ignoring contract_namespace '%s' (allowed: letters, digits, . _ / -; must not start like a contract ID.version)\n", ns)
 		return ""
 	}
 	return ns
@@ -265,7 +277,7 @@ func LocalContractRef(ref, namespace string) (string, bool) {
 		return ref, true
 	}
 	m := qualifiedRefRE.FindStringSubmatch(ref)
-	if m == nil {
+	if m == nil || !validContractNamespace(m[1]) {
 		return ref, true
 	}
 	if m[1] != namespace {

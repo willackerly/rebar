@@ -134,6 +134,8 @@ func TestContractNamespace(t *testing.T) {
 		{"commented out", "# contract_namespace = github.com/org/repo\n", "", ""},
 		{"invalid ignored", "contract_namespace = org repo\n", "", ""},
 		{"colon ignored", "contract_namespace = org:repo\n", "", ""},
+		{"ID.version lookalike ignored", "contract_namespace = acme.1.2\n", "", ""},
+		{"env trimmed like the bash reader", "", "  github.com/org/repo/  ", "github.com/org/repo"},
 		{"env wins", "contract_namespace = github.com/org/repo\n", "example.com/env", "example.com/env"},
 	}
 	for _, tc := range cases {
@@ -162,6 +164,8 @@ func TestLocalContractRef(t *testing.T) {
 		{"other namespace is foreign", "github.com/org/other:AUTH.1.0", ns, "", false},
 		{"namespace prefix is not a match", ns + "-fork:AUTH.1.0", ns, "", false},
 		{"trailing colon is not a namespace", "AUTH.1.0:", ns, "AUTH.1.0:", true},
+		{"ID.version before a colon is not a namespace", "MISSING.1.0:see.2", ns, "MISSING.1.0:see.2", true},
+		{"dot is literal", "githubXcom/org/repo:AUTH.1.0", ns, "", false},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
