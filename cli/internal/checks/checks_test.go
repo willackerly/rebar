@@ -2,6 +2,7 @@ package checks
 
 import (
 	"bytes"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -23,8 +24,9 @@ func TestNativeAndScriptEnv(t *testing.T) {
 	if _, ok := Native("check-todos.sh"); ok {
 		t.Error("shell implementation returned a native check")
 	}
-	if env := ScriptEnv(); !slices.Equal(env, []string{"REBAR_NATIVE_CHECKS="}) {
-		t.Errorf("shell ScriptEnv = %v, want an inherited list cleared", env)
+	off := []string{"REBAR_NATIVE_CHECKS=", "REBAR_NATIVE_SCRIPTS="}
+	if env := ScriptEnv("/install/scripts"); !slices.Equal(env, off) {
+		t.Errorf("shell ScriptEnv = %v, want the inherited hand-off cleared", env)
 	}
 
 	t.Setenv("REBAR_CHECK_IMPL", "go")
@@ -34,19 +36,21 @@ func TestNativeAndScriptEnv(t *testing.T) {
 	if _, ok := Native("steward"); ok {
 		t.Error("go: an unported check returned a native implementation")
 	}
-	env := strings.Join(ScriptEnv(), "\n")
-	if !strings.Contains(env, "REBAR_BIN=") || !strings.Contains(env, "REBAR_NATIVE_CHECKS=check-todos") {
-		t.Errorf("go ScriptEnv = %q", env)
+	install := t.TempDir()
+	env := strings.Join(ScriptEnv(install), "\n")
+	real, _ := filepath.EvalSymlinks(install)
+	if !strings.Contains(env, "REBAR_BIN=") || !strings.Contains(env, "REBAR_NATIVE_CHECKS=check-todos") ||
+		!strings.Contains(env, "REBAR_NATIVE_SCRIPTS="+real+"\n") && !strings.HasSuffix(env, "REBAR_NATIVE_SCRIPTS="+real) {
+		t.Errorf("go ScriptEnv = %q, want the binary, the checks and the install's scripts (%s)", env, real)
+	}
+	if env := ScriptEnv(""); !slices.Equal(env, off) {
+		t.Errorf("go ScriptEnv for a project copy = %v, want the hand-off cleared", env)
 	}
 }
 
-// markers spells the tags so that rebar's own check-todos, pointed at this
-// file, does not count them.
-var markers = strings.NewReplacer("@todo", "TO"+"DO:", "@tracked", "TRACKED"+"-TASK:")
-
 func write(t *testing.T, root, rel, body string) {
 	t.Helper()
-	testutil.WriteFile(t, root, rel, markers.Replace(body))
+	testutil.WriteFile(t, root, rel, testutil.Tags.Replace(body))
 }
 
 func runTodosIn(t *testing.T, root string, args ...string) (string, int) {
@@ -83,7 +87,7 @@ Before committing, you must either:
 
 Also found 2 tracked tasks (OK).
 `
-	if want = markers.Replace(want); code != 1 || out != want {
+	if want = testutil.Tags.Replace(want); code != 1 || out != want {
 		t.Fatalf("untracked: %d\n%s\nwant\n%s", code, out, want)
 	}
 

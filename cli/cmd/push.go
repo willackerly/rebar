@@ -53,7 +53,7 @@ func runPush(cmd *cobra.Command, args []string) error {
 		fmt.Println("Running checks...")
 		warnLegacy(s)
 		// Run checks but don't block on missing scripts
-		checkOut, code, err := scripts.OutputInProject(s.Path, cfg.RepoRoot)
+		checkOut, code, err := scripts.OutputInProject(s.Path, cfg.RepoRoot, s.nativeEnv())
 		if err != nil || code != 0 {
 			fmt.Println(string(checkOut))
 			// Only fail if it's a real check failure, not a missing dependency

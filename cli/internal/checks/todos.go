@@ -29,11 +29,16 @@ var todosExcludedFiles = []string{"TODO.md", "check-todos.sh"}
 
 func runTodos(ctx *Context, args []string) int {
 	scope := sourcescan.ScopeFor(ctx.Root)
+	wd := ctx.WorkDir()
 
 	dirs := args
 	if len(dirs) == 0 {
 		for _, d := range scope.Dirs {
-			if info, err := os.Stat(filepath.Join(ctx.Root, d)); err == nil && info.IsDir() {
+			p := d
+			if !filepath.IsAbs(p) {
+				p = filepath.Join(wd, d)
+			}
+			if info, err := os.Stat(p); err == nil && info.IsDir() {
 				dirs = append(dirs, d)
 			}
 		}
@@ -50,7 +55,7 @@ func runTodos(ctx *Context, args []string) int {
 	}
 	var untracked []string
 	tracked := 0
-	for _, l := range sourcescan.Search(filter.Files(ctx.Root, dirs), func(text string) bool {
+	for _, l := range sourcescan.Search(filter.Files(wd, dirs), func(text string) bool {
 		return strings.Contains(text, todoTag) || strings.Contains(text, trackedTag)
 	}) {
 		if strings.Contains(l.Text, trackedTag) {

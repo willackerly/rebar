@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 	"sync"
@@ -19,11 +20,24 @@ import (
 
 // Context is what a check runs against.
 type Context struct {
-	// Root is the project root. Relative arguments and the default source
-	// directories resolve against it (the scripts run there).
-	Root   string
+	// Root is the project root, whose .rebarrc the check reads.
+	Root string
+	// Dir is the working directory the script would run in: relative
+	// arguments and the default source directories resolve against it, and
+	// paths in the output are relative to it, as the script's grep prints
+	// them. Empty means Root (`rebar check` and `rebar run` run the scripts
+	// in the project root).
+	Dir    string
 	Stdout io.Writer
 	Stderr io.Writer
+}
+
+// WorkDir is the directory relative paths resolve against: Dir, else Root.
+func (c *Context) WorkDir() string {
+	if c.Dir != "" {
+		return c.Dir
+	}
+	return c.Root
 }
 
 // Check is a native implementation of one check script.
@@ -88,19 +102,34 @@ func Native(name string) (*Check, bool) {
 	return Lookup(name)
 }
 
-// ScriptEnv is the environment the CLI adds to the scripts it runs so that
-// a script with a native counterpart hands off to it (_rebar_native in
-// scripts/_rebar-config.sh): REBAR_NATIVE_CHECKS lists the checks to run
-// natively and REBAR_BIN names this binary. Under the shell implementation
-// it is empty, and a REBAR_NATIVE_CHECKS inherited from the caller's
-// environment is cleared.
-func ScriptEnv() []string {
-	if Impl() != ImplGo {
-		return []string{"REBAR_NATIVE_CHECKS="}
+// ScriptEnv is the environment the CLI adds to a script it runs so that the
+// scripts of the install at installScripts that have a native counterpart
+// hand off to it (_rebar_native in scripts/_rebar-config.sh):
+// REBAR_NATIVE_CHECKS lists the checks to run natively, REBAR_BIN names this
+// binary, and REBAR_NATIVE_SCRIPTS is the install's scripts directory
+// (symlinks resolved). Only a script in that directory hands off, so a
+// project's own copy of a check, which may be customized, always runs
+// itself, even one made from a script that has the hand-off line.
+//
+// Pass "" for installScripts when the script being run is a project's copy
+// (its siblings are copies too), and under the shell implementation: the
+// hand-off variables are then cleared, so values inherited from the
+// caller's environment cannot route anything to a binary.
+func ScriptEnv(installScripts string) []string {
+	off := []string{"REBAR_NATIVE_CHECKS=", "REBAR_NATIVE_SCRIPTS="}
+	if Impl() != ImplGo || installScripts == "" {
+		return off
 	}
 	exe, err := os.Executable()
 	if err != nil {
-		return []string{"REBAR_NATIVE_CHECKS="}
+		return off
 	}
-	return []string{"REBAR_BIN=" + exe, "REBAR_NATIVE_CHECKS=" + strings.Join(Names(), " ")}
+	dir, err := filepath.Abs(installScripts)
+	if err != nil {
+		return off
+	}
+	if real, err := filepath.EvalSymlinks(dir); err == nil {
+		dir = real
+	}
+	return []string{"REBAR_BIN=" + exe, "REBAR_NATIVE_CHECKS=" + strings.Join(Names(), " "), "REBAR_NATIVE_SCRIPTS=" + dir}
 }

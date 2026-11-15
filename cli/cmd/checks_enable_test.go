@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"path/filepath"
 	"strings"
 	"testing"
 
@@ -25,10 +24,7 @@ func checksEnableProject(t *testing.T, extraRC string) string {
 // The CLI runs the install's scripts in the project (`rebar run`, `rebar
 // check --pre-commit`), and the project's checks_enable reaches them.
 func TestChecksEnableReachesInstallScripts(t *testing.T) {
-	install, err := filepath.Abs(filepath.Join("..", ".."))
-	if err != nil {
-		t.Fatal(err)
-	}
+	install := testutil.RebarSource(t)
 	t.Setenv("REBAR_TIER", "")
 	t.Setenv("REBAR_CHECKS_ENABLE", "")
 	t.Setenv("_REBAR_CHECKS_VALIDATED", "")
@@ -39,7 +35,7 @@ func TestChecksEnableReachesInstallScripts(t *testing.T) {
 		if !ok || s.Legacy {
 			t.Fatalf("resolveScript(%s) = %+v, %v", name, s, ok)
 		}
-		out, code, err := scripts.OutputInProject(s.Path, project)
+		out, code, err := scripts.OutputInProject(s.Path, project, nil)
 		if err != nil {
 			t.Fatalf("%s: %v", name, err)
 		}

@@ -6,8 +6,6 @@ import (
 	"os"
 	"os/exec"
 	"time"
-
-	"github.com/willackerly/rebar/cli/internal/checks"
 )
 
 // Result captures the output of running a bash script.
@@ -82,30 +80,29 @@ func RunPassthrough(scriptsDir, scriptName string, args ...string) (int, error) 
 
 // projectCommand builds a bash invocation of scriptPath that checks
 // projectRoot: it runs there, and REBAR_PROJECT_ROOT tells scripts that live
-// in a rebar install (not in the project) which repo to check. Under
-// REBAR_CHECK_IMPL=go, checks.ScriptEnv makes scripts with a native
-// counterpart hand off to this binary.
-func projectCommand(scriptPath, projectRoot string, args ...string) *exec.Cmd {
+// in a rebar install (not in the project) which repo to check. env is added
+// last (the CLI passes checks.ScriptEnv, the native hand-off settings).
+func projectCommand(scriptPath, projectRoot string, env []string, args ...string) *exec.Cmd {
 	cmd := exec.Command("bash", append([]string{scriptPath}, args...)...)
 	cmd.Dir = projectRoot
-	cmd.Env = append(append(os.Environ(), "REBAR_PROJECT_ROOT="+projectRoot), checks.ScriptEnv()...)
+	cmd.Env = append(append(os.Environ(), "REBAR_PROJECT_ROOT="+projectRoot), env...)
 	return cmd
 }
 
-// RunInProject runs scriptPath against projectRoot with stdio connected to
-// the terminal and returns its exit code.
-func RunInProject(scriptPath, projectRoot string, args ...string) (int, error) {
-	cmd := projectCommand(scriptPath, projectRoot, args...)
+// RunInProject runs scriptPath against projectRoot, with env added to the
+// environment, stdio connected to the terminal, and returns its exit code.
+func RunInProject(scriptPath, projectRoot string, env []string, args ...string) (int, error) {
+	cmd := projectCommand(scriptPath, projectRoot, env, args...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	cmd.Stdin = os.Stdin
 	return exitCode(cmd.Run())
 }
 
-// OutputInProject runs scriptPath against projectRoot and returns its
-// combined output and exit code.
-func OutputInProject(scriptPath, projectRoot string, args ...string) ([]byte, int, error) {
-	out, err := projectCommand(scriptPath, projectRoot, args...).CombinedOutput()
+// OutputInProject runs scriptPath against projectRoot, with env added to
+// the environment, and returns its combined output and exit code.
+func OutputInProject(scriptPath, projectRoot string, env []string, args ...string) ([]byte, int, error) {
+	out, err := projectCommand(scriptPath, projectRoot, env, args...).CombinedOutput()
 	code, err := exitCode(err)
 	return out, code, err
 }

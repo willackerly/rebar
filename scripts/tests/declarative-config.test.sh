@@ -121,9 +121,9 @@ ok "T3: registry scope prefixes and purpose settings apply (ellipsis default, by
 # T4 — source_dirs and source_extensions drive check-todos.
 mkdir -p "$P/tools"
 printf '#!/bin/sh\n# TODO: untracked\n' > "$P/tools/x.sh"
-( cd "$P" && REBAR_PROJECT_ROOT="$P" "$SRC/check-todos.sh" ) >/dev/null || fail "T4: tools/ is not a default source dir"
+run_in "$P" check-todos.sh >/dev/null || fail "T4: tools/ is not a default source dir"
 printf 'source_dirs = tools\nsource_extensions = sh\n' >> "$P/.rebarrc"
-( cd "$P" && REBAR_PROJECT_ROOT="$P" "$SRC/check-todos.sh" ) >/dev/null && fail "T4: configured source dir not scanned"
+run_in "$P" check-todos.sh >/dev/null && fail "T4: configured source dir not scanned"
 rm -rf "$P/tools"
 ok "T4: source_dirs / source_extensions reach check-todos"
 

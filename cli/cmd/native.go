@@ -42,7 +42,13 @@ func runNative(cmd *cobra.Command, args []string) error {
 	if !ok {
 		return fmt.Errorf("no native implementation of %q (have: %s)", args[0], strings.Join(checks.Names(), ", "))
 	}
-	if code := runNativeCheck(c, nativeRoot(), args[1:]); code != 0 {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+	// Like the script, which runs where it was started: relative arguments
+	// resolve against the working directory, settings come from the root.
+	if code := runNativeCheck(c, nativeRoot(), cwd, args[1:]); code != 0 {
 		os.Exit(code)
 	}
 	return nil
@@ -63,6 +69,8 @@ func nativeRoot() string {
 	return cwd
 }
 
-func runNativeCheck(c *checks.Check, root string, args []string) int {
-	return c.Run(&checks.Context{Root: root, Stdout: os.Stdout, Stderr: os.Stderr}, args)
+// runNativeCheck runs c against the project at root from the working
+// directory dir, on the terminal, and returns its exit code.
+func runNativeCheck(c *checks.Check, root, dir string, args []string) int {
+	return c.Run(&checks.Context{Root: root, Dir: dir, Stdout: os.Stdout, Stderr: os.Stderr}, args)
 }

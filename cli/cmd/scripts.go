@@ -70,14 +70,26 @@ func resolveScript(projectRoot, rebarRoot, name string) (resolvedScript, bool) {
 func runRebarScript(name string, args ...string) (exitCode int, found bool, err error) {
 	s, ok := resolveScript(cfg.RepoRoot, findRebarRoot(), name)
 	if c, native := nativeFor(name, s, ok); native {
-		return runNativeCheck(c, cfg.RepoRoot, args), true, nil
+		// The script would run in the project root, so its arguments
+		// resolve there too.
+		return runNativeCheck(c, cfg.RepoRoot, cfg.RepoRoot, args), true, nil
 	}
 	if !ok {
 		return 0, false, nil
 	}
 	warnLegacy(s)
-	code, err := scripts.RunInProject(s.Path, cfg.RepoRoot, args...)
+	code, err := scripts.RunInProject(s.Path, cfg.RepoRoot, s.nativeEnv(), args...)
 	return code, true, err
+}
+
+// nativeEnv is the hand-off environment for running s (checks.ScriptEnv):
+// the scripts of an install may hand off to the native checks; a project's
+// legacy copy, and the copies it calls, never do.
+func (s resolvedScript) nativeEnv() []string {
+	if s.Legacy {
+		return checks.ScriptEnv("")
+	}
+	return checks.ScriptEnv(filepath.Dir(s.Path))
 }
 
 // nativeFor returns the native check to run in place of the script

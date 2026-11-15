@@ -278,20 +278,24 @@ _rebar_contract_ref_ere() {
 # _rebar_native NAME [ARGS...] — run check NAME's native (Go) implementation
 # in place of the calling script, when the rebar CLI that started the script
 # asked for it: under REBAR_CHECK_IMPL=go, `rebar check` and `rebar run` export
-# REBAR_NATIVE_CHECKS (the checks that binary implements natively) and
-# REBAR_BIN (the binary). Otherwise it returns and the script runs as
-# before, so running a script directly, or from an older CLI, is unchanged.
+# REBAR_NATIVE_CHECKS (the checks that binary implements natively), REBAR_BIN
+# (the binary) and REBAR_NATIVE_SCRIPTS (the install's scripts directory).
+# Only a script in that directory hands off: a project's own copy of a check
+# may be customized, so it always runs itself, even when it was copied from a
+# script with this hook. Otherwise it returns and the script runs as before,
+# so running a script directly, or from an older CLI, is unchanged.
 # Call it right after sourcing this file: _rebar_native check-todos "$@"
 _rebar_native() {
-  local name="$1"
+  local name="$1" here
   shift
-  [ -n "${REBAR_BIN:-}" ] && [ -x "$REBAR_BIN" ] || return 0
+  [ -n "${REBAR_BIN:-}" ] && [ -x "$REBAR_BIN" ] && [ -n "${REBAR_NATIVE_SCRIPTS:-}" ] || return 0
   case " ${REBAR_NATIVE_CHECKS:-} " in
-    *" $name "*)
-      REBAR_PROJECT_ROOT="$(_rebar_project_root)" exec "$REBAR_BIN" native "$name" "$@"
-      ;;
+    *" $name "*) ;;
+    *) return 0 ;;
   esac
-  return 0
+  here="$(cd "$(dirname "$0")" 2>/dev/null && pwd -P)" || return 0
+  [ "$here" = "$REBAR_NATIVE_SCRIPTS" ] || return 0
+  REBAR_PROJECT_ROOT="$(_rebar_project_root)" exec "$REBAR_BIN" native "$name" "$@"
 }
 
 # Read the rebar-scripts version from a script file

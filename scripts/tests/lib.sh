@@ -16,8 +16,9 @@
 #
 # REBAR_TEST_NATIVE_BIN=<rebar binary> makes run_in hand the checks that binary
 # implements natively (`rebar native` lists them) to it, as
-# `REBAR_CHECK_IMPL=go rebar check` does, so a test's assertions also hold the
-# Go ports to the scripts' behaviour:
+# `REBAR_CHECK_IMPL=go rebar check` does, and sets REBAR_CHECK_IMPL=go for tests
+# that drive the CLI, so a test's assertions also hold the Go ports to the
+# scripts' behaviour:
 #   REBAR_TEST_NATIVE_BIN=/path/to/rebar scripts/tests/run.sh source-scan
 #
 # Bash 3.2 compatible.
@@ -29,8 +30,11 @@ REBAR_TESTS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # REBAR_PROJECT_ROOT, which would point fixture runs at the caller's repo).
 unset REBAR_TIER REBAR_CHECKS_ENABLE _REBAR_CHECKS_VALIDATED REBAR_PROJECT_ROOT \
   REBAR_CONTRACTS_DIR REBAR_CONTRACT_NAMESPACE REBAR_REGISTRY_IMPL_COUNTS \
-  REBAR_CHECK_IMPL REBAR_BIN REBAR_NATIVE_CHECKS
+  REBAR_CHECK_IMPL REBAR_BIN REBAR_NATIVE_CHECKS REBAR_NATIVE_SCRIPTS REBAR_RCFILE
 REBAR_SCRIPTS="${REBAR_SCRIPTS_DIR:-$REBAR_TESTS_DIR/..}"
+if [ -n "${REBAR_TEST_NATIVE_BIN:-}" ]; then
+  export REBAR_CHECK_IMPL=go
+fi
 
 fail() { echo "FAIL: $*" >&2; exit 1; }
 ok() { echo "ok $*"; }
@@ -55,6 +59,7 @@ run_in() {
   if [ -n "${REBAR_TEST_NATIVE_BIN:-}" ]; then
     ( cd "$dir" && REBAR_PROJECT_ROOT="$dir" REBAR_BIN="$REBAR_TEST_NATIVE_BIN" \
       REBAR_NATIVE_CHECKS="$("$REBAR_TEST_NATIVE_BIN" native | tr '\n' ' ')" \
+      REBAR_NATIVE_SCRIPTS="$(cd "$REBAR_SCRIPTS" && pwd -P)" \
       "$REBAR_SCRIPTS/$script" "$@" ) 2>&1
     return
   fi
