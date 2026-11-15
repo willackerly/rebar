@@ -116,7 +116,7 @@ git -C "$ROOT" archive "$last^" templates/project-bootstrap | tar -x -C "$TMP" \
 g -C "$F" init -q && g -C "$F" add -A && g -C "$F" commit -qm init
 before=$(cd "$F" && rebar check --pre-commit >/dev/null 2>&1; echo $?)
 out=$(cd "$F" && rebar migrate --apply 2>&1) || fail "T5: --apply failed: $out"
-left=$(cd "$F/scripts" && ls | tr '\n' ' ')
+left=$(cd "$F/scripts" && ls | LC_ALL=C sort | tr '\n' ' ')  # ls order follows the locale
 [ "$left" = "README.md ci-check.sh pre-commit.sh " ] || fail "T5: left in scripts/: $left
 $out"
 grep -q '^# rebar-thin-wrapper' "$F/scripts/ci-check.sh" || fail "T5: ci-check.sh is not the thin wrapper"
