@@ -53,7 +53,7 @@ func Load(repoRoot string) (*Config, error) {
 		}
 	} else {
 		// Read from .rebarrc
-		tier, err := readRebarRC(filepath.Join(repoRoot, ".rebarrc"))
+		tier, err := readRebarRC(RCFile(repoRoot))
 		if err == nil && tier >= 1 && tier <= 3 {
 			c.Tier = tier
 		}
@@ -155,11 +155,29 @@ func ContractsDirFor(repoRoot string) string {
 	return dir
 }
 
-// RCValue returns the value of key in repoRoot/.rebarrc ("" if absent),
-// parsed like scripts/_rebar-config.sh: the first `key = value` line wins
-// and `#` starts a comment.
+// RCFile is the .rebarrc the settings of the repo at repoRoot are read
+// from: REBAR_RCFILE when set (`rebar migrate` uses it to try settings
+// before writing them), else repoRoot/.rebarrc. Mirrors _rebar_rc_file in
+// scripts/_rebar-config.sh.
+func RCFile(repoRoot string) string {
+	if f := os.Getenv("REBAR_RCFILE"); f != "" {
+		return f
+	}
+	return filepath.Join(repoRoot, ".rebarrc")
+}
+
+// RCValue returns the value of key in the repo's .rebarrc (RCFile; "" if
+// absent), parsed like scripts/_rebar-config.sh: the first `key = value`
+// line wins and `#` starts a comment.
 func RCValue(repoRoot, key string) string {
-	f, err := os.Open(filepath.Join(repoRoot, ".rebarrc"))
+	return RCValueIn(RCFile(repoRoot), key)
+}
+
+// RCValueIn is RCValue for an explicit settings file, for callers that
+// must not depend on the environment (an in-process check run on settings
+// that are not written yet).
+func RCValueIn(rcFile, key string) string {
+	f, err := os.Open(rcFile)
 	if err != nil {
 		return ""
 	}
@@ -182,7 +200,7 @@ func RCValue(repoRoot, key string) string {
 // RCValueOr returns a .rebarrc setting the way _rebar_config in
 // scripts/_rebar-config.sh does: the environment variable envVar when it is
 // set and non-empty (pass "" for keys without one), else the key's value in
-// repoRoot/.rebarrc, else def when that is absent or empty.
+// the repo's .rebarrc (RCFile), else def when that is absent or empty.
 func RCValueOr(repoRoot, key, envVar, def string) string {
 	if envVar != "" {
 		if v := os.Getenv(envVar); v != "" {

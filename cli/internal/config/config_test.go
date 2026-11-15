@@ -2,9 +2,11 @@ package config
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -105,7 +107,7 @@ func TestCheckTierAndUnknownChecks(t *testing.T) {
 // KnownChecks must match the bash list and name real scripts, or the CLI and
 // the scripts would disagree about which names are valid.
 func TestKnownChecksMatchScripts(t *testing.T) {
-	scriptsDir := filepath.Join("..", "..", "..", "scripts")
+	scriptsDir := filepath.Join(testutil.RebarSource(t), "scripts")
 	data, err := os.ReadFile(filepath.Join(scriptsDir, "_rebar-config.sh"))
 	if err != nil {
 		t.Fatal(err)
@@ -197,6 +199,72 @@ func TestRCValueOr(t *testing.T) {
 			}
 			if got := RCValueOr(root, tc.key, tc.env, "go"); got != tc.want {
 				t.Fatalf("RCValueOr(%q) = %q, want %q", tc.key, got, tc.want)
+			}
+		})
+	}
+}
+
+// TestRCFileParity: REBAR_RCFILE replaces <root>/.rebarrc for every reader,
+// in Go as in scripts/_rebar-config.sh (rebar migrate tries settings that
+// way before writing them).
+func TestRCFileParity(t *testing.T) {
+	root := t.TempDir()
+	testutil.WriteFile(t, root, ".rebarrc", "tier = 1\nsource_dirs = project\nchecks_enable = steward\n")
+	alt := testutil.WriteFile(t, t.TempDir(), "alt.rc", "tier = 2\nsource_dirs = alt  # tried\n")
+	keys := []string{"source_dirs", "checks_enable", "source_extensions"}
+
+	bashValues := func(env ...string) []string {
+		t.Helper()
+		script := `. "$1/_rebar-config.sh"; _rebar_tier; for k in source_dirs checks_enable source_extensions; do _rebar_config "$k" _REBAR_NO_ENV "-"; done`
+		cmd := exec.Command("bash", "-c", script, "bash", filepath.Join(testutil.RebarSource(t), "scripts"))
+		cmd.Env = testutil.IsolatedEnv(append([]string{"REBAR_PROJECT_ROOT=" + root}, env...)...)
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			t.Fatalf("bash: %v\n%s", err, out)
+		}
+		return strings.Split(strings.TrimSpace(string(out)), "\n")
+	}
+	goValues := func() []string {
+		t.Helper()
+		c, err := Load(root)
+		if err != nil {
+			t.Fatal(err)
+		}
+		vals := []string{strconv.Itoa(c.Tier)}
+		for _, k := range keys {
+			vals = append(vals, RCValueOr(root, k, "", "-"))
+		}
+		return vals
+	}
+
+	if _, err := exec.LookPath("bash"); err != nil {
+		t.Skip("bash not installed")
+	}
+	for _, tc := range []struct {
+		name, rcfile string
+		want         []string
+	}{
+		{"project .rebarrc", "", []string{"1", "project", "steward", "-"}},
+		{"REBAR_RCFILE", alt, []string{"2", "alt", "-", "-"}},
+		{"REBAR_RCFILE missing", filepath.Join(root, "none.rc"), []string{"3", "-", "-", "-"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			for _, kv := range os.Environ() {
+				if k, _, _ := strings.Cut(kv, "="); strings.HasPrefix(k, "REBAR_") {
+					t.Setenv(k, "")
+				}
+			}
+			var env []string
+			if tc.rcfile != "" {
+				t.Setenv("REBAR_RCFILE", tc.rcfile)
+				env = append(env, "REBAR_RCFILE="+tc.rcfile)
+			}
+			gotGo, gotBash := goValues(), bashValues(env...)
+			if !slices.Equal(gotGo, tc.want) || !slices.Equal(gotBash, tc.want) {
+				t.Fatalf("tier and %v:\n go   = %q\n bash = %q\n want = %q", keys, gotGo, gotBash, tc.want)
+			}
+			if got := ChecksEnableFor(root); strings.Join(got, " ") != map[bool]string{true: "steward", false: ""}[tc.rcfile == ""] {
+				t.Fatalf("ChecksEnableFor = %q", got)
 			}
 		})
 	}
