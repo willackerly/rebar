@@ -89,6 +89,15 @@ chmod +x scripts/*.sh
 | `SKIP_SCRIPT_TESTS` | `0` | Skip the shell regression tests, `scripts/tests/run.sh` (rebar-source-only) |
 | `SKIP_STEWARD` | `0` | Skip steward scan |
 
+### Skipped directories (`.rebarrc`)
+
+check-todos, check-contract-refs and check-registry skip the directory names in
+`source_exclude_dirs` (default `node_modules vendor dist`) anywhere in the
+tree, plus `.git` and `.claude` (agent worktrees) always. Names are matched
+with `grep --exclude-dir`, never as substrings of a path or line, so
+`.github/`, `dist-esm/` or `distance.go` are scanned. compute-registry uses
+`registry_exclude_dirs` (same default) for implementing-file counts.
+
 ### Tiers and `checks_enable` (`.rebarrc`)
 
 `tier` (env `REBAR_TIER`, default 3) gates these checks; every other check

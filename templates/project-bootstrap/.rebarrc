@@ -44,6 +44,9 @@ REBAR_VERSION=3.0.0-beta
 # Source roots and file types for check-todos / contract headers / refs.
 # source_dirs       = src internal cmd client packages lib app
 # source_extensions = go ts tsx js jsx py rs
+# Directory names those scanners skip anywhere (matched by name; .git and
+# .claude/ agent worktrees are always skipped).
+# source_exclude_dirs = node_modules vendor dist
 
 # Days before a freshness:/last-synced: marker counts as stale.
 # freshness_max_days = 14

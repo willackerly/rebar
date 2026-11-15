@@ -19,17 +19,22 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 SOURCE_EXTENSIONS="go ts tsx js py rs jsx"
 CONTRACTS_DIR=architecture
 NAMESPACE=""
+EXCLUDE_DIRS="node_modules vendor dist .git .claude"
 if [ -f "$SCRIPT_DIR/_rebar-config.sh" ]; then
   # shellcheck source=scripts/_rebar-config.sh
   source "$SCRIPT_DIR/_rebar-config.sh"
   SOURCE_EXTENSIONS=$(_rebar_config source_extensions _REBAR_NO_ENV "$SOURCE_EXTENSIONS")
   CONTRACTS_DIR=$(_rebar_contracts_dir)
   NAMESPACE=$(_rebar_contract_namespace)
+  EXCLUDE_DIRS=$(_rebar_source_exclude_dirs)
 fi
 ARCH_DIR="${1:-$CONTRACTS_DIR}"
 INCLUDES=()
 for ext in $SOURCE_EXTENSIONS; do
   INCLUDES+=("--include=*.${ext#.}")
+done
+for dir in $EXCLUDE_DIRS; do
+  INCLUDES+=("--exclude-dir=$dir")
 done
 
 if [ ! -d "$ARCH_DIR" ]; then
@@ -54,8 +59,8 @@ if [ -n "$NAMESPACE" ]; then
   NS_ERE="${NAMESPACE//./\\.}"
 fi
 
-# Find all CONTRACT: references in source files. node_modules/, vendor/,
-# dist/ and .git/ directories are skipped by name; filtering the match lines
+# Find all CONTRACT: references in source files. Excluded directories
+# (_rebar_source_exclude_dirs) are skipped by name; filtering the match lines
 # with grep -v also dropped .github/, distance.go, and any line whose text
 # mentioned those words.
 while IFS= read -r line; do
@@ -87,7 +92,6 @@ while IFS= read -r line; do
   fi
 done < <(grep -rnE "$SEARCH_ERE" \
   "${INCLUDES[@]}" \
-  --exclude-dir=node_modules --exclude-dir=vendor --exclude-dir=dist --exclude-dir=.git \
   . 2>/dev/null)
 
 echo ""

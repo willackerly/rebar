@@ -20,7 +20,8 @@ REBAR_TESTS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # Tests set tiers and checks in their fixtures' .rebarrc; don't let a caller's
 # settings leak in (ci-check.sh exports _REBAR_CHECKS_VALIDATED, which would
 # silence the checks_enable warnings under test).
-unset REBAR_TIER REBAR_CHECKS_ENABLE _REBAR_CHECKS_VALIDATED
+unset REBAR_TIER REBAR_CHECKS_ENABLE _REBAR_CHECKS_VALIDATED \
+  REBAR_CONTRACTS_DIR REBAR_CONTRACT_NAMESPACE REBAR_REGISTRY_IMPL_COUNTS
 REBAR_SCRIPTS="${REBAR_SCRIPTS_DIR:-$REBAR_TESTS_DIR/..}"
 
 fail() { echo "FAIL: $*" >&2; exit 1; }
