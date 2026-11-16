@@ -375,3 +375,85 @@ func TestRegistryImplCountsFollowNewDefault(t *testing.T) {
 		t.Fatalf("opted-in counts: want the copy deleted with no regeneration, got %+v regen=%v", reg, plan.RegenRegistry)
 	}
 }
+
+// The install's check-ground-truth passes without METRICS (SKIP) and with a
+// computed key missing from it (NEW); a copy that fails both is matched with
+// metrics_strict = true, so migrating keeps those failures. A copy that
+// passes both needs nothing, and one that fails only one is kept.
+func TestGroundTruthStrictness(t *testing.T) {
+	install := installRoot(t)
+	const metrics = "go_files = 2\nshell_scripts = 3\n"
+	lenient := func(p string) {
+		t.Helper()
+		gt := filepath.Join(p, "scripts", "check-ground-truth.sh")
+		src, _ := os.ReadFile(gt)
+		old := `if [ "$doc" = "$value" ]`
+		if !strings.Contains(string(src), old) {
+			t.Fatal("fixture changed shape")
+		}
+		lax := strings.Replace(string(src), old, `if [ -z "$doc" ] || [ "$doc" = "$value" ]`, 1)
+		lax = strings.Replace(lax, `"$REPO_ROOT/METRICS")`, `"$REPO_ROOT/METRICS" 2>/dev/null || true)`, 1)
+		testutil.WriteExecutable(t, p, "scripts/check-ground-truth.sh", lax)
+	}
+
+	t.Run("copy fails both: metrics_strict proposed", func(t *testing.T) {
+		p := newProject(t, ":", metrics)
+		plan, err := BuildPlan(opts(p, install))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if gt := scriptPlan(plan, "check-ground-truth.sh"); gt.Verdict != Delete {
+			t.Fatalf("not verified:\n%s", render(plan))
+		}
+		if v, ok := acceptedValue(plan.Added, strictKey); !ok || v != "true" {
+			t.Fatalf("metrics_strict = true not proposed:\n%s", render(plan))
+		}
+		if _, err := Apply(plan, opts(p, install), ApplyOptions{}); err != nil {
+			t.Fatal(err)
+		}
+		// The install now fails where the copy did.
+		testutil.WriteFile(t, p, "METRICS", "go_files = 2\n")
+		r := run(time.Minute, p, scrubbedEnv("REBAR_PROJECT_ROOT="+p, "REBAR_TIER=3"), filepath.Join(install, "scripts", "check-ground-truth.sh"))
+		if r.Code == 0 || !strings.Contains(r.Stdout, "MISSING") {
+			t.Fatalf("after migration a key missing from METRICS passes:\n%s", r.Stdout)
+		}
+	})
+
+	t.Run("copy passes both: nothing proposed", func(t *testing.T) {
+		p := newProject(t, ":", metrics)
+		lenient(p)
+		commitAll(t, p)
+		plan, err := BuildPlan(opts(p, install))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if gt := scriptPlan(plan, "check-ground-truth.sh"); gt.Verdict != Delete {
+			t.Fatalf("not verified:\n%s", render(plan))
+		}
+		if _, ok := acceptedValue(plan.Added, strictKey); ok {
+			t.Fatalf("metrics_strict proposed for a lenient copy:\n%s", render(plan))
+		}
+	})
+
+	t.Run("copy fails only without METRICS: kept", func(t *testing.T) {
+		p := newProject(t, ":", metrics)
+		lenient(p)
+		gt := filepath.Join(p, "scripts", "check-ground-truth.sh")
+		src, _ := os.ReadFile(gt)
+		testutil.WriteExecutable(t, p, "scripts/check-ground-truth.sh", strings.Replace(string(src),
+			"  failed=0\n", "  [ -f \"$REPO_ROOT/METRICS\" ] || { echo 'no METRICS'; exit 1; }\n  failed=0\n", 1))
+		commitAll(t, p)
+		plan, err := BuildPlan(opts(p, install))
+		if err != nil {
+			t.Fatal(err)
+		}
+		sp := scriptPlan(plan, "check-ground-truth.sh")
+		if sp.Verdict != Keep || !strings.Contains(sp.Reason, "fails without a METRICS file") ||
+			!strings.Contains(sp.Reason, "passes with METRICS lacking go_files") {
+			t.Fatalf("copy with mixed strictness not kept with the reason:\n%s", render(plan))
+		}
+		if _, ok := acceptedValue(plan.Added, strictKey); ok {
+			t.Fatalf("metrics_strict proposed although it cannot match:\n%s", render(plan))
+		}
+	})
+}

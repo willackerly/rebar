@@ -1,13 +1,13 @@
 === Ground Truth Verification ===
 
-[0;31mDRIFT[0m: test_files — METRICS floor is 99999999999999999999, code says 2
-[0;32mOK[0m:    sdks = 2  (floor 0002)
-[1;33mNEW[0m:   agents = 2  (not in METRICS file)
-[1;33mNEW[0m:   contract_files = 3  (not in METRICS file)
-[1;33mNEW[0m:   contract_ids = 2  (not in METRICS file)
-[1;33mNEW[0m:   headed = 1  (not in METRICS file)
-[1;33mNEW[0m:   go_all = 3  (not in METRICS file)
-[1;33mNEW[0m:   nothing = 0  (not in METRICS file)
+DRIFT: test_files — METRICS floor is 99999999999999999999, code says 2
+OK:    sdks = 2  (floor 0002)
+NEW:   agents = 2  (not in METRICS file)
+NEW:   contract_files = 3  (not in METRICS file)
+NEW:   contract_ids = 2  (not in METRICS file)
+NEW:   headed = 1  (not in METRICS file)
+NEW:   go_all = 3  (not in METRICS file)
+NEW:   nothing = 0  (not in METRICS file)
 
-[0;31mMetric drift detected — update METRICS to match reality[0m
+Metric drift detected — update METRICS to match reality
 --- exit 1 ---

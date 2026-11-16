@@ -10,8 +10,9 @@
 #
 #   T1  registry_impl_counts = false + METRICS floors: both merges are clean,
 #       and the merged registry and METRICS still pass their checks
-#   T2  impl counts on (default): the merge is clean but leaves main's registry
-#       stale. This is why busy repos turn them off.
+#   T2  impl counts on (registry_impl_counts = true; off by default since
+#       3.1): the merge is clean but leaves main's registry stale. This is
+#       why they are off by default.
 #   T3  a branch that adds a contract merges cleanly with one that only
 #       regenerates
 #   T4  output does not depend on the caller's locale
@@ -91,7 +92,7 @@ if merge_both "$R2"; then
   ( cd "$R2" && scripts/compute-registry.sh --check >/dev/null ) \
     && fail "T2: expected a stale registry after merging two impl-count changes"
 fi
-echo "ok T2: impl counts on are not merge-safe (why busy repos turn them off)"
+echo "ok T2: impl counts on are not merge-safe (why they are off by default)"
 
 # --- T3: a new contract on one branch, regeneration on the other ------------
 R3="$TMP/t3"

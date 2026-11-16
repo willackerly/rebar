@@ -1,6 +1,8 @@
 package checks
 
 import (
+	"io"
+	"os"
 	"strings"
 	"testing"
 
@@ -67,7 +69,7 @@ func TestCountMetricSedErrors(t *testing.T) {
 		if strings.Contains(distinct, "(.*)") {
 			want = 1
 		}
-		if got := countMetric(root, rc, "m"); got != want {
+		if got := countMetric(io.Discard, root, rc, "m"); got != want {
 			t.Errorf("distinct %q: %d, want %d", distinct, got, want)
 		}
 	}
@@ -86,5 +88,48 @@ func TestGroundTruthUnterminatedQuote(t *testing.T) {
 	code := runGroundTruth(&Context{Root: root, Stdout: &out, Stderr: &errOut}, nil)
 	if code != 1 || strings.Contains(out.String(), "n = 1") || strings.Contains(out.String(), "drift") || !strings.Contains(errOut.String(), "unterminated quote") {
 		t.Errorf("exit %d\nstdout:\n%s\nstderr:\n%s", code, out.String(), errOut.String())
+	}
+}
+
+// TestUseColour: colour needs a terminal (not a pipe, a buffer or
+// /dev/null) and no NO_COLOR.
+func TestUseColour(t *testing.T) {
+	t.Setenv("NO_COLOR", "")
+	var b strings.Builder
+	if UseColour(&b) {
+		t.Error("a buffer is not a terminal")
+	}
+	null, err := os.Open(os.DevNull)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer null.Close()
+	if UseColour(null) {
+		t.Error("/dev/null is not a terminal")
+	}
+	if tty, err := os.OpenFile("/dev/tty", os.O_WRONLY, 0); err == nil {
+		defer tty.Close()
+		if !UseColour(tty) {
+			t.Error("/dev/tty should be a terminal")
+		}
+		t.Setenv("NO_COLOR", "1")
+		if UseColour(tty) {
+			t.Error("NO_COLOR should turn colour off")
+		}
+	}
+}
+
+func TestOnlyTracked(t *testing.T) {
+	testutil.IsolateGitConfig(t)
+	root := testutil.InitRepo(t)
+	testutil.WriteFile(t, root, "ops/kept/a.sh", "")
+	testutil.WriteFile(t, root, "ops/b.sh", "")
+	testutil.Git(t, root, "add", ".")
+	testutil.WriteFile(t, root, "ops/local/c.sh", "")
+	in := []string{root + "/.", root + "/./ops/", root + "/ops//kept", root + "/ops/kept/a.sh", root + "/./ops/b.sh", root + "/ops/local", root + "/ops/local/c.sh"}
+	got := onlyTracked(root, in)
+	want := []string{root + "/.", root + "/./ops/", root + "/ops//kept", root + "/ops/kept/a.sh", root + "/./ops/b.sh"}
+	if strings.Join(got, "\n") != strings.Join(want, "\n") {
+		t.Errorf("onlyTracked = %q, want %q", got, want)
 	}
 }

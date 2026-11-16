@@ -5,13 +5,18 @@
 #
 #   T1  declared metrics: files, dirs, depth, exclude_names, exclude_dirs,
 #       contains, distinct, missing path
+#   T1b metric tracked = true: only git-tracked files / dirs (all outside git)
 #   T2  METRICS exact and >= floor pass; drift and a broken floor fail
+#   T2b metrics_strict (.rebarrc or REBAR_METRICS_STRICT): a missing METRICS
+#       and a computed key missing from it fail; by default both pass
 #   T3  registry_scope_prefixes / registry_purpose_heading / _style
 #   T4  source_dirs / source_extensions reach check-todos
 #   T5  a project copy of a check still runs, with a deprecation notice;
 #       thin wrappers are never picked
 #   T6  check-ground-truth.sh --print prints values at any tier, with no
 #       METRICS; REBAR_RCFILE replaces the project's .rebarrc (rebar migrate)
+#
+#   T7  check-ground-truth colours only on a terminal, never with NO_COLOR
 #
 # Usage: bash scripts/tests/declarative-config.test.sh
 # Override the scripts under test with REBAR_SCRIPTS_DIR.
@@ -85,6 +90,49 @@ for m in 'test_files = 2' 'sdks = 2' 'agents = 2' 'contract_files = 3' 'contract
 done
 ok "T1: declared metrics compute files, dirs, depth, excludes, contains, distinct"
 
+# T1b — tracked = true counts only what git tracks (dirs: holding a tracked
+# file); outside a git work tree it counts everything, with a note.
+mkdir -p "$P/ops/kept" "$P/ops/local"
+printf 'MARK\n' > "$P/ops/kept/a.sh"
+: > "$P/ops/b.sh"
+printf 'local/\n' > "$P/ops/.gitignore"
+( cd "$P" && g add ops && g commit -q -m ops ) || fail "T1b: setup"
+: > "$P/ops/local/ignored.sh"
+printf 'MARK\n' > "$P/ops/untracked.sh"
+cat > "$TMP/tracked.rc" <<'RC'
+metric.all_sh.paths         = ops
+metric.all_sh.names         = *.sh
+metric.tracked_sh.paths     = ./ops/
+metric.tracked_sh.names     = *.sh
+metric.tracked_sh.tracked   = true
+metric.tracked_dirs.type      = dirs
+metric.tracked_dirs.paths     = ops
+metric.tracked_dirs.min_depth = 1
+metric.tracked_dirs.tracked   = true
+metric.tracked_marked.paths    = ops
+metric.tracked_marked.contains = MARK
+metric.tracked_marked.tracked  = true
+metric.tracked_names.paths    = ops
+metric.tracked_names.names    = *.sh
+metric.tracked_names.distinct = ^(.*)$
+metric.tracked_names.tracked  = true
+RC
+out="$( native_env; cd / && REBAR_RCFILE="$TMP/tracked.rc" REBAR_PROJECT_ROOT="$P" "$SRC/check-ground-truth.sh" --print 2>&1 )"
+want='all_sh=4
+tracked_sh=2
+tracked_dirs=1
+tracked_marked=1
+tracked_names=2'
+[ "$out" = "$want" ] || { echo "$out"; fail "T1b: tracked counts"; }
+NG="$TMP/nogit"
+mkdir -p "$NG" && cp -R "$P/ops" "$NG/ops"
+out="$( native_env; cd / && REBAR_RCFILE="$TMP/tracked.rc" REBAR_PROJECT_ROOT="$NG" "$SRC/check-ground-truth.sh" --print 2>"$TMP/err" )"
+printf '%s\n' "$out" | grep -qx 'tracked_sh=4' || { echo "$out"; fail "T1b: outside git, tracked should count every file"; }
+grep -q 'not a git work tree' "$TMP/err" || { cat "$TMP/err"; fail "T1b: no note outside git"; }
+( cd "$P" && g rm -rq ops && g commit -q -m "drop ops" ) || fail "T1b: cleanup"
+rm -rf "$P/ops"
+ok "T1b: tracked = true counts git-tracked files and dirs only; outside git, everything"
+
 # T2 — floors pass at or above the value; drift fails either way.
 printf 'test_files >= 1\nsdks = 2\n' > "$P/METRICS"
 out="$(gt)" || { echo "$out"; fail "T2: floor below the count should pass"; }
@@ -94,6 +142,29 @@ gt >/dev/null && fail "T2: floor above the count should fail"
 printf 'test_files = 5\n' > "$P/METRICS"
 gt >/dev/null && fail "T2: exact mismatch should fail"
 ok "T2: METRICS exact and floor semantics hold for declared metrics"
+
+# T2b — metrics_strict: by default a computed key missing from METRICS (NEW)
+# and a missing METRICS (SKIP) pass; strict, both fail.
+FULL='test_files = 2\nsdks = 2\nagents = 2\ncontract_files = 3\ncontract_ids = 2\nheaded_sources = 1\nnothing = 0\n'
+printf 'test_files = 2\n' > "$P/METRICS"
+out="$(gt)" || { echo "$out"; fail "T2b: a key missing from METRICS should pass by default"; }
+printf '%s\n' "$out" | grep -q 'NEW.*sdks = 2' || { echo "$out"; fail "T2b: NEW not reported"; }
+out="$(REBAR_METRICS_STRICT=true gt)" && { echo "$out"; fail "T2b: strict, a key missing from METRICS should fail"; }
+printf '%s\n' "$out" | grep -q 'MISSING.*sdks = 2' || { echo "$out"; fail "T2b: MISSING not reported"; }
+cp "$P/.rebarrc" "$TMP/rc.bak"
+printf 'metrics_strict = true\n' >> "$P/.rebarrc"
+gt >/dev/null && fail "T2b: .rebarrc metrics_strict = true not honored"
+printf "$FULL" > "$P/METRICS"
+out="$(gt)" || { echo "$out"; fail "T2b: strict with every key in METRICS should pass"; }
+rm "$P/METRICS"
+out="$(gt)" && { echo "$out"; fail "T2b: strict, a missing METRICS should fail"; }
+printf '%s\n' "$out" | grep -q 'FAIL.*No METRICS file' || { echo "$out"; fail "T2b: missing METRICS not reported"; }
+cp "$TMP/rc.bak" "$P/.rebarrc"
+out="$(gt)" || { echo "$out"; fail "T2b: a missing METRICS should pass by default"; }
+printf '%s\n' "$out" | grep -q 'SKIP.*No METRICS file' || { echo "$out"; fail "T2b: SKIP not reported"; }
+out="$(REBAR_METRICS_STRICT=false gt)" || fail "T2b: REBAR_METRICS_STRICT=false should not be strict"
+printf "$FULL" > "$P/METRICS"
+ok "T2b: metrics_strict fails a missing METRICS and keys missing from it"
 
 # T3 — registry classification and purpose rendering come from .rebarrc.
 reg() { run_from / "$P" compute-registry.sh --stdout; }
@@ -151,5 +222,20 @@ out="$(REBAR_RCFILE="$TMP/alt.rc" run_from / "$P" check-ground-truth.sh --print)
 [ "$out" = "only_this=1" ] || { echo "$out"; fail "T6: REBAR_RCFILE not used instead of .rebarrc"; }
 mv "$P/METRICS.off" "$P/METRICS"
 ok "T6: --print ignores tier and METRICS; REBAR_RCFILE replaces .rebarrc"
+
+# T7 — colour only on a terminal, and never with NO_COLOR.
+ESC=$(printf '\033')
+out="$(gt)"
+case "$out" in *"$ESC"*) fail "T7: colour codes in piped output" ;; esac
+tty_out="$(native_env; cd / && REBAR_PROJECT_ROOT="$P" run_tty "$SRC/check-ground-truth.sh" 2>&1)"
+rc=$?
+if [ "$rc" -eq 77 ]; then
+  ok "T7: piped output has no colour (no script(1) for the terminal case)"
+else
+  case "$tty_out" in *"$ESC["*) ;; *) echo "$tty_out"; fail "T7: no colour on a terminal" ;; esac
+  tty_out="$(native_env; cd / && NO_COLOR=1 REBAR_PROJECT_ROOT="$P" run_tty "$SRC/check-ground-truth.sh" 2>&1)"
+  case "$tty_out" in *"$ESC["*) echo "$tty_out"; fail "T7: colour despite NO_COLOR" ;; esac
+  ok "T7: colour on a terminal only, and not with NO_COLOR"
+fi
 
 echo "PASS: declarative .rebarrc config"
