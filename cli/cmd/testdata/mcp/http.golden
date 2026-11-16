@@ -1,0 +1,154 @@
+GET /mcp/schema 
+200 {
+  "protocol": "mcp",
+  "version": "2024-11-05",
+  "capabilities": {
+    "tools": {
+      "listChanged": false
+    },
+    "resources": {
+      "subscribe": false,
+      "listChanged": false
+    }
+  },
+  "serverInfo": {
+    "name": "ask-mcp-server",
+    "version": "1.0.0",
+    "description": "MCP server for ASK agent coordination"
+  }
+}
+GET /v1/health 
+200 {
+  "status": "ok",
+  "repos": 2,
+  "mcp_enabled": true
+}
+GET /v1/agents/ 
+200 [
+  {
+    "repo": "dsp_2_8",
+    "role": "steward",
+    "id": "dsp_2_8:steward"
+  },
+  {
+    "repo": "web",
+    "role": "architect",
+    "id": "web:architect"
+  },
+  {
+    "repo": "web",
+    "role": "broken",
+    "id": "web:broken"
+  },
+  {
+    "repo": "web",
+    "role": "custom",
+    "id": "web:custom"
+  },
+  {
+    "repo": "web",
+    "role": "empty",
+    "id": "web:empty"
+  },
+  {
+    "repo": "web",
+    "role": "product",
+    "id": "web:product"
+  }
+]
+GET /v1/repos?x=1 
+200 [
+  {
+    "repo": "dsp_2_8",
+    "path": "$REPOS/group/dsp_2_8",
+    "agents": [
+      "steward"
+    ]
+  },
+  {
+    "repo": "web",
+    "path": "$REPOS/web",
+    "agents": [
+      "architect",
+      "broken",
+      "custom",
+      "empty",
+      "product"
+    ]
+  }
+]
+GET /v1/status/web/architect 
+404 {"error": "Not found"}
+POST /mcp {"jsonrpc":"2.0","method":"initialize","params":{},"id":1}
+200 {
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "protocolVersion": "2024-11-05",
+    "capabilities": {
+      "tools": {
+        "listChanged": false
+      },
+      "resources": {
+        "subscribe": false,
+        "listChanged": false
+      }
+    },
+    "serverInfo": {
+      "name": "ask-mcp-server",
+      "version": "1.0.0",
+      "description": "MCP server for ASK agent coordination platform"
+    }
+  }
+}
+POST /mcp {"jsonrpc":"2.0","method":"notifications/initialized"}
+200 null
+POST /mcp {"jsonrpc":"2.0","method":"tools/call","params":{"name":"ask_web_architect","arguments":{"question":"Why?"}},"id":2}
+200 {
+  "jsonrpc": "2.0",
+  "id": 2,
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "answer from web: architect Why?"
+      }
+    ]
+  }
+}
+POST /mcp not json
+400 {"error": "Invalid JSON: invalid character 'o' in literal null (expecting 'u')"}
+POST /mcp 
+400 {"error": "Invalid JSON: Expecting value: line 1 column 1 (char 0)"}
+POST /v1/ask {"repo":"web","role":"product","question":" Who? ","verbose":true}
+200 {
+  "repo": "web",
+  "role": "product",
+  "answer": "answer from web: -v product Who?",
+  "exit_code": 0,
+  "error": null
+}
+POST /v1/ask {"repo":"web","role":"broken","question":"q"}
+500 {"error": "ask: error: claude invocation failed\n(stdout) partial output\n(exit code: 3)\n(cmd: $STUB broken q cwd=$REPOS/web)"}
+POST /v1/ask {"repo":"WEB","role":"product","question":"q"}
+500 {"error": "Repository WEB not found"}
+POST /v1/ask {"repo":"web","question":"q"}
+400 {"error": "Required fields: repo, role, question"}
+POST /v1/reset/web/architect 
+404 {"error": "Not found"}
+PUT /mcp {}
+501 <!DOCTYPE HTML>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <title>Error response</title>
+    </head>
+    <body>
+        <h1>Error response</h1>
+        <p>Error code: 501</p>
+        <p>Message: Unsupported method ('PUT').</p>
+        <p>Error code explanation: 501 - Server does not support this operation.</p>
+    </body>
+</html>
+
+--- exit 0 ---

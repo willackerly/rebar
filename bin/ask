@@ -349,7 +349,7 @@ cmd_serve() {
   # Start the enterprise ASK server
   local script_dir
   script_dir="$(cd "$(dirname "$0")" && pwd)"
-  local server_bin="$script_dir/ask-server"
+  local server_bin="$script_dir/legacy/ask-server.py"
 
   if [ ! -f "$server_bin" ]; then
     die "ask-server not found at $server_bin"

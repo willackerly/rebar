@@ -291,7 +291,7 @@ var askCases = []askCase{
 	{name: "remote agents without server", args: []string{"agents"}},
 
 	// ask serve (ask-server, python)
-	{name: "serve needs repos", args: []string{"serve", "--port", "0"}, needs: []string{"python3"}},
+	{name: "serve needs repos", args: []string{"serve", "--port", "0"}, needs: []string{"python3"}, diverges: "the usage line is rebar's, not argparse's (the error line and exit 2 match)"},
 }
 
 // TestAskParity: bin/ask (bash) and the native `rebar ask` agree on every

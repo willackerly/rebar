@@ -1,0 +1,30 @@
+=== MCP Client Test ===
+
+1. Initializing MCP session...
+   Server: ask-mcp-server
+   Protocol: 2024-11-05
+
+2. Listing available tools...
+   Found 6 agent tools:
+   1. ask_dsp_2_8_steward: Steward agent for dsp_2_8. Runs automated quality scans, tracks contract lifecycle, detects drift, and reports compliance posture. Best for: 'is the codebase healthy?', 'which contracts need attention?', 'what's drifting?'. Returns structured summaries computed from current state. Repo specifics: Keeps score: é ünïcode ✓ and emoji 🚀. Second line.
+   2. ask_web_architect: Architect agent for web. Owns system design, contract definitions, component boundaries, and architectural trade-offs. Best for: 'why' questions about design choices, integration decisions, cross-repo interface choices, and contract-level reasoning. Prefer over grep when the question is intent-shaped rather than location-shaped. Repo specifics: Repo-specific: owns the API gateway.
+   3. ask_web_broken: Query the broken agent for web. Repo specifics: Fails.
+   ... and 3 more
+
+3. Listing available resources...
+   Found 18 agent resources:
+   1. dsp_2_8:steward Memory (ask://memory/dsp_2_8:steward)
+   2. dsp_2_8:steward Log (ask://log/dsp_2_8:steward)
+   3. dsp_2_8:steward Definition (ask://agent/dsp_2_8:steward)
+   ... and 15 more
+
+4. Calling an agent tool...
+   Using tool: ask_dsp_2_8_steward
+   Agent response: answer from dsp_2_8: steward What is your role and purpose?...
+
+5. Reading an agent resource...
+   Reading: dsp_2_8:steward Memory
+   Content: (no memory yet)...
+
+=== MCP Test Complete ===
+--- exit 0 ---

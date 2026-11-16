@@ -1,0 +1,52 @@
+GET /mcp/schema 
+401 {"error": "Bearer token required"}
+GET /mcp/schema 
+200 {
+  "protocol": "mcp",
+  "version": "2024-11-05",
+  "capabilities": {
+    "tools": {
+      "listChanged": false
+    },
+    "resources": {
+      "subscribe": false,
+      "listChanged": false
+    }
+  },
+  "serverInfo": {
+    "name": "ask-mcp-server",
+    "version": "1.0.0",
+    "description": "MCP server for ASK agent coordination"
+  }
+}
+GET /v1/health 
+403 {"error": "Invalid API key"}
+GET /v1/health 
+401 {"error": "Bearer token required"}
+GET /v1/health 
+404 {"error": "Only MCP endpoints available in --mcp-only mode"}
+POST /v1/ask {"repo":"web","role":"product","question":"q"}
+404 {"error": "Only MCP endpoints available in --mcp-only mode"}
+POST /mcp {"jsonrpc":"2.0","method":"initialize","params":{},"id":1}
+200 {
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "protocolVersion": "2024-11-05",
+    "capabilities": {
+      "tools": {
+        "listChanged": false
+      },
+      "resources": {
+        "subscribe": false,
+        "listChanged": false
+      }
+    },
+    "serverInfo": {
+      "name": "ask-mcp-server",
+      "version": "1.0.0",
+      "description": "MCP server for ASK agent coordination platform"
+    }
+  }
+}
+--- exit 0 ---

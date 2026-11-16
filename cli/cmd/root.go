@@ -82,6 +82,9 @@ var rootCmd = &cobra.Command{
 		if (name == "ask" || name == "ask-agent-loop") && cmd.Parent() != nil && cmd.Parent().Name() == "rebar" {
 			return nil
 		}
+		if p := cmd.Parent(); p != nil && p.Name() == "mcp" && p.Parent() != nil && p.Parent().Name() == "rebar" {
+			return nil // the MCP server and client serve whatever repos they are given
+		}
 		// These commands handle their own repo root
 		if name == "init" || name == "new" || name == "audit" || name == "adopt" {
 			if cmd.Parent() != nil && cmd.Parent().Name() == "rebar" {
