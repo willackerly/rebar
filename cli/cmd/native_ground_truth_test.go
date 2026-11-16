@@ -148,6 +148,15 @@ metricXodd.names = *.md
 		env:   []string{"REBAR_METRICS_STRICT=yes"},
 	},
 	{
+		name:  "metrics_strict: no metric declarations fail",
+		files: gtCase("tier = 3\nmetrics_strict = true\n", gtMetrics, nil),
+	},
+	{
+		name:  "metrics_strict: no .rebarrc fails by env",
+		files: gtCase("", gtMetrics, nil),
+		env:   []string{"REBAR_METRICS_STRICT=1"},
+	},
+	{
 		name:  "metrics_strict: every key present passes",
 		files: gtCase(gtRC+"metrics_strict = on\n", gtMetrics, nil),
 	},

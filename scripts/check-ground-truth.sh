@@ -16,8 +16,9 @@
 # conflict or, if both write the same number, leave main's count wrong.
 #
 # Strictness: by default a missing METRICS file is a SKIP and a computed key
-# missing from METRICS is reported as NEW; both pass. With .rebarrc
-# `metrics_strict = true` (env REBAR_METRICS_STRICT) both fail.
+# missing from METRICS is reported as NEW; both pass, as does a .rebarrc that
+# declares no metrics. With .rebarrc `metrics_strict = true` (env
+# REBAR_METRICS_STRICT) all three fail.
 #
 # Usage: ./scripts/check-ground-truth.sh [--print]
 #   --print  print each declared metric's computed value as key=value and
@@ -244,7 +245,13 @@ verify() {
   computed=$(compute_metrics)
 
   if [ -z "$computed" ]; then
-    echo "No metrics declared. Add metric.<key>.* lines to .rebarrc (see this script's header)."
+    if $STRICT; then
+      echo -e "${RED}FAIL${NC}: No metrics declared (metrics_strict = true)"
+      exit_code=1
+    else
+      echo "No metrics declared."
+    fi
+    echo "  Add metric.<key>.* lines to .rebarrc (see this script's header)."
     return 0
   fi
 
@@ -264,6 +271,7 @@ verify() {
     if [ -z "$documented" ] && $STRICT; then
       echo -e "${RED}MISSING${NC}: $key = $value  (not in METRICS file; metrics_strict = true)"
       exit_code=1
+      drift=true
     elif [ -z "$documented" ]; then
       echo -e "${YELLOW}NEW${NC}:   $key = $value  (not in METRICS file)"
     elif echo "$line" | grep -Eq "^[[:space:]]*${key}[[:space:]]*>="; then
@@ -272,25 +280,30 @@ verify() {
       else
         echo -e "${RED}DRIFT${NC}: $key — METRICS floor is $documented, code says $value"
         exit_code=1
+        drift=true
       fi
     elif [ "$value" = "$documented" ]; then
       echo -e "${GREEN}OK${NC}:    $key = $value"
     else
       echo -e "${RED}DRIFT${NC}: $key — METRICS says $documented, code says $value"
       exit_code=1
+      drift=true
     fi
   done <<< "$computed"
 }
 
 echo "=== Ground Truth Verification ==="
 echo ""
+drift=false
 verify
 echo ""
 
 if [ $exit_code -eq 0 ]; then
   echo -e "${GREEN}All documented metrics match codebase reality${NC}"
-else
+elif $drift; then
   echo -e "${RED}Metric drift detected — update METRICS to match reality${NC}"
+else
+  echo -e "${RED}Ground truth not verified — metrics_strict = true needs a METRICS file and metric declarations${NC}"
 fi
 
 exit $exit_code
