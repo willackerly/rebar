@@ -169,7 +169,7 @@ out="$(REBAR_METRICS_STRICT=false gt)" || fail "T2b: REBAR_METRICS_STRICT=false 
 printf "$FULL" > "$P/METRICS"
 # No metric.* lines at all: passes by default, fails strict (not as drift).
 printf 'tier = 3\n' > "$TMP/nometrics.rc"
-gtrc() { ( cd / && REBAR_RCFILE="$TMP/nometrics.rc" REBAR_PROJECT_ROOT="$P" "$SRC/check-ground-truth.sh" ) 2>&1; }
+gtrc() { ( native_env; cd / && REBAR_RCFILE="$TMP/nometrics.rc" REBAR_PROJECT_ROOT="$P" "$SRC/check-ground-truth.sh" ) 2>&1; }
 out="$(gtrc)" || { echo "$out"; fail "T2b: no metric declarations should pass by default"; }
 printf '%s\n' "$out" | grep -q 'No metrics declared' || { echo "$out"; fail "T2b: no-declarations note missing"; }
 printf 'metrics_strict = true\n' >> "$TMP/nometrics.rc"

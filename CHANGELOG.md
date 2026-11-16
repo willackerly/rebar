@@ -29,8 +29,10 @@ All notable changes to rebar. Versioned with [semver](https://semver.org/).
   6.1 s (the script ran one `git grep` per contract). check-ground-truth
   computes the `metric.<key>.*` DSL as the script's `find` does (depths,
   pruning, symlinks not followed, `contains`, `distinct`) and compares
-  METRICS the same way, `--print` and the tier gate included, with rc.3's
-  `metrics_strict` (env `REBAR_METRICS_STRICT`), `metric.<key>.tracked` (git
+  METRICS the same way, `--print` and the tier gate included, with 3.1's
+  `metrics_strict` (env `REBAR_METRICS_STRICT`; no declarations fail too, and
+  a strict failure that is not drift ends "Ground truth not verified"),
+  `metric.<key>.tracked` (git
   tracked files and the directories holding one) and colour only on a
   terminal without `NO_COLOR` (`checks.UseColour`, shared by the native
   checks that colour). The expected outputs live as golden files
@@ -38,7 +40,8 @@ All notable changes to rebar. Versioned with [semver](https://semver.org/).
   quirks are settled one way: a status right after its colon
   (`Status:stable`) keeps its first letter (BSD sed read `\s` as `s`), and a
   binary contract file is a draft (BSD grep's "Binary file … matches" became
-  its status).
+  its status). `rebar new` writes the new project's registry with the
+  native compute-registry.
 - **Native (Go) checks are the default for seven checks.** check-todos and
   six more ported scanners, check-freshness, check-contract-refs,
   check-registry, check-contract-headers, check-prefix-uniqueness and
