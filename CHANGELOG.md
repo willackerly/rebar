@@ -18,7 +18,13 @@ All notable changes to rebar. Versioned with [semver](https://semver.org/).
 
 ## Unreleased
 
-_Nothing yet._
+- **Root flags before a pass-through command work:** `rebar --repo-root X run
+  check-todos` (and `-v`, `--json`) failed with `no script "--repo-root"`,
+  because `run` takes its arguments verbatim and cobra handed it the root
+  flags too. Root flags before `run`, `ask` or `push` are now parsed by rebar;
+  for `run` also between `run` and the script name. Everything after the
+  script name (for `ask`/`push`, after the command name) still passes through
+  untouched, so `rebar ask -v …` keeps meaning ask's own `-v`.
 
 ---
 

@@ -4,8 +4,10 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+	"strings"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 	"github.com/willackerly/rebar/cli/internal/config"
 )
 
@@ -112,11 +114,99 @@ var rootCmd = &cobra.Command{
 // so the error is printed here, once, on stderr; without this a failing
 // command (e.g. "rebar install not found (set REBAR_ROOT …)") exited 1 silently.
 func Execute() error {
-	err := rootCmd.Execute()
+	return executeArgs(os.Args[1:])
+}
+
+// executeArgs runs the CLI on args (os.Args[1:] outside tests).
+func executeArgs(args []string) error {
+	args, err := hoistRootFlags(args)
+	if err == nil {
+		rootCmd.SetArgs(args)
+		err = rootCmd.Execute()
+	}
 	if err != nil {
 		fmt.Fprintln(rootCmd.ErrOrStderr(), "rebar:", err)
 	}
 	return err
+}
+
+// rootFlagsAfterName marks a pass-through command whose first argument can
+// never start with "-" (run's script name), so root flags right after the
+// command name are hoisted too: `rebar run -v steward`.
+const rootFlagsAfterName = "rebar/root-flags-after-name"
+
+// hoistRootFlags parses root persistent flags (--repo-root, -v, --json) that
+// precede a pass-through command and drops them from args. Pass-through
+// commands (run, ask, push) set DisableFlagParsing so their arguments reach
+// the script or tool untouched, and for such a command cobra hands over every
+// argument but the command name, root flags included: `rebar --repo-root X
+// run steward` reached run as ["--repo-root" "X" "steward"]. Only flags before
+// the command name are taken (plus, for rootFlagsAfterName commands, right
+// after it); anything else, including flags after the script name, passes
+// through. args come back unchanged when they do not start with root flags
+// followed by a pass-through command, and cobra handles them as before.
+func hoistRootFlags(args []string) ([]string, error) {
+	n, clean := rootFlagPrefix(args)
+	if !clean || n >= len(args) {
+		return args, nil
+	}
+	sub := passThroughCommand(args[n])
+	if sub == nil {
+		return args, nil
+	}
+	flags := append([]string{}, args[:n]...)
+	rest := args[n+1:]
+	if sub.Annotations[rootFlagsAfterName] == "true" {
+		m, _ := rootFlagPrefix(rest)
+		flags = append(flags, rest[:m]...)
+		rest = rest[m:]
+	}
+	if err := rootCmd.PersistentFlags().Parse(flags); err != nil {
+		return nil, err
+	}
+	return append([]string{args[n]}, rest...), nil
+}
+
+// rootFlagPrefix counts the leading args that are root persistent flags,
+// with their values. clean is false when it stopped at a flag the root does
+// not define.
+func rootFlagPrefix(args []string) (n int, clean bool) {
+	flags := rootCmd.PersistentFlags()
+	for n < len(args) {
+		a := args[n]
+		if a == "--" || len(a) < 2 || a[0] != '-' {
+			return n, true
+		}
+		var f *pflag.Flag
+		name, _, hasValue := strings.Cut(strings.TrimLeft(a, "-"), "=")
+		if strings.HasPrefix(a, "--") {
+			f = flags.Lookup(name)
+		} else if len(name) == 1 {
+			f = flags.ShorthandLookup(name)
+		}
+		if f == nil {
+			return n, false
+		}
+		n++
+		if !hasValue && f.NoOptDefVal == "" {
+			if n >= len(args) {
+				return n - 1, false // value missing: let cobra report it
+			}
+			n++
+		}
+	}
+	return n, true
+}
+
+// passThroughCommand returns the root subcommand called name when it takes
+// its arguments verbatim (DisableFlagParsing), else nil.
+func passThroughCommand(name string) *cobra.Command {
+	for _, c := range rootCmd.Commands() {
+		if (c.Name() == name || c.HasAlias(name)) && c.DisableFlagParsing {
+			return c
+		}
+	}
+	return nil
 }
 
 func init() {
