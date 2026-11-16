@@ -1,10 +1,12 @@
 # CI for rebar itself: the same checks contributors run locally.
-# Runs on PRs into and pushes to main and release/* branches.
+# Runs on PRs into and pushes to main and release/* branches, and on PRs
+# into the go-native stack branches (each stacked PR's base is the previous
+# one's branch).
 name: ci
 
 on:
   pull_request:
-    branches: [main, "release/**"]
+    branches: [main, "release/**", "feat/go-native-**"]
   push:
     branches: [main, "release/**"]
   workflow_dispatch:
