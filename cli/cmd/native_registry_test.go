@@ -172,7 +172,11 @@ func runGolden(t *testing.T, check parityCheck, cases []parityCase) {
 				t.Setenv(k, v)
 			}
 			var out strings.Builder
-			code := c.Run(&checks.Context{Root: root, Stdout: &out, Stderr: &out}, rootArgs(tc.args, root))
+			install := filepath.Join(testutil.RebarSource(t), "scripts")
+			if check.install != nil {
+				install = check.install(t, tc)
+			}
+			code := c.Run(&checks.Context{Root: root, Install: install, Stdout: &out, Stderr: &out}, rootArgs(tc.args, root))
 			got := out.String() + takeChanges(t, root, before)
 			if check.normalize != nil {
 				got = check.normalize(got)

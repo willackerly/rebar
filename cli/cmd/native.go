@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -48,7 +49,13 @@ func runNative(cmd *cobra.Command, args []string) error {
 	}
 	// Like the script, which runs where it was started: relative arguments
 	// resolve against the working directory, settings come from the root.
-	if code := runNativeCheck(c, nativeRoot(), cwd, args[1:]); code != 0 {
+	// A suite that a script handed off runs the checks with no native
+	// implementation from that script's install.
+	install := os.Getenv("REBAR_NATIVE_SCRIPTS")
+	if install == "" {
+		install = installScripts()
+	}
+	if code := runNativeCheckIn(c, nativeRoot(), cwd, install, args[1:]); code != 0 {
 		os.Exit(code)
 	}
 	return nil
@@ -74,7 +81,29 @@ func nativeRoot() string {
 }
 
 // runNativeCheck runs c against the project at root from the working
-// directory dir, on the terminal, and returns its exit code.
+// directory dir, on the terminal, and returns its exit code. A suite runs
+// the checks that have no native implementation from the install the CLI
+// finds (installScripts).
 func runNativeCheck(c *checks.Check, root, dir string, args []string) int {
-	return c.Run(&checks.Context{Root: root, Dir: dir, Stdout: os.Stdout, Stderr: os.Stderr}, args)
+	return runNativeCheckIn(c, root, dir, installScripts(), args)
+}
+
+// runNativeCheckIn is runNativeCheck with the install's scripts directory
+// given ("" for none).
+func runNativeCheckIn(c *checks.Check, root, dir, install string, args []string) int {
+	return c.Run(&checks.Context{Root: root, Dir: dir, Install: install, Stdout: os.Stdout, Stderr: os.Stderr}, args)
+}
+
+// installScripts is the scripts directory of the rebar install the CLI
+// finds (findRebarRoot), "" when there is none.
+func installScripts() string {
+	root := findRebarRoot()
+	if root == "" {
+		return ""
+	}
+	dir := filepath.Join(root, "scripts")
+	if info, err := os.Stat(dir); err != nil || !info.IsDir() {
+		return ""
+	}
+	return dir
 }

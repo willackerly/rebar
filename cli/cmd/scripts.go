@@ -9,6 +9,7 @@ import (
 
 	"github.com/willackerly/rebar/cli/internal/checks"
 	"github.com/willackerly/rebar/cli/internal/scripts"
+	"github.com/willackerly/rebar/cli/internal/suite"
 )
 
 // thinWrapperMarker tags a project script that only hands off to the rebar
@@ -67,12 +68,24 @@ func resolveScript(projectRoot, rebarRoot, name string) (resolvedScript, bool) {
 // that instead, in process, even when no install has the script; a
 // project's own legacy copy still wins, since it may carry customizations
 // the native check does not have.
+//
+// An extra check the project lists in .rebarrc checks_extra (or
+// checks_extra_pre_commit) is found by its name too, unless rebar has a
+// script or check of that name; it runs as the suites run it, without the
+// legacy-copy notice: it is the project's own check, not a copy of rebar's.
 func runRebarScript(name string, args ...string) (exitCode int, found bool, err error) {
 	s, ok := resolveScript(cfg.RepoRoot, findRebarRoot(), name)
 	if c, native := nativeFor(name, s, ok); native {
 		// The script would run in the project root, so its arguments
 		// resolve there too.
 		return runNativeCheck(c, cfg.RepoRoot, cfg.RepoRoot, args), true, nil
+	}
+	if e, extra := suite.FindExtra(cfg.RepoRoot, name); extra && (!ok || s.Legacy) {
+		if !e.Runnable(cfg.RepoRoot) {
+			return 0, false, fmt.Errorf("extra check %s (.rebarrc checks_extra) is not an executable file", e.Path)
+		}
+		ctx := &checks.Context{Root: cfg.RepoRoot, Dir: cfg.RepoRoot, Install: installScripts(), Stdout: os.Stdout, Stderr: os.Stderr}
+		return e.Run(ctx, args), true, nil
 	}
 	if !ok {
 		return 0, false, nil

@@ -1,12 +1,14 @@
 package cmd
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"os/exec"
 	"strings"
 
 	"github.com/spf13/cobra"
+	"github.com/willackerly/rebar/cli/internal/checks"
 	"github.com/willackerly/rebar/cli/internal/integrity"
 	"github.com/willackerly/rebar/cli/internal/scripts"
 )
@@ -49,11 +51,22 @@ func runPush(cmd *cobra.Command, args []string) error {
 	fmt.Println("Integrity verified ✓")
 
 	// 2. Run checks (if scripts exist)
-	if s, ok := resolveScript(cfg.RepoRoot, findRebarRoot(), "ci-check.sh"); ok {
+	s, ok := resolveScript(cfg.RepoRoot, findRebarRoot(), "ci-check.sh")
+	c, native := nativeFor("ci-check.sh", s, ok)
+	if ok || native {
 		fmt.Println("Running checks...")
-		warnLegacy(s)
-		// Run checks but don't block on missing scripts
-		checkOut, code, err := scripts.OutputInProject(s.Path, cfg.RepoRoot, s.nativeEnv())
+		var checkOut []byte
+		var code int
+		var err error
+		if native {
+			var buf bytes.Buffer
+			code = c.Run(&checks.Context{Root: cfg.RepoRoot, Dir: cfg.RepoRoot, Install: installScripts(), Stdout: &buf, Stderr: &buf}, nil)
+			checkOut = buf.Bytes()
+		} else {
+			warnLegacy(s)
+			// Run checks but don't block on missing scripts
+			checkOut, code, err = scripts.OutputInProject(s.Path, cfg.RepoRoot, s.nativeEnv())
+		}
 		if err != nil || code != 0 {
 			fmt.Println(string(checkOut))
 			// Only fail if it's a real check failure, not a missing dependency

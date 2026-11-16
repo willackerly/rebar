@@ -1,0 +1,125 @@
+Running contract and documentation checks...
+
+━━━ Contract Headers ━━━
+MISSING: src/a.go
+
+Scanned 2 source files, 1 missing contract headers.
+
+Every source file must declare which contract it implements:
+  // CONTRACT:C1-BLOBSTORE.2.1
+  // Architecture: CONTRACT:S2-API-GATEWAY.1.0
+
+See architecture/README.md for the full convention.
+
+━━━ Contract References ━━━
+BROKEN: ./src/b.go:3 references CONTRACT:S9-GONE.1.0
+        Expected: architecture/CONTRACT-S9-GONE.1.0.md
+
+Checked 1 contract references, 1 broken.
+
+Fix by either:
+  1. Creating the missing contract in architecture/
+  2. Updating the code reference to the correct contract version
+
+━━━ Doc References ━━━
+check-doc-refs: 1 broken ref(s) — referenced file is not tracked in git
+
+README.md:5:docs/gone.md
+
+Each line: <source.md>:<lineno>:<target>
+Either `git add` the target, fix the link, or allowlist it via .rebar/doc-refs-allow.txt
+
+━━━ TODO Tracking ━━━
+FAIL: 1 untracked TODO(s) found:
+
+src/b.go:2:// TODO: untracked
+
+Before committing, you must either:
+  1. Fix the TODO immediately (remove it), OR
+  2. Add it to TODO.md and convert to: TRACKED-TASK: description
+
+Also found 1 tracked tasks (OK).
+
+━━━ Doc Freshness ━━━
+STALE (40 days): ./docs/old.md — freshness: 2026-10-07
+
+Checked 2 docs with currency markers (freshness:/last-synced:), 1 stale (>14 days).
+3 .md file(s) carry no currency marker at all — unchecked, not verified.
+
+Stale docs may contain outdated status claims.
+Review and update the freshness date after verifying content.
+
+━━━ Registry Consistency ━━━
+FAIL: $ROOT/architecture/CONTRACT-REGISTRY.md does not exist. Generate it: rebar run compute-registry
+
+━━━ JTBD Presence ━━━
+OK: no contracts found in architecture/ — nothing to check.
+
+━━━ Prefix Uniqueness ━━━
+SKIP: no architecture/CONTRACT-REGISTRY.md (run scripts/compute-registry.sh to generate).
+
+━━━ Ground Truth ━━━
+SKIP: tier 2 < required tier 3 (set REBAR_TIER or .rebarrc to change, or name it in checks_enable)
+
+━━━ Rebar Compliance ━━━
+=== Rebar compliance check ===
+
+OK: .rebar-version = v3.1.0
+OK: .rebarrc tier = 2 (ADOPTED)
+OK: README.md badge found on line 3
+    Version: v3.1.0 | Tier: 2 (ADOPTED)
+
+=== AGENTS.md required sections ===
+FAIL: AGENTS.md missing required section: Cold Start / Read Before Coding — agents must know the reading order
+FAIL: AGENTS.md missing required section: Contract-Driven Development — the 4 rules that make contracts operational
+FAIL: AGENTS.md missing required section: Testing expectations — cascade tiers or scout rule
+FAIL: AGENTS.md missing required section: TODO Tracking — two-tag system prevents invisible debt
+FAIL: AGENTS.md does not mention ASK CLI
+  Agents need to know they can use 'ask <role> "question"' for focused queries.
+  Add a reference in the Cold Start or Reference section.
+
+=== Contract maturity (declared Status:) ===
+OK: no contracts found — maturity weighting not applicable
+
+FAIL: 5 compliance issue(s) found.
+
+━━━ Decay Patterns ━━━
+check-decay-patterns: no files to scan.
+
+━━━ Bootstrap Sync ━━━
+check-bootstrap-sync: SKIP — not in rebar source repo (no templates/project-bootstrap/)
+
+━━━ Script Tests ━━━
+SKIP: script tests run only in the rebar source repo
+
+━━━ Fix Commit Gate ━━━
+check-fix-commit: OK — Gate G satisfied (no fix:/regression: commits without Reproduced on:)
+
+━━━ Bypass Flags Gate ━━━
+check-bypass-flags: OK — Gate I satisfied (no bypass mentions without Bypass tickets:)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SUMMARY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  FAIL  Contract Headers
+  FAIL  Contract References
+  FAIL  Doc References
+  FAIL  TODO Tracking
+  FAIL  Doc Freshness
+  FAIL  Registry Consistency
+  PASS  JTBD Presence
+  PASS  Prefix Uniqueness
+  PASS  Ground Truth
+  FAIL  Rebar Compliance
+  PASS  Decay Patterns
+  PASS  Bootstrap Sync
+  PASS  Script Tests
+  PASS  Fix Commit Gate
+  PASS  Bypass Flags Gate
+  SKIP  Steward
+
+  8 passed, 7 failed, 1 skipped
+
+CI check failed. Fix the issues above or skip individual checks
+with environment variables (e.g., SKIP_FRESHNESS=1).
+--- exit 1 ---

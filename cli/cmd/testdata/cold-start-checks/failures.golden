@@ -1,0 +1,10 @@
+<rebar-cold-start>
+rebar cold-start health — advisory (this hook always exits 0)
+[FAIL] check-contract-refs — Checked 1 contract references, 1 broken.
+[FAIL] check-todos — FAIL: 1 untracked TODO(s) found:
+[FAIL] check-freshness — Checked 2 docs with currency markers (freshness:/last-synced:), 1 stale (>14 days).
+[SKIP] check-ground-truth — SKIP: tier 2 < required tier 3 (set REBAR_TIER or .rebarrc to change, or name it in checks_enable)
+maturity: no contracts yet
+3 of 4 checks failing (Ns) — rerun the named check (`rebar run <name>`) for full output.
+</rebar-cold-start>
+--- exit 0 ---

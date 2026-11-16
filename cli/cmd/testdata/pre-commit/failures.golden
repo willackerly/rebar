@@ -1,0 +1,27 @@
+Pre-commit: checking TODO tracking...
+FAIL: 1 untracked TODO(s) found:
+
+src/b.go:2:// TODO: untracked
+
+Before committing, you must either:
+  1. Fix the TODO immediately (remove it), OR
+  2. Add it to TODO.md and convert to: TRACKED-TASK: description
+
+Also found 1 tracked tasks (OK).
+
+Pre-commit: checking contract references...
+BROKEN: ./src/b.go:3 references CONTRACT:S9-GONE.1.0
+        Expected: architecture/CONTRACT-S9-GONE.1.0.md
+
+Checked 1 contract references, 1 broken.
+
+Fix by either:
+  1. Creating the missing contract in architecture/
+  2. Updating the code reference to the correct contract version
+
+Pre-commit: checking ground truth metrics...
+SKIP: tier 2 < required tier 3 (set REBAR_TIER or .rebarrc to change, or name it in checks_enable)
+
+Pre-commit checks failed. Fix the issues above before committing.
+To skip (not recommended): git commit --no-verify
+--- exit 1 ---

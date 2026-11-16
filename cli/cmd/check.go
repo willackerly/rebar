@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
+	"github.com/willackerly/rebar/cli/internal/suite"
 )
 
 var (
@@ -18,17 +19,21 @@ var checkCmd = &cobra.Command{
 	Short: "Run enforcement checks",
 	Long: `Run rebar's enforcement checks against the current project.
 
-The checks run from the rebar installation, so a project needs no copies of
-rebar's scripts; repo-specific settings live in .rebarrc. A project that
-still has its own scripts/ci-check.sh (or pre-commit.sh, cold-start-checks.sh)
-runs that copy instead, with a deprecation notice.
+The suites and checks are built into rebar (native Go), so a project needs no
+copies of rebar's scripts; repo-specific settings live in .rebarrc. A project
+that still has its own scripts/ci-check.sh (or pre-commit.sh,
+cold-start-checks.sh) runs that copy instead, with a deprecation notice, and
+so does a project's own copy of a check the suite runs.
 
-  rebar check               full suite (CI): scripts/ci-check.sh
+  rebar check               full suite (CI), as scripts/ci-check.sh
   rebar check --pre-commit  fast checks for the git pre-commit hook
   rebar check --cold-start  advisory session-start summary (always exits 0)
 
-Checks that have a native (Go) implementation (rebar native lists them) run
-it in place of their script; REBAR_CHECK_IMPL=shell runs the scripts.`,
+Skip a check with its SKIP_* variable (SKIP_FRESHNESS=1; see
+scripts/README.md). The project's own checks in .rebarrc checks_extra
+(checks_extra_pre_commit for --pre-commit) run after rebar's and count in
+the summary. REBAR_CHECK_IMPL=shell runs the install's suite scripts
+instead (until they are removed); they do not run checks_extra.`,
 	Args: cobra.NoArgs,
 	RunE: runCheck,
 }
@@ -53,6 +58,7 @@ func runCheck(cmd *cobra.Command, args []string) error {
 		scriptArgs = append(scriptArgs, "--no-strict")
 	}
 
+	warnExtrasIgnored(name)
 	exitCode, found, err := runRebarScript(name, scriptArgs...)
 	if err != nil {
 		return fmt.Errorf("running %s: %w", name, err)
@@ -69,4 +75,24 @@ func runCheck(cmd *cobra.Command, args []string) error {
 		os.Exit(exitCode)
 	}
 	return nil
+}
+
+// warnExtrasIgnored tells the user when the suite for name will not run the
+// project's checks_extra / checks_extra_pre_commit: only the native suite
+// does, so REBAR_CHECK_IMPL=shell and a project's own copy of the suite
+// script skip them.
+func warnExtrasIgnored(name string) {
+	key := map[string]string{"ci-check.sh": suite.ExtraKey, "pre-commit.sh": suite.ExtraPreCommitKey}[name]
+	if key == "" || len(suite.Extras(cfg.RepoRoot, key)) == 0 {
+		return
+	}
+	s, ok := resolveScript(cfg.RepoRoot, findRebarRoot(), name)
+	if _, native := nativeFor(name, s, ok); native {
+		return
+	}
+	why := "REBAR_CHECK_IMPL=shell runs the suite script"
+	if ok && s.Legacy {
+		why = "the project's own scripts/" + name + " runs instead"
+	}
+	fmt.Fprintf(os.Stderr, "rebar: .rebarrc %s not run: %s (only the built-in suite runs it)\n", key, why)
 }

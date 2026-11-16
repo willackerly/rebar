@@ -524,6 +524,10 @@ type parityCheck struct {
 	// normalize rewrites what differs between runs (a timestamp) in every
 	// output, the script's, the native check's and the golden's (nil: as is).
 	normalize func(out string) string
+	// install returns the scripts directory a case runs (nil: the rebar
+	// source's scripts/): the script side runs the check's script from it,
+	// the native check gets it as its install (checks.Context.Install).
+	install func(t *testing.T, tc parityCase) string
 }
 
 // runParity runs scripts/<check>.sh, the native check in process, and the
@@ -534,16 +538,20 @@ type parityCheck struct {
 func runParity(t *testing.T, check parityCheck, cases []parityCase) {
 	t.Helper()
 	requireBash(t)
-	scriptsDir := filepath.Join(testutil.RebarSource(t), "scripts")
-	script := filepath.Join(scriptsDir, check.name+".sh")
+	sourceScripts := filepath.Join(testutil.RebarSource(t), "scripts")
 	c, ok := checks.Lookup(check.name)
 	if !ok {
 		t.Fatalf("%s is not registered", check.name)
 	}
 	flavour := grepFlavour(t)
-	scriptText, _ := os.ReadFile(script)
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
+			scriptsDir := sourceScripts
+			if check.install != nil {
+				scriptsDir = check.install(t, tc)
+			}
+			script := filepath.Join(scriptsDir, check.name+".sh")
+			scriptText, _ := os.ReadFile(script)
 			if tc.pending != "" && !strings.Contains(string(scriptText), tc.pending) {
 				t.Skipf("pending: %s lacks %q", filepath.Base(script), tc.pending)
 			}
@@ -598,7 +606,7 @@ func runParity(t *testing.T, check parityCheck, cases []parityCase) {
 			shellOut = testErrorLine.ReplaceAllString(shellOut, "") + changes()
 
 			var native strings.Builder
-			nativeCode := c.Run(&checks.Context{Root: root, Stdout: &native, Stderr: &native}, tcArgs)
+			nativeCode := c.Run(&checks.Context{Root: root, Install: scriptsDir, Stdout: &native, Stderr: &native}, tcArgs)
 			native.WriteString(changes())
 
 			// The hand-off goes through a wrapper that logs it, so a script
@@ -734,6 +742,11 @@ func TestShellRegressionTestsAgainstNative(t *testing.T) {
 			}
 			logged, _ := os.ReadFile(log)
 			for _, name := range ported {
+				// "pre-commit" and the like are words too: a suite counts
+				// when the test runs its script with run_in / run_from.
+				if suiteNames[name] && !regexp.MustCompile(`run_(in|from) .*\b`+regexp.QuoteMeta(name)+`\.sh`).Match(data) {
+					continue
+				}
 				if !strings.Contains(string(logged), "native "+name) {
 					t.Errorf("%s never handed %s off to the native check; hand-offs:\n%s\noutput:\n%s", filepath.Base(test), name, logged, out)
 				}
@@ -744,6 +757,9 @@ func TestShellRegressionTestsAgainstNative(t *testing.T) {
 		t.Fatal("no script test exercises a ported check")
 	}
 }
+
+// suiteNames are the native suites (internal/suite).
+var suiteNames = map[string]bool{"ci-check": true, "pre-commit": true, "cold-start-checks": true}
 
 func TestNativeFor(t *testing.T) {
 	install := resolvedScript{Path: "/install/scripts/check-todos.sh"}

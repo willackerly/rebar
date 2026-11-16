@@ -37,6 +37,8 @@ STRICT="${1:---strict}"
 
 # shellcheck source=scripts/_rebar-config.sh
 source "$SCRIPT_DIR/_rebar-config.sh" 2>/dev/null || true
+# Under `REBAR_CHECK_IMPL=go rebar check` (the default) the CLI's native suite runs instead.
+if type _rebar_native >/dev/null 2>&1; then _rebar_native ci-check "$@"; fi
 type _rebar_script >/dev/null 2>&1 || _rebar_script() { echo "$SCRIPT_DIR/$1"; }
 # Unknown .rebarrc checks_enable names are reported once here, not per check.
 if type _rebar_checks_enable_warn >/dev/null 2>&1; then _rebar_checks_enable_warn; fi

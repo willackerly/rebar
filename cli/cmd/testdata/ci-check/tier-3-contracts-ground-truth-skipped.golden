@@ -1,0 +1,97 @@
+Running contract and documentation checks...
+
+━━━ Contract Headers ━━━
+
+Scanned 1 source files, 0 missing contract headers.
+
+━━━ Contract References ━━━
+
+Checked 1 contract references, 0 broken.
+
+━━━ Doc References ━━━
+check-doc-refs: OK — no broken markdown links to untracked files
+
+━━━ TODO Tracking ━━━
+OK: 0 untracked TODOs. 0 tracked tasks.
+
+━━━ Doc Freshness ━━━
+
+Checked 1 docs with currency markers (freshness:/last-synced:), 0 stale (>14 days).
+7 .md file(s) carry no currency marker at all — unchecked, not verified.
+
+━━━ JTBD Presence ━━━
+MISSING: architecture/CONTRACT-S2-BAR.1.0.md — 'Why this exists' 'Who needs this' 'Scenarios'
+
+Checked 2 latest-version contract(s), 0 superseded skipped, 1 with missing JTBD sections.
+
+Every contract needs non-empty 'Why this exists', 'Who needs this', and
+'Scenarios' sections. An interface description is not a Job To Be Done —
+see architecture/CONTRACT-TEMPLATE.md for the required framing.
+
+━━━ Prefix Uniqueness ━━━
+OK: no numbered contract IDs listed in the registry — nothing to check.
+
+━━━ Rebar Compliance ━━━
+=== Rebar compliance check ===
+
+OK: .rebar-version = v3.1.0
+OK: .rebarrc tier = 3 (ENFORCED)
+OK: README.md badge found on line 3
+    Version: v3.1.0 | Tier: 3 (ENFORCED)
+
+=== AGENTS.md required sections ===
+FAIL: AGENTS.md missing required section: Cold Start / Read Before Coding — agents must know the reading order
+FAIL: AGENTS.md missing required section: Contract-Driven Development — the 4 rules that make contracts operational
+FAIL: AGENTS.md missing required section: Testing expectations — cascade tiers or scout rule
+FAIL: AGENTS.md missing required section: TODO Tracking — two-tag system prevents invisible debt
+FAIL: AGENTS.md does not mention ASK CLI
+  Agents need to know they can use 'ask <role> "question"' for focused queries.
+  Add a reference in the Cold Start or Reference section.
+
+=== Contract maturity (declared Status:) ===
+OK: 2 of 2 live contract(s) declare maturity — 1 stub-or-draft-or-undeclared (50.0%)
+NOTE: 50.0% of live contracts are stub-or-draft — badge reads as
+  'Tier 3: ENFORCED — IN PROGRESS' until the set matures
+
+FAIL: 5 compliance issue(s) found.
+
+━━━ Decay Patterns ━━━
+check-decay-patterns: no files to scan.
+
+━━━ Bootstrap Sync ━━━
+check-bootstrap-sync: SKIP — not in rebar source repo (no templates/project-bootstrap/)
+
+━━━ Script Tests ━━━
+SKIP: script tests run only in the rebar source repo
+
+━━━ Fix Commit Gate ━━━
+check-fix-commit: OK — Gate G satisfied (no fix:/regression: commits without Reproduced on:)
+
+━━━ Bypass Flags Gate ━━━
+check-bypass-flags: OK — Gate I satisfied (no bypass mentions without Bypass tickets:)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SUMMARY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  PASS  Contract Headers
+  PASS  Contract References
+  PASS  Doc References
+  PASS  TODO Tracking
+  PASS  Doc Freshness
+  SKIP  Registry Consistency
+  FAIL  JTBD Presence
+  PASS  Prefix Uniqueness
+  SKIP  Ground Truth
+  FAIL  Rebar Compliance
+  PASS  Decay Patterns
+  PASS  Bootstrap Sync
+  PASS  Script Tests
+  PASS  Fix Commit Gate
+  PASS  Bypass Flags Gate
+  SKIP  Steward
+
+  11 passed, 2 failed, 3 skipped
+
+CI check failed. Fix the issues above or skip individual checks
+with environment variables (e.g., SKIP_FRESHNESS=1).
+--- exit 1 ---

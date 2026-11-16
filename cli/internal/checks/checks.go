@@ -27,9 +27,14 @@ type Context struct {
 	// paths in the output are relative to it, as the script's grep prints
 	// them. Empty means Root (`rebar check` and `rebar run` run the scripts
 	// in the project root).
-	Dir    string
-	Stdout io.Writer
-	Stderr io.Writer
+	Dir string
+	// Install is the scripts directory of the rebar install the CLI found
+	// ("" when there is none). The suites (ci-check, pre-commit,
+	// cold-start-checks) run the checks that have no native implementation
+	// from it, as the suite scripts run their sibling scripts.
+	Install string
+	Stdout  io.Writer
+	Stderr  io.Writer
 }
 
 // WorkDir is the directory relative paths resolve against: Dir, else Root.
@@ -51,6 +56,10 @@ type Check struct {
 var registry = map[string]*Check{}
 
 func register(c *Check) { registry[c.Name] = c }
+
+// Register adds a native implementation from another package (the suites
+// in internal/suite, which run the checks registered here).
+func Register(c *Check) { register(c) }
 
 // Lookup returns the native check for a script name, with or without .sh.
 func Lookup(name string) (*Check, bool) {
