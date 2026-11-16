@@ -96,6 +96,7 @@ value computed from `metric.<key>.*` lines. Every field is optional.
 | `min_depth` / `max_depth` | As `find -mindepth` / `-maxdepth`, relative to each path |
 | `contains` | ERE; count only files whose content matches |
 | `distinct` | ERE with one group, matched against each name; counts the distinct values of the group |
+| `tracked` | `true`: count only files git tracks (`git ls-files`), and for `type = dirs` only directories holding a tracked file, so gitignored or untracked local files don't change the count. Outside a git work tree it has no effect: every file counts, with a note on stderr. |
 
 ```
 metric.test_files.paths        = api sdk
@@ -106,9 +107,16 @@ metric.contract_ids.max_depth  = 1
 metric.contract_ids.names      = CONTRACT-*.md
 metric.contract_ids.exclude_names = CONTRACT-TEMPLATE.md CONTRACT-REGISTRY.md
 metric.contract_ids.distinct   = ^CONTRACT-(.*)\.[0-9]+\.[0-9]+\.md$
+metric.shell_scripts.paths     = scripts
+metric.shell_scripts.names     = *.sh
+metric.shell_scripts.tracked   = true
 ```
 
 Check the computed values with `rebar run check-ground-truth`.
+
+| Key | Env override | Default | Meaning |
+|-----|--------------|---------|---------|
+| `metrics_strict` | `REBAR_METRICS_STRICT` | `false` | `true` fails the check when there is no `METRICS` file (otherwise SKIP) and when a declared metric has no `METRICS` line (otherwise reported as NEW). `rebar migrate` proposes it when your old copy of the check failed in both cases. |
 
 ## Skipping a check for one run
 

@@ -76,6 +76,10 @@ func defFromRC(rc []byte, key string) *MetricDef {
 	d := &MetricDef{Type: f("type"), Paths: strings.Fields(f("paths")), Names: strings.Fields(f("names")),
 		ExcludeNames: strings.Fields(f("exclude_names")), ExcludeDirs: strings.Fields(f("exclude_dirs")),
 		MinDepth: f("min_depth"), MaxDepth: f("max_depth"), Contains: f("contains"), Distinct: f("distinct")}
+	switch f("tracked") {
+	case "true", "1", "yes", "on":
+		d.Tracked = true
+	}
 	if len(d.Paths) == 0 {
 		d.Paths = []string{"."}
 	}

@@ -83,7 +83,9 @@ It takes seconds on a small project and a few minutes on a large one
   `compute-registry.sh`, `source_dirs` / `source_extensions` from your
   scanners. Lines already in `.rebarrc` are never edited or duplicated.
 - **delete / replace / wrap.** A copy goes when the install, with the derived
-  settings, behaves the same: every metric has the same value,
+  settings, behaves the same: every metric has the same value (and
+  ground truth fails where the copy did without a METRICS file or with a key
+  missing from it, adding `metrics_strict = true` if needed),
   `compute-registry.sh --stdout` is byte-identical, other checks give the
   same exit status and findings (the source scanners also on a probe tree).
   An unmodified copy of an older release goes too, with the difference
@@ -136,6 +138,14 @@ convenient, then delete the wrapper:
 | `scripts/ci-check.sh`, `scripts/pre-commit.sh` | unchanged: they are the thin entry points |
 
 `rebar run` with no arguments lists every script the install provides.
+
+A file that *sources* a copy for its functions keeps the copy: the wrapper
+cannot provide them. The one exception is `check-ground-truth.sh` sourced for
+`compute_metrics()`, which its wrapper defines (it calls `rebar run
+check-ground-truth --print`). If the sourcing file also calls other functions
+of the copy (`count_*` helpers), migrate keeps the copy and names them; have
+the caller read the values from `rebar run check-ground-truth --print`
+(`key=value` lines) instead, then run `rebar migrate` again.
 
 - **Git hook.** `.git/hooks/pre-commit → ../../scripts/pre-commit.sh` keeps
   working; the target is now the thin wrapper. If you never linked it:

@@ -24,6 +24,7 @@ for example:
 The script runs in the project root with REBAR_PROJECT_ROOT set, and reads
 the project's .rebarrc. Without arguments, lists the available scripts.`,
 	DisableFlagParsing: true,
+	Annotations:        map[string]string{rootFlagsAfterName: "true"},
 	RunE:               runScript,
 }
 

@@ -15,6 +15,10 @@
 # exact counts, two PRs that each add a test both edit the same line, so they
 # conflict or, if both write the same number, leave main's count wrong.
 #
+# Strictness: by default a missing METRICS file is a SKIP and a computed key
+# missing from METRICS is reported as NEW; both pass. With .rebarrc
+# `metrics_strict = true` (env REBAR_METRICS_STRICT) both fail.
+#
 # Usage: ./scripts/check-ground-truth.sh [--print]
 #   --print  print each declared metric's computed value as key=value and
 #            exit 0 (no METRICS comparison, no tier gate; used by
@@ -41,10 +45,22 @@ REPO_ROOT="${REBAR_PROJECT_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}"
 METRICS_FILE="$REPO_ROOT/METRICS"
 [ ! -f "$METRICS_FILE" ] && [ -f "$REPO_ROOT/METRICS.md" ] && METRICS_FILE="$REPO_ROOT/METRICS.md"
 
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-NC='\033[0m'
+STRICT=false
+if type _rebar_config >/dev/null 2>&1; then
+  case "$(_rebar_config metrics_strict REBAR_METRICS_STRICT false)" in
+    true|1|yes|on) STRICT=true ;;
+  esac
+fi
+
+# Colour only on a terminal, and never with NO_COLOR set (no-color.org).
+if [ -t 1 ] && [ -z "${NO_COLOR:-}" ]; then
+  RED='\033[0;31m'
+  GREEN='\033[0;32m'
+  YELLOW='\033[1;33m'
+  NC='\033[0m'
+else
+  RED='' GREEN='' YELLOW='' NC=''
+fi
 exit_code=0
 
 # ── Metrics declared in .rebarrc ──
@@ -64,6 +80,10 @@ exit_code=0
 #   distinct       ERE with one group, matched against each name; count the
 #                  distinct values of the group (a name that does not match
 #                  counts as itself)
+#   tracked        true: count only what git tracks (a dir counts when it
+#                  holds a tracked file), so gitignored or untracked local
+#                  files don't inflate the count. Outside a git work tree it
+#                  has no effect (a note goes to stderr).
 #
 # Example — test files under two roots, and contract IDs across versions:
 #   metric.test_files.paths    = api sdk
@@ -88,7 +108,7 @@ metric_field() {
 
 # count_metric <name>: print the computed value of one declared metric.
 count_metric() {
-  local name="$1" type paths names exclude_names exclude_dirs min max contains distinct
+  local name="$1" type paths names exclude_names exclude_dirs min max contains distinct tracked
   type=$(metric_field "$name" type files)
   paths=$(metric_field "$name" paths .)
   names=$(metric_field "$name" names)
@@ -98,6 +118,18 @@ count_metric() {
   max=$(metric_field "$name" max_depth)
   contains=$(metric_field "$name" contains)
   distinct=$(metric_field "$name" distinct)
+  tracked=$(metric_field "$name" tracked false)
+  case "$tracked" in
+    true|1|yes|on)
+      if git -C "$REPO_ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+        tracked=true
+      else
+        echo "rebar: metric.$name.tracked: $REPO_ROOT is not a git work tree; counting every file" >&2
+        tracked=false
+      fi
+      ;;
+    *) tracked=false ;;
+  esac
 
   # Globs in the values are patterns for find, not for this shell.
   set -f
@@ -139,11 +171,43 @@ count_metric() {
   set +f
 
   if [ -n "$distinct" ]; then
-    { find "${args[@]}" 2>/dev/null || true; } \
+    { find "${args[@]}" 2>/dev/null || true; } | only_tracked "$tracked" \
       | sed 's|.*/||' | sed -E "s#${distinct}#\\1#" | LC_ALL=C sort -u | wc -l | tr -d ' '
   else
-    { find "${args[@]}" 2>/dev/null || true; } | wc -l | tr -d ' '
+    { find "${args[@]}" 2>/dev/null || true; } | only_tracked "$tracked" | wc -l | tr -d ' '
   fi
+}
+
+# only_tracked true|false: filter find's paths (under $REPO_ROOT) to those
+# git tracks, and directories holding a tracked file; false passes all.
+only_tracked() {
+  if [ "$1" != true ]; then
+    cat
+    return
+  fi
+  local list
+  list=$(mktemp "${TMPDIR:-/tmp}/rebar-tracked.XXXXXX")
+  git -C "$REPO_ROOT" -c core.quotepath=off ls-files > "$list" 2>/dev/null || true
+  awk -v root="$REPO_ROOT/" -v list="$list" '
+    FILENAME == list {
+      t[$0] = 1
+      p = $0
+      while (sub(/\/[^\/]*$/, "", p)) t[p] = 1
+      t["."] = 1
+      next
+    }
+    {
+      rel = $0
+      if (index(rel, root) == 1) rel = substr(rel, length(root) + 1)
+      else if (rel == substr(root, 1, length(root) - 1)) rel = "."
+      gsub(/\/\/+/, "/", rel)
+      gsub(/\/\.\//, "/", rel)
+      sub(/^\.\//, "", rel)
+      sub(/\/$/, "", rel)
+      if (rel in t) print
+    }
+  ' "$list" -
+  rm -f "$list"
 }
 
 compute_metrics() {
@@ -163,7 +227,12 @@ fi
 
 verify() {
   if [ ! -f "$METRICS_FILE" ]; then
-    echo -e "${YELLOW}SKIP${NC}: No METRICS file found"
+    if $STRICT; then
+      echo -e "${RED}FAIL${NC}: No METRICS file found (metrics_strict = true)"
+      exit_code=1
+    else
+      echo -e "${YELLOW}SKIP${NC}: No METRICS file found"
+    fi
     echo "  Create a METRICS file with key = value pairs and declare how"
     echo "  to compute each one as metric.<key>.* lines in .rebarrc."
     return 0
@@ -190,7 +259,10 @@ verify() {
     line=$(grep -E "^[[:space:]]*${key}[[:space:]]*>?=" "$METRICS_FILE" 2>/dev/null | head -1) || true
     documented=$(echo "$line" | sed -E 's/^[^=]*=//' | xargs)
 
-    if [ -z "$documented" ]; then
+    if [ -z "$documented" ] && $STRICT; then
+      echo -e "${RED}MISSING${NC}: $key = $value  (not in METRICS file; metrics_strict = true)"
+      exit_code=1
+    elif [ -z "$documented" ]; then
       echo -e "${YELLOW}NEW${NC}:   $key = $value  (not in METRICS file)"
     elif echo "$line" | grep -Eq "^[[:space:]]*${key}[[:space:]]*>="; then
       if [[ "$value" =~ ^[0-9]+$ && "$documented" =~ ^[0-9]+$ ]] && [ "$value" -ge "$documented" ]; then

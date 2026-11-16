@@ -159,6 +159,7 @@ if [ ! -x "$ROOT/bin/rebar" ] || [ "$(cat "$ROOT/.pinned-commit" 2>/dev/null)" !
   (cd "$tmp/tree/cli" && CGO_ENABLED=0 go build -trimpath -o ../bin/rebar .)
   echo "$REBAR_PIN_COMMIT" > "$tmp/tree/.pinned-commit"
   mkdir -p "$(dirname "$ROOT")" && rm -rf "$ROOT" && mv "$tmp/tree" "$ROOT"
+  rm -rf "$tmp"; trap - EXIT   # exec below replaces the shell: no EXIT trap runs
 fi
 
 export REBAR_ROOT="$ROOT"
