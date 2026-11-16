@@ -172,3 +172,10 @@ func inClass(name string, c byte) bool {
 	}
 	return false
 }
+
+// Match reports whether name matches the shell glob pattern as fnmatch(3)
+// with no flags does (see fnmatch): find's -name and grep's --include
+// patterns.
+func Match(pattern, name string) bool {
+	return fnmatch(pattern, name)
+}

@@ -271,9 +271,9 @@ var (
 	idVersionRE         = regexp.MustCompile(`^[A-Za-z0-9_-]+\.[0-9]+\.[0-9]+`)
 )
 
-// validContractNamespace reports whether ns may be a contract namespace,
+// ValidContractNamespace reports whether ns may be a contract namespace,
 // for the configured value and for namespaces parsed from references alike.
-func validContractNamespace(ns string) bool {
+func ValidContractNamespace(ns string) bool {
 	return contractNamespaceRE.MatchString(ns) && !idVersionRE.MatchString(ns)
 }
 
@@ -288,16 +288,21 @@ var qualifiedRefRE = regexp.MustCompile(`^([A-Za-z0-9._/-]+):([A-Za-z0-9][A-Za-z
 // references qualified with another namespace belong to other repos.
 // Mirrors _rebar_contract_namespace in scripts/_rebar-config.sh.
 func ContractNamespace(repoRoot string) string {
-	ns := os.Getenv("REBAR_CONTRACT_NAMESPACE")
-	if ns == "" {
-		ns = RCValue(repoRoot, "contract_namespace")
-	}
-	ns = strings.TrimSuffix(strings.TrimSpace(ns), "/")
-	if ns != "" && !validContractNamespace(ns) {
+	ns := ContractNamespaceValue(repoRoot)
+	if ns != "" && !ValidContractNamespace(ns) {
 		fmt.Fprintf(os.Stderr, "rebar: ignoring contract_namespace '%s' (allowed: letters, digits, . _ / -; must not start like a contract ID.version)\n", ns)
 		return ""
 	}
 	return ns
+}
+
+// ContractNamespaceValue is the configured contract namespace of the repo
+// at repoRoot before validation: env REBAR_CONTRACT_NAMESPACE, then .rebarrc
+// contract_namespace, trimmed, one trailing / dropped. Mirrors
+// _rebar_contract_namespace_value in scripts/_rebar-config.sh.
+func ContractNamespaceValue(repoRoot string) string {
+	ns := RCValueOr(repoRoot, "contract_namespace", "REBAR_CONTRACT_NAMESPACE", "")
+	return strings.TrimSuffix(strings.TrimSpace(ns), "/")
 }
 
 // LocalContractRef interprets ref, the text after a "CONTRACT:" marker, for
@@ -311,7 +316,7 @@ func LocalContractRef(ref, namespace string) (string, bool) {
 		return ref, true
 	}
 	m := qualifiedRefRE.FindStringSubmatch(ref)
-	if m == nil || !validContractNamespace(m[1]) {
+	if m == nil || !ValidContractNamespace(m[1]) {
 		return ref, true
 	}
 	if m[1] != namespace {
