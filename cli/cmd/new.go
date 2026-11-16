@@ -98,6 +98,10 @@ build/
 
 # OS
 .DS_Store
+
+# Steward reports, regenerated on every scan (rebar run steward, rebar check)
+STEWARD_REPORT.md
+architecture/.state/*.json
 `), 0644)
 	fmt.Println("  ✓ .gitignore")
 

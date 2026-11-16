@@ -49,7 +49,7 @@ Thumbs.db
 # Rebar-specific
 # Keep steward state but ignore computed files
 architecture/.state/*.json
-architecture/.state/steward-report.md
+STEWARD_REPORT.md
 !architecture/.state/.gitkeep
 
 # Agent session files (from ASK CLI)

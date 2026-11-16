@@ -38,6 +38,13 @@ All notable changes to rebar. Versioned with [semver](https://semver.org/).
   takes 0.07 s instead of 6 s; on virtru-analyze (60 contracts) 6.6 s
   instead of 48 s, most of it the project's own check copies, which still
   run as bash.
+- **`rebar new` ignores the steward's reports.** The steward contract says
+  `STEWARD_REPORT.md` is generated and gitignored, but `rebar new` wrote a
+  `.gitignore` without it or `architecture/.state/*.json`, so a fresh
+  project's first `rebar check` left both untracked. The bootstrap
+  template's `.gitignore` listed `architecture/.state/steward-report.md`, a
+  file nothing writes, instead of `STEWARD_REPORT.md`; fixed too.
+
 - **The suites run natively: `rebar check` needs no bash for rebar's
   checks.** `rebar check`, `rebar check --pre-commit` and `rebar check
   --cold-start` (and `rebar commit`, `rebar push`, `rebar run ci-check`) run
