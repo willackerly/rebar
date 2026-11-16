@@ -36,6 +36,8 @@ copy, can go.
   everything else        deleted only if byte-identical to a released rebar
                          version (ci-check.sh / pre-commit.sh become the thin
                          wrappers)
+  .mcp.json              servers running bin/ask-mcp-server are pointed at
+                         'rebar mcp serve' (same arguments)
 
 Without --apply nothing changes: the proposed .rebarrc lines, the files to
 remove and the files kept (with reasons) are printed. --apply writes them,
@@ -62,6 +64,7 @@ func migrateMain(cmd *cobra.Command) error {
 		ProjectRoot:        cfg.RepoRoot,
 		RebarRoot:          findRebarRoot(),
 		RegenerateRegistry: migrateRegenerate,
+		RebarBin:           findRebarCommand(),
 		Timeout:            migrateTimeout,
 		Progress:           os.Stderr,
 	}

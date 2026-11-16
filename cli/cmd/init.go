@@ -376,18 +376,18 @@ func ensureClaudeAssets(root string) bool {
 	return false
 }
 
-// ensureMCPConfig writes a project-local .mcp.json that registers the rebar
-// ASK MCP server with Claude Code. Skipped silently if the file already exists.
-// Skipped with a message if ask-mcp-server can't be located.
+// ensureMCPConfig writes a project-local .mcp.json that registers rebar's
+// ASK MCP server (`rebar mcp serve --stdio`) with Claude Code. Skipped
+// silently if the file already exists.
 func ensureMCPConfig(root string) bool {
 	mcpPath := filepath.Join(root, ".mcp.json")
 	if _, err := os.Stat(mcpPath); err == nil {
 		return false
 	}
 
-	serverPath := findMCPServerPath()
-	if serverPath == "" {
-		fmt.Println("  Skipped .mcp.json — ask-mcp-server not found; see SETUP.md §MCP to configure manually")
+	rebar := findRebarCommand()
+	if rebar == "" {
+		fmt.Println("  Skipped .mcp.json — the rebar binary's path is unknown; see docs/MCP-SETUP.md to configure manually")
 		return false
 	}
 
@@ -398,11 +398,11 @@ func ensureMCPConfig(root string) bool {
   "mcpServers": {
     "rebar-ask": {
       "command": %q,
-      "args": ["--stdio", "--repos-dir", %q]
+      "args": ["mcp", "serve", "--stdio", "--repos-dir", %q]
     }
   }
 }
-`, serverPath, reposDir)
+`, rebar, reposDir)
 
 	if err := os.WriteFile(mcpPath, []byte(content), 0644); err != nil {
 		fmt.Printf("  Warning: could not write .mcp.json: %v\n", err)
@@ -412,11 +412,12 @@ func ensureMCPConfig(root string) bool {
 	return true
 }
 
-// findMCPServerPath locates the ask-mcp-server executable.
-// Tries: same bin/ as this rebar CLI, then findRebarRoot()/bin/, then PATH.
-func findMCPServerPath() string {
+// findRebarCommand is the rebar binary .mcp.json runs: this one (through
+// ~/.rebar/current when that is the active version), else the install's
+// bin/rebar, else rebar on PATH.
+func findRebarCommand() string {
 	exe, _ := os.Executable()
-	return mcpServerPathFrom(exe)
+	return rebarCommandFrom(exe)
 }
 
 // stableBinDir maps <base>/versions/<v>/bin to <base>/current/bin when
@@ -441,25 +442,26 @@ func stableBinDir(dir string) string {
 	return filepath.Join(current, "bin")
 }
 
-// mcpServerPathFrom is findMCPServerPath for a given rebar executable path
-// ("" if unknown).
-func mcpServerPathFrom(exe string) string {
-	if exe != "" {
-		candidate := filepath.Join(stableBinDir(filepath.Dir(exe)), "ask-mcp-server")
+// rebarCommandFrom is findRebarCommand for a given executable path ("" if
+// unknown).
+func rebarCommandFrom(exe string) string {
+	if exe != "" && filepath.Base(exe) == "rebar" {
+		candidate := filepath.Join(stableBinDir(filepath.Dir(exe)), "rebar")
 		if _, err := os.Stat(candidate); err == nil {
 			return candidate
 		}
+		return exe
 	}
 	if rebarRoot := findRebarRoot(); rebarRoot != "" {
-		candidate := filepath.Join(rebarRoot, "bin", "ask-mcp-server")
+		candidate := filepath.Join(rebarRoot, "bin", "rebar")
 		if _, err := os.Stat(candidate); err == nil {
 			return candidate
 		}
 	}
-	if p, err := exec.LookPath("ask-mcp-server"); err == nil {
+	if p, err := exec.LookPath("rebar"); err == nil {
 		return p
 	}
-	return ""
+	return exe
 }
 
 // ensureAgentsScaffolding runs `ask init` (rebar's native ASK) in the

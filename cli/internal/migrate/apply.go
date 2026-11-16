@@ -68,6 +68,14 @@ func Render(w io.Writer, p *Plan, applied bool) {
 		}
 		fmt.Fprintln(w)
 	}
+	if p.MCP != nil {
+		fmt.Fprintf(w, ".mcp.json: %s to rebar's native MCP server (bin/ask-mcp-server only hands off to it):\n",
+			map[bool]string{false: "would point Claude Code", true: "pointed Claude Code"}[applied])
+		for _, e := range p.MCP.Servers {
+			fmt.Fprintf(w, "  %s: %s\n  %s→ %s\n", e.Name, e.From, strings.Repeat(" ", len(e.Name)), e.To)
+		}
+		fmt.Fprintln(w)
+	}
 	if p.RegenRegistry {
 		why := "with the ellipsis purpose style (--regenerate-registry)"
 		if p.RegenReason != "" {
@@ -209,6 +217,18 @@ func Apply(p *Plan, opts Options, ao ApplyOptions) (*ApplyResult, error) {
 			return fail(err)
 		}
 	}
+	if p.MCP != nil {
+		if err := save(p.MCP.File); err != nil {
+			return fail(err)
+		}
+		mode := os.FileMode(0o644)
+		if info, err := os.Stat(p.MCP.File); err == nil {
+			mode = info.Mode().Perm()
+		}
+		if err := writeAtomic(p.MCP.File, p.MCP.New, mode); err != nil {
+			return fail(err)
+		}
+	}
 	env := scrubbedEnv("REBAR_PROJECT_ROOT=" + p.Project)
 	if p.RegenRegistry {
 		reg := filepath.Join(p.Project, firstNonEmpty(rcValue(p.NewRC, "contracts_dir"), "architecture"), "CONTRACT-REGISTRY.md")
@@ -319,6 +339,12 @@ func (p *Plan) preflight(ao ApplyOptions) error {
 	targets := []string{filepath.Join(p.Project, ".rebarrc")}
 	if p.MetricsFile != "" {
 		targets = append(targets, p.MetricsFile)
+	}
+	if p.MCP != nil {
+		if !sameBytes(p.MCP.File, p.MCP.Data) {
+			return fmt.Errorf(".mcp.json changed since the plan was made; rerun rebar migrate")
+		}
+		targets = append(targets, p.MCP.File)
 	}
 	for _, s := range p.Deletions() {
 		path := filepath.Join(p.Project, "scripts", s.Name)

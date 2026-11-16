@@ -36,6 +36,9 @@ type Options struct {
 	Timeout            time.Duration // per script run
 	// Progress, if set, gets a line per step of a long run.
 	Progress io.Writer
+	// RebarBin is the rebar binary a rewritten .mcp.json runs when the old
+	// ask-mcp-server has no rebar beside it ("": rebar on PATH).
+	RebarBin string
 }
 
 const defaultTimeout = 3 * time.Minute
@@ -106,7 +109,10 @@ type Plan struct {
 	MetricsEdits     []MetricsEdit
 	RegenRegistry    bool
 	RegenReason      string
-	Notes            []string
+	// MCP rewrites .mcp.json servers from bin/ask-mcp-server to `rebar mcp
+	// serve` (nil: nothing to rewrite).
+	MCP   *MCPEdit
+	Notes []string
 }
 
 // Deletions returns the copies a plan deletes or replaces.
@@ -122,7 +128,7 @@ func (p *Plan) Deletions() []*ScriptPlan {
 
 // Empty reports whether the plan changes nothing.
 func (p *Plan) Empty() bool {
-	return len(p.Added) == 0 && len(p.Deletions()) == 0 && len(p.MetricsEdits) == 0 && !p.RegenRegistry
+	return len(p.Added) == 0 && len(p.Deletions()) == 0 && len(p.MetricsEdits) == 0 && !p.RegenRegistry && p.MCP == nil
 }
 
 // Checks that only read the project and can run on any repo, with the
@@ -297,6 +303,11 @@ func BuildPlan(opts Options) (*Plan, error) {
 	m.metricsEdits()
 	m.registryAfterDeletions()
 	m.notes()
+	if edit, err := PlanMCP(proj, opts.RebarBin); err != nil {
+		m.plan.Notes = append(m.plan.Notes, err.Error())
+	} else {
+		m.plan.MCP = edit
+	}
 	return m.plan, nil
 }
 
