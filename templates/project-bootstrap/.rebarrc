@@ -54,8 +54,10 @@ REBAR_TIER=1
 
 # METRICS ground truth: declare how each METRICS key is computed.
 # Fields: type (files|dirs), paths, names, exclude_names, exclude_dirs,
-# min_depth, max_depth, contains (ERE on content), distinct (ERE, one group).
+# min_depth, max_depth, contains (ERE on content), distinct (ERE, one group),
+# tracked (true: only files git tracks).
 # METRICS then holds `key = N` (exact) or `key >= N` (floor).
+# metrics_strict = true     # fail on a missing METRICS or a key missing from it
 # metric.test_files.paths        = src tests
 # metric.test_files.names        = *_test.go *.test.ts
 # metric.test_files.exclude_dirs = node_modules vendor dist

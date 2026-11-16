@@ -1,0 +1,8 @@
+all_sh=6
+tracked_sh=3
+tracked_dirs=3
+tracked_root=2
+tracked_marked=1
+tracked_names=2
+not_tracked=8
+--- exit 0 ---

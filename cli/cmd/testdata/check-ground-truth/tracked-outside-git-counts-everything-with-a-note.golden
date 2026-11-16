@@ -1,0 +1,9 @@
+=== Ground Truth Verification ===
+
+rebar: metric.tracked_sh.tracked: $ROOT is not a git work tree; counting every file
+rebar: metric.tracked_none.tracked: $ROOT is not a git work tree; counting every file
+OK:    tracked_sh = 2
+NEW:   tracked_none = 0  (not in METRICS file)
+
+All documented metrics match codebase reality
+--- exit 0 ---

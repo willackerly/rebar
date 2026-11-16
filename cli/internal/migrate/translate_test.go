@@ -296,3 +296,23 @@ compute_metrics() {
 		t.Errorf("breToERE(x(*) = %q", breToERE(`x(*`))
 	}
 }
+
+// A declared metric round-trips through defFromRC and Settings, tracked
+// included (as check-ground-truth.sh reads it: true/1/yes/on).
+func TestDefFromRCTracked(t *testing.T) {
+	rc := []byte("metric.sh.paths = scripts\nmetric.sh.names = *.sh\nmetric.sh.tracked = yes\n")
+	d := defFromRC(rc, "sh")
+	if !d.Tracked {
+		t.Fatalf("tracked not read: %+v", d)
+	}
+	var got []string
+	for _, s := range d.Settings("sh", "x") {
+		got = append(got, s.Key+"="+s.Value)
+	}
+	if want := "metric.sh.paths=scripts metric.sh.names=*.sh metric.sh.tracked=true"; strings.Join(got, " ") != want {
+		t.Fatalf("settings = %q, want %q", strings.Join(got, " "), want)
+	}
+	if defFromRC([]byte("metric.sh.tracked = false\n"), "sh").Tracked {
+		t.Fatal("tracked = false read as true")
+	}
+}

@@ -14,7 +14,7 @@ Design notes: [self-contained install](feedback/2026-11-14-self-contained-instal
 [rebar migrate](feedback/2026-11-14-rebar-migrate.md),
 [versioned installer](feedback/2026-11-14-versioned-installer.md).
 
-In the commands below, `v3.1.0-rc.2` is the release you are moving to. Use
+In the commands below, `v3.1.0-rc.3` is the release you are moving to. Use
 the tag you are actually installing (for example `v3.1.0` once it ships).
 
 | You are on | Steps |
@@ -26,15 +26,15 @@ the tag you are actually installing (for example `v3.1.0` once it ships).
 ## 1. Install the new version next to the old one
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/willackerly/rebar/v3.1.0-rc.2/setup-rebar.sh \
-  | bash -s -- v3.1.0-rc.2 --no-switch
+curl -fsSL https://raw.githubusercontent.com/willackerly/rebar/v3.1.0-rc.3/setup-rebar.sh \
+  | bash -s -- v3.1.0-rc.3 --no-switch
 ```
 
 Fetch the installer from the tag you install: until 3.1 is on `main`,
 `main`'s `setup-rebar.sh` is the old installer and has no version argument
 (see [Testing a release candidate](SETUP.md#testing-a-release-candidate)).
 
-The new version lands in `~/.rebar/versions/v3.1.0-rc.2/`, a complete rebar
+The new version lands in `~/.rebar/versions/v3.1.0-rc.3/`, a complete rebar
 tree. `--no-switch` leaves `~/.rebar/current` (the version on your PATH)
 alone, so other projects are unaffected while you try this one. The
 exception is a machine with **no versioned install yet**, including a
@@ -48,10 +48,10 @@ To run a version that is not `current`, call it by path; each version runs
 its own scripts:
 
 ```bash
-~/.rebar/versions/v3.1.0-rc.2/bin/rebar version
+~/.rebar/versions/v3.1.0-rc.3/bin/rebar version
 ```
 
-Switch for good with `ln -sfn versions/v3.1.0-rc.2 ~/.rebar/current` (or
+Switch for good with `ln -sfn versions/v3.1.0-rc.3 ~/.rebar/current` (or
 re-run the installer without `--no-switch`). The rest of this runbook writes
 plain `rebar` for the 3.1 CLI.
 
@@ -83,7 +83,9 @@ It takes seconds on a small project and a few minutes on a large one
   `compute-registry.sh`, `source_dirs` / `source_extensions` from your
   scanners. Lines already in `.rebarrc` are never edited or duplicated.
 - **delete / replace / wrap.** A copy goes when the install, with the derived
-  settings, behaves the same: every metric has the same value,
+  settings, behaves the same: every metric has the same value (and
+  ground truth fails where the copy did without a METRICS file or with a key
+  missing from it, adding `metrics_strict = true` if needed),
   `compute-registry.sh --stdout` is byte-identical, other checks give the
   same exit status and findings (the source scanners also on a probe tree).
   An unmodified copy of an older release goes too, with the difference
@@ -137,6 +139,14 @@ convenient, then delete the wrapper:
 
 `rebar run` with no arguments lists every script the install provides.
 
+A file that *sources* a copy for its functions keeps the copy: the wrapper
+cannot provide them. The one exception is `check-ground-truth.sh` sourced for
+`compute_metrics()`, which its wrapper defines (it calls `rebar run
+check-ground-truth --print`). If the sourcing file also calls other functions
+of the copy (`count_*` helpers), migrate keeps the copy and names them; have
+the caller read the values from `rebar run check-ground-truth --print`
+(`key=value` lines) instead, then run `rebar migrate` again.
+
 - **Git hook.** `.git/hooks/pre-commit → ../../scripts/pre-commit.sh` keeps
   working; the target is now the thin wrapper. If you never linked it:
   `ln -sf ../../scripts/pre-commit.sh .git/hooks/pre-commit`.
@@ -145,7 +155,7 @@ convenient, then delete the wrapper:
   it for that reason). The 3.1 hook runs `rebar check --cold-start` instead:
 
   ```bash
-  T=~/.rebar/versions/v3.1.0-rc.2/templates/project-bootstrap
+  T=~/.rebar/versions/v3.1.0-rc.3/templates/project-bootstrap
   diff .claude/settings.json $T/.claude/settings.json
   # unmodified: copy it; customized: replace the SessionStart "command" by hand
   cp $T/.claude/settings.json .claude/settings.json
@@ -169,9 +179,9 @@ convenient, then delete the wrapper:
 `check-compliance` fails when the two disagree, so change both together:
 
 ```bash
-echo v3.1.0-rc.2 > .rebar-version
-sed -i.bak 's/^> \*\*rebar v[^*]*\*\*/> **rebar v3.1.0-rc.2**/' README.md && rm README.md.bak
-sed -n 3p README.md   # > **rebar v3.1.0-rc.2** | **Tier 1: PARTIAL**
+echo v3.1.0-rc.3 > .rebar-version
+sed -i.bak 's/^> \*\*rebar v[^*]*\*\*/> **rebar v3.1.0-rc.3**/' README.md && rm README.md.bak
+sed -n 3p README.md   # > **rebar v3.1.0-rc.3** | **Tier 1: PARTIAL**
 ```
 
 The badge is the first line after the title. Keep its tier as it was; it must
@@ -275,7 +285,7 @@ staged deletions (the removed copies).
 
 ```bash
 git add -A
-rebar commit -m "chore(rebar): upgrade to v3.1.0-rc.2"
+rebar commit -m "chore(rebar): upgrade to v3.1.0-rc.3"
 rebar verify --strict      # RESULT: Integrity verified ✓
 ```
 

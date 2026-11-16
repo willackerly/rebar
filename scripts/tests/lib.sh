@@ -15,6 +15,14 @@
 #                         way `rebar check` does (REBAR_PROJECT_ROOT); stderr is merged
 #   run_from CWD DIR SCRIPT [ARGS...]
 #                         run_in, started in CWD instead of DIR
+#   native_env            under REBAR_TEST_NATIVE_BIN, export the hand-off variables
+#                         run_in sets (call it in a subshell before running a script
+#                         directly, e.g. under run_tty)
+#   run_tty CMD [ARGS...] run CMD with stdout on a pseudo-terminal (script(1), BSD or
+#                         util-linux); returns 77 when no script(1) is available
+#   doc_snippet FILE MARKER
+#                         print the first fenced code block after the first line of
+#                         FILE containing MARKER (fixed string), without the fences
 #
 # The tests exercise the scripts: tests that drive the CLI get
 # REBAR_CHECK_IMPL=shell (the CLI's default is go). REBAR_TEST_NATIVE_BIN=<rebar
@@ -32,7 +40,7 @@ REBAR_TESTS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # silence the checks_enable warnings under test; `rebar check` exports
 # REBAR_PROJECT_ROOT, which would point fixture runs at the caller's repo).
 unset REBAR_TIER REBAR_CHECKS_ENABLE _REBAR_CHECKS_VALIDATED REBAR_PROJECT_ROOT \
-  REBAR_CONTRACTS_DIR REBAR_CONTRACT_NAMESPACE REBAR_REGISTRY_IMPL_COUNTS \
+  REBAR_CONTRACTS_DIR REBAR_CONTRACT_NAMESPACE REBAR_REGISTRY_IMPL_COUNTS REBAR_METRICS_STRICT \
   REBAR_CHECK_IMPL REBAR_BIN REBAR_NATIVE_CHECKS REBAR_NATIVE_SCRIPTS REBAR_RCFILE
 REBAR_SCRIPTS="${REBAR_SCRIPTS_DIR:-$REBAR_TESTS_DIR/..}"
 if [ -n "${REBAR_TEST_NATIVE_BIN:-}" ]; then
@@ -65,12 +73,32 @@ run_in() {
 run_from() {
   local cwd="$1" dir="$2" script="$3"
   shift 3
-  if [ -n "${REBAR_TEST_NATIVE_BIN:-}" ]; then
-    ( cd "$cwd" && REBAR_PROJECT_ROOT="$dir" REBAR_BIN="$REBAR_TEST_NATIVE_BIN" \
-      REBAR_NATIVE_CHECKS="$("$REBAR_TEST_NATIVE_BIN" native | tr '\n' ' ')" \
-      REBAR_NATIVE_SCRIPTS="$(cd "$REBAR_SCRIPTS" && pwd -P)" \
-      "$REBAR_SCRIPTS/$script" "$@" ) 2>&1
-    return
+  ( native_env && cd "$cwd" && REBAR_PROJECT_ROOT="$dir" "$REBAR_SCRIPTS/$script" "$@" ) 2>&1
+}
+native_env() {
+  [ -n "${REBAR_TEST_NATIVE_BIN:-}" ] || return 0
+  REBAR_BIN="$REBAR_TEST_NATIVE_BIN"
+  REBAR_NATIVE_CHECKS="$("$REBAR_TEST_NATIVE_BIN" native | tr '\n' ' ')"
+  REBAR_NATIVE_SCRIPTS="$(cd "$REBAR_SCRIPTS" && pwd -P)"
+  export REBAR_BIN REBAR_NATIVE_CHECKS REBAR_NATIVE_SCRIPTS
+}
+
+doc_snippet() {
+  awk -v marker="$2" '
+    !found && index($0, marker) { found = 1; next }
+    found && !inblock && /^```/ { inblock = 1; next }
+    inblock && /^```/ { exit }
+    inblock { print }
+  ' "$1"
+}
+
+run_tty() {
+  command -v script >/dev/null 2>&1 || return 77
+  if script -q /dev/null true >/dev/null 2>&1 </dev/null; then
+    script -q /dev/null "$@" </dev/null   # BSD / macOS
+  else
+    local cmd="" a
+    for a in "$@"; do cmd="$cmd $(printf '%q' "$a")"; done
+    script -qec "$cmd" /dev/null </dev/null   # util-linux
   fi
-  ( cd "$cwd" && REBAR_PROJECT_ROOT="$dir" "$REBAR_SCRIPTS/$script" "$@" ) 2>&1
 }
