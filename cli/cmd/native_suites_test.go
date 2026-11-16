@@ -250,3 +250,36 @@ func TestColdStartParity(t *testing.T) {
 		normalize: func(out string) string { return elapsed.ReplaceAllString(out, "$1 (Ns)") },
 	}, coldStartCases)
 }
+
+// TestSuitesWithoutInstall runs the CLI (this binary) with no rebar install
+// to find: the native suites still run every native check, list the
+// scripts-only checks as not found, and the shell implementation has
+// nothing to run (rebar check fails, the hooks skip).
+func TestSuitesWithoutInstall(t *testing.T) {
+	requireBash(t)
+	root := writeTree(t, suiteProject, nil)
+	testutil.Git(t, root, "init", "-q", "-b", "main")
+	withRegistry(t, root)
+	bin, home := testBinary(t), t.TempDir()
+
+	out, code := testutil.RunEnv(t, root, cliEnv(home, "", ""), bin, "check")
+	for _, want := range []string{
+		"SKIP  Bootstrap Sync (script not found or not executable)",
+		"SKIP  Script Tests (script not found or not executable)",
+		"SKIP  Steward (script not found or not executable)",
+		"PASS  TODO Tracking", "13 passed, 0 failed, 3 skipped",
+	} {
+		if code != 0 || !strings.Contains(out, want) {
+			t.Errorf("go, no install: rebar check (exit %d) lacks %q:\n%s", code, want, out)
+		}
+	}
+	if out, code := testutil.RunEnv(t, root, cliEnv(home, "", ""), bin, "check", "--cold-start"); code != 0 || !strings.Contains(out, "all 4 checks passing") {
+		t.Errorf("go, no install: rebar check --cold-start (exit %d):\n%s", code, out)
+	}
+	if out, code := testutil.RunEnv(t, root, cliEnv(home, "shell", ""), bin, "check"); code == 0 || !strings.Contains(out, "ci-check.sh not found") {
+		t.Errorf("shell, no install: rebar check (exit %d):\n%s", code, out)
+	}
+	if out, code := testutil.RunEnv(t, root, cliEnv(home, "shell", ""), bin, "check", "--pre-commit"); code != 0 || !strings.Contains(out, "skipping") {
+		t.Errorf("shell, no install: rebar check --pre-commit (exit %d):\n%s", code, out)
+	}
+}
