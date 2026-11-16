@@ -137,6 +137,14 @@ convenient, then delete the wrapper:
 
 `rebar run` with no arguments lists every script the install provides.
 
+A file that *sources* a copy for its functions keeps the copy: the wrapper
+cannot provide them. The one exception is `check-ground-truth.sh` sourced for
+`compute_metrics()`, which its wrapper defines (it calls `rebar run
+check-ground-truth --print`). If the sourcing file also calls other functions
+of the copy (`count_*` helpers), migrate keeps the copy and names them; have
+the caller read the values from `rebar run check-ground-truth --print`
+(`key=value` lines) instead, then run `rebar migrate` again.
+
 - **Git hook.** `.git/hooks/pre-commit → ../../scripts/pre-commit.sh` keeps
   working; the target is now the thin wrapper. If you never linked it:
   `ln -sf ../../scripts/pre-commit.sh .git/hooks/pre-commit`.

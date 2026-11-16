@@ -1711,7 +1711,9 @@ type reference struct {
 	CI      bool // a CI configuration file
 }
 
-var sourceRe = regexp.MustCompile(`(^|[;&|({]\s*|\s)(source|\.)\s+\S*`)
+// sourceRe matches `source X` / `. X` up to the end of the command, so a
+// path with spaces in a substitution counts: `. "$(dirname "$0")/x.sh"`.
+var sourceRe = regexp.MustCompile(`(^|[;&|({]\s*|\s)(source|\.)\s+[^;&|]*`)
 
 func isCIFile(rel string) bool {
 	return strings.HasPrefix(rel, ".github/workflows/") || strings.HasPrefix(rel, ".circleci/") ||
@@ -1782,7 +1784,9 @@ func (m *migrator) findReferences(names []string) map[string][]reference {
 // thin wrapper, so those callers keep working: CI scripts, pre-commit
 // configs, tests. A copy that is sourced for its functions can only be
 // replaced when the install provides them (check-ground-truth's
-// compute_metrics, via --print); otherwise it stays.
+// compute_metrics, via --print); otherwise it stays. That includes a
+// check-ground-truth.sh whose sourcing callers use other functions of the
+// copy (count_* helpers): the wrapper defines compute_metrics() only.
 func (m *migrator) shimCallers() {
 	for _, sp := range m.plan.Scripts {
 		if sp.Verdict != Delete || len(m.refs[sp.Name]) == 0 {
@@ -1802,11 +1806,72 @@ func (m *migrator) shimCallers() {
 			sp.Reason = "used by " + sourced + " for its functions, which the install does not provide (was: " + sp.Reason + ")"
 			continue
 		}
+		if sp.Name == "check-ground-truth.sh" {
+			if uses := m.uncoveredFunctionUses(sp.Name); len(uses) > 0 {
+				sp.Verdict = Keep
+				sp.Reason = "sourced by " + strings.Join(uses, "; ") + " — functions of the copy that the wrapper migrate leaves would not define (it defines compute_metrics() only) (was: " + sp.Reason + ")"
+				m.plan.Notes = append(m.plan.Notes, "callers: scripts/check-ground-truth.sh stays because files that source it call its other functions; "+
+					"have them read the metric values from `rebar run check-ground-truth --print` (key=value lines, the same as compute_metrics()) instead, then run `rebar migrate` again")
+				continue
+			}
+		}
 		sp.Verdict = Replace
 		sp.Shim = true
 		sp.ReplaceContent = shimScript(strings.TrimSuffix(sp.Name, ".sh"))
 		sp.Reason += "; becomes a thin wrapper because other files call it"
 	}
+}
+
+// shimFunctions are the functions shimScript defines for a sourcing caller.
+var shimFunctions = map[string][]string{"check-ground-truth.sh": {"compute_metrics"}}
+
+// uncoveredFunctionUses lists, as "file:line (f, g)", the sourcing callers
+// of the copy name that call functions the copy defines and its wrapper
+// would not. A caller that defines a function of the same name itself does
+// not need the copy's.
+func (m *migrator) uncoveredFunctionUses(name string) []string {
+	src, err := os.ReadFile(m.legacyPath(name))
+	if err != nil {
+		return nil
+	}
+	var offered []string
+	for f := range parseFunctions(string(src)) {
+		if !containsStr(shimFunctions[name], f) {
+			offered = append(offered, f)
+		}
+	}
+	sort.Strings(offered)
+	var out []string
+	seen := map[string]bool{}
+	for _, r := range m.refs[name] {
+		if !r.Sourced || seen[r.File] {
+			continue
+		}
+		seen[r.File] = true
+		data, err := os.ReadFile(filepath.Join(m.opts.ProjectRoot, r.File))
+		if err != nil {
+			continue
+		}
+		own := parseFunctions(string(data))
+		var code []string
+		for _, l := range strings.Split(string(data), "\n") {
+			code = append(code, stripComment(l))
+		}
+		body := strings.Join(code, "\n")
+		var used []string
+		for _, f := range offered {
+			if _, ok := own[f]; ok {
+				continue
+			}
+			if regexp.MustCompile(`(^|[^A-Za-z0-9_./-])` + regexp.QuoteMeta(f) + `([^A-Za-z0-9_./-]|$)`).MatchString(body) {
+				used = append(used, f)
+			}
+		}
+		if len(used) > 0 {
+			out = append(out, fmt.Sprintf("%s:%d (%s)", r.File, r.Line, strings.Join(used, ", ")))
+		}
+	}
+	return out
 }
 
 // shimScript is the wrapper left for a migrated copy that has callers.

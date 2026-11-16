@@ -31,6 +31,14 @@ All notable changes to rebar. Versioned with [semver](https://semver.org/).
   (and drops the trap) once the tree is in place. If you copied the snippet,
   add `rm -rf "$tmp"; trap - EXIT` after its `mv`. A new test runs the snippet
   straight from SETUP.md.
+- **`rebar migrate` keeps a `check-ground-truth.sh` that callers source for
+  other functions.** A file sourcing the copy got the thin wrapper, which
+  defines only `compute_metrics()`, so a caller using the copy's `count_*`
+  helpers (virtru-analyze's `rebar-fix.sh`) would break. migrate now keeps
+  the copy, names the caller and functions, and notes how to migrate the
+  caller (read `rebar run check-ground-truth --print`). It also recognizes
+  `. "$(dirname "$0")/x.sh"` as sourcing (a path with spaces inside a
+  command substitution was missed).
 
 ---
 

@@ -591,3 +591,46 @@ func TestRegistryBodyIgnoresHeaderComments(t *testing.T) {
 		t.Fatal("a content difference was ignored")
 	}
 }
+
+// A caller that sources check-ground-truth.sh for its count_* helpers
+// (virtru-analyze's rebar-fix.sh) would break on the wrapper, which only
+// defines compute_metrics(): the copy stays, with a note on migrating the
+// caller. A caller that sources it for compute_metrics() alone still gets
+// the wrapper.
+func TestSourcedForOtherFunctionsKeepsGroundTruth(t *testing.T) {
+	install := installRoot(t)
+	p := newProject(t, ":", "go_files = 2\nshell_scripts = 4\n")
+	gt := filepath.Join(p, "scripts", "check-ground-truth.sh")
+	src, _ := os.ReadFile(gt)
+	testutil.WriteExecutable(t, p, "scripts/check-ground-truth.sh", strings.Replace(string(src),
+		"compute_metrics() {", "count_lines() { wc -l < \"$1\" | tr -d ' '; }\ncompute_metrics() {", 1))
+	testutil.WriteExecutable(t, p, "scripts/rebar-fix.sh", "#!/usr/bin/env bash\n"+
+		". \"$(dirname \"$0\")/check-ground-truth.sh\"\n"+
+		"# count_lines is used below\nn=$(count_lines src/a.go)\nverify-things() { :; }\n")
+	commitAll(t, p)
+
+	plan, err := BuildPlan(opts(p, install))
+	if err != nil {
+		t.Fatal(err)
+	}
+	sp := scriptPlan(plan, "check-ground-truth.sh")
+	out := render(plan)
+	if sp.Verdict != Keep || !strings.Contains(sp.Reason, "sourced by scripts/rebar-fix.sh:2 (count_lines)") {
+		t.Fatalf("copy sourced for count_lines not kept:\n%s", out)
+	}
+	if !strings.Contains(out, "`rebar run check-ground-truth --print`") {
+		t.Fatalf("no note on migrating the caller:\n%s", out)
+	}
+
+	// Only compute_metrics(): the wrapper provides it.
+	testutil.WriteExecutable(t, p, "scripts/rebar-fix.sh", "#!/usr/bin/env bash\n"+
+		". \"$(dirname \"$0\")/check-ground-truth.sh\"\ncompute_metrics\n")
+	commitAll(t, p)
+	plan, err = BuildPlan(opts(p, install))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sp := scriptPlan(plan, "check-ground-truth.sh"); sp.Verdict != Replace || !sp.Shim {
+		t.Fatalf("caller of compute_metrics() alone: want the wrapper:\n%s", render(plan))
+	}
+}
