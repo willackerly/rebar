@@ -100,9 +100,3 @@ func runPrefixUniqueness(ctx *Context, args []string) int {
 	fmt.Fprintf(w, "WARN: advisory at Tier %s; blocking at Tier 3.\n", tier)
 	return 0
 }
-
-// isRegular is [ -f p ] for an absolute path.
-func isRegular(p string) bool {
-	info, err := os.Stat(p)
-	return err == nil && info.Mode().IsRegular()
-}

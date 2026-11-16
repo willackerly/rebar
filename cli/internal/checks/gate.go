@@ -130,6 +130,12 @@ func (c *Context) isFile(p string) bool {
 	return err == nil && info.Mode().IsRegular()
 }
 
+// isRegular is [ -f p ] for a path that needs no resolving.
+func isRegular(p string) bool {
+	info, err := os.Stat(p)
+	return err == nil && info.Mode().IsRegular()
+}
+
 // isDir is the scripts' [ -d p ].
 func (c *Context) isDir(p string) bool {
 	if p == "" {

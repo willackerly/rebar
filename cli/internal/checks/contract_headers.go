@@ -106,13 +106,13 @@ func findFiles(ctx *Context, operands, names []string) []sourcescan.File {
 			}
 			continue
 		}
-		prefix := strings.TrimRight(op, "/")
-		if prefix == "" {
-			prefix = "/" // find / prints /a, not //a
-		}
+		prefix := strings.TrimRight(op, "/") // find / prints /a, not //a
 		_ = filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
-			if err != nil || p == root {
-				if err != nil && d != nil && d.IsDir() && p != root {
+			if p == root {
+				return nil
+			}
+			if err != nil {
+				if d != nil && d.IsDir() {
 					return fs.SkipDir
 				}
 				return nil
@@ -121,11 +121,7 @@ func findFiles(ctx *Context, operands, names []string) []sourcescan.File {
 				return nil
 			}
 			rel, _ := filepath.Rel(root, p)
-			display := prefix + "/" + filepath.ToSlash(rel)
-			if prefix == "/" {
-				display = "/" + filepath.ToSlash(rel)
-			}
-			files = append(files, sourcescan.File{Display: display, Path: p})
+			files = append(files, sourcescan.File{Display: prefix + "/" + filepath.ToSlash(rel), Path: p})
 			return nil
 		})
 	}
