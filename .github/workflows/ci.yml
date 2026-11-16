@@ -1,0 +1,86 @@
+# CI for rebar itself: the same checks contributors run locally.
+# Runs on PRs into and pushes to main and release/* branches.
+name: ci
+
+on:
+  pull_request:
+    branches: [main, "release/**"]
+  push:
+    branches: [main, "release/**"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    name: checks (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            path_prefix: ""
+          # Stock macOS /bin/bash is 3.2; put it first so `#!/usr/bin/env bash`
+          # scripts run under it, as they do on a developer's Mac.
+          - os: macos-latest
+            path_prefix: "/bin:/usr/bin:"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: cli/go.mod
+          cache-dependency-path: cli/go.sum
+
+      - name: Tool versions
+        run: |
+          export PATH="${{ matrix.path_prefix }}$PATH"
+          bash --version | head -1
+          go version
+          jq --version
+          git --version
+
+      - name: Go tests
+        working-directory: cli
+        run: go test ./...
+
+      # The release workflow's go test fails on a tag whose scripts are missing
+      # from released-blobs.txt. Apply the same test to the head of a release
+      # branch, via a throwaway local v* tag, so a merge that leaves the list
+      # stale fails here instead of at tag time. (Not `gen-released-blobs.sh
+      # --check`: the list may hold extra blobs from refs this clone lacks.)
+      - name: released-blobs cover the release branch
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/heads/release/')
+        working-directory: cli
+        run: |
+          git tag v0.0.0-ci-head HEAD
+          go test ./internal/migrate -run '^TestReleasedManifestCoversLocalTags$' -count=1
+
+      - name: ci-check
+        run: |
+          export PATH="${{ matrix.path_prefix }}$PATH"
+          scripts/ci-check.sh
+
+      - name: Script tests
+        run: |
+          export PATH="${{ matrix.path_prefix }}$PATH"
+          if [ -x scripts/tests/run.sh ]; then
+            echo "scripts/tests/run.sh is part of ci-check; nothing extra to run."
+            exit 0
+          fi
+          failed=0
+          for t in scripts/tests/*.test.sh; do
+            echo "::group::$t"
+            bash "$t" || failed=1
+            echo "::endgroup::"
+          done
+          exit "$failed"

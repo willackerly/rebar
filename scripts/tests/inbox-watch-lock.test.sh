@@ -15,21 +15,20 @@
 # Override the binary under test with INBOX_WATCH_BIN.
 set -uo pipefail
 
-HERE="$(cd "$(dirname "$0")" && pwd)"
-WATCH="${INBOX_WATCH_BIN:-$HERE/../inbox-watch.sh}"
+. "$(dirname "$0")/lib.sh"
+WATCH="${INBOX_WATCH_BIN:-$REBAR_SCRIPTS/inbox-watch.sh}"
 LOCK=".inbox-watch.lock"
-
-fail() { echo "FAIL: $*" >&2; exit 1; }
 [ -f "$WATCH" ] || fail "watcher not found at $WATCH"
 
-TMP="$(mktemp -d)"
+rebar_tmpdir inbox-watch-lock
 PIDS=""
-cleanup() { for p in $PIDS; do kill "$p" 2>/dev/null; done; rm -rf "$TMP"; }
-trap cleanup EXIT
+rebar_on_exit 'for p in $PIDS; do kill "$p"; done'
 mkdir -p "$TMP/inbox"
 INBOX="$TMP/inbox"
 
 arm() { # arm a watcher on $INBOX, redirecting out/err to given files; echo pid
+  # Called as X="$(arm ...)", so this runs in a subshell: the caller must add
+  # the echoed PID to PIDS itself, or the EXIT cleanup can't kill the watcher.
   # Absolute path, NO subshell wrapper: `$!` must be the watcher's own PID
   # (the process that writes the lock). A `( cd && bash )` wrapper would make
   # `$!` the subshell PID and the watcher's real PID would be its child.
@@ -37,12 +36,13 @@ arm() { # arm a watcher on $INBOX, redirecting out/err to given files; echo pid
   # assertions grep for "already holds", a different line.)
   local out="$1" err="$2"
   bash "$WATCH" -i 1 "$INBOX" > "$out" 2> "$err" &
-  local p=$!; PIDS="$PIDS $p"; echo "$p"
+  echo "$!"
 }
 settle() { sleep 2; }
 
 # --- T1: lock written, holds our PID, hidden from ls -1 --------------------
 A="$(arm "$TMP/a.out" "$TMP/a.err")"
+PIDS="$PIDS $A"  # arm runs in a $(...) subshell; record the PID here
 settle
 [ -f "$INBOX/$LOCK" ] || fail "T1: no lock file written"
 held="$(head -n1 "$INBOX/$LOCK" | tr -dc '0-9')"
@@ -53,6 +53,7 @@ echo "T1 PASS: lock written (PID $A), hidden from ls -1"
 
 # --- T2: second watcher on the same inbox warns, does not steal ------------
 B="$(arm "$TMP/b.out" "$TMP/b.err")"
+PIDS="$PIDS $B"  # arm runs in a $(...) subshell; record the PID here
 settle
 grep -q "already holds" "$TMP/b.err" || fail "T2: second watcher did not warn (b.err: $(cat "$TMP/b.err"))"
 grep -q "PID $A" "$TMP/b.err" || fail "T2: warning did not name the live holder PID $A"
@@ -72,6 +73,7 @@ kill "$B" 2>/dev/null; wait "$B" 2>/dev/null
 sh -c 'exit 0' & DEAD=$!; wait "$DEAD" 2>/dev/null   # DEAD is now a dead PID
 printf '%s\n' "$DEAD" > "$INBOX/$LOCK"
 C="$(arm "$TMP/c.out" "$TMP/c.err")"
+PIDS="$PIDS $C"  # arm runs in a $(...) subshell; record the PID here
 settle
 grep -q "already holds" "$TMP/c.err" && fail "T4: false warning on a stale (dead-PID $DEAD) lock (c.err: $(cat "$TMP/c.err"))"
 held="$(head -n1 "$INBOX/$LOCK" | tr -dc '0-9')"

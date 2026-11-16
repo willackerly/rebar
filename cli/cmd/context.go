@@ -8,6 +8,8 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+
+	"github.com/willackerly/rebar/cli/internal/config"
 )
 
 var contextCmd = &cobra.Command{
@@ -85,7 +87,7 @@ func runContext(cmd *cobra.Command, args []string) error {
 		return runSessionStart()
 	}
 
-	patterns, ok := roleFiles[role]
+	rolePatterns, ok := roleFiles[role]
 	if !ok {
 		available := make([]string, 0, len(roleFiles))
 		for r := range roleFiles {
@@ -96,6 +98,10 @@ func runContext(cmd *cobra.Command, args []string) error {
 		sort.Strings(available)
 		return fmt.Errorf("unknown role %q — available: %s, session-start", role, strings.Join(available, ", "))
 	}
+
+	// Role patterns name the default contracts dir; branch contract patterns
+	// already name the configured one, so only the former are rewritten.
+	patterns := withContractsDirAll(rolePatterns)
 
 	// For developer role, also include contracts for files changed on current branch
 	if role == "developer" {
@@ -177,6 +183,8 @@ func findBranchContracts() []string {
 		return nil
 	}
 
+	namespace := config.ContractNamespace(cfg.RepoRoot)
+	contractsDir := config.ContractsDirFor(cfg.RepoRoot)
 	contracts := map[string]bool{}
 	for _, file := range strings.Split(diff, "\n") {
 		file = strings.TrimSpace(file)
@@ -197,15 +205,30 @@ func findBranchContracts() []string {
 			limit = len(lines)
 		}
 		for _, line := range lines[:limit] {
-			if idx := strings.Index(line, "CONTRACT:"); idx >= 0 {
-				ref := line[idx:]
-				// Extract the contract ID (e.g., the C1-BLOBSTORE.2.1 portion).
-				// The literal CONTRACT prefix is intentionally elided in this
-				// comment so check-contract-refs.sh doesn't false-positive on it.
-				ref = strings.TrimPrefix(ref, "CONTRACT:")
-				ref = strings.Fields(ref)[0]
-				// Convert to glob pattern
-				pattern := fmt.Sprintf("architecture/CONTRACT-%s*.md", strings.Split(ref, ".")[0])
+			// Every reference on the line counts: a foreign reference may
+			// precede a local one. The literal CONTRACT prefix is elided in
+			// these comments so check-contract-refs.sh doesn't read them.
+			const marker = "CONTRACT:"
+			for rest := line; ; {
+				idx := strings.Index(rest, marker)
+				if idx < 0 {
+					break
+				}
+				rest = rest[idx+len(marker):]
+				fields := strings.Fields(rest)
+				if len(fields) == 0 {
+					break
+				}
+				// A reference qualified with another repo's contract
+				// namespace has no contract file here.
+				ref, ok := config.LocalContractRef(fields[0], namespace)
+				if !ok {
+					continue
+				}
+				// The contract ID (the C1-BLOBSTORE portion of C1-BLOBSTORE.2.1)
+				// as a glob under the contracts dir.
+				id := strings.Split(ref, ".")[0]
+				pattern := filepath.ToSlash(filepath.Join(contractsDir, "CONTRACT-"+id+"*.md"))
 				contracts[pattern] = true
 			}
 		}
@@ -221,8 +244,7 @@ func findBranchContracts() []string {
 
 func runSessionStart() error {
 	// First, try to run refresh-context.sh
-	refreshScript := filepath.Join(cfg.RepoRoot, "scripts", "refresh-context.sh")
-	if _, err := os.Stat(refreshScript); err == nil {
+	if _, ok := resolveScript(cfg.RepoRoot, findRebarRoot(), "refresh-context.sh"); ok {
 		fmt.Println("═══ Freshness Check ═══")
 		fmt.Println()
 		out := gitOutput("log", "--since=7 days", "--oneline")

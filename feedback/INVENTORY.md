@@ -31,7 +31,7 @@ section below._
 
 | Item | Decision | Source |
 |------|----------|--------|
-| Flip `registry_impl_counts` default to `false` | 3.1 (stays `true` on 3.0) | `feedback/2026-11-14-busy-repo-merge-conflicts.md` Q1 |
+| ~~Flip `registry_impl_counts` default to `false`~~ | **Done in v3.1.0-rc.1** | `feedback/2026-11-14-busy-repo-merge-conflicts.md` Q1 |
 
 ### 2026-08-02 window — all five implemented same-day
 

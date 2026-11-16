@@ -18,9 +18,18 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-STATE_DIR="$PROJECT_ROOT/architecture/.state"
-ARCH_DIR="$PROJECT_ROOT/architecture"
+PROJECT_ROOT="${REBAR_PROJECT_ROOT:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+# shellcheck source=scripts/_rebar-config.sh
+source "$SCRIPT_DIR/_rebar-config.sh" 2>/dev/null || true
+type _rebar_script >/dev/null 2>&1 || _rebar_script() { echo "$SCRIPT_DIR/$1"; }
+CONTRACTS_DIR=architecture
+type _rebar_contracts_dir >/dev/null 2>&1 && CONTRACTS_DIR=$(_rebar_contracts_dir)
+# Start of a reference to this repo's contracts: CONTRACT:, plus an optional
+# CONTRACT:<namespace>: when .rebarrc sets contract_namespace.
+REF_ERE='CONTRACT:'
+type _rebar_contract_ref_ere >/dev/null 2>&1 && REF_ERE=$(_rebar_contract_ref_ere)
+STATE_DIR="$PROJECT_ROOT/$CONTRACTS_DIR/.state"
+ARCH_DIR="$PROJECT_ROOT/$CONTRACTS_DIR"
 
 # Ensure state directory exists
 mkdir -p "$STATE_DIR"
@@ -85,7 +94,9 @@ scan_contract() {
     completeness="fail"
   fi
 
-  # Implementing files: grep for CONTRACT:<id> across the project
+  # Implementing files: grep for CONTRACT:<id> (or, with a contract
+  # namespace, CONTRACT:<namespace>:<id>) across the project. References
+  # qualified with another repo's namespace are not implementations of ours.
   local impl_files=()
   local test_files=()
 
@@ -93,7 +104,7 @@ scan_contract() {
     local filepath
     filepath="$(echo "$line" | cut -d: -f1)"
     impl_files+=("$filepath")
-  done < <(grep -rn "CONTRACT:${id}" "$PROJECT_ROOT" \
+  done < <(grep -rEn "${REF_ERE}${id}" "$PROJECT_ROOT" \
     --include='*.go' --include='*.ts' --include='*.js' --include='*.py' \
     --include='*.rs' --include='*.java' --include='*.rb' --include='*.c' \
     --include='*.cpp' --include='*.h' --include='*.cs' --include='*.swift' \
@@ -245,7 +256,8 @@ run_enforcement() {
     if [ "$script" != "$script_with_args" ]; then
       args="${script_with_args#* }"
     fi
-    local script_path="$SCRIPT_DIR/$script"
+    local script_path
+    script_path="$(_rebar_script "$script" 2>/dev/null)"
     total=$((total + 1))
 
     local result="skip"

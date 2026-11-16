@@ -22,6 +22,251 @@ _Nothing yet._
 
 ---
 
+## v3.1.0 — 2026-11-16
+
+**Adopters carry configuration, not rebar's scripts.** Checks run from a
+versioned, self-contained rebar install (`rebar check`, `rebar run <check>`);
+everything repo-specific lives in `.rebarrc`
+([docs/CONFIGURATION.md](docs/CONFIGURATION.md)); `rebar migrate` converts a
+project's copied, even customized, scripts into settings, verified by running
+them; and the installer keeps versions side by side under `~/.rebar/versions/`,
+installing checksum-verified prebuilt downloads. Upgrade with
+[UPGRADING.md](UPGRADING.md); CI needs a full rebar tree, not just the binary
+([SETUP.md § Run rebar in CI](SETUP.md#run-rebar-in-ci)).
+
+Field-tested on virtru-analyze: upgrades from v2.0.0 and v3.0.0-beta.4 copies,
+and the adopter's own CI running a pinned 3.1 tree. The full list of changes is
+in the release candidates below; since rc.3:
+
+- **`rebar new` writes the contract registry,** so a new project passes its
+  first `rebar check`. The registry check runs at every tier and failed with
+  "CONTRACT-REGISTRY.md does not exist" (15/16) until the user ran
+  `rebar run compute-registry`; the registry is now generated before the
+  initial commit and included in it.
+- **`metrics_strict = true` also fails when `.rebarrc` declares no metrics.**
+  In rc.3, a strict check with no `metric.<key>.*` lines passed ("No metrics
+  declared"), so deleting the declarations silently turned enforcement off.
+  A strict failure for a missing `METRICS` file or missing declarations now
+  ends with "Ground truth not verified" instead of the misleading "Metric
+  drift detected".
+
+---
+
+## v3.1.0-rc.3 — 2026-11-16
+
+Third release candidate for 3.1.0, still a **pre-release** (default "latest"
+stays `v3.0.0`). Fixes from running rc.2 in a real adopter's CI
+(virtru-analyze #457), and the released-blobs CI guard (#30):
+
+- **Root flags before a pass-through command work:** `rebar --repo-root X run
+  check-todos` (and `-v`, `--json`) failed with `no script "--repo-root"`,
+  because `run` takes its arguments verbatim and cobra handed it the root
+  flags too. Root flags before `run`, `ask` or `push` are now parsed by rebar;
+  for `run` also between `run` and the script name. Everything after the
+  script name (for `ask`/`push`, after the command name) still passes through
+  untouched, so `rebar ask -v …` keeps meaning ask's own `-v`.
+- **SETUP.md's pinned CI wrapper no longer leaks a temp clone per cold run.**
+  It set `trap 'rm -rf "$tmp"' EXIT` and then `exec`'d the pinned rebar, which
+  replaces the shell before any EXIT trap can run. It now removes the temp dir
+  (and drops the trap) once the tree is in place. If you copied the snippet,
+  add `rm -rf "$tmp"; trap - EXIT` after its `mv`. A new test runs the snippet
+  straight from SETUP.md.
+- **`rebar migrate` keeps a `check-ground-truth.sh` that callers source for
+  other functions.** A file sourcing the copy got the thin wrapper, which
+  defines only `compute_metrics()`, so a caller using the copy's `count_*`
+  helpers (virtru-analyze's `rebar-fix.sh`) would break. migrate now keeps
+  the copy, names the caller and functions, and notes how to migrate the
+  caller (read `rebar run check-ground-truth --print`). It also recognizes
+  `. "$(dirname "$0")/x.sh"` as sourcing (a path with spaces inside a
+  command substitution was missed).
+- **`.rebarrc` `metrics_strict = true`** (env `REBAR_METRICS_STRICT`) makes
+  `check-ground-truth` fail when `METRICS` is missing and when a declared
+  metric has no `METRICS` line; by default these still pass (SKIP, NEW).
+  `rebar migrate` now also compares the copy and the install in those two
+  cases: it proposes `metrics_strict = true` when the copy failed both (as
+  virtru-analyze's did; rc.2 judged them equivalent and dropped the
+  failures), and keeps a copy that fails only one of them.
+- **`metric.<key>.tracked = true`** counts only files git tracks (for
+  `type = dirs`, directories holding a tracked file), so gitignored or
+  untracked local files no longer inflate a count such as `shell_scripts`.
+  Outside a git work tree it has no effect (every file counts, with a note on
+  stderr). `rebar migrate` reads and keeps the field on metrics already in
+  `.rebarrc`; it does not derive it from a legacy copy.
+- **Colour only on a terminal:** `check-ground-truth`, `refresh-context` and
+  `test-e2e-live` printed ANSI colour codes into CI logs and pipes. They now
+  colour only when stdout is a terminal and `NO_COLOR` is unset.
+- **Release branches can't go stale for the release workflow:** CI now runs
+  the release workflow's released-blobs coverage test against the head of a
+  `release/**` branch on every push (#30), so a merge that leaves
+  `released-blobs.txt` incomplete fails at once, not at tag time (rc.2's
+  first tag did).
+
+---
+
+## v3.1.0-rc.2 — 2026-11-15
+
+Second release candidate for 3.1.0, still a **pre-release** (default "latest"
+stays `v3.0.0`). One fix found by testing rc.1 on a real adopter:
+
+- **`refresh-context.sh` no longer dies with exit 141** in a repo with many
+  commits since QUICKCONTEXT was last synced. It listed them with
+  `git log | head -20` under `pipefail`, so git got SIGPIPE and `set -e` ended
+  the script; it now uses `git log -n 20`. `test-e2e-live.sh` dropped the same
+  pattern (`git for-each-ref --count=1`, `find -print -quit`).
+
+---
+
+## v3.1.0-rc.1 — 2026-11-15
+
+First release candidate for 3.1.0, a **pre-release**: the installer's default
+"latest" stays on `v3.0.0`; install it with an explicit version
+(`curl -fsSL https://raw.githubusercontent.com/willackerly/rebar/v3.1.0-rc.1/setup-rebar.sh | bash -s -- v3.1.0-rc.1`)
+or `--pre`. The theme is **adopters carry configuration, not rebar's
+scripts**: the checks run from a versioned, self-contained install, everything
+repo-specific moves into `.rebarrc`, and `rebar migrate` converts existing
+copied (even customized) scripts, verified by running them. Upgrade steps:
+[UPGRADING.md](UPGRADING.md).
+
+- **Implementing-file counts are off by default** (`.rebarrc`
+  `registry_impl_counts`, now `false`): the committed registry has no
+  `Impl Files` column and no Contract Health section, because any PR that adds
+  a `CONTRACT:` header changes them and two such PRs merge into a wrong count.
+  `rebar run compute-registry --health` prints them. **Upgrade note:** a
+  registry with counts reports STALE once — regenerate it (UPGRADING.md step
+  5), or set `registry_impl_counts = true` to keep them. `rebar migrate`
+  follows the new default and regenerates unless the project opted in.
+- **The registry's regenerate hint names the CLI:** `<!-- Regenerate: rebar run
+  compute-registry -->` (it said `./scripts/compute-registry.sh`, which adopters
+  no longer have). `compute-registry.sh --check` ignores that comment, as it
+  ignores the old timestamp, so a registry with the old hint stays current and
+  picks up the new one when next regenerated; `rebar migrate` compares
+  registries the same way.
+- **The source scanners skip binary files** (`grep -I`). A matching binary was
+  reported as "Binary file … matches" and read as a reference or a TODO — a
+  built `bin/rebar` that embeds `CONTRACT:` strings made the registry STALE.
+
+- **Upgrading:** [UPGRADING.md](UPGRADING.md) is the runbook for moving an
+  adopting project from v2.0.0 or v3.0.x (install side by side, bump
+  `.rebar-version` and the badge, `rebar migrate`, registry, `checks_enable`,
+  integrity manifest, CI, verify). Install a release candidate with its own
+  tag's installer:
+  `curl -fsSL https://raw.githubusercontent.com/willackerly/rebar/v3.1.0-rc.1/setup-rebar.sh | bash -s -- v3.1.0-rc.1`
+  ([SETUP.md § Testing a release candidate](SETUP.md#testing-a-release-candidate)).
+  CI must install a full rebar tree, not just the binary
+  ([SETUP.md § Run rebar in CI](SETUP.md#run-rebar-in-ci)).
+- **`rebar migrate`** turns an adopter's legacy, possibly customized,
+  script copies into `.rebarrc` settings, decided by running them: each
+  `compute_metrics()` line of a custom `check-ground-truth.sh` becomes
+  `metric.<key>.*` only if the install computes the same value, on the
+  project and on a probe tree built from the metric; registry settings are
+  kept only if `compute-registry.sh --stdout` stays byte-identical
+  (`registry_purpose_style = bytes` when the old cut is needed); other checks
+  must give the same exit status and findings, and the source scanners also
+  on a probe tree with exclusion bait. All probes run in a scratch copy of
+  the project, and a copy that writes files is kept. Dry run by default;
+  `--apply` refuses a dirty work tree (`--allow-dirty`), writes `.rebarrc`
+  atomically, deletes only verified copies (a copy other files call becomes
+  a `# rebar-thin-wrapper` instead, so callers keep working), adjusts METRICS
+  counts the deletions change, reruns the checks and rolls everything back on
+  a regression. It refuses symlinked `scripts/` outside the project and any
+  rebar checkout, ignores `REBAR_*` in the environment, never changes `tier`,
+  and keeps checks whose copies ran ungated below the install's tier gate
+  running with a proposed `checks_enable`. Unmodified copies are recognized
+  from a released-blobs list embedded in the CLI
+  (`scripts/gen-released-blobs.sh`, a release step), so installs without git
+  history work. A scanner copy that is a released version plus settings
+  (its directories, extensions) is migrated even though the install now
+  excludes directories by name (#19), with the newly reported findings
+  listed before `--apply`; old substring filters map to
+  `source_exclude_dirs`. The CLI now honors `REBAR_PROJECT_ROOT` for repo
+  detection, as the scripts do.
+  `check-ground-truth.sh --print` and `REBAR_RCFILE` support it. Design:
+  `feedback/2026-11-14-rebar-migrate.md`.
+- **CLI errors are printed.** A failing command printed nothing and exited 1
+  (cobra's printing was off and `main` didn't print), so hints like
+  "rebar install not found (set REBAR_ROOT …)" never reached the user. They now
+  go to stderr as `rebar: <error>`.
+- **`rebar commit` drops manifest entries for staged deletions** (a rename
+  counts as delete + add). They used to stay, so `rebar verify --strict`
+  reported the files as Missing — e.g. after `rebar migrate --apply`.
+- The registry check's hint says `rebar run compute-registry` instead of the
+  project-local `scripts/compute-registry.sh`.
+
+- **Versioned installer.** `setup-rebar.sh [<version>|latest|<branch>]`
+  installs side by side under `~/.rebar/versions/<version>/`, with
+  `~/.rebar/current` pointing at the active one and `~/.rebar/current/bin`
+  on PATH. "latest" (the default) is the highest stable tag (the highest
+  pre-release only while no stable tag exists); `--pre` includes
+  pre-releases. Tags download a
+  prebuilt tarball verified against the release's SHA-256 checksums, and
+  build from source (git + Go) when the release has no assets; branches and
+  full commit SHAs always build from source, replacing the committed darwin/arm64
+  `bin/rebar`. `--pre`, `--no-switch`, `--source`. An existing `~/.rebar` clone is
+  left untouched; versions are added inside it. Design:
+  `feedback/2026-11-14-versioned-installer.md` (from #8).
+- **Release workflow.** Pushing a `v*` tag builds darwin/linux ×
+  amd64/arm64 with `scripts/package-release.sh` and publishes a GitHub
+  Release (a pre-release for suffixed tags) with the tarballs and
+  `rebar_<ver>_checksums.txt`.
+- **`rebar version` can be stamped:** `-ldflags "-X
+  github.com/willackerly/rebar/cli/cmd.Version=<ver>"`; branch builds from
+  the installer report `<branch>@<sha7>`. README badges written by `rebar
+  new` / `rebar adopt` still use the release string.
+- **Adopters carry configuration, not rebar's scripts.** `rebar check`,
+  `rebar check --pre-commit|--cold-start` and the new `rebar run <script>`
+  run the rebar install's scripts against the project
+  (`REBAR_PROJECT_ROOT`). The bootstrap template's `scripts/` is down to
+  two `# rebar-thin-wrapper` entry points. Legacy project copies keep
+  running, with a deprecation notice. Design and migration:
+  `feedback/2026-11-14-self-contained-install.md` (from #8).
+- **Repo-specific settings in `.rebarrc`:** declarative METRICS
+  (`metric.<key>.*`, same `=` / `>=` semantics), registry classification
+  and purpose settings, `source_dirs`, `source_extensions`,
+  `freshness_max_days`.
+- **`contracts_dir`** (default `architecture`) moves the contracts,
+  registry and steward state anywhere in the repo; honored by every script
+  and the CLI.
+- **Registry purposes are cut cleanly by default** (`registry_purpose_style
+  = ellipsis`): `|` is escaped so it can't break the table, and long
+  purposes are cut to 77 characters plus `...` instead of at byte 80, which
+  could split a multibyte character. **Upgrade note:** a registry generated
+  with the old cut reports STALE once; regenerate it, or set
+  `registry_purpose_style = bytes` to keep the old output.
+- **`checks_enable`** (`.rebarrc`, env `REBAR_CHECKS_ENABLE`) runs named
+  checks regardless of the tier, each as it would run at tier 3:
+  `tier = 1` + `checks_enable = check-ground-truth` runs ground truth.
+  Names are check script basenames without `.sh`; an unknown name warns
+  once per run and is ignored. `rebar status` and `rebar audit --all` show
+  the enabled checks. Unset, nothing changes. The registry check was never
+  tier-gated (docs said tier 2+); they now say it runs at every tier.
+- **`contract_namespace`** (optional, e.g. `github.com/org/repo`): source
+  may cite this repo's contracts as `CONTRACT:<namespace>:<ID>.<v>` as well
+  as the short form. Steward, compute-registry, check-contract-refs,
+  check-registry and `rebar context developer` treat both alike
+  (check-contract-headers only shows the qualified form in its hint); references
+  qualified with another repo's namespace are counted, never treated as
+  ours. Filenames stay unnamespaced; composes with `contracts_dir`; unset
+  behaves exactly as before. From #8; see
+  `feedback/2026-11-14-contract-namespace.md`.
+- **Fix: the source scanners skipped too much.** check-todos, check-contract-refs,
+  check-registry and compute-registry's non-git fallback dropped any match whose
+  path or line text contained `dist`, `vendor`, `node_modules` or `.git`
+  (a broken reference under `.github/` or in `distance.go`, a TODO mentioning
+  `TODO.md`, every match when the project's own path contained `dist`). They now
+  skip directories by name: `.rebarrc` `source_exclude_dirs` (default
+  `node_modules vendor dist`) plus `.git` and `.claude` (agent worktrees, which
+  were scanned before). `contracts_dir` is normalised (`./docs/specs/` →
+  `docs/specs`); check-registry also scans `*.sh` and `bin/` and skips
+  `CONTRACT-SEAM-TEMPLATE.md`. **Upgrade note:** checks can report findings
+  they used to miss — e.g. TODOs in compiled `dist-esm/` output now block
+  pre-commit; add such directories to `source_exclude_dirs`.
+- **Fix:** `check-registry.sh` stopped silently (exit 1, no ORPHAN line)
+  at the first contract with no implementing file.
+- `sync-bootstrap.sh --check` also keeps the bootstrap template's
+  `CONTRACT-TEMPLATE.md` identical to `architecture/`.
+
+---
+
 ## v3.0.0 — 2026-11-14
 
 Graduation of the v3 line. The four annealing betas (`v3.0.0-beta`,

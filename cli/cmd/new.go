@@ -9,7 +9,9 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+	"github.com/willackerly/rebar/cli/internal/config"
 	"github.com/willackerly/rebar/cli/internal/llm"
+	"github.com/willackerly/rebar/cli/internal/scripts"
 )
 
 var (
@@ -75,7 +77,7 @@ func runNew(cmd *cobra.Command, args []string) error {
 	fmt.Println("  ✓ .rebarrc")
 
 	// .rebar-version
-	os.WriteFile(filepath.Join(root, ".rebar-version"), []byte(rootCmd.Version+"\n"), 0644)
+	os.WriteFile(filepath.Join(root, ".rebar-version"), []byte(badgeVersion()+"\n"), 0644)
 	fmt.Println("  ✓ .rebar-version")
 
 	// .gitignore
@@ -104,7 +106,7 @@ build/
 	bootstrapV2Files(root)
 
 	// README.md
-	readme := fmt.Sprintf("# %s\n\n> **rebar %s** | **Tier 1: PARTIAL**\n\n", name, rootCmd.Version)
+	readme := fmt.Sprintf("# %s\n\n> **rebar %s** | **Tier 1: PARTIAL**\n\n", name, badgeVersion())
 	if newDescription != "" {
 		readme += newDescription + "\n\n"
 	}
@@ -120,8 +122,9 @@ build/
 	writeMinimalClaude(root, name)
 	fmt.Println("  ✓ CLAUDE.md")
 
-	// architecture/
-	archDir := filepath.Join(root, "architecture")
+	// contracts directory (architecture/ by default)
+	contractsDir := config.ContractsDirFor(root)
+	archDir := filepath.Join(root, contractsDir)
 	os.MkdirAll(archDir, 0755)
 	rebarRoot := findRebarRoot()
 	if rebarRoot != "" {
@@ -130,15 +133,19 @@ build/
 			os.WriteFile(filepath.Join(archDir, "CONTRACT-TEMPLATE.md"), data, 0644)
 		}
 	}
-	fmt.Println("  ✓ architecture/")
+	fmt.Printf("  ✓ %s/\n", contractsDir)
 
-	// scripts/
+	// scripts/ — the thin entry points; every check runs from the rebar install.
 	scriptsDir := filepath.Join(root, "scripts")
 	os.MkdirAll(scriptsDir, 0755)
 	if rebarRoot != "" {
-		src := filepath.Join(rebarRoot, "scripts", "refresh-context.sh")
-		if data, err := os.ReadFile(src); err == nil {
-			os.WriteFile(filepath.Join(scriptsDir, "refresh-context.sh"), data, 0755)
+		srcDir := filepath.Join(rebarRoot, "templates", "project-bootstrap", "scripts")
+		if entries, err := os.ReadDir(srcDir); err == nil {
+			for _, e := range entries {
+				if data, err := os.ReadFile(filepath.Join(srcDir, e.Name())); err == nil && !e.IsDir() {
+					os.WriteFile(filepath.Join(scriptsDir, e.Name()), data, 0755)
+				}
+			}
 		}
 	}
 	fmt.Println("  ✓ scripts/")
@@ -185,7 +192,7 @@ Be practical and specific. Don't over-engineer — this is a fresh project.`, na
 			sections := parseLLMSections(response)
 
 			if content, ok := sections["README Content"]; ok {
-				readme := fmt.Sprintf("# %s\n\n> **rebar %s** | **Tier 1: PARTIAL**\n\n%s\n", name, rootCmd.Version, content)
+				readme := fmt.Sprintf("# %s\n\n> **rebar %s** | **Tier 1: PARTIAL**\n\n%s\n", name, badgeVersion(), content)
 				os.WriteFile(filepath.Join(root, "README.md"), []byte(readme), 0644)
 				fmt.Println("  ✓ README.md (AI-generated)")
 			}
@@ -203,8 +210,19 @@ Be practical and specific. Don't over-engineer — this is a fresh project.`, na
 					fmt.Printf("    %s\n", line)
 				}
 				fmt.Println()
-				fmt.Println("  Create these using: architecture/CONTRACT-TEMPLATE.md")
+				fmt.Printf("  Create these using: %s/CONTRACT-TEMPLATE.md\n", contractsDir)
 			}
+		}
+	}
+
+	// The registry check runs at every tier, so the first `rebar check` fails
+	// without a registry. It lists tracked files, so stage first.
+	exec.Command("git", "-C", root, "add", "-A").Run()
+	if s, ok := resolveScript(root, rebarRoot, "compute-registry"); ok {
+		if out, code, err := scripts.OutputInProject(s.Path, root); err != nil || code != 0 {
+			fmt.Fprintf(os.Stderr, "  ⚠ compute-registry failed (exit %d): %s\n", code, strings.TrimSpace(string(out)))
+		} else {
+			fmt.Printf("  ✓ %s/CONTRACT-REGISTRY.md\n", contractsDir)
 		}
 	}
 

@@ -6,7 +6,7 @@
 This file declares which **external contracts** (owned by other rebar
 repos) this project depends on. It exists because:
 
-- Owners can scan their consumers (`scripts/scan-consumers.sh`) and notify
+- Owners can scan their consumers (`rebar run scan-consumers`) and notify
   them of revisions via the existing `ask_<consumer>_featurerequest` gate
 - Consumers can detect upstream drift (`rebar contract drift-check`) and
   decide when to upgrade
@@ -90,10 +90,10 @@ Example:
   repo via the existing `ask_<owner>_featurerequest` gate, proposing
   your local extension be considered for upstreaming.
 
-- **Owner-side `scripts/scan-consumers.sh <my-contract>`** — greps known
+- **Owner-side `rebar run scan-consumers <my-contract>`** — greps known
   sibling repos for `CONSUMES.md` declarations citing the contract.
 
-- **Owner-side `scripts/flush-notifications.sh`** — when owner has bumped
+- **Owner-side `rebar run flush-notifications`** — when owner has bumped
   a contract version, files notification FRs in each consumer who
   declared `notify_on_change: true` (or all, per owner's policy).
 
@@ -105,7 +105,7 @@ Adding a `CONSUMES.md` is **opportunistic**: declare your dependencies
 when you hit a real cross-repo coordination need (you want notifications
 of upstream changes, or you want your local extension considered for
 upstreaming). Once you add this file, `rebar contract drift-check`
-becomes a required CI check per `scripts/check-compliance.sh` —
+becomes a required CI check per `rebar run check-compliance` —
 self-selecting adopters get gated when they're ready.
 
 If you have no cross-repo dependencies, **delete this file** or leave it

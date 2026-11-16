@@ -8,12 +8,12 @@ The contract filesystem IS the registry. This script renders it.
 
 **To regenerate:**
 ```bash
-./scripts/compute-registry.sh
+rebar run compute-registry
 ```
 
 **To verify it's current (CI/steward):**
 ```bash
-./scripts/compute-registry.sh --check
+rebar run compute-registry --check
 ```
 
 ---

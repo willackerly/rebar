@@ -18,7 +18,7 @@ change unrelated things. In one busy adopter (virtru-analyze, 2026-11), over
 | `.rebar/integrity.json` | `generated_at` restamped on every `rebar commit` | CLI: the header is written once by `rebar init` |
 | `.rebar/integrity.json` | `ratchets` `min`/`current`, raised on every commit that adds a test | CLI: floors are derived from the per-file entries |
 | `CONTRACT-REGISTRY.md` | `<!-- Generated: <timestamp> -->` | Script: no timestamp, C collation |
-| `CONTRACT-REGISTRY.md` | `Impl Files` count, changed by any PR that adds a `CONTRACT:` header | Config: `registry_impl_counts = false` |
+| `CONTRACT-REGISTRY.md` | `Impl Files` count, changed by any PR that adds a `CONTRACT:` header | Default since 3.1: counts are left out (`registry_impl_counts`) |
 | `METRICS` | `test_files = 352`, changed by any PR that adds a test | Config: write `test_files >= 352` |
 
 GitHub's merge button and merge queue ignore `.gitattributes` merge drivers,
@@ -47,20 +47,15 @@ With this version of the CLI and scripts, no setup is needed for these:
 Two derived counts can't merge correctly however they are written. If two PRs
 each add an implementing file for the same contract, both change its count from
 13 to 14. Git merges the identical change cleanly and main says 14 when the real
-count is 15, so main's `compute-registry.sh --check` fails. Keep these counts
-out of committed files:
-
-```ini
-# .rebarrc
-registry_impl_counts = false
-```
-
-The registry then has no `Impl Files` column and no Contract Health section.
+count is 15, so main's `compute-registry.sh --check` fails. Since 3.1 these
+counts are left out of the committed registry by default (`.rebarrc`
+`registry_impl_counts`, default `false`): the registry has no `Impl Files`
+column and no Contract Health section. Don't set it to `true` in a busy repo.
 Read them on demand:
 
 ```bash
-scripts/compute-registry.sh --health   # impl counts + zombie/shadow contracts
-scripts/check-registry.sh              # orphan contracts, exits 1 on untracked ones
+rebar run compute-registry --health   # impl counts + zombie/shadow contracts
+rebar run check-registry              # orphan contracts, exits 1 on untracked ones
 ```
 
 For `METRICS`, use floors for counts that most PRs change:
@@ -88,16 +83,25 @@ protected files you changed with `rebar commit`. Don't hand-merge hashes.
 
 ## Adopting in an existing repo
 
-1. Update `scripts/compute-registry.sh`, `scripts/_rebar-config.sh` and the
-   verification engine in `scripts/check-ground-truth.sh` (below the
-   "do not modify" line) from this version. Keep any local customizations.
-2. Add `registry_impl_counts = false` to `.rebarrc` and regenerate the registry
-   once: `scripts/compute-registry.sh`.
-3. Change churning `METRICS` lines to `>=` floors.
-4. Pin the CLI version that keeps the manifest header stable.
-5. Remove `.rebar/integrity.json merge=ours` from `.gitattributes`. It needs a
-   local `merge.ours.driver` setting to do anything, and it never applies to
-   PR merges on GitHub.
+Upgrade with [UPGRADING.md](../UPGRADING.md): install the new version,
+`rebar migrate` your copied scripts, then steps 5, 6 and 9 there cover what
+matters for a busy repo. In short:
+
+1. Land the whole upgrade (migrate, registry, `.rebarrc`, METRICS, manifest)
+   in one PR, merged while few others are open: it regenerates the registry
+   and rewrites `METRICS`, `.rebarrc` and `integrity.json`, so every open
+   branch rebases onto it once.
+2. Regenerate the registry (`rebar run compute-registry`) in that same PR, so
+   the purpose-style change and the dropped counts column (both 3.1
+   defaults) cost one regeneration, not two.
+3. Turn churning `METRICS` lines into `>=` floors.
+4. Commit with the 3.1 CLI (`rebar commit`): it keeps the manifest header
+   stable and drops the old ratchet `current` lines once. Pin that version in
+   CI ([SETUP.md § Run rebar in CI](../SETUP.md#run-rebar-in-ci)) so no
+   older CLI rewrites them again.
+5. Remove `.rebar/integrity.json merge=ours` from `.gitattributes`. It needs
+   a local `merge.ours.driver` setting to do anything, and it never applies
+   to PR merges on GitHub.
 
 Regression test: `scripts/tests/merge-friendly.test.sh`, and
 `TestBranchesTouchingDifferentFilesMergeCleanly` in `cli/internal/integrity`.

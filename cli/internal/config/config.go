@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 )
@@ -17,7 +19,17 @@ type Config struct {
 	ScriptsDir string // scripts/
 	AgentsDir  string // agents/
 	BinDir     string // bin/
+	// ContractsDir holds the contracts (CONTRACT-*.md, CONTRACT-REGISTRY.md,
+	// the steward's .state/), relative to RepoRoot. It names the contracts
+	// location only: some repos keep other design docs in architecture/.
+	ContractsDir string
+	// ChecksEnable lists the checks .rebarrc checks_enable force-enables
+	// below their tier (see ChecksEnableFor).
+	ChecksEnable []string
 }
+
+// DefaultContractsDir is where contracts live unless .rebarrc says otherwise.
+const DefaultContractsDir = "architecture"
 
 // Load reads configuration from .rebarrc and .rebar-version, respecting
 // REBAR_TIER env override. Mirrors the logic in scripts/_rebar-config.sh.
@@ -30,6 +42,8 @@ func Load(repoRoot string) (*Config, error) {
 		BinDir:     filepath.Join(repoRoot, "bin"),
 		Tier:       3, // default: full enforcement
 	}
+	c.ContractsDir = ContractsDirFor(repoRoot)
+	c.ChecksEnable = ChecksEnableFor(repoRoot)
 
 	// REBAR_TIER env takes precedence
 	if env := os.Getenv("REBAR_TIER"); env != "" {
@@ -123,4 +137,151 @@ func EnsureRebarDir(repoRoot string) error {
 		}
 	}
 	return nil
+}
+
+// ContractsDirFor returns the contracts directory of the repo at repoRoot,
+// relative to it: env REBAR_CONTRACTS_DIR, then .rebarrc contracts_dir, then
+// "architecture". Mirrors _rebar_contracts_dir in scripts/_rebar-config.sh.
+// A value that is absolute or leaves the repo falls back to the default.
+func ContractsDirFor(repoRoot string) string {
+	dir := os.Getenv("REBAR_CONTRACTS_DIR")
+	if dir == "" {
+		dir = RCValue(repoRoot, "contracts_dir")
+	}
+	dir = filepath.Clean(strings.TrimSpace(dir))
+	if dir == "." || filepath.IsAbs(dir) || dir == ".." || strings.HasPrefix(dir, ".."+string(filepath.Separator)) {
+		return DefaultContractsDir
+	}
+	return dir
+}
+
+// RCValue returns the value of key in repoRoot/.rebarrc ("" if absent),
+// parsed like scripts/_rebar-config.sh: the first `key = value` line wins
+// and `#` starts a comment.
+func RCValue(repoRoot, key string) string {
+	f, err := os.Open(filepath.Join(repoRoot, ".rebarrc"))
+	if err != nil {
+		return ""
+	}
+	defer f.Close()
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		line := scanner.Text()
+		k, v, ok := strings.Cut(line, "=")
+		if !ok || strings.TrimRight(k, " \t") != key {
+			continue
+		}
+		if i := strings.Index(v, "#"); i >= 0 {
+			v = v[:i]
+		}
+		return strings.TrimSpace(v)
+	}
+	return ""
+}
+
+// KnownChecks are the names checks_enable accepts: the script basenames
+// (without .sh) of every check the suites run. Mirrors _REBAR_KNOWN_CHECKS in
+// scripts/_rebar-config.sh.
+var KnownChecks = []string{
+	"check-bypass-flags", "check-compliance", "check-contract-headers",
+	"check-contract-refs", "check-decay-patterns", "check-doc-refs",
+	"check-fix-commit", "check-freshness", "check-ground-truth",
+	"check-jtbd-presence", "check-prefix-uniqueness", "check-todos",
+	"compute-registry", "steward", "sync-bootstrap",
+}
+
+// ChecksEnableFor returns the checks the repo at repoRoot force-enables below
+// their tier: env REBAR_CHECKS_ENABLE, else .rebarrc checks_enable, split on
+// whitespace with any .sh suffix dropped. Unknown names are kept (see
+// UnknownChecks); the scripts warn about and ignore them. Mirrors
+// _rebar_checks_enable in scripts/_rebar-config.sh.
+func ChecksEnableFor(repoRoot string) []string {
+	raw := os.Getenv("REBAR_CHECKS_ENABLE")
+	if raw == "" {
+		raw = RCValue(repoRoot, "checks_enable")
+	}
+	var names []string
+	for _, f := range strings.Fields(raw) {
+		names = append(names, strings.TrimSuffix(f, ".sh"))
+	}
+	return names
+}
+
+// UnknownChecks returns the names that are not in KnownChecks.
+func UnknownChecks(names []string) []string {
+	var unknown []string
+	for _, n := range names {
+		if !slices.Contains(KnownChecks, n) {
+			unknown = append(unknown, n)
+		}
+	}
+	return unknown
+}
+
+// CheckTier is the tier check name runs at: 3 when checks_enable names it,
+// otherwise the configured tier. Mirrors _rebar_check_tier.
+func (c *Config) CheckTier(name string) int {
+	if slices.Contains(c.ChecksEnable, strings.TrimSuffix(name, ".sh")) {
+		return 3
+	}
+	return c.Tier
+}
+
+// contractNamespaceRE is the character set a contract namespace may use
+// (e.g. github.com/org/repo); idVersionRE is the start of a contract
+// ID.version (S1-FOO.1.0), which a namespace must not look like, or the
+// reference <ID>.<v>:see.2 would read as qualified. Mirrors
+// _rebar_contract_namespace_valid in scripts/_rebar-config.sh.
+var (
+	contractNamespaceRE = regexp.MustCompile(`^[A-Za-z0-9._/-]+$`)
+	idVersionRE         = regexp.MustCompile(`^[A-Za-z0-9_-]+\.[0-9]+\.[0-9]+`)
+)
+
+// validContractNamespace reports whether ns may be a contract namespace,
+// for the configured value and for namespaces parsed from references alike.
+func validContractNamespace(ns string) bool {
+	return contractNamespaceRE.MatchString(ns) && !idVersionRE.MatchString(ns)
+}
+
+// qualifiedRefRE splits a namespace-qualified reference body
+// (<namespace>:<ID>.<major>...) into namespace and the rest.
+var qualifiedRefRE = regexp.MustCompile(`^([A-Za-z0-9._/-]+):([A-Za-z0-9][A-Za-z0-9_-]*\.[0-9].*)$`)
+
+// ContractNamespace returns the contract namespace of the repo at repoRoot:
+// env REBAR_CONTRACT_NAMESPACE, then .rebarrc contract_namespace, "" if
+// unset or invalid. With a namespace, a reference to one of this repo's
+// contracts may carry it (CONTRACT + ":" + namespace + ":" + ID.version);
+// references qualified with another namespace belong to other repos.
+// Mirrors _rebar_contract_namespace in scripts/_rebar-config.sh.
+func ContractNamespace(repoRoot string) string {
+	ns := os.Getenv("REBAR_CONTRACT_NAMESPACE")
+	if ns == "" {
+		ns = RCValue(repoRoot, "contract_namespace")
+	}
+	ns = strings.TrimSuffix(strings.TrimSpace(ns), "/")
+	if ns != "" && !validContractNamespace(ns) {
+		fmt.Fprintf(os.Stderr, "rebar: ignoring contract_namespace '%s' (allowed: letters, digits, . _ / -; must not start like a contract ID.version)\n", ns)
+		return ""
+	}
+	return ns
+}
+
+// LocalContractRef interprets ref, the text after a "CONTRACT:" marker, for
+// a repo whose namespace is namespace. It returns the unqualified reference
+// (ID.version...) and true when ref points at this repo's contracts, or
+// false when it is qualified with another repo's namespace. With no
+// namespace configured every ref is returned unchanged, as before
+// namespaces existed.
+func LocalContractRef(ref, namespace string) (string, bool) {
+	if namespace == "" {
+		return ref, true
+	}
+	m := qualifiedRefRE.FindStringSubmatch(ref)
+	if m == nil || !validContractNamespace(m[1]) {
+		return ref, true
+	}
+	if m[1] != namespace {
+		return "", false
+	}
+	return m[2], true
 }

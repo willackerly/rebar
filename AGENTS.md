@@ -1,6 +1,6 @@
 # AGENTS.md — working on rebar itself
 
-> **rebar v3.0.0** | **Tier 3: ENFORCED** — this repo dogfoods its own methodology.
+> **rebar v3.1.0** | **Tier 3: ENFORCED** — this repo dogfoods its own methodology.
 
 ## Read Before Coding
 
@@ -85,6 +85,7 @@ The rebar source repo has contracts for its own load-bearing components:
 | Tier | Target | Speed | Command |
 |------|--------|-------|---------|
 | **T0** | Bash syntax | <2s | `for f in scripts/*.sh; do bash -n "$f"; done` |
+| **T0.5** | Shell regression tests | ~15s | `scripts/tests/run.sh [pattern]` (also in ci-check) |
 | **T1** | Single Go test file | <10s | `cd cli && go test ./cmd/<file>_test.go` |
 | **T2** | All Go tests | <30s | `cd cli && go test ./...` |
 | **T3** | Full ci-check (rebar enforces itself) | <30s | `scripts/ci-check.sh` |
@@ -95,6 +96,11 @@ The rebar source repo has contracts for its own load-bearing components:
 - Iterate at T1 (Go) or T0 (bash). Promote on success.
 - Never skip tiers in the inner loop.
 - The Scout Rule applies — no skipped tests, no flakes, no walking past red.
+- Reuse the shared test helpers rather than writing per-test support code:
+  shell tests source `scripts/tests/lib.sh` (`fail`, `ok`, `g`,
+  `rebar_tmpdir`, `rebar_on_exit`, `run_in`); Go tests use
+  `cli/internal/testutil` (`WriteFile`, `WriteExecutable`, `Git`, `TryGit`,
+  `InitRepo`). Extend them when a helper is missing.
 
 ## TODO Tracking
 

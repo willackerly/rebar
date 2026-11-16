@@ -43,12 +43,9 @@ func runCommit(cmd *cobra.Command, args []string) error {
 
 	// 1. Run pre-commit checks
 	fmt.Println("Running pre-commit checks...")
-	preCommitPath := filepath.Join(cfg.ScriptsDir, "pre-commit.sh")
-	if _, err := os.Stat(preCommitPath); err == nil {
-		exitCode, err := scripts.RunPassthrough(cfg.ScriptsDir, "pre-commit.sh")
-		if err != nil {
-			return fmt.Errorf("running pre-commit: %w", err)
-		}
+	if exitCode, found, err := runRebarScript("pre-commit.sh"); err != nil {
+		return fmt.Errorf("running pre-commit: %w", err)
+	} else if found {
 		if exitCode != 0 {
 			return fmt.Errorf("pre-commit checks failed (exit %d) — fix issues and retry", exitCode)
 		}
@@ -157,6 +154,10 @@ func runCommit(cmd *cobra.Command, args []string) error {
 		updated++
 	}
 
+	// Staged deletions (a rename counts as delete + add) leave the manifest:
+	// otherwise `rebar verify --strict` reports them as Missing forever.
+	pruned := pruneStagedDeletions(manifest, cfg.RepoRoot)
+
 	// 6. Save manifest and stage it
 	if err := manifest.Save(cfg.RebarDir); err != nil {
 		return fmt.Errorf("saving manifest: %w", err)
@@ -179,6 +180,9 @@ func runCommit(cmd *cobra.Command, args []string) error {
 
 	if updated > 0 {
 		fmt.Printf("Integrity: %d protected file(s) updated in manifest\n", updated)
+	}
+	if pruned > 0 {
+		fmt.Printf("Integrity: %d deleted file(s) removed from manifest\n", pruned)
 	}
 
 	// 8. Session checkpoint reminder
@@ -240,4 +244,26 @@ func mustGitOutput(repoRoot string, args ...string) []byte {
 	cmd.Dir = repoRoot
 	out, _ := cmd.Output()
 	return out
+}
+
+// pruneStagedDeletions removes manifest entries for files whose deletion is
+// staged, and returns how many it removed.
+func pruneStagedDeletions(manifest *integrity.Manifest, repoRoot string) int {
+	out, err := exec.Command("git", "-C", repoRoot, "diff", "--cached", "--name-only", "--no-renames", "--diff-filter=D").Output()
+	if err != nil {
+		return 0
+	}
+	pruned := 0
+	for _, path := range strings.Split(strings.TrimSpace(string(out)), "\n") {
+		if path == "" {
+			continue
+		}
+		for _, files := range manifest.Checksums {
+			if _, ok := files[path]; ok {
+				delete(files, path)
+				pruned++
+			}
+		}
+	}
+	return pruned
 }

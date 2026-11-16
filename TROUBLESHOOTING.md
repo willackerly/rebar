@@ -30,12 +30,28 @@ This guide covers the most frequent problems teams encounter when adopting rebar
 - Consider tier 1 (partial) adoption first
 
 ### "Scripts fail with permission errors"
-**Symptoms:** `./scripts/check-*.sh` fails with "Permission denied"
+**Symptoms:** `./scripts/ci-check.sh` or the pre-commit hook fails with "Permission denied"
 
 **Solution:**
 ```bash
 chmod +x scripts/*.sh
 ```
+
+### "ci-check.sh not found in the project or a rebar install" / "pre-commit.sh not found … skipping"
+**Symptoms:** `rebar check` fails with `rebar: ci-check.sh not found in the
+project or a rebar install`, `rebar run <check>` with `no script "<check>" in
+the project or a rebar install`, and `rebar check --pre-commit` prints
+`pre-commit.sh not found … skipping` and exits 0.
+
+**Cause:** the CLI found no rebar install to run the checks from. Since 3.1
+the checks live in the install, not in the project, and the CLI looks in
+`$REBAR_ROOT`, then beside its own binary, then `~/.rebar/current`. A `rebar`
+binary built on its own (for example by a CI wrapper) has no `scripts/` beside
+it.
+
+**Solution:** install with `setup-rebar.sh`, or point `REBAR_ROOT` at a full
+rebar tree of the same version. See
+[SETUP.md § Run rebar in CI](SETUP.md#run-rebar-in-ci).
 
 ### "check-contract-refs.sh fails"
 **Symptoms:** Script reports "CONTRACT: ref doesn't match any contract file"
@@ -116,7 +132,7 @@ ls architecture/CONTRACT-*.md
 **Solution:**
 - Implement **ground truth enforcement** from [Human-based Digital Signer case](feedback/processed/digital-signer-feedback.md)
 - Use `METRICS.template` file with computed values
-- Set up `scripts/check-ground-truth.sh` to verify claims
+- Declare how each METRICS key is computed (`metric.<key>.*` in `.rebarrc`) and verify with `rebar run check-ground-truth`
 - Consider tier 2 or 3 for automated enforcement
 
 ### "Documentation freshness is hard to maintain"
@@ -125,7 +141,7 @@ ls architecture/CONTRACT-*.md
 **Solutions:**
 1. **Use freshness enforcement:**
    ```bash
-   scripts/check-freshness.sh  # Catches stale dates
+   rebar run check-freshness  # Catches stale dates
    ```
 
 2. **Touch files when you modify them:**
@@ -225,12 +241,13 @@ REBAR_TIER=3  # Enforced: + ground truth, strict steward
 **Solutions:**
 1. **Check rebar version:**
    ```bash
-   cat .rebar-version  # Should match your rebar checkout
+   rebar version       # the CLI (and the scripts it runs)
+   cat .rebar-version  # what the project declares; must match its README badge
    ```
 
-2. **See migration guide:**
-   - [versioning-and-upgrade-path](feedback/processed/versioning-and-upgrade-path-2026-03-20.md)
-   - Follow backwards compatibility patterns
+2. **Upgrade the project:** follow [UPGRADING.md](UPGRADING.md) (install the new
+   version side by side, `rebar migrate`, verify). Background:
+   [versioning-and-upgrade-path](feedback/processed/versioning-and-upgrade-path-2026-03-20.md)
 
 ---
 

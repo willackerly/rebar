@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/willackerly/rebar/cli/internal/testutil"
 )
 
 func intPtr(n int) *int { return &n }
@@ -126,9 +128,7 @@ func TestBranchesTouchingDifferentFilesMergeCleanly(t *testing.T) {
 		t.Fatal(err)
 	}
 	git := func(args ...string) error {
-		cmd := exec.Command("git", append([]string{"-c", "user.name=t", "-c", "user.email=t@example.com", "-c", "commit.gpgsign=false"}, args...)...)
-		cmd.Dir = repo
-		out, err := cmd.CombinedOutput()
+		out, err := testutil.TryGit(repo, args...)
 		if err != nil {
 			t.Logf("git %v: %s", args, out)
 		}

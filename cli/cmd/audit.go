@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+	"github.com/willackerly/rebar/cli/internal/config"
 )
 
 var (
@@ -130,17 +131,7 @@ func collectRepos(dir, prefix string, depth int, scores *[]repoScore) {
 		if _, err := os.Stat(filepath.Join(path, ".git")); err == nil {
 			// Git repo: audit it.
 			score, _ := auditRepo(path)
-			tier := "none"
-			if data, err := os.ReadFile(filepath.Join(path, ".rebarrc")); err == nil {
-				for _, line := range strings.Split(string(data), "\n") {
-					if strings.Contains(line, "tier") {
-						parts := strings.SplitN(line, "=", 2)
-						if len(parts) == 2 {
-							tier = strings.TrimSpace(parts[1])
-						}
-					}
-				}
-			}
+			tier := auditTier(path)
 			*scores = append(*scores, repoScore{Name: displayName, Path: path, Score: score, Tier: tier})
 		} else if depth > 1 {
 			// Not a repo — descend one more level to find nested repos
@@ -222,9 +213,10 @@ func auditStructure(root string) auditResult {
 }
 
 func auditContracts(root string) auditResult {
-	archDir := filepath.Join(root, "architecture")
+	contractsDir := config.ContractsDirFor(root)
+	archDir := filepath.Join(root, contractsDir)
 	checks := []checkResult{
-		dirExists(root, "architecture", "architecture/ directory"),
+		dirExists(root, contractsDir, contractsDir+"/ directory"),
 	}
 
 	// Count contract files
@@ -252,15 +244,17 @@ func auditContracts(root string) auditResult {
 }
 
 func auditEnforcement(root string) auditResult {
-	checks := []checkResult{
-		dirExists(root, "scripts", "scripts/ directory"),
-		hookInstalled(root),
-		fileExists(root, "scripts/refresh-context.sh", "refresh-context.sh"),
-	}
+	checks := []checkResult{hookInstalled(root)}
 
-	// Check for enforcement scripts
-	for _, script := range []string{"check-contract-refs.sh", "check-todos.sh"} {
-		checks = append(checks, fileExists(root, filepath.Join("scripts", script), script))
+	// The checks run from the rebar install; a project's own copy also counts.
+	rebarRoot := findRebarRoot()
+	for _, script := range []string{"ci-check.sh", "check-contract-refs.sh", "check-todos.sh", "refresh-context.sh"} {
+		_, ok := resolveScript(root, rebarRoot, script)
+		checks = append(checks, checkResult{
+			Name:   script + " available",
+			Pass:   ok,
+			Detail: "project scripts/ or the rebar install",
+		})
 	}
 
 	return auditResult{Section: "Enforcement & Scripts", Score: scoreChecks(checks), Weight: 15, Checks: checks}
@@ -533,7 +527,7 @@ func applyFixes(root string) int {
 	// .rebar-version
 	versionPath := filepath.Join(root, ".rebar-version")
 	if _, err := os.Stat(versionPath); os.IsNotExist(err) {
-		os.WriteFile(versionPath, []byte(rootCmd.Version+"\n"), 0644)
+		os.WriteFile(versionPath, []byte(badgeVersion()+"\n"), 0644)
 		fmt.Println("  ✓ Created .rebar-version")
 		fixed++
 	}
@@ -549,23 +543,9 @@ func applyFixes(root string) int {
 		}
 	}
 
-	// refresh-context.sh
-	refreshPath := filepath.Join(root, "scripts", "refresh-context.sh")
-	if _, err := os.Stat(refreshPath); os.IsNotExist(err) {
-		rebarRoot := findRebarRoot()
-		if rebarRoot != "" {
-			src := filepath.Join(rebarRoot, "scripts", "refresh-context.sh")
-			if data, err := os.ReadFile(src); err == nil {
-				os.MkdirAll(filepath.Join(root, "scripts"), 0755)
-				os.WriteFile(refreshPath, data, 0755)
-				fmt.Println("  ✓ Copied refresh-context.sh")
-				fixed++
-			}
-		}
-	}
-
-	// architecture/ directory
-	archDir := filepath.Join(root, "architecture")
+	// contracts directory (architecture/ unless .rebarrc contracts_dir says otherwise)
+	contractsDir := config.ContractsDirFor(root)
+	archDir := filepath.Join(root, contractsDir)
 	if _, err := os.Stat(archDir); os.IsNotExist(err) {
 		os.MkdirAll(archDir, 0755)
 		rebarRoot := findRebarRoot()
@@ -575,9 +555,27 @@ func applyFixes(root string) int {
 				os.WriteFile(filepath.Join(archDir, "CONTRACT-TEMPLATE.md"), data, 0644)
 			}
 		}
-		fmt.Println("  ✓ Created architecture/ with contract template")
+		fmt.Printf("  ✓ Created %s/ with contract template\n", contractsDir)
 		fixed++
 	}
 
 	return fixed
+}
+
+// auditTier is the tier column of `rebar audit --all` for the repo at path:
+// the .rebarrc tier ("none" without one), plus the checks force-enabled by
+// checks_enable, e.g. "1 +check-ground-truth".
+func auditTier(path string) string {
+	tier := config.RCValue(path, "tier")
+	if tier == "" {
+		tier = config.RCValue(path, "rebar_tier")
+	}
+	if tier == "" {
+		return "none"
+	}
+	// Each repo's own setting; REBAR_CHECKS_ENABLE would apply to all of them.
+	for _, name := range strings.Fields(config.RCValue(path, "checks_enable")) {
+		tier += " +" + strings.TrimSuffix(name, ".sh")
+	}
+	return tier
 }

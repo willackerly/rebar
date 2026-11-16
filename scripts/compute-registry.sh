@@ -15,11 +15,11 @@
 # that regenerate it from the same contracts produce identical bytes and merge
 # cleanly. Implementing-file counts and the Contract Health section are derived
 # from source code, so any PR that adds or removes a CONTRACT: header changes
-# them. Busy repos should keep them out of the committed file:
+# them, and two such PRs merge into a wrong count. Since 3.1 they are left out
+# of the committed file by default; read them with --health. A repo that wants
+# them in the file sets:
 #
-#   .rebarrc:  registry_impl_counts = false    (env: REBAR_REGISTRY_IMPL_COUNTS)
-#
-# and read them with --health (or scripts/check-registry.sh) instead.
+#   .rebarrc:  registry_impl_counts = true    (env: REBAR_REGISTRY_IMPL_COUNTS)
 #
 # Exit code: 0 = success/current, 1 = stale (--check mode)
 
@@ -30,20 +30,35 @@ set -euo pipefail
 export LC_ALL=C
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-ARCH_DIR="$PROJECT_ROOT/architecture"
-REGISTRY="$ARCH_DIR/CONTRACT-REGISTRY.md"
+PROJECT_ROOT="${REBAR_PROJECT_ROOT:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+CONTRACTS_DIR=architecture
 MODE="${1:-generate}"
 
-IMPL_COUNTS=true
+# Settings from .rebarrc (see the helpers below for what each one does).
+IMPL_COUNTS=false
+SCOPE_PREFIXES=""
+PURPOSE_HEADING=""
+PURPOSE_STYLE=ellipsis
+IMPL_GLOBS="*.go *.ts *.tsx *.js *.py *.rs *.java *.rb *.jsx *.sh bin/"
+EXCLUDE_DIRS="node_modules vendor dist"
+REF_ERE='CONTRACT:'   # with contract_namespace: CONTRACT:(<namespace>:)?
 if [ -f "$SCRIPT_DIR/_rebar-config.sh" ]; then
   # shellcheck source=scripts/_rebar-config.sh
   source "$SCRIPT_DIR/_rebar-config.sh"
-  IMPL_COUNTS=$(_rebar_config registry_impl_counts REBAR_REGISTRY_IMPL_COUNTS true)
+  IMPL_COUNTS=$(_rebar_config registry_impl_counts REBAR_REGISTRY_IMPL_COUNTS false)
+  SCOPE_PREFIXES=$(_rebar_config registry_scope_prefixes _REBAR_NO_ENV "")
+  PURPOSE_HEADING=$(_rebar_config registry_purpose_heading _REBAR_NO_ENV "")
+  PURPOSE_STYLE=$(_rebar_config registry_purpose_style _REBAR_NO_ENV ellipsis)
+  IMPL_GLOBS=$(_rebar_config registry_impl_globs _REBAR_NO_ENV "$IMPL_GLOBS")
+  EXCLUDE_DIRS=$(_rebar_config registry_exclude_dirs _REBAR_NO_ENV "$EXCLUDE_DIRS")
+  CONTRACTS_DIR=$(_rebar_contracts_dir)
+  REF_ERE=$(_rebar_contract_ref_ere)
 fi
+ARCH_DIR="$PROJECT_ROOT/$CONTRACTS_DIR"
+REGISTRY="$ARCH_DIR/CONTRACT-REGISTRY.md"
 case "$IMPL_COUNTS" in
-  false|0|no|off) IMPL_COUNTS=false ;;
-  *) IMPL_COUNTS=true ;;
+  true|1|yes|on) IMPL_COUNTS=true ;;
+  *) IMPL_COUNTS=false ;;
 esac
 
 # ─── Helpers ────────────────────────────────────────────────────────────────
@@ -76,15 +91,47 @@ extract_status() {
   echo "${status:-draft}"
 }
 
-# Extract purpose (first non-empty line after ## Purpose)
+# Extract purpose: the first non-empty line after the purpose heading.
+#
+#   registry_purpose_heading  heading text (ERE) to take the purpose from,
+#                             e.g. `Purpose|Why this exists`. When set, a
+#                             numbered heading (`## 2. Purpose`) also matches.
+#                             Unset: `## Purpose` only.
+#   registry_purpose_style    ellipsis (default): escape `|` for the table
+#                             and cut to 77 characters plus `...`.
+#                             bytes: the first 80 bytes, as before v3.0.0-beta.5
+#                             (can split a multibyte character, leaves `|`
+#                             unescaped).
 extract_purpose() {
-  local file="$1"
-  awk '/^## Purpose/{found=1; next} found && /^[^#]/ && NF{print; exit}' "$file" 2>/dev/null | head -c 80
+  local file="$1" heading_re purpose
+  heading_re='^## Purpose'
+  if [ -n "$PURPOSE_HEADING" ]; then
+    heading_re="^## ([0-9]+[.][[:space:]]*)?(${PURPOSE_HEADING})"
+  fi
+  purpose=$(awk -v re="$heading_re" '$0 ~ re {found=1; next} found && /^[^#]/ && NF{print; exit}' "$file" 2>/dev/null)
+  if [ "$PURPOSE_STYLE" != bytes ]; then
+    # Character-aware slicing needs a UTF-8 locale; the rest of the script
+    # stays in C for stable sort order.
+    (
+      export LC_ALL=C.UTF-8
+      purpose=${purpose//|/\\|}
+      if [ "${#purpose}" -gt 80 ]; then
+        purpose="${purpose:0:77}..."
+      fi
+      printf '%s' "$purpose"
+    )
+  else
+    printf '%s' "$purpose" | head -c 80
+  fi
 }
 
-# Classify by prefix
+# Classify by prefix. registry_scope_prefixes (e.g. `SDK- MCP-`) are
+# stripped, in order, before classifying, so SDK-S1-FOO files as a Service.
 classify_prefix() {
-  local id="$1"
+  local id="$1" prefix
+  for prefix in $SCOPE_PREFIXES; do
+    id="${id#"$prefix"}"
+  done
   case "$id" in
     S*) echo "Services" ;;
     C*) echo "Components" ;;
@@ -115,30 +162,61 @@ if git -C "$PROJECT_ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
   IN_GIT=true
 fi
 
+# The searched files are configurable in .rebarrc:
+#   registry_impl_globs    git pathspecs; a trailing / means a whole directory
+#                          (default: the list above plus bin/)
+#   registry_exclude_dirs  directory names skipped anywhere
+#                          (default: node_modules vendor dist)
+set -f
+GIT_PATHSPECS=()
+FIND_NAMES=()   # outside git: find -name tests for the file globs
+GREP_DIRS=()
+for glob in $IMPL_GLOBS; do
+  GIT_PATHSPECS+=("$glob")
+  case "$glob" in
+    */) GREP_DIRS+=("${glob%/}") ;;
+    *)  FIND_NAMES+=(${FIND_NAMES[@]+-o} -name "$glob") ;;
+  esac
+done
+GIT_PATHSPECS+=(":(exclude)$CONTRACTS_DIR/")
+# Outside git, prune the contracts dir by path and excluded directories (plus
+# .git and agent worktrees under .claude) by name. Filtering grep's output
+# by substring dropped .github/, distance.go and, when the project's own path
+# contained one of the words, every match.
+FIND_PRUNE=(-path "$PROJECT_ROOT/$CONTRACTS_DIR" -o -name .git -o -name .claude)
+for dir in $EXCLUDE_DIRS; do
+  GIT_PATHSPECS+=(":(exclude,glob)**/$dir/**")
+  FIND_PRUNE+=(-o -name "$dir")
+done
+set +f
+
 search_source() {
   if [ "$IN_GIT" = true ]; then
-    git -C "$PROJECT_ROOT" grep "$@" -- \
-      '*.go' '*.ts' '*.tsx' '*.js' '*.py' '*.rs' '*.java' '*.rb' '*.jsx' '*.sh' 'bin/' \
-      ':(exclude)architecture/' ':(exclude,glob)**/node_modules/**' \
-      ':(exclude,glob)**/vendor/**' ':(exclude,glob)**/dist/**' 2>/dev/null
+    # -I: skip binary files. grep reports a matching binary (e.g. a built
+    # bin/rebar) as "Binary file … matches", which read as a reference.
+    git -C "$PROJECT_ROOT" grep -I "$@" -- "${GIT_PATHSPECS[@]}" 2>/dev/null
   else
     {
-      grep -r "$@" "$PROJECT_ROOT" \
-        --include='*.go' --include='*.ts' --include='*.tsx' --include='*.js' \
-        --include='*.py' --include='*.rs' --include='*.java' --include='*.rb' \
-        --include='*.jsx' --include='*.sh' 2>/dev/null
-      if [ -d "$PROJECT_ROOT/bin" ]; then
-        grep -r "$@" "$PROJECT_ROOT/bin" 2>/dev/null
+      if [ ${#FIND_NAMES[@]} -gt 0 ]; then
+        find "$PROJECT_ROOT" \( "${FIND_PRUNE[@]}" \) -prune -o -type f \( "${FIND_NAMES[@]}" \) -print0
       fi
-    } | grep -v "node_modules\|vendor\|dist\|\.git\|architecture/"
+      local dir
+      for dir in ${GREP_DIRS[@]+"${GREP_DIRS[@]}"}; do
+        if [ -d "$PROJECT_ROOT/$dir" ]; then
+          find "$PROJECT_ROOT/$dir" \( "${FIND_PRUNE[@]}" \) -prune -o -type f -print0
+        fi
+      done
+    } | xargs -0 grep -I "$@" /dev/null 2>/dev/null
   fi
 }
 
-# Count implementing files for a contract, deduplicated by path.
+# Count implementing files for a contract, deduplicated by path. With a
+# contract namespace, CONTRACT:<namespace>:<id> counts too; references
+# qualified with another repo's namespace do not.
 count_implementations() {
   local id="$1"
   set +o pipefail
-  search_source -l "CONTRACT:${id}" | sort -u | wc -l | tr -d ' '
+  search_source -El "${REF_ERE}${id}" | sort -u | wc -l | tr -d ' '
   set -o pipefail
 }
 
@@ -187,7 +265,7 @@ generate_registry() {
 # Contract Registry
 
 <!-- AUTO-GENERATED by scripts/compute-registry.sh — do not edit manually -->
-<!-- Regenerate: ./scripts/compute-registry.sh -->
+<!-- Regenerate: rebar run compute-registry -->
 
 HEADER
 
@@ -279,8 +357,8 @@ generate_health() {
   local shadows_tmp
   shadows_tmp="$(mktemp)"
   set +o pipefail
-  search_source -Eho 'CONTRACT:[A-Za-z0-9_-]+\.[0-9]+\.[0-9]+' \
-    | sed -E 's/^CONTRACT://; s/\.[0-9]+\.[0-9]+$//' \
+  search_source -Eho "${REF_ERE}"'[A-Za-z0-9_-]+\.[0-9]+\.[0-9]+' \
+    | sed -E "s#^${REF_ERE}##"'; s/\.[0-9]+\.[0-9]+$//' \
     | sort -u > "$shadows_tmp"
   set -o pipefail
 
@@ -289,7 +367,7 @@ generate_health() {
     [ -z "$ref_id" ] && continue
     case "$known_ids" in
       *" $ref_id "*) ;;  # known — not a shadow
-      *) shadows+=("- **$ref_id** — referenced in source, no architecture/CONTRACT-${ref_id}.*.md found") ;;
+      *) shadows+=("- **$ref_id** — referenced in source, no $CONTRACTS_DIR/CONTRACT-${ref_id}.*.md found") ;;
     esac
   done < "$shadows_tmp"
   rm -f "$shadows_tmp"
@@ -351,7 +429,7 @@ generate_health_report() {
 case "$MODE" in
   --check)
     if [ ! -f "$REGISTRY" ]; then
-      echo "FAIL: $REGISTRY does not exist. Run scripts/compute-registry.sh to generate."
+      echo "FAIL: $REGISTRY does not exist. Generate it: rebar run compute-registry"
       exit 1
     fi
 
@@ -359,13 +437,16 @@ case "$MODE" in
     tmpfile=$(mktemp)
     generate_registry > "$tmpfile"
 
-    # Ignore the timestamp line older versions wrote
-    if diff <(grep -v "^<!-- Generated:" "$REGISTRY") <(grep -v "^<!-- Generated:" "$tmpfile") >/dev/null 2>&1; then
+    # Ignore the header comments that aren't content: the timestamp older
+    # versions wrote, and the regenerate hint (it named
+    # ./scripts/compute-registry.sh before 3.1), so upgrading doesn't make an
+    # otherwise current registry STALE.
+    if diff <(grep -Ev "^<!-- (Generated|Regenerate):" "$REGISTRY") <(grep -Ev "^<!-- (Generated|Regenerate):" "$tmpfile") >/dev/null 2>&1; then
       echo "OK: Registry is current."
       rm "$tmpfile"
       exit 0
     else
-      echo "STALE: Registry needs regeneration. Run scripts/compute-registry.sh"
+      echo "STALE: Registry needs regeneration: rebar run compute-registry"
       rm "$tmpfile"
       exit 1
     fi

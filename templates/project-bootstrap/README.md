@@ -1,6 +1,6 @@
 # My Project
 
-> **rebar v3.0.0** | **Tier 1: PARTIAL** | [What is rebar?](https://github.com/willackerly/rebar)
+> **rebar v3.1.0** | **Tier 1: PARTIAL** | [What is rebar?](https://github.com/willackerly/rebar)
 
 **Description:** [Brief description of what this project does]
 
@@ -90,8 +90,8 @@ my-project/
 
 ```bash
 # Before committing
-scripts/check-contract-refs.sh    # Contract links valid
-scripts/check-todos.sh           # No untracked TODOs
+rebar run check-contract-refs    # Contract links valid
+rebar run check-todos           # No untracked TODOs
 
 # Before merging
 scripts/ci-check.sh              # Full quality scan

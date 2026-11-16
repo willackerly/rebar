@@ -2,7 +2,14 @@
 
 <!-- Copy this file to create a new contract.
      Replace all {placeholders} with actual values.
-     Remove these HTML comments when done. -->
+     Remove these HTML comments when done.
+
+     Naming: the file is CONTRACT-{NAME}.{MAJOR}.{MINOR}.md and source files
+     cite it as CONTRACT:{NAME}.{MAJOR}.{MINOR}. If .rebarrc sets
+     contract_namespace (e.g. github.com/org/repo), the qualified form
+     CONTRACT:{NAMESPACE}:{NAME}.{MAJOR}.{MINOR} is accepted too; use it
+     where the reference may be read outside this repo. Filenames and this
+     title never carry the namespace. -->
 
 <!-- VERSIONING:
      - When this contract is superseded, add: SUPERSEDED BY: CONTRACT-{NAME}.{NEW}
@@ -113,6 +120,7 @@ type BlobStore interface {
      configuration. -->
 
 - Depends on: `CONTRACT:I2-KEY-EXCHANGE.1.0` for encryption keys
+- Depends on (another repo): `CONTRACT:github.com/org/keys:KEY-ROTATION.1.0` — qualified with that repo's namespace and pinned in CONSUMES.md
 - Configuration: `BLOBSTORE_PATH` environment variable
 - External: none (self-contained)
 
@@ -151,6 +159,8 @@ type BlobStore interface {
 <!-- List all files that implement this contract.
      Keep updated — or regenerate with:
      grep -rn "CONTRACT:{NAME}" src/ internal/ client/
+     With contract_namespace set, also:
+     grep -rn "CONTRACT:{NAMESPACE}:{NAME}" src/ internal/ client/
 -->
 
 - `internal/blobstore/file.go` — file-backed implementation

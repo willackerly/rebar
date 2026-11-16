@@ -39,7 +39,7 @@ Each script is standalone, runs in <5 seconds, and exits 0 (pass) or 1 (fail).
 | `check-decay-patterns.sh` | Soft-hardening anti-patterns in spec/test files |
 | `check-jtbd-presence.sh` | Latest-version contracts carry non-empty Why/Who/Scenarios sections |
 | `check-prefix-uniqueness.sh` | No prefix number (S1, I3, …) claimed by two different contract IDs |
-| `sync-bootstrap.sh --check` | `templates/project-bootstrap/scripts/` matches `/scripts/` |
+| `sync-bootstrap.sh --check` | `templates/project-bootstrap/scripts/` holds only thin entry points; the template's `CONTRACT-TEMPLATE.md` matches `architecture/` |
 
 ## Composite Runners
 
@@ -58,19 +58,27 @@ Each script is standalone, runs in <5 seconds, and exits 0 (pass) or 1 (fail).
 
 ## Installation
 
-```bash
-# Pre-commit hook (pick one)
-cp scripts/pre-commit.sh .git/hooks/pre-commit     # copy
-ln -sf ../../scripts/pre-commit.sh .git/hooks/pre-commit  # symlink
+Adopting projects don't copy these scripts: `rebar check` and `rebar run
+<script>` run them from the rebar install against the project, and the
+project's `scripts/` holds only the two thin entry points from
+`templates/project-bootstrap/scripts/`. See [SETUP.md](../SETUP.md#install-rebar)
+(and [§ Run rebar in CI](../SETUP.md#run-rebar-in-ci)); projects with older
+copies: [UPGRADING.md](../UPGRADING.md).
 
-# Make all scripts executable
-chmod +x scripts/*.sh
+In this repository:
+
+```bash
+# Pre-commit hook
+ln -sf ../../scripts/pre-commit.sh .git/hooks/pre-commit
 
 # CI pipeline (GitHub Actions example)
 # - run: ./scripts/ci-check.sh --strict
 ```
 
 ## Configuration
+
+`.rebarrc` keys: [docs/CONFIGURATION.md](../docs/CONFIGURATION.md). Environment
+variables:
 
 | Environment Variable | Default | Purpose |
 |---------------------|---------|---------|
@@ -86,7 +94,48 @@ chmod +x scripts/*.sh
 | `SKIP_JTBD` | `0` | Skip JTBD-presence contract check |
 | `SKIP_PREFIX_UNIQUENESS` | `0` | Skip contract prefix-number uniqueness check |
 | `SKIP_BOOTSTRAP_SYNC` | `0` | Skip templates/scripts drift check (rebar-source-only) |
+| `SKIP_SCRIPT_TESTS` | `0` | Skip the shell regression tests, `scripts/tests/run.sh` (rebar-source-only) |
 | `SKIP_STEWARD` | `0` | Skip steward scan |
+
+### Skipped directories (`.rebarrc`)
+
+check-todos, check-contract-refs and check-registry skip the directory names in
+`source_exclude_dirs` (default `node_modules vendor dist`) anywhere in the
+tree, plus `.git` and `.claude` (agent worktrees) always. Names are matched
+with `grep --exclude-dir`, never as substrings of a path or line, so
+`.github/`, `dist-esm/` or `distance.go` are scanned. compute-registry uses
+`registry_exclude_dirs` (same default) for implementing-file counts.
+
+### Tiers and `checks_enable` (`.rebarrc`)
+
+`tier` (env `REBAR_TIER`, default 3) gates these checks; every other check
+runs at every tier, including the registry check (`compute-registry.sh --check`).
+
+| Check | Below its tier | From its tier |
+|-------|----------------|---------------|
+| `check-contract-headers` | tier 1: SKIP | tier 2+ |
+| `check-freshness` | tier 1: SKIP | tier 2+ |
+| `check-jtbd-presence` | tier 1: SKIP | tier 2: advisory, tier 3: blocking |
+| `check-prefix-uniqueness` | tier 1: SKIP | tier 2: advisory, tier 3: blocking |
+| `check-ground-truth` | tiers 1-2: SKIP | tier 3 |
+| `check-compliance` | tier 1: AGENTS.md sections not checked | tier 2+ |
+
+`checks_enable` (env `REBAR_CHECKS_ENABLE`) runs named checks regardless of the
+tier, each as it would run at tier 3 (so a named jtbd or prefix check blocks):
+
+```
+tier = 1
+checks_enable = check-ground-truth check-contract-headers
+```
+
+Names are the check script basenames without `.sh`, as in `rebar run <name>`:
+`check-bypass-flags check-compliance check-contract-headers check-contract-refs
+check-decay-patterns check-doc-refs check-fix-commit check-freshness
+check-ground-truth check-jtbd-presence check-prefix-uniqueness check-todos
+compute-registry steward sync-bootstrap`. Naming an ungated check is allowed and
+changes nothing. An unknown name prints one `rebar: WARN:` line on stderr per run
+and is ignored; it never fails the run. `rebar status` lists the enabled checks;
+`rebar audit --all` shows them in the tier column. Unset, tiers behave as before.
 
 ## Automation Hierarchy
 
@@ -112,16 +161,17 @@ Pre-commit (fast, <5s)       CI (thorough, <30s)          Full scan (comprehensi
 
 | Script | What it does |
 |--------|--------------|
-| `sync-bootstrap.sh` (+ `--check`) | Mirror `/scripts/` into `templates/project-bootstrap/scripts/`; drift caught by ci-check |
+| `package-release.sh <version>` | Build the release tarballs (full tree at the ref + `bin/rebar` per platform) and `rebar_<ver>_checksums.txt`; what `.github/workflows/release.yml` runs on a `v*` tag. `--targets`, `--out`, `--ref`, `--repo` |
+| `sync-bootstrap.sh` (+ `--check`) | Keep `templates/project-bootstrap/scripts/` down to the thin entry points; caught by ci-check |
 | `test-e2e-live.sh` | End-to-end smoke against a live LLM. Gated on `claude` CLI; per-repo gates skip cleanly when adopted repos aren't on disk. Includes version triple-check (binary / `.rebar-version` / latest tag), MCP server discovery + tools/list smoke, ASK HTTP server smoke (if running), and 4 live LLM keyword-acceptance queries (rebar:steward, rebar:architect, local-mode, cross-repo). Run after every meaningful update — single command answer to "is this still working?" |
-
-The maintainer-facing scripts are NOT mirrored into the bootstrap copy
-(they assume the rebar source repo's dev layout) — `sync-bootstrap.sh`
-explicitly skips them.
 
 ## Source-of-truth structure
 
-`/scripts/` is canonical. `templates/project-bootstrap/scripts/` is mirrored
-from it by `sync-bootstrap.sh` so adopters running `cp -r templates/project-bootstrap/.`
-get a working project in one command. Drift between the two trees is caught
-by `sync-bootstrap.sh --check` (wired into `ci-check.sh`).
+`/scripts/` is the only copy. Adopting projects don't carry these scripts:
+`rebar check` and `rebar run <script>` run them from the rebar install against
+the project (`REBAR_PROJECT_ROOT`), and the project tailors them in `.rebarrc`
+([docs/CONFIGURATION.md](../docs/CONFIGURATION.md)).
+`templates/project-bootstrap/scripts/` holds just the two thin entry points
+(`ci-check.sh`, `pre-commit.sh`) that adopters get from
+`cp -r templates/project-bootstrap/.`; `sync-bootstrap.sh --check` (wired into
+`ci-check.sh`) keeps anything else from creeping back in.

@@ -10,31 +10,35 @@ Experience rebar's value immediately: write one contract, link it to code, see a
 
 ## Solo Developer Setup
 
-### Step 1: Copy the bootstrap template (30 seconds)
+### Step 1: Install rebar and create a project (2 minutes)
 ```bash
-# Clone rebar
-git clone https://github.com/willackerly/rebar.git
-cd rebar
+# Install the rebar CLI (versions side by side under ~/.rebar/versions/)
+curl -fsSL https://raw.githubusercontent.com/willackerly/rebar/v3.1.0/setup-rebar.sh | bash -s -- v3.1.0
+# Open a new terminal (or source your shell RC) so PATH picks up ~/.rebar/current/bin
+rebar version
 
-# Copy complete working project template
-cp -r templates/project-bootstrap/. ../my-new-project/
-cd ../my-new-project
+# Create a project: git repo, scaffolding, role agents, first commit
+rebar new my-new-project
+cd my-new-project
 
-# Create the ASK role agents (architect, product, englead, steward, merger, featurerequest)
-../rebar/bin/ask init
+# Enforce the checks on every commit
+ln -sf ../../scripts/pre-commit.sh .git/hooks/pre-commit
 ```
 
-> **Why `ask init` matters:** the bootstrap template ships scaffolding
-> docs but not agent skeletons. Without `ask init`, `ask architect "X"`
-> fails with "no agents directory" and the MCP tool list in Claude Code
-> is empty. `rebar new` and `rebar adopt` run this automatically; the
-> manual `cp -r` path needs it explicitly.
+Trying a release candidate? Install it from its own tag:
+[SETUP.md § Testing a release candidate](SETUP.md#testing-a-release-candidate).
+Adding rebar to an existing repository instead? Run `rebar adopt --tier 1`
+in it, then link the hook the same way. Already using an older rebar? See
+[UPGRADING.md](UPGRADING.md).
 
-> **Optional — put the ASK CLI on your PATH:**
-> `../rebar/bin/install` adds rebar's `bin/` to your shell RC. You can
-> skip this for the 5-minute walkthrough; the contract you write below
-> doesn't need it. If you later run a remote ASK server, pass
-> `--server HOST:PORT` to record it as `ASK_SERVER` in your shell.
+> **What `rebar new` sets up:** the Cold Start Quad (README, QUICKCONTEXT,
+> TODO, AGENTS), `CLAUDE.md`, `architecture/` with the contract template,
+> the six ASK role agents (architect, product, englead, steward, merger,
+> featurerequest), `.mcp.json`, a Claude Code SessionStart hook, and
+> `scripts/ci-check.sh` + `scripts/pre-commit.sh`. Those two only call
+> `rebar check`: the checks themselves run from your rebar install, and the
+> project tailors them in `.rebarrc` ([every setting](docs/CONFIGURATION.md)). `-d "what it does"` additionally asks an
+> LLM to draft the README and first contracts.
 
 ### Step 2: Write your first contract (3 minutes)
 
@@ -86,10 +90,14 @@ func Save(key string, data []byte) error {
 }
 ```
 
-**Verify the link:**
+**Verify the link and commit:**
 ```bash
 grep -r "CONTRACT:C1-FILESTORE" .
-scripts/check-contract-refs.sh  # Should pass
+rebar run check-contract-refs   # Should pass
+git add -A                      # the registry counts implementing files git tracks
+rebar run compute-registry      # add the contract to architecture/CONTRACT-REGISTRY.md
+rebar check                     # the full suite CI runs
+git add -A && git commit -m "feat: first contract"   # the hook runs the pre-commit checks
 ```
 
 ---
@@ -143,7 +151,9 @@ rebar status     # Quick health dashboard
 
 | Problem | Solution |
 |---------|----------|
-| Scripts fail with permissions | `chmod +x scripts/*.sh` |
+| `rebar: command not found` | Open a new terminal or source your shell RC; the installer added `~/.rebar/current/bin` to it |
+| `rebar: ci-check.sh not found in the project or a rebar install` | The CLI found no rebar install to run checks from. Check `rebar version` and unset a stale `REBAR_ROOT`; lookup order: [SETUP.md § Run rebar in CI](SETUP.md#run-rebar-in-ci) |
+| Registry check fails after adding a contract | `rebar run compute-registry`, then commit the registry |
 | Contract check fails | Make sure CONTRACT: comment matches filename exactly |
 | Agents give generic answers | Fill in QUICKCONTEXT.md with your project details |
 | Too overwhelming | Stick to just this quickstart until it feels natural |

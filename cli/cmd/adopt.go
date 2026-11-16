@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+	"github.com/willackerly/rebar/cli/internal/config"
 	"github.com/willackerly/rebar/cli/internal/llm"
 )
 
@@ -102,7 +103,7 @@ func runAdopt(cmd *cobra.Command, args []string) error {
 			}
 			lines := strings.SplitN(string(data), "\n", 2)
 			if len(lines) == 2 {
-				badged := lines[0] + "\n\n> **rebar " + rootCmd.Version + "** | **Tier " + fmt.Sprintf("%d: %s", adoptTier, tierLevel) + "**\n" + lines[1]
+				badged := lines[0] + "\n\n> **rebar " + badgeVersion() + "** | **Tier " + fmt.Sprintf("%d: %s", adoptTier, tierLevel) + "**\n" + lines[1]
 				os.WriteFile(readmePath, []byte(badged), 0644)
 				fmt.Println("  ✓ Added rebar badge to README.md")
 				fixed++
@@ -154,7 +155,7 @@ Only propose contracts for code that actually exists — don't invent components
 					fmt.Printf("    %s\n", line)
 				}
 				fmt.Println()
-				fmt.Println("  To create these contracts, use the template at architecture/CONTRACT-TEMPLATE.md")
+				fmt.Printf("  To create these contracts, use the template at %s/CONTRACT-TEMPLATE.md\n", config.ContractsDirFor(root))
 				fmt.Println("  Then add CONTRACT: headers to the implementing source files.")
 			}
 		}

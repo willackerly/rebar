@@ -52,7 +52,7 @@ PREVIEW=0
 # Own-sender suppression (see the emit loop). Defaults to the repo directory
 # name, which is the sender token this repo's own memos carry. --self ''
 # disables suppression entirely.
-SELF="$(basename "$(cd "$(dirname "$0")/.." && pwd)")"
+SELF="$(basename "${REBAR_PROJECT_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}")"
 DIRS=()
 
 while [ $# -gt 0 ]; do

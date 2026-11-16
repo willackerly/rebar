@@ -1,8 +1,8 @@
 # QUICKCONTEXT — rebar (main, v3 line)
 
-last-synced: 2026-11-14
-<!-- freshness: 2026-11-14 -->
-**Branch:** main — **v3 line, graduated to `v3.0.0`** 2026-11-14 (plan D12)
+last-synced: 2026-11-16
+<!-- freshness: 2026-11-16 -->
+**Branch:** main — **v3 line, graduated to `v3.0.0`** 2026-11-14 (plan D12); `v3.1.0` released 2026-11-16 (from `release/v3.1.0-rc`)
 **Tier:** 3 (ENFORCED) — rebar dogfoods its own methodology
 
 ---
@@ -15,9 +15,23 @@ last-synced: 2026-11-14
   re-verified after its expected 2026-08-16 close, and beta.3/beta.4 shipped
   after it. Recorded as D12 + a final scoreboard in `docs/v3-beta-plan.md`.
   No code change since beta.4. Tag `v2.0.0` remains the stable v2 point.
-- **v3.1.0 is being assembled on `release/v3.1.0-rc`:** #14 (self-contained
-  install), #8 (`contract_namespace`), plus `rebar migrate` and a versioned
-  installer, both in progress.
+- **`v3.1.0` (2026-11-16)** — the 3.1 line graduated after three release
+  candidates field-tested on virtru-analyze (#457); plus `metrics_strict`
+  failing on zero declarations. Next: the Go-native stack (#23 → …) for 3.2.
+- **`v3.1.0-rc.3` (2026-11-16) on `release/v3.1.0-rc`** — #33, fixes from
+  running rc.2 in virtru-analyze's CI (#457): root flags before `run`,
+  SETUP CI snippet cleanup, migrate keeps sourced ground-truth copies,
+  `metrics_strict`, `metric.<key>.tracked`, TTY-only colour; #30 CI guard.
+- **`v3.1.0-rc.2` (2026-11-15)** — rc.1 plus #27
+  (`refresh-context.sh` exit 141 with many commits since the last sync, found
+  testing rc.1 on virtru-analyze). rc.1 was a pre-release with:
+  #14 self-contained install + `checks_enable`, #8 `contract_namespace`, #19
+  scanners exclude directories by name, #17 versioned installer + release
+  workflow, #20 CLI errors/commit pruning, #21 v3.0.0 merged in, #18
+  `rebar migrate`, #22, #24 runbooks (UPGRADING.md). CI runs on PRs into
+  `main` and `release/**` (#15). Test it, fix forward into the rc branch, tag
+  `rc.N`; when happy, PR `release/v3.1.0-rc` → `main` and tag `v3.1.0`.
+  Draft for 3.2: #23 (Go-native checks).
 - **main has been the v3 line since 2026-07-04**: built, tagged
   `v3.0.0-beta`, adversarially reviewed, merged here, then annealed through
   `-beta.2` (2026-08-02), `-beta.3` and `-beta.4` (2026-11-14).
@@ -69,8 +83,8 @@ last-synced: 2026-11-14
 
 - **Quiet 2026-08-12 → 2026-11-14**, then beta.3 (#9, #10) from
   virtru-analyze's busy-repo feedback
-  (`feedback/2026-11-14-busy-repo-merge-conflicts.md`). Queued from it:
-  flip the `registry_impl_counts` default to `false` in 3.1.
+  (`feedback/2026-11-14-busy-repo-merge-conflicts.md`); its queued
+  `registry_impl_counts` default flip landed in `v3.1.0-rc.1`.
 
 - **Watcher re-armed 2026-08-12** with own-sender suppression
   (`--self`, default = repo dir name). Two stale pre-fix watchers on
@@ -83,7 +97,7 @@ Ordered roughly by cost.
 | # | Action | Owner | Notes |
 |---|---|---|---|
 | 1 | Announce `v3.0.0` | rebar / Will | After the tag is pushed: announce through the outbox/inbox channels (the plan's last graduation step). |
-| 2 | Leaked test watcher | rebar | A test-spawned watcher ran **10 days** against a deleted temp dir (found 2026-08-12, killed). Both watcher tests have EXIT traps, so the leak path is not obvious — needs a real look before it recurs. |
+| 2 | ~~Leaked test watcher~~ | rebar | **Fixed in 3.1 (b9fbb58):** `inbox-watch-lock.test.sh` recorded watcher PIDs inside a `$(…)` subshell, so its EXIT cleanup never saw them. |
 | 3 | `TDFLite` runs **two** live watchers on one inbox | TDFLite seat | PIDs armed 2026-08-02 and 2026-08-04, both on `TDFLite/inbox` — the split-provenance case Principle 5 warns about. Report; not rebar's to kill. |
 | 4 | `pdf-signer-web` watches `vendor/dapple/inbox` | pdf-signer-web seat | Watching a vendored peer's inbox is the self-echo / peer-surveillance case (SOP 2026-07-06). Report. |
 | 5 | office180 `text-fit` unusable for consumers | office180 | Font fixtures are not in the published `files`; the one command defending the no-reflow constraint cannot run out of the box. Open in their inbox since 2026-08-02. |
@@ -95,12 +109,15 @@ Ordered roughly by cost.
 
 ## What's Next — proposed go-forward
 
-**Now — tag and announce `v3.0.0`.** After the release PR merges, tag
+**Now — `v3.1.0` is out.** Install it (`… | bash -s -- v3.1.0`),
+run UPGRADING.md on adopters; 3.1.x fixes go to `main`, the Go-native stack targets 3.2.
+
+**Done — `v3.0.0` tagged and released 2026-11-14.** After the release PR merges, tag
 the merge commit and announce (action 1).
 
 **Next — v3.1.0 on `release/v3.1.0-rc`.** #14, #8, `rebar migrate` and a
-versioned installer (see Current State). Also queued for 3.1: flip the
-`registry_impl_counts` default to `false`.
+versioned installer (see Current State). The `registry_impl_counts`
+default flip (to `false`) is in `v3.1.0-rc.1`.
 
 **Also staged for v3.1+:**
 1. **`rebar watch` as a shipped command** (`_atlas` slice 1) — kills the

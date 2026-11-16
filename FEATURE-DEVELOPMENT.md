@@ -342,8 +342,8 @@ func TestAuthenticate_TimingAttack(t *testing.T) {
 go test ./auth/... -v
 
 # Check enforcement
-scripts/check-contract-headers.sh  # Verify CONTRACT: headers
-scripts/check-todos.sh            # No untracked TODOs
+rebar run check-contract-headers  # Verify CONTRACT: headers
+rebar run check-todos             # No untracked TODOs
 ```
 
 **Why testing cascade matters:** Each tier catches different classes of bugs. T0 catches logic errors, T1 catches integration issues, T2 catches security vulnerabilities.

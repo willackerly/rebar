@@ -54,11 +54,16 @@ while [ $# -gt 0 ]; do
 done
 
 # ─── Output helpers ────────────────────────────────────────────────────────
-GREEN='\033[0;32m'
-RED='\033[0;31m'
-YELLOW='\033[1;33m'
-GRAY='\033[0;90m'
-NC='\033[0m'
+# Colour only on a terminal, and never with NO_COLOR set (no-color.org).
+if [ -t 1 ] && [ -z "${NO_COLOR:-}" ]; then
+  GREEN='\033[0;32m'
+  RED='\033[0;31m'
+  YELLOW='\033[1;33m'
+  GRAY='\033[0;90m'
+  NC='\033[0m'
+else
+  GREEN='' RED='' YELLOW='' GRAY='' NC=''
+fi
 
 passed=0; failed=0; skipped=0
 results_tmp="$(mktemp)"
@@ -112,7 +117,7 @@ REBAR_BIN="$PROJECT_ROOT/bin/rebar"
 [ -x "$REBAR_BIN" ] || REBAR_BIN="$(command -v rebar || echo /nonexistent)"
 binary_version="$("$REBAR_BIN" version 2>&1 | head -1 | awk '{print $NF}')"
 file_version="$(cat "$PROJECT_ROOT/.rebar-version" 2>/dev/null || echo "unknown")"
-tag_version="$(git -C "$PROJECT_ROOT" tag --sort=-v:refname 2>/dev/null | head -1)"
+tag_version="$(git -C "$PROJECT_ROOT" for-each-ref --count=1 --sort=-v:refname --format='%(refname:short)' refs/tags 2>/dev/null)"
 
 if [ "$binary_version" = "$file_version" ] && [ "$binary_version" = "$tag_version" ]; then
   record PASS "Version coherent across binary, .rebar-version, latest tag" "$binary_version"
@@ -122,7 +127,7 @@ fi
 
 # ─── Build freshness: is bin/rebar built from current source? ──────────────
 binary_mtime="$(stat -f %m "$PROJECT_ROOT/bin/rebar" 2>/dev/null || stat -c %Y "$PROJECT_ROOT/bin/rebar" 2>/dev/null)"
-source_mtime="$(find "$PROJECT_ROOT/cli" -name '*.go' -newer "$PROJECT_ROOT/bin/rebar" 2>/dev/null | head -1)"
+source_mtime="$(find "$PROJECT_ROOT/cli" -name '*.go' -newer "$PROJECT_ROOT/bin/rebar" -print -quit 2>/dev/null)"
 if [ -n "$source_mtime" ]; then
   record FAIL "bin/rebar fresher than cli/ source" "rebuild needed: cd cli && go build -o ../bin/rebar ."
 else

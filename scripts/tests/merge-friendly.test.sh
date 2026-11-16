@@ -10,8 +10,9 @@
 #
 #   T1  registry_impl_counts = false + METRICS floors: both merges are clean,
 #       and the merged registry and METRICS still pass their checks
-#   T2  impl counts on (default): the merge is clean but leaves main's registry
-#       stale. This is why busy repos turn them off.
+#   T2  impl counts on (registry_impl_counts = true; off by default since
+#       3.1): the merge is clean but leaves main's registry stale. This is
+#       why they are off by default.
 #   T3  a branch that adds a contract merges cleanly with one that only
 #       regenerates
 #   T4  output does not depend on the caller's locale
@@ -22,18 +23,13 @@
 # Override the scripts under test with REBAR_SCRIPTS_DIR.
 set -uo pipefail
 
-HERE="$(cd "$(dirname "$0")" && pwd)"
-SRC="${REBAR_SCRIPTS_DIR:-$HERE/..}"
-
-fail() { echo "FAIL: $*" >&2; exit 1; }
-
-TMP="$(mktemp -d)"
-trap 'rm -rf "$TMP"' EXIT
+. "$(dirname "$0")/lib.sh"
+SRC="$REBAR_SCRIPTS"
+rebar_tmpdir merge-friendly
 
 # Built at runtime so rebar's own registry scan doesn't read it as a reference.
 HEADER="CONTRACT"":S1-FOO.1.0"
 
-g() { git -c user.name=t -c user.email=t@example.com -c commit.gpgsign=false "$@"; }
 
 # new_repo <dir> <impl_counts>: base repo with two contracts, one impl, one test
 new_repo() {
@@ -96,7 +92,7 @@ if merge_both "$R2"; then
   ( cd "$R2" && scripts/compute-registry.sh --check >/dev/null ) \
     && fail "T2: expected a stale registry after merging two impl-count changes"
 fi
-echo "ok T2: impl counts on are not merge-safe (why busy repos turn them off)"
+echo "ok T2: impl counts on are not merge-safe (why they are off by default)"
 
 # --- T3: a new contract on one branch, regeneration on the other ------------
 R3="$TMP/t3"
@@ -133,5 +129,16 @@ health="$(cd "$R1" && scripts/compute-registry.sh --health)"
 echo "$health" | grep -q '^| S1-FOO | 4 |' \
   || fail "T6: grep -r fallback outside git does not count all 4 files"
 echo "ok T6: counts cover tracked files only; non-git fallback still counts"
+
+# --- T7: the regenerate hint names the CLI, and an old hint isn't STALE -------
+R7="$TMP/t7"
+new_repo "$R7" false
+grep -q '^<!-- Regenerate: rebar run compute-registry -->' "$R7/architecture/CONTRACT-REGISTRY.md" \
+  || fail "T7: registry hint does not name rebar run compute-registry"
+sed 's|^<!-- Regenerate: .*-->|<!-- Regenerate: ./scripts/compute-registry.sh -->|' \
+  "$R7/architecture/CONTRACT-REGISTRY.md" > "$TMP/t7.md" && mv "$TMP/t7.md" "$R7/architecture/CONTRACT-REGISTRY.md"
+( cd "$R7" && scripts/compute-registry.sh --check >/dev/null ) \
+  || fail "T7: a registry with the pre-3.1 hint is reported STALE"
+echo "ok T7: new regenerate hint; a registry with the old hint is still current"
 
 echo "PASS: merge-friendly generated files"

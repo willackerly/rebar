@@ -138,6 +138,7 @@ func runAgentStart(cmd *cobra.Command, args []string) error {
 	fmt.Printf("  Base:       %s\n", baseCommit[:12])
 
 	perms, ok := rolePermissions[agentRole]
+	perms.Writable, perms.ReadOnly = withContractsDirAll(perms.Writable), withContractsDirAll(perms.ReadOnly)
 	if ok {
 		if len(perms.Writable) > 0 {
 			fmt.Printf("  Writable:   %s\n", strings.Join(perms.Writable, ", "))
@@ -194,6 +195,7 @@ func runAgentFinish(cmd *cobra.Command, args []string) error {
 
 	// Check permissions
 	perms, hasPerms := rolePermissions[envelope.Role]
+	perms.Writable, perms.ReadOnly = withContractsDirAll(perms.Writable), withContractsDirAll(perms.ReadOnly)
 	violations := []string{}
 	allowed := []string{}
 

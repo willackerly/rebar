@@ -3,7 +3,11 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
-REPORT="$REPO_ROOT/architecture/.state/steward-report.json"
+# Contracts location: .rebarrc contracts_dir (env REBAR_CONTRACTS_DIR), default architecture.
+CONTRACTS_DIR="$(sed -n 's/^contracts_dir[[:space:]]*=[[:space:]]*//p' "$REPO_ROOT/.rebarrc" 2>/dev/null \
+  | sed 's/[[:space:]]*#.*$//; s/[[:space:]]*$//; s:/$::' | head -1)" || true
+CONTRACTS_DIR="${REBAR_CONTRACTS_DIR:-${CONTRACTS_DIR:-architecture}}"
+REPORT="$REPO_ROOT/$CONTRACTS_DIR/.state/steward-report.json"
 
 # Ensure steward data exists
 if [ ! -f "$REPORT" ]; then
