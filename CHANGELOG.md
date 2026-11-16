@@ -29,8 +29,8 @@ All notable changes to rebar. Versioned with [semver](https://semver.org/).
   project's own customized `ci-check.sh` / `pre-commit.sh` still runs
   instead, and so does a project's own copy of a check a suite calls, with
   the deprecation notice; thin wrappers go native. `REBAR_CHECK_IMPL=shell`
-  runs the scripts. On rebar itself `rebar check` takes ~1.4 s instead of
-  ~18 s.
+  runs the scripts. On rebar itself `rebar check` takes 1.4 s instead of
+  16 s (0.3 s instead of 11 s without steward, which S5 ports).
 - **`checks_extra` / `checks_extra_pre_commit`.** List your own check
   programs (any language) in `.rebarrc`; `rebar check` (`--pre-commit`)
   runs them after rebar's checks, in the project root with
