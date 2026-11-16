@@ -4,7 +4,7 @@ OK: .rebar-version = v3.1.0-rc.2
 OK: .rebarrc tier = 2 (ADOPTED)
 FAIL: README.md has no rebar badge
   Add this as the first line after your # Title:
-  > **rebar v3.1.0-rc.3** | **Tier 2: ADOPTED**
+  > **rebar v3.1.0** | **Tier 2: ADOPTED**
 
 === AGENTS.md required sections ===
 OK: Cold Start / Read Before Coding — agents must know the reading order
