@@ -15,6 +15,10 @@
 # exact counts, two PRs that each add a test both edit the same line, so they
 # conflict or, if both write the same number, leave main's count wrong.
 #
+# Strictness: by default a missing METRICS file is a SKIP and a computed key
+# missing from METRICS is reported as NEW; both pass. With .rebarrc
+# `metrics_strict = true` (env REBAR_METRICS_STRICT) both fail.
+#
 # Usage: ./scripts/check-ground-truth.sh [--print]
 #   --print  print each declared metric's computed value as key=value and
 #            exit 0 (no METRICS comparison, no tier gate; used by
@@ -40,6 +44,13 @@ REPO_ROOT="${REBAR_PROJECT_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}"
 # accepts both, so this checker must too.
 METRICS_FILE="$REPO_ROOT/METRICS"
 [ ! -f "$METRICS_FILE" ] && [ -f "$REPO_ROOT/METRICS.md" ] && METRICS_FILE="$REPO_ROOT/METRICS.md"
+
+STRICT=false
+if type _rebar_config >/dev/null 2>&1; then
+  case "$(_rebar_config metrics_strict REBAR_METRICS_STRICT false)" in
+    true|1|yes|on) STRICT=true ;;
+  esac
+fi
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -163,7 +174,12 @@ fi
 
 verify() {
   if [ ! -f "$METRICS_FILE" ]; then
-    echo -e "${YELLOW}SKIP${NC}: No METRICS file found"
+    if $STRICT; then
+      echo -e "${RED}FAIL${NC}: No METRICS file found (metrics_strict = true)"
+      exit_code=1
+    else
+      echo -e "${YELLOW}SKIP${NC}: No METRICS file found"
+    fi
     echo "  Create a METRICS file with key = value pairs and declare how"
     echo "  to compute each one as metric.<key>.* lines in .rebarrc."
     return 0
@@ -190,7 +206,10 @@ verify() {
     line=$(grep -E "^[[:space:]]*${key}[[:space:]]*>?=" "$METRICS_FILE" 2>/dev/null | head -1) || true
     documented=$(echo "$line" | sed -E 's/^[^=]*=//' | xargs)
 
-    if [ -z "$documented" ]; then
+    if [ -z "$documented" ] && $STRICT; then
+      echo -e "${RED}MISSING${NC}: $key = $value  (not in METRICS file; metrics_strict = true)"
+      exit_code=1
+    elif [ -z "$documented" ]; then
       echo -e "${YELLOW}NEW${NC}:   $key = $value  (not in METRICS file)"
     elif echo "$line" | grep -Eq "^[[:space:]]*${key}[[:space:]]*>="; then
       if [[ "$value" =~ ^[0-9]+$ && "$documented" =~ ^[0-9]+$ ]] && [ "$value" -ge "$documented" ]; then

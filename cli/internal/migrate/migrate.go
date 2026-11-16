@@ -656,10 +656,14 @@ func (m *migrator) groundTruth() *ScriptPlan {
 	case len(extra) > 0:
 		sp.Reason = "the install would also check " + strings.Join(extra, ", ") + " (declared in .rebarrc, not computed by the copy)"
 	default:
-		after := m.runInstall(m.work, name, nil)
-		if after.Code != before.Code {
-			sp.Reason = fmt.Sprintf("same values, but the check exits %d with the install and %d with the copy", after.Code, before.Code)
+		strict, why := m.groundTruthStrictness(name, legacy.Keys, before)
+		if why != "" {
+			sp.Reason = why
 			break
+		}
+		if strict != nil {
+			m.accepted = append(m.accepted, *strict)
+			sp.Details = append(sp.Details, "strict    "+strictKey+" = true: the copy fails when METRICS is missing or lacks a computed key, as the install then does")
 		}
 		sp.Verdict = Delete
 		if len(legacy.Keys) == 0 {
@@ -669,6 +673,113 @@ func (m *migrator) groundTruth() *ScriptPlan {
 		}
 	}
 	return sp
+}
+
+// strictKey makes the install's check-ground-truth fail when METRICS is
+// missing or lacks a key it computes; by default it passes both (SKIP, NEW).
+const strictKey = "metrics_strict"
+
+// groundTruthStrictness checks that the install's check-ground-truth passes
+// and fails where the copy does: on the project (same exit code), without a
+// METRICS file, and with METRICS lacking one computed key. The last two are
+// run in the scratch workspace, which is restored after each. It returns
+// metrics_strict = true when only that makes the install match, nil when
+// the defaults already do, or why neither does.
+func (m *migrator) groundTruthStrictness(name string, keys []string, before runResult) (*Setting, string) {
+	strict := &Setting{Key: strictKey, Value: "true", Source: "scripts/" + name}
+	metricsFiles := []string{filepath.Join(m.work, "METRICS"), filepath.Join(m.work, "METRICS.md")}
+	mf := metricsFiles[0]
+	if !isFile(mf) {
+		mf = metricsFiles[1]
+	}
+	data, err := os.ReadFile(mf)
+
+	type scenario struct {
+		label  string
+		mutate func() error
+	}
+	var scenarios []scenario
+	if err == nil {
+		scenarios = append(scenarios, scenario{"without a METRICS file", func() error {
+			for _, f := range metricsFiles {
+				if err := os.Remove(f); err != nil && !os.IsNotExist(err) {
+					return err
+				}
+			}
+			return nil
+		}})
+		for _, k := range keys {
+			if _, _, ok := metricsLine(string(data), k); !ok {
+				continue
+			}
+			k := k
+			scenarios = append(scenarios, scenario{"with " + filepath.Base(mf) + " lacking " + k, func() error {
+				var kept []string
+				for _, line := range strings.Split(string(data), "\n") {
+					if mm := metricsLineRe.FindStringSubmatch(line); mm == nil || mm[1] != k {
+						kept = append(kept, line)
+					}
+				}
+				return os.WriteFile(mf, []byte(strings.Join(kept, "\n")), 0o644)
+			}})
+			break
+		}
+	}
+
+	// Outcomes per scenario: the copy's, the install's by default and with
+	// metrics_strict = true. Only pass/fail is compared here.
+	legacyFails := make([]bool, len(scenarios))
+	installFails := [2][]bool{make([]bool, len(scenarios)), make([]bool, len(scenarios))}
+	variants := [2][]Setting{nil, {*strict}}
+	for i, sc := range scenarios {
+		if err := sc.mutate(); err != nil {
+			_ = m.ws.restore()
+			return nil, "could not check the copy " + sc.label + ": " + err.Error()
+		}
+		l := run(m.opts.Timeout, m.work, scrubbedEnv("REBAR_PROJECT_ROOT="+m.work, "REBAR_TIER=3"), m.workPath(name))
+		legacyFails[i] = !l.ok()
+		for v, extra := range variants {
+			r := run(m.opts.Timeout, m.work,
+				scrubbedEnv("REBAR_PROJECT_ROOT="+m.work, "REBAR_TIER=3", "REBAR_RCFILE="+m.rcFile(extra)),
+				m.installPath(name))
+			installFails[v][i] = !r.ok()
+		}
+		if err := m.ws.restore(); err != nil {
+			return nil, "could not restore the scratch copy: " + err.Error()
+		}
+	}
+
+	var mainCode [2]int
+	for v, extra := range variants {
+		mainCode[v] = m.runInstall(m.work, name, extra).Code
+	}
+	matches := func(v int) bool {
+		if mainCode[v] != before.Code {
+			return false
+		}
+		for i := range scenarios {
+			if installFails[v][i] != legacyFails[i] {
+				return false
+			}
+		}
+		return true
+	}
+	switch {
+	case matches(0):
+		return nil, ""
+	case matches(1):
+		return strict, ""
+	}
+	verdict := func(fails bool) string { return map[bool]string{false: "passes", true: "fails"}[fails] }
+	var parts []string
+	for i, sc := range scenarios {
+		parts = append(parts, fmt.Sprintf("%s %s (install: %s, with %s = true: %s)",
+			verdict(legacyFails[i]), sc.label, verdict(installFails[0][i]), strictKey, verdict(installFails[1][i])))
+	}
+	if mainCode[0] != before.Code && mainCode[1] != before.Code {
+		parts = append([]string{fmt.Sprintf("exits %d on the project (install: %d, with %s = true: %d)", before.Code, mainCode[0], strictKey, mainCode[1])}, parts...)
+	}
+	return nil, "same values, but the install cannot reproduce when the copy fails: the copy " + strings.Join(parts, "; ")
 }
 
 func describeSettings(s []Setting, why string) string {

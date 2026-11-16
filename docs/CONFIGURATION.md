@@ -110,6 +110,10 @@ metric.contract_ids.distinct   = ^CONTRACT-(.*)\.[0-9]+\.[0-9]+\.md$
 
 Check the computed values with `rebar run check-ground-truth`.
 
+| Key | Env override | Default | Meaning |
+|-----|--------------|---------|---------|
+| `metrics_strict` | `REBAR_METRICS_STRICT` | `false` | `true` fails the check when there is no `METRICS` file (otherwise SKIP) and when a declared metric has no `METRICS` line (otherwise reported as NEW). `rebar migrate` proposes it when your old copy of the check failed in both cases. |
+
 ## Skipping a check for one run
 
 Skips are environment variables, not `.rebarrc` keys. For example,

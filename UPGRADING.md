@@ -83,7 +83,9 @@ It takes seconds on a small project and a few minutes on a large one
   `compute-registry.sh`, `source_dirs` / `source_extensions` from your
   scanners. Lines already in `.rebarrc` are never edited or duplicated.
 - **delete / replace / wrap.** A copy goes when the install, with the derived
-  settings, behaves the same: every metric has the same value,
+  settings, behaves the same: every metric has the same value (and
+  ground truth fails where the copy did without a METRICS file or with a key
+  missing from it, adding `metrics_strict = true` if needed),
   `compute-registry.sh --stdout` is byte-identical, other checks give the
   same exit status and findings (the source scanners also on a probe tree).
   An unmodified copy of an older release goes too, with the difference

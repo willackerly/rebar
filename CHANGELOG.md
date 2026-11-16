@@ -39,6 +39,13 @@ All notable changes to rebar. Versioned with [semver](https://semver.org/).
   caller (read `rebar run check-ground-truth --print`). It also recognizes
   `. "$(dirname "$0")/x.sh"` as sourcing (a path with spaces inside a
   command substitution was missed).
+- **`.rebarrc` `metrics_strict = true`** (env `REBAR_METRICS_STRICT`) makes
+  `check-ground-truth` fail when `METRICS` is missing and when a declared
+  metric has no `METRICS` line; by default these still pass (SKIP, NEW).
+  `rebar migrate` now also compares the copy and the install in those two
+  cases: it proposes `metrics_strict = true` when the copy failed both (as
+  virtru-analyze's did; rc.2 judged them equivalent and dropped the
+  failures), and keeps a copy that fails only one of them.
 
 ---
 

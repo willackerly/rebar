@@ -6,6 +6,8 @@
 #   T1  declared metrics: files, dirs, depth, exclude_names, exclude_dirs,
 #       contains, distinct, missing path
 #   T2  METRICS exact and >= floor pass; drift and a broken floor fail
+#   T2b metrics_strict (.rebarrc or REBAR_METRICS_STRICT): a missing METRICS
+#       and a computed key missing from it fail; by default both pass
 #   T3  registry_scope_prefixes / registry_purpose_heading / _style
 #   T4  source_dirs / source_extensions reach check-todos
 #   T5  a project copy of a check still runs, with a deprecation notice;
@@ -94,6 +96,29 @@ gt >/dev/null && fail "T2: floor above the count should fail"
 printf 'test_files = 5\n' > "$P/METRICS"
 gt >/dev/null && fail "T2: exact mismatch should fail"
 ok "T2: METRICS exact and floor semantics hold for declared metrics"
+
+# T2b — metrics_strict: by default a computed key missing from METRICS (NEW)
+# and a missing METRICS (SKIP) pass; strict, both fail.
+FULL='test_files = 2\nsdks = 2\nagents = 2\ncontract_files = 3\ncontract_ids = 2\nheaded_sources = 1\nnothing = 0\n'
+printf 'test_files = 2\n' > "$P/METRICS"
+out="$(gt)" || { echo "$out"; fail "T2b: a key missing from METRICS should pass by default"; }
+printf '%s\n' "$out" | grep -q 'NEW.*sdks = 2' || { echo "$out"; fail "T2b: NEW not reported"; }
+out="$(REBAR_METRICS_STRICT=true gt)" && { echo "$out"; fail "T2b: strict, a key missing from METRICS should fail"; }
+printf '%s\n' "$out" | grep -q 'MISSING.*sdks = 2' || { echo "$out"; fail "T2b: MISSING not reported"; }
+cp "$P/.rebarrc" "$TMP/rc.bak"
+printf 'metrics_strict = true\n' >> "$P/.rebarrc"
+gt >/dev/null && fail "T2b: .rebarrc metrics_strict = true not honored"
+printf "$FULL" > "$P/METRICS"
+out="$(gt)" || { echo "$out"; fail "T2b: strict with every key in METRICS should pass"; }
+rm "$P/METRICS"
+out="$(gt)" && { echo "$out"; fail "T2b: strict, a missing METRICS should fail"; }
+printf '%s\n' "$out" | grep -q 'FAIL.*No METRICS file' || { echo "$out"; fail "T2b: missing METRICS not reported"; }
+cp "$TMP/rc.bak" "$P/.rebarrc"
+out="$(gt)" || { echo "$out"; fail "T2b: a missing METRICS should pass by default"; }
+printf '%s\n' "$out" | grep -q 'SKIP.*No METRICS file' || { echo "$out"; fail "T2b: SKIP not reported"; }
+out="$(REBAR_METRICS_STRICT=false gt)" || fail "T2b: REBAR_METRICS_STRICT=false should not be strict"
+printf "$FULL" > "$P/METRICS"
+ok "T2b: metrics_strict fails a missing METRICS and keys missing from it"
 
 # T3 — registry classification and purpose rendering come from .rebarrc.
 reg() { ( cd / && REBAR_PROJECT_ROOT="$P" "$SRC/compute-registry.sh" --stdout ); }
