@@ -227,7 +227,7 @@ func askEnv(t *testing.T, base, path string) []string {
 		}
 		env = append(env, kv)
 	}
-	env = append(env, "HOME="+filepath.Join(base, "home"), "PATH="+path, "TERM=dumb", "LC_ALL=C",
+	env = append(env, "HOME="+filepath.Join(base, "home"), "PATH="+path, "TERM=dumb", "LC_ALL=C", "PYTHONDONTWRITEBYTECODE=1",
 		"REBAR_ROOT="+testutil.RebarSource(t))
 	return env
 }
@@ -413,6 +413,10 @@ func srvURLs(s *askServers) []string {
 	return s.urls
 }
 
+// noRoot is a golden root that never occurs: the records are already
+// normalized ($BASE).
+const noRoot = "\x00no-root\x00"
+
 // runAskParity runs the cases.
 func runAskParity(t *testing.T, cases []askCase) {
 	t.Helper()
@@ -424,6 +428,7 @@ func runAskParity(t *testing.T, cases []askCase) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel() // each run has its own trees, servers and stub claude
 			for _, tool := range tc.needs {
 				if _, err := exec.LookPath(tool); err != nil {
 					t.Skipf("needs %s", tool)
@@ -449,7 +454,7 @@ func runAskParity(t *testing.T, cases []askCase) {
 				}
 			}
 			if !platformDiverges {
-				checkGolden(t, "ask", tc.name, want, "\x00", wantCode)
+				checkGolden(t, "ask", tc.name, want, noRoot, wantCode)
 			}
 			for _, got := range []struct {
 				how  string

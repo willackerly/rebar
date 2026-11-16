@@ -219,6 +219,14 @@ remain stable regardless of format.
 
 ## Agent Loop
 
+> **Implementation:** `ask up <agent>` runs the agent's `run.sh` if it has
+> one, else the built-in loop of the `rebar` binary; `bin/ask-agent-loop
+> <agent-dir>` (a hand-off to `rebar ask-agent-loop`) runs the same loop for
+> use as a `run.sh`. It scans `inbox/*.json` every 2 seconds, answers each
+> question with `claude --print` into `outbox/<id>.json`, appends the
+> answer to `shared/messages/events.jsonl` and `memory.log.md`, removes the
+> question, and on SIGINT/SIGTERM removes `.pid` and exits 0.
+
 Each agent runs:
 
 ```text

@@ -46,7 +46,12 @@ sets `ASK_SERVER`, and checks dependencies. Idempotent — safe to run again.
 
 Then apply with `source ~/.zshrc` (or open a new terminal).
 
-**Dependencies:** bash 4.0+, jq, claude CLI, python3 (for ask-server).
+**Dependencies:** the `rebar` binary and the claude CLI. ASK is built into
+`rebar` (`rebar ask …`); `bin/ask` and `bin/ask-agent-loop` hand off to the
+`rebar` beside them (else `REBAR_BIN`, else the one on `PATH`), so the two
+spellings behave the same. `REBAR_CHECK_IMPL=shell` runs the original bash
+implementation instead (needs bash, jq, uuidgen) until it is removed.
+python3 is still needed for `ask serve` (ask-server).
 
 ## Commands
 

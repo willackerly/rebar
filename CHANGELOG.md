@@ -18,6 +18,34 @@ All notable changes to rebar. Versioned with [semver](https://semver.org/).
 
 ## Unreleased
 
+- **ASK runs natively.** `rebar ask` no longer execs `bin/ask`: the Go
+  port in the binary implements every subcommand (`who`, `where`,
+  `status`, `log`, `peek`, `tail`, `watch`, `up`, `reset`, `compact`,
+  `register`, `projects`, `init`, `agents`, agent commands, cross-project
+  `project:agent`, remote mode over `ASK_SERVER`), its flags, `ASK_*`
+  variables, exit codes and on-disk state (`.session-id`, `.pid`,
+  `.progress`, `.last-stderr`, inbox/outbox, `memory.log.md`,
+  `shared/messages/events.jsonl`, `~/.config/ask/projects`,
+  `.rr-index`), and the inbox loop (`ask up`, `bin/ask-agent-loop`, now
+  also `rebar ask-agent-loop`). It works in any directory, as `bin/ask`
+  did, and needs no jq (it writes jq's bytes itself). `bin/ask` and
+  `bin/ask-agent-loop` hand off to the `rebar` beside them (else
+  `REBAR_BIN`, else `PATH`), so scripts and `run.sh` files that call them
+  keep working; `REBAR_CHECK_IMPL=shell` runs the bash. `rebar init/new`
+  scaffold `agents/` and `rebar contract upstream` dispatch in process
+  (`ASK_BIN` still picks another ask for the latter). Parity:
+  `TestAskParity` (110 cases: bash, native and the shim against a stub
+  claude and test ASK servers; output, exit code, files, claude calls and
+  HTTP requests) and `TestAskLoopParity`, goldens in
+  `cli/cmd/testdata/ask`. Deliberate deviations from the bash:
+  `ask --help` / `ask -h` show the help (the flag loop rejected them as
+  unknown flags); `ask where` prints the canonical-case directory;
+  `LAST_ACTIVE` of `ask status` is computed on every platform (the
+  script's `stat -f %m` crashed it with GNU stat); re-registering a moved
+  project that was the registry's only entry works (the script's `grep -v`
+  exited it silently); the background compaction does not auto-register
+  its directory; on a terminal the answer header is capitalised and
+  wrapped as GNU sed and `fmt` did (BSD sed left it as is).
 - **The utility scripts run natively.** `rebar run refresh-context`,
   `agent-health`, `scan-consumers`, `rebar-doc`, `inbox-watch` and
   `flush-notifications` run Go ports, with the scripts' arguments,

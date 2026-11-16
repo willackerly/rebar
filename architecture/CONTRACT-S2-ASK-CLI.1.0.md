@@ -110,7 +110,7 @@ Exit codes: 0 success, 1 ask-level failure, 2 invocation error.
 
 ## Dependencies
 
-- Depends on: Python 3.10+ for `bin/ask`, `bin/ask-server`, `bin/ask-agent-loop`
+- Depends on: the `rebar` binary (ASK is native Go; `bin/ask` and `bin/ask-agent-loop` hand off to it)
 - Depends on: `claude` CLI (or other LLM endpoint) reachable for question handling
 - Optional: `ASK_SERVER` for remote-server mode (not required for local default)
 - Configuration: `agents/<role>/AGENT.md` defines the role; `agents/<role>/memory.md` seeds durable state
@@ -135,9 +135,11 @@ This is the latest version. No predecessor.
 
 ## Implementing Files
 
-- `bin/ask` — primary CLI entry point (Python, ~1900 lines)
+- `cli/internal/ask/` — the CLI and agent loop (native Go; `rebar ask`, `rebar ask-agent-loop`)
+- `cli/cmd/ask.go` — the `rebar ask` / `rebar ask-agent-loop` commands
+- `bin/ask` — hand-off to `rebar ask` (bash implementation under `REBAR_CHECK_IMPL=shell`)
 - `bin/ask-server` — long-running session server
-- `bin/ask-agent-loop` — agent-loop harness
+- `bin/ask-agent-loop` — hand-off to `rebar ask-agent-loop` (agent-loop harness)
 - `bin/install` — PATH installer + dependency check
 - `agents/<role>/AGENT.md` — per-role config, read by ASK on every call
 - `agents/<role>/commands/*.sh` — unquoted-command implementations

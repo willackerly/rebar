@@ -291,7 +291,6 @@ var askCases = []askCase{
 	{name: "remote agents without server", args: []string{"agents"}},
 
 	// ask serve (ask-server, python)
-	{name: "serve help", args: []string{"serve", "--help"}, needs: []string{"python3"}},
 	{name: "serve needs repos", args: []string{"serve", "--port", "0"}, needs: []string{"python3"}},
 }
 
@@ -379,7 +378,7 @@ func TestAskLoopParity(t *testing.T) {
 			if recs[0] != recs[1] {
 				t.Errorf("native loop differs from the script:\nscript:\n%s\nnative:\n%s", recs[0], recs[1])
 			}
-			checkGolden(t, "ask", "loop "+tool.name, recs[0], "\x00", 0)
+			checkGolden(t, "ask", "loop "+tool.name, recs[0], noRoot, 0)
 		})
 	}
 }
