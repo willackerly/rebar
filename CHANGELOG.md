@@ -18,6 +18,25 @@ All notable changes to rebar. Versioned with [semver](https://semver.org/).
 
 ## Unreleased
 
+- **compute-registry and check-ground-truth run natively too.** Both are
+  ported to the `rebar` binary and are its default (`REBAR_CHECK_IMPL=shell`
+  selects the scripts). compute-registry writes, `--check`s, prints
+  (`--stdout`) and `--health`s the same bytes as the script for every
+  `registry_*` key (impl counts on or off, `ellipsis` / `bytes` purposes,
+  scope prefixes, numbered purpose headings), in a git work tree (tracked
+  files, as `git grep`) and outside one (as `find`); on virtru-analyze
+  `--check` takes 0.02 s instead of 1.9 s and `--health` 0.09 s instead of
+  6.1 s (the script ran one `git grep` per contract). check-ground-truth
+  computes the `metric.<key>.*` DSL as the script's `find` does (depths,
+  pruning, symlinks not followed, `contains`, `distinct`) and compares
+  METRICS the same way, colours, `--print` and the tier gate included, and
+  knows rc.3's `metrics_strict` (env `REBAR_METRICS_STRICT`: a missing METRICS
+  or a key missing from it fails). The expected outputs live as golden files
+  in `cli/cmd/testdata/`, so the coverage outlives the scripts. Platform
+  quirks are settled one way: a status right after its colon
+  (`Status:stable`) keeps its first letter (BSD sed read `\s` as `s`), and a
+  binary contract file is a draft (BSD grep's "Binary file … matches" became
+  its status).
 - **Native (Go) checks are the default for seven checks.** check-todos and
   six more ported scanners, check-freshness, check-contract-refs,
   check-registry, check-contract-headers, check-prefix-uniqueness and
