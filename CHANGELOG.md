@@ -83,6 +83,36 @@ All notable changes to rebar. Versioned with [semver](https://semver.org/).
 
 ---
 
+## v3.1.0 — 2026-11-16
+
+**Adopters carry configuration, not rebar's scripts.** Checks run from a
+versioned, self-contained rebar install (`rebar check`, `rebar run <check>`);
+everything repo-specific lives in `.rebarrc`
+([docs/CONFIGURATION.md](docs/CONFIGURATION.md)); `rebar migrate` converts a
+project's copied, even customized, scripts into settings, verified by running
+them; and the installer keeps versions side by side under `~/.rebar/versions/`,
+installing checksum-verified prebuilt downloads. Upgrade with
+[UPGRADING.md](UPGRADING.md); CI needs a full rebar tree, not just the binary
+([SETUP.md § Run rebar in CI](SETUP.md#run-rebar-in-ci)).
+
+Field-tested on virtru-analyze: upgrades from v2.0.0 and v3.0.0-beta.4 copies,
+and the adopter's own CI running a pinned 3.1 tree. The full list of changes is
+in the release candidates below; since rc.3:
+
+- **`rebar new` writes the contract registry,** so a new project passes its
+  first `rebar check`. The registry check runs at every tier and failed with
+  "CONTRACT-REGISTRY.md does not exist" (15/16) until the user ran
+  `rebar run compute-registry`; the registry is now generated before the
+  initial commit and included in it.
+- **`metrics_strict = true` also fails when `.rebarrc` declares no metrics.**
+  In rc.3, a strict check with no `metric.<key>.*` lines passed ("No metrics
+  declared"), so deleting the declarations silently turned enforcement off.
+  A strict failure for a missing `METRICS` file or missing declarations now
+  ends with "Ground truth not verified" instead of the misleading "Metric
+  drift detected".
+
+---
+
 ## v3.1.0-rc.3 — 2026-11-16
 
 Third release candidate for 3.1.0, still a **pre-release** (default "latest"

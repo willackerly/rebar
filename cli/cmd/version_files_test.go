@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -84,5 +85,34 @@ func TestBranchBuildWritesReleaseVersion(t *testing.T) {
 	}
 	if strings.TrimSpace(string(got)) != releaseVersion {
 		t.Errorf(".rebar-version = %q on a branch build, want %q", strings.TrimSpace(string(got)), releaseVersion)
+	}
+}
+
+// A project created by `rebar new` passes the registry check, which runs at
+// every tier, without the user first running compute-registry.
+func TestNewWritesCurrentRegistry(t *testing.T) {
+	src, err := filepath.Abs(filepath.Join("..", ".."))
+	if err != nil {
+		t.Fatal(err)
+	}
+	isolateGit(t)
+	t.Setenv("REBAR_ROOT", src)
+	t.Chdir(t.TempDir())
+	newDescription = ""
+	if err := runNew(newCmd, []string{"probe"}); err != nil {
+		t.Fatalf("rebar new: %v", err)
+	}
+	root, _ := filepath.Abs("probe")
+	if _, err := os.Stat(filepath.Join(root, "architecture", "CONTRACT-REGISTRY.md")); err != nil {
+		t.Fatalf("rebar new wrote no registry: %v", err)
+	}
+	check := exec.Command("bash", filepath.Join(src, "scripts", "compute-registry.sh"), "--check")
+	check.Env = append(os.Environ(), "REBAR_PROJECT_ROOT="+root)
+	check.Dir = root
+	if out, err := check.CombinedOutput(); err != nil {
+		t.Fatalf("compute-registry --check on a new project: %v\n%s", err, out)
+	}
+	if out, err := exec.Command("git", "-C", root, "status", "--porcelain").Output(); err != nil || len(out) != 0 {
+		t.Fatalf("registry not in the initial commit: %q %v", out, err)
 	}
 }
