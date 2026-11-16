@@ -34,7 +34,9 @@ All notable changes to rebar. Versioned with [semver](https://semver.org/).
   ordered `implementing_files` by locale collation of `path:line:text`); a
   binary file holding a reference is not an implementation (BSD grep's
   "Binary file … matches" line became an implementing file named that); a
-  directory named like a contract file is not a contract. Steward on rebar
+  directory named like a contract file is not a contract; lines are read
+  as bytes (GNU grep under a UTF-8 locale dropped a TODO.md discovery line
+  that is not valid UTF-8, taking it for binary data). Steward on rebar
   takes 0.07 s instead of 6 s; on virtru-analyze (60 contracts) 6.6 s
   instead of 48 s, most of it the project's own check copies, which still
   run as bash.

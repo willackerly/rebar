@@ -151,8 +151,15 @@ var stewardParityCases = []parityCase{
 	},
 }
 
+// stewardLocale runs the scripts in the C locale: the native steward sorts
+// in byte order, and GNU grep under a UTF-8 locale takes a line that is not
+// valid UTF-8 for binary data (neither is emulated). LC_ALL also beats a
+// runner's own LC_ALL, which LC_COLLATE alone would not.
+func stewardLocale(t *testing.T) { t.Setenv("LC_ALL", "C") }
+
 func TestStewardParity(t *testing.T) {
 	t.Setenv("REBAR_TEST_RUN_CLI", "1")
+	stewardLocale(t)
 	runParity(t, stewardCheck, stewardParityCases)
 }
 
@@ -166,6 +173,7 @@ func TestStewardGolden(t *testing.T) {
 // stdout, as the native port.
 func TestStewardBinaryReference(t *testing.T) {
 	requireBash(t)
+	stewardLocale(t)
 	files := map[string]string{
 		".rebarrc":                            "tier = 1\n",
 		"architecture/CONTRACT-S1-BIN.1.0.md": specContract("S1-BIN"),
@@ -211,6 +219,7 @@ func TestStewardBinaryReference(t *testing.T) {
 // REBAR_CHECK_IMPL=shell, with the same output and reports.
 func TestStewardCLI(t *testing.T) {
 	requireBash(t)
+	stewardLocale(t)
 	files := map[string]string{}
 	for rel, body := range stewardTree {
 		files[rel] = testutil.Tags.Replace(body)
