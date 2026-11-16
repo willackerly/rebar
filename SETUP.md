@@ -25,7 +25,7 @@ That installs v3.1.0 and puts `~/.rebar/current/bin` (`rebar`, `ask`,
 source the RC) and check with `rebar version`. Fetch `setup-rebar.sh` from the
 tag you install, as above: the copy on `main` is whatever `main` holds. With no
 version argument the installer takes the latest stable release (the highest
-`vX.Y.Z` tag, ignoring pre-releases such as `v3.1.0-rc.3`; if no stable tag
+`vX.Y.Z` tag, ignoring pre-releases such as `v3.2.0-rc.1`; if no stable tag
 exists yet, the highest pre-release). Variants (`…` is the `curl` part):
 
 | Command | Installs |
@@ -54,20 +54,20 @@ rebar: [UPGRADING.md](UPGRADING.md).
 
 ### Testing a release candidate
 
-Release candidates are tags like `v3.1.0-rc.3`. Until 3.1 is merged to
-`main`, `main`'s `setup-rebar.sh` is the old installer, which takes no version
-argument, so use the installer from the candidate's own tag:
+Release candidates are tags like `v3.2.0-rc.1`, published as GitHub
+pre-releases; the default "latest" install skips them. Use the installer from
+the candidate's own tag (or `--pre` for the newest pre-release):
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/willackerly/rebar/v3.1.0-rc.3/setup-rebar.sh \
-  | bash -s -- v3.1.0-rc.3 --no-switch
-~/.rebar/versions/v3.1.0-rc.3/bin/rebar version     # rebar v3.1.0-rc.3
+curl -fsSL https://raw.githubusercontent.com/willackerly/rebar/v3.2.0-rc.1/setup-rebar.sh \
+  | bash -s -- v3.2.0-rc.1 --no-switch
+~/.rebar/versions/v3.2.0-rc.1/bin/rebar version     # rebar v3.2.0-rc.1
 ```
 
 `--no-switch` keeps your current version active (except on a first versioned
 install, which always becomes current), so you can try the candidate by path
 on one project, then switch with
-`ln -sfn versions/v3.1.0-rc.3 ~/.rebar/current`. Then follow
+`ln -sfn versions/v3.2.0-rc.1 ~/.rebar/current`. Then follow
 [QUICKSTART.md](QUICKSTART.md) for a new project or
 [UPGRADING.md](UPGRADING.md) for an existing one, and report problems as
 issues on the repository.
