@@ -82,6 +82,23 @@ func runRebarScript(name string, args ...string) (exitCode int, found bool, err 
 	return code, true, err
 }
 
+// outputRebarScript is runRebarScript for the project at root and the
+// install at rebarRoot, returning the combined output instead of printing
+// it: a native check runs in process when one is selected, else the script.
+func outputRebarScript(root, rebarRoot, name string, args ...string) (out []byte, code int, found bool, err error) {
+	s, ok := resolveScript(root, rebarRoot, name)
+	if c, native := nativeFor(name, s, ok); native {
+		var buf bytes.Buffer
+		code := c.Run(&checks.Context{Root: root, Dir: root, Stdout: &buf, Stderr: &buf}, args)
+		return buf.Bytes(), code, true, nil
+	}
+	if !ok {
+		return nil, 0, false, nil
+	}
+	out, code, err = scripts.OutputInProject(s.Path, root, s.nativeEnv(), args...)
+	return out, code, true, err
+}
+
 // nativeEnv is the hand-off environment for running s (checks.ScriptEnv):
 // the scripts of an install may hand off to the native checks; a project's
 // legacy copy, and the copies it calls, never do.
