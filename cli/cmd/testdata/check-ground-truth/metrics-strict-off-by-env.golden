@@ -1,0 +1,13 @@
+=== Ground Truth Verification ===
+
+[0;32mOK[0m:    test_files = 2
+[1;33mNEW[0m:   sdks = 2  (not in METRICS file)
+[1;33mNEW[0m:   agents = 2  (not in METRICS file)
+[1;33mNEW[0m:   contract_files = 3  (not in METRICS file)
+[1;33mNEW[0m:   contract_ids = 2  (not in METRICS file)
+[1;33mNEW[0m:   headed = 1  (not in METRICS file)
+[1;33mNEW[0m:   go_all = 3  (not in METRICS file)
+[1;33mNEW[0m:   nothing = 0  (not in METRICS file)
+
+[0;32mAll documented metrics match codebase reality[0m
+--- exit 0 ---

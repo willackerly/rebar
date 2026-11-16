@@ -1,0 +1,13 @@
+=== Ground Truth Verification ===
+
+[0;31mDRIFT[0m: test_files — METRICS says a	b, code says 2
+[0;31mDRIFT[0m: sdks — METRICS says 2, code says 2
+[0;32mOK[0m:    agents = 2
+[0;31mDRIFT[0m: contract_files — METRICS says it's, code says 3
+[0;32mOK[0m:    contract_ids = 2
+[0;31mDRIFT[0m: headed — METRICS says x\y, code says 1
+[0;31mDRIFT[0m: go_all — METRICS says A, code says 3
+[0;32mOK[0m:    nothing = 0
+
+[0;31mMetric drift detected — update METRICS to match reality[0m
+--- exit 1 ---

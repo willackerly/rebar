@@ -1,0 +1,6 @@
+=== Ground Truth Verification ===
+
+[0;32mOK[0m:    only = 1
+
+[0;32mAll documented metrics match codebase reality[0m
+--- exit 0 ---
