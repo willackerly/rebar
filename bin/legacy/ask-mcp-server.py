@@ -853,7 +853,17 @@ class MCPHandler(BaseHTTPRequestHandler):
 
 class ThreadedMCPServer(ThreadingMixIn, HTTPServer):
     """Multi-threaded MCP server."""
-    pass
+    daemon_threads = True
+    allow_reuse_address = True
+
+    def server_bind(self):
+        # As ask-server: skip HTTPServer's socket.getfqdn(), which can hang
+        # for many seconds on macOS (it stalled the parity tests on CI).
+        self.socket.setsockopt(__import__('socket').SOL_SOCKET, __import__('socket').SO_REUSEADDR, 1)
+        self.socket.bind(self.server_address)
+        host, port = self.server_address[:2]
+        self.server_name = host or "localhost"
+        self.server_port = port
 
 
 # ---------------------------------------------------------------------------
