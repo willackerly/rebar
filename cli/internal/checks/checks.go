@@ -3,9 +3,9 @@
 // scripts/check-todos.sh) and behaves like the script: same arguments, same
 // .rebarrc settings, same output and exit code.
 //
-// During the transition the shell script stays the default; REBAR_CHECK_IMPL=go
-// makes `rebar check` and `rebar run` use the native implementation of every
-// check registered here (see feedback/2026-11-14-go-native-checks.md).
+// A check registered here is the default for `rebar check` and `rebar run`;
+// REBAR_CHECK_IMPL=shell selects the scripts instead until they are deleted
+// (see feedback/2026-11-14-go-native-checks.md).
 package checks
 
 import (
@@ -76,20 +76,20 @@ const (
 
 var warnImplOnce sync.Once
 
-// Impl is the implementation REBAR_CHECK_IMPL selects: ImplGo for "go",
-// otherwise ImplShell (the default). An unknown value is warned about once
-// and treated as shell.
+// Impl is the implementation REBAR_CHECK_IMPL selects: ImplShell for
+// "shell", otherwise ImplGo (the default). An unknown value is warned about
+// once and treated as go.
 func Impl() string {
 	switch v := strings.TrimSpace(os.Getenv("REBAR_CHECK_IMPL")); v {
-	case "", ImplShell:
+	case ImplShell:
 		return ImplShell
-	case ImplGo:
+	case "", ImplGo:
 		return ImplGo
 	default:
 		warnImplOnce.Do(func() {
-			fmt.Fprintf(os.Stderr, "rebar: ignoring REBAR_CHECK_IMPL=%q (use shell or go); running the shell checks\n", v)
+			fmt.Fprintf(os.Stderr, "rebar: ignoring REBAR_CHECK_IMPL=%q (use shell or go); running the native checks\n", v)
 		})
-		return ImplShell
+		return ImplGo
 	}
 }
 

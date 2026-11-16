@@ -13,7 +13,7 @@ import (
 // nativeCmd runs a check's native (Go) implementation whatever
 // REBAR_CHECK_IMPL says. It is the target of _rebar_native in
 // scripts/_rebar-config.sh, which a script with a native counterpart calls
-// when `rebar check` / `rebar run` asked for the go implementation, and a
+// when `rebar check` / `rebar run` use the go implementation (the default), and a
 // way to compare the two by hand. It never runs a script, so the hand-off
 // cannot loop.
 var nativeCmd = &cobra.Command{
@@ -24,7 +24,7 @@ current project (REBAR_PROJECT_ROOT, else the enclosing repository), with
 the same arguments, output and exit code as its script. Without arguments,
 lists the checks that have one.
 
-Set REBAR_CHECK_IMPL=go to make rebar check and rebar run use them.`,
+rebar check and rebar run use them unless REBAR_CHECK_IMPL=shell.`,
 	Hidden:             true,
 	DisableFlagParsing: true,
 	RunE:               runNative,

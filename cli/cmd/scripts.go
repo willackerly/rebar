@@ -63,10 +63,10 @@ func resolveScript(projectRoot, rebarRoot, name string) (resolvedScript, bool) {
 // runRebarScript resolves name for the current project and runs it there.
 // found is false when neither the project nor a rebar install has it.
 //
-// Under REBAR_CHECK_IMPL=go a check with a native implementation runs that
-// instead, in process, even when no install has the script; a project's
-// own legacy copy still wins, since it may carry customizations the native
-// check does not have.
+// Unless REBAR_CHECK_IMPL=shell, a check with a native implementation runs
+// that instead, in process, even when no install has the script; a
+// project's own legacy copy still wins, since it may carry customizations
+// the native check does not have.
 func runRebarScript(name string, args ...string) (exitCode int, found bool, err error) {
 	s, ok := resolveScript(cfg.RepoRoot, findRebarRoot(), name)
 	if c, native := nativeFor(name, s, ok); native {
@@ -93,7 +93,7 @@ func (s resolvedScript) nativeEnv() []string {
 }
 
 // nativeFor returns the native check to run in place of the script
-// resolved for name (s, found): one is registered, REBAR_CHECK_IMPL=go, and
+// resolved for name (s, found): one is registered, the go implementation is selected, and
 // the script is not a project's legacy copy.
 func nativeFor(name string, s resolvedScript, found bool) (*checks.Check, bool) {
 	c, ok := checks.Native(name)

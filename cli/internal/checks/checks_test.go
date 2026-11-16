@@ -11,7 +11,7 @@ import (
 )
 
 func TestImpl(t *testing.T) {
-	for v, want := range map[string]string{"": ImplShell, "shell": ImplShell, "go": ImplGo, " go ": ImplGo, "rust": ImplShell} {
+	for v, want := range map[string]string{"": ImplGo, "shell": ImplShell, " shell ": ImplShell, "go": ImplGo, "rust": ImplGo} {
 		t.Setenv("REBAR_CHECK_IMPL", v)
 		if got := Impl(); got != want {
 			t.Errorf("REBAR_CHECK_IMPL=%q: Impl() = %q, want %q", v, got, want)
@@ -20,7 +20,7 @@ func TestImpl(t *testing.T) {
 }
 
 func TestNativeAndScriptEnv(t *testing.T) {
-	t.Setenv("REBAR_CHECK_IMPL", "")
+	t.Setenv("REBAR_CHECK_IMPL", "shell")
 	if _, ok := Native("check-todos.sh"); ok {
 		t.Error("shell implementation returned a native check")
 	}
@@ -29,7 +29,7 @@ func TestNativeAndScriptEnv(t *testing.T) {
 		t.Errorf("shell ScriptEnv = %v, want the inherited hand-off cleared", env)
 	}
 
-	t.Setenv("REBAR_CHECK_IMPL", "go")
+	t.Setenv("REBAR_CHECK_IMPL", "")
 	if c, ok := Native("check-todos.sh"); !ok || c.Name != "check-todos" {
 		t.Errorf("go: Native(check-todos.sh) = %v, %v", c, ok)
 	}
@@ -39,7 +39,7 @@ func TestNativeAndScriptEnv(t *testing.T) {
 	install := t.TempDir()
 	env := strings.Join(ScriptEnv(install), "\n")
 	real, _ := filepath.EvalSymlinks(install)
-	if !strings.Contains(env, "REBAR_BIN=") || !strings.Contains(env, "REBAR_NATIVE_CHECKS=check-todos") ||
+	if !strings.Contains(env, "REBAR_BIN=") || !strings.Contains(env, "REBAR_NATIVE_CHECKS="+strings.Join(Names(), " ")) ||
 		!strings.Contains(env, "REBAR_NATIVE_SCRIPTS="+real+"\n") && !strings.HasSuffix(env, "REBAR_NATIVE_SCRIPTS="+real) {
 		t.Errorf("go ScriptEnv = %q, want the binary, the checks and the install's scripts (%s)", env, real)
 	}

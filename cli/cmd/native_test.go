@@ -564,7 +564,8 @@ func TestNativeFor(t *testing.T) {
 		found      bool
 		want       bool
 	}{
-		{"", "check-todos", install, true, false},
+		{"shell", "check-todos", install, true, false},
+		{"", "check-todos", install, true, true}, // go is the default
 		{"go", "check-todos", install, true, true},
 		{"go", "check-todos.sh", resolvedScript{}, false, true}, // binary-only install
 		{"go", "check-todos", legacy, true, false},              // a legacy copy wins

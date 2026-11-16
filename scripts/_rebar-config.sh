@@ -277,9 +277,10 @@ _rebar_contract_ref_ere() {
 
 # _rebar_native NAME [ARGS...] — run check NAME's native (Go) implementation
 # in place of the calling script, when the rebar CLI that started the script
-# asked for it: under REBAR_CHECK_IMPL=go, `rebar check` and `rebar run` export
-# REBAR_NATIVE_CHECKS (the checks that binary implements natively), REBAR_BIN
-# (the binary) and REBAR_NATIVE_SCRIPTS (the install's scripts directory).
+# asked for it: unless REBAR_CHECK_IMPL=shell, `rebar check` and `rebar run`
+# export REBAR_NATIVE_CHECKS (the checks that binary implements natively),
+# REBAR_BIN (the binary) and REBAR_NATIVE_SCRIPTS (the install's scripts
+# directory).
 # Only a script in that directory hands off: a project's own copy of a check
 # may be customized, so it always runs itself, even when it was copied from a
 # script with this hook. Otherwise it returns and the script runs as before,
