@@ -1,5 +1,5 @@
 --- stdout ---
-$BASE/proj/agents/PRODUCT
+$BASE/proj/agents/product
 --- stderr ---
 --- changes ---
 --- made home/.config/ ---

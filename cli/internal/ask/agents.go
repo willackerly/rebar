@@ -54,14 +54,22 @@ func (a *App) canonicalize(input string) string {
 	if input == "" {
 		return ""
 	}
-	if isDir(a.agentsDir+"/"+input) && isFile(a.agentsDir+"/"+input+"/AGENT.md") {
-		return input
+	// The directory's own spelling, also on a case-insensitive file system
+	// (where the script's [ -d ] fast path kept the spelling as typed).
+	names := a.agentDirs()
+	for _, name := range names {
+		if name == input {
+			return name
+		}
 	}
 	lc := lowerASCII(input)
-	for _, name := range a.agentDirs() {
+	for _, name := range names {
 		if lowerASCII(name) == lc {
 			return name
 		}
+	}
+	if isDir(a.agentsDir+"/"+input) && isFile(a.agentsDir+"/"+input+"/AGENT.md") {
+		return input // a hidden agent directory, named exactly
 	}
 	return ""
 }

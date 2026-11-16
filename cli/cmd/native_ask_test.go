@@ -60,7 +60,8 @@ type askCase struct {
 	// golden one; the script's is only logged.
 	diverges string
 	// divergesOn is "linux" or "darwin" for a platform-specific script
-	// behaviour (the native side follows the other platform).
+	// behaviour: the native side follows the other platform, whose script
+	// output is the golden one.
 	divergesOn string
 	// needs lists tools the script side needs beyond bash and jq.
 	needs []string
@@ -453,9 +454,7 @@ func runAskParity(t *testing.T, cases []askCase) {
 					t.Logf("the script diverges, as documented (%s%s); it gave (exit %d):\n%s", tc.diverges, tc.divergesOn, scriptCode, script)
 				}
 			}
-			if !platformDiverges {
-				checkGolden(t, "ask", tc.name, want, noRoot, wantCode)
-			}
+			checkGolden(t, "ask", tc.name, want, noRoot, wantCode)
 			for _, got := range []struct {
 				how  string
 				rec  string

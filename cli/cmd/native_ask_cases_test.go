@@ -217,7 +217,7 @@ var askCases = []askCase{
 	{name: "ask verbose", files: askAgents, args: []string{"-v", "product", "Who is it for?"}},
 	{name: "ask resumes session", files: withAsk(map[string]string{"agents/architect/.session-id": "11111111-2222-4333-8444-555555555555\n"}), args: []string{"architect", "And now?"}},
 	{name: "ask resumes verbose", files: withAsk(map[string]string{"agents/architect/.session-id": "11111111-2222-4333-8444-555555555555\n"}), args: []string{"--verbose", "architect", "And now?"}},
-	{name: "ask other case", files: askAgents, args: []string{"ARCHITECT", "q"}},
+	{name: "ask other case", files: askAgents, args: []string{"ARCHITECT", "q"}, divergesOn: "darwin"}, // the script kept "ARCHITECT" where the file system ignores case
 	{name: "ask debug", files: askAgents, args: []string{"-d", "architect", "q"}},
 	{name: "ask debug without usage", files: askAgents, args: []string{"-d", "architect", "q"}, claude: map[string]string{"claude-out": `{"result":"r","session_id":"s1"}`}},
 	{name: "ask plain text answer", files: askAgents, args: []string{"architect", "q"}, claude: map[string]string{"claude-out": "Not JSON at all.\nSecond line.\n"}},

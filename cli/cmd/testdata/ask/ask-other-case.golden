@@ -11,7 +11,7 @@ It is computed in src/calc.go.
 [<UUID>]
 [--output-format]
 [json]
-[You are the ARCHITECT agent.
+[You are the architect agent.
 
 Your role and context:
 # Agent: Architect
@@ -59,14 +59,14 @@ A: The answer is 42.
 {
   "id": "<MSGID>",
   "from": "human",
-  "to": "ARCHITECT",
+  "to": "architect",
   "type": "question",
   "timestamp": "<TS>",
   "body": "q"
 }
 {
   "id": "<MSGID>",
-  "from": "ARCHITECT",
+  "from": "architect",
   "to": "human",
   "type": "answer",
   "timestamp": "<TS>",
