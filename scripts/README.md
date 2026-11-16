@@ -64,6 +64,12 @@ step of `rebar check`): same arguments, output and report files, no jq needed.
 |--------|-------|
 | `inbox-watch.sh` | Long-running peer-inbox watcher (runs until killed) — armed at coordination-seat cold start per `practices/session-lifecycle.md` step 4; NOT a 0/1 check, never wire into CI |
 | `rebar-doc.sh` | Resolver of record for `rebar:<kind>/<name>` refs (`conventions.md` §Cross-Repo References): local → `$REBAR_ROOT` → discovered checkout → upstream URL (exit 4). `--cat` streams the doc. Go twin: `rebar doc` |
+| `refresh-context.sh` | QUICKCONTEXT / TODO freshness, commits since the last sync, untracked TODO comments, worktrees; `--quick`, `--test-baseline` |
+| `agent-health.sh` | `source` it in a worktree agent's shell for `agent_checkpoint` / `agent_heartbeat` / `agent_metric` / `agent_rmse`; run as a command it runs one (`agent-health.sh checkpoint "msg"`) |
+| `scan-consumers.sh` / `flush-notifications.sh` | Federation: which repos consume a contract (`REBAR_REPOS` or the ASK registry), and dispatching the outbox's pending change notices through `ask <consumer>:featurerequest` (`practices/federation-outbox.md`) |
+
+`rebar run <name>` runs native (Go) versions of all of these with the same
+arguments, output and exit codes (`REBAR_CHECK_IMPL=shell` runs the scripts).
 
 ## Installation
 

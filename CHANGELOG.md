@@ -18,6 +18,37 @@ All notable changes to rebar. Versioned with [semver](https://semver.org/).
 
 ## Unreleased
 
+- **The utility scripts run natively.** `rebar run refresh-context`,
+  `agent-health`, `scan-consumers`, `rebar-doc`, `inbox-watch` and
+  `flush-notifications` run Go ports, with the scripts' arguments,
+  environment variables (`REBAR_REPOS`, `ASK_REGISTRY`, `REBAR_OUTBOX`,
+  `REBAR_NOTIFY_DEFAULT`, `ASK_BIN`, `AGENT_ID`, `AGENT_PROGRESS_FILE`,
+  `REBAR_ROOT`, `HOME`), output, files and exit codes. The install's scripts
+  hand off to the binary under `rebar run`; `REBAR_CHECK_IMPL=shell` runs
+  the scripts. `inbox-watch` waits on a timer and SIGINT/SIGTERM together,
+  as the script's background `sleep` + `wait` did, so a kill still lands at
+  once and releases the per-inbox lock (the lock holds the same PID: the
+  hand-off `exec`s). `agent-health.sh` stays a library to `source` into an
+  agent's shell; run as a command it now takes the function to run
+  (`agent-health.sh checkpoint "msg"`, `heartbeat`, `metric K V`, `rmse D B
+  A`), which is what `rebar run agent-health …` runs natively.
+  `flush-notifications` calls ask through `ASK_BIN` as before and reads
+  scan-consumers' JSON as the script did with jq. `rebar doc` and
+  `rebar-doc` now share one kind table, so `rebar doc` also rejects a name
+  with whitespace or `..` (exit 2), as the script did. Kept for parity, to
+  fix later in both implementations: refresh-context ends with exit 128
+  outside a git repository (and before any commit), right after "Commits
+  since last sync:", because of `set -e` with pipefail; scan-consumers ends
+  with exit 1 at the first consumer section missing `version_pinned`,
+  `pin_date`, `notify_on_change` or `rationale`, though the template marks
+  `notify_on_change` optional (so flush-notifications sees no consumers for
+  that contract); flush-notifications exits 1 after every run that is not
+  `--dry-run`; the TODO counts print `0<newline>0` when there are none.
+  Platform choices: dates are read as GNU date reads them (a date that does
+  not exist gives no staleness line; BSD rolled it over), binary source
+  files are not untracked TODOs, the `--dry-run` message length counts
+  characters (bash 3.2 in the C locale counted bytes).
+
 - **steward runs natively.** `rebar run steward` and the Steward step of
   `rebar check` run a Go port of `scripts/steward.sh`
   (the S1-STEWARD 2.0 contract) with the same arguments (`--json`,
