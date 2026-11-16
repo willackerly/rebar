@@ -1,0 +1,19 @@
+=== Rebar compliance check ===
+
+OK: .rebar-version = v3.1.0-rc.2
+OK: .rebarrc tier = 2 (ADOPTED)
+OK: README.md badge found on line 2
+    Version: v3.0.0 | Tier: 3 (ADOPTED)
+FAIL: Badge says v3.0.0 but .rebar-version says v3.1.0-rc.2
+FAIL: Badge says Tier 3 but .rebarrc says tier = 2
+FAIL: Tier 3 should be 'ENFORCED', not 'ADOPTED'
+
+=== AGENTS.md required sections ===
+OK: Cold Start / Read Before Coding — agents must know the reading order
+OK: Contract-Driven Development — the 4 rules that make contracts operational
+OK: Testing expectations — cascade tiers or scout rule
+OK: TODO Tracking — two-tag system prevents invisible debt
+OK: AGENTS.md mentions ASK CLI
+
+FAIL: 3 compliance issue(s) found.
+--- exit 1 ---

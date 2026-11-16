@@ -1,0 +1,22 @@
+=== Rebar compliance check ===
+
+OK: .rebar-version = v3.1.0-rc.2
+OK: .rebarrc tier = 2 (ADOPTED)
+OK: README.md badge found on line 2
+    Version: v3.1.0-rc.2 | Tier: 2 (ADOPTED)
+
+=== AGENTS.md required sections ===
+OK: Cold Start / Read Before Coding — agents must know the reading order
+OK: Contract-Driven Development — the 4 rules that make contracts operational
+OK: Testing expectations — cascade tiers or scout rule
+OK: TODO Tracking — two-tag system prevents invisible debt
+OK: AGENTS.md mentions ASK CLI
+
+=== Contract maturity (declared Status:) ===
+WARN: CONTRACT-S1-A.1.0.md has no Status: line — add one (see architecture/CONTRACT-TEMPLATE.md header)
+OK: 1 of 2 live contract(s) declare maturity — 1 stub-or-draft-or-undeclared (50.0%)
+NOTE: 50.0% of live contracts are stub-or-draft — badge reads as
+  'Tier 2: ADOPTED — IN PROGRESS' until the set matures
+
+OK: Rebar compliance verified.
+--- exit 0 ---

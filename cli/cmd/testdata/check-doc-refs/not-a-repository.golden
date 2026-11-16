@@ -1,0 +1,4 @@
+fatal: not a git repository (or any of the parent directories): .git
+fatal: not a git repository (or any of the parent directories): .git
+check-doc-refs: OK — no broken markdown links to untracked files
+--- exit 0 ---

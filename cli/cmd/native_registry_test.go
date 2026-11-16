@@ -172,7 +172,7 @@ func runGolden(t *testing.T, check parityCheck, cases []parityCase) {
 				t.Setenv(k, v)
 			}
 			var out strings.Builder
-			code := c.Run(&checks.Context{Root: root, Stdout: &out, Stderr: &out}, tc.args)
+			code := c.Run(&checks.Context{Root: root, Stdout: &out, Stderr: &out}, rootArgs(tc.args, root))
 			got := out.String() + takeChanges(t, root, before)
 			if check.normalize != nil {
 				got = check.normalize(got)

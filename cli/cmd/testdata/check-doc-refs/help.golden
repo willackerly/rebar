@@ -1,0 +1,27 @@
+check-doc-refs.sh — Verify that every file referenced from a tracked *.md
+is itself tracked in git.
+
+Catches a class of drift Tier 2 ci-check.sh misses: a load-bearing doc
+(e.g., FEDERATION-STORIES-DRAFT.md) is added to the working tree, cited
+from another doc, but never `git add`-ed. The current repo passes; a
+fresh clone fails to resolve the link.
+
+Source: rebar/feedback/2026-04-21-filedag-cross-ref-and-federation-coord.md §1
+
+Usage:
+  ./scripts/check-doc-refs.sh           # report broken refs, exit 1 if any
+  ./scripts/check-doc-refs.sh --quiet   # only print failures
+  ./scripts/check-doc-refs.sh --json    # JSON summary on stdout
+
+Heuristics:
+  - Walks every tracked *.md file (`git ls-files '*.md'`).
+  - Extracts markdown-link targets: `[text](TARGET)`.
+  - Skips: external URLs (http*, mailto, tel, ftp), anchor-only refs (#x),
+    home-relative refs (~/...), template placeholders ({...}), allowlisted
+    paths from .rebar/doc-refs-allow.txt (one path per line, # for comments).
+  - Resolves remaining targets relative to the source file's directory.
+  - Fails if resolved target is not in `git ls-files`.
+
+Bash 3.2 compatible (macOS default).
+
+--- exit 0 ---

@@ -34,6 +34,12 @@ README="$PROJECT_ROOT/README.md"
 AGENTS="$PROJECT_ROOT/AGENTS.md"
 VERSION_FILE="$PROJECT_ROOT/.rebar-version"
 RC_FILE="$PROJECT_ROOT/.rebarrc"
+if [ -f "$SCRIPT_DIR/_rebar-config.sh" ]; then
+  # shellcheck source=scripts/_rebar-config.sh
+  source "$SCRIPT_DIR/_rebar-config.sh"
+  # Under `REBAR_CHECK_IMPL=go rebar check` (the default) the CLI's native port runs instead.
+  _rebar_native check-compliance "$@"
+fi
 
 errors=0
 
@@ -148,9 +154,8 @@ fi
 
 # ─── Check 6: AGENTS.md load-bearing sections (Tier 2+) ──────────────────
 
-# Source tier config if available
-if [ -f "$SCRIPT_DIR/_rebar-config.sh" ]; then
-  source "$SCRIPT_DIR/_rebar-config.sh"
+# The tier config, when it was sourced above.
+if type _rebar_check_tier >/dev/null 2>&1; then
   current_tier=$(_rebar_check_tier check-compliance)
 else
   current_tier="${declared_tier:-3}"

@@ -28,6 +28,12 @@
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+if [ -f "$SCRIPT_DIR/_rebar-config.sh" ]; then
+  # shellcheck source=scripts/_rebar-config.sh
+  source "$SCRIPT_DIR/_rebar-config.sh"
+  # Under `REBAR_CHECK_IMPL=go rebar check` (the default) the CLI's native port runs instead.
+  _rebar_native check-doc-refs "$@"
+fi
 PROJECT_ROOT="${REBAR_PROJECT_ROOT:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 ALLOWLIST="$PROJECT_ROOT/.rebar/doc-refs-allow.txt"
 

@@ -590,14 +590,15 @@ func runParity(t *testing.T, check parityCheck, cases []parityCase) {
 					t.Setenv(k, v)
 				}
 			}
-			args := append([]string{script}, tc.args...)
+			tcArgs := rootArgs(tc.args, root)
+			args := append([]string{script}, tcArgs...)
 			base := append([]string{"REBAR_PROJECT_ROOT=" + root, "LC_COLLATE=C"}, env...)
 
 			shellOut, shellCode := testutil.RunEnv(t, root, testutil.IsolatedEnv(base...), "bash", args...)
 			shellOut = testErrorLine.ReplaceAllString(shellOut, "") + changes()
 
 			var native strings.Builder
-			nativeCode := c.Run(&checks.Context{Root: root, Stdout: &native, Stderr: &native}, tc.args)
+			nativeCode := c.Run(&checks.Context{Root: root, Stdout: &native, Stderr: &native}, tcArgs)
 			native.WriteString(changes())
 
 			// The hand-off goes through a wrapper that logs it, so a script
@@ -658,6 +659,15 @@ func runParity(t *testing.T, check parityCheck, cases []parityCase) {
 			}
 		})
 	}
+}
+
+// rootArgs is args with "$ROOT" spelling the tree's root, as in env.
+func rootArgs(args []string, root string) []string {
+	out := make([]string, len(args))
+	for i, a := range args {
+		out[i] = strings.ReplaceAll(a, "$ROOT", root)
+	}
+	return out
 }
 
 // TestTodosParity: check-todos.sh and its native port (runParity), finding
