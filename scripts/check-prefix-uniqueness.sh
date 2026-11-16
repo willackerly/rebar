@@ -56,6 +56,8 @@ CONTRACTS_DIR=architecture
 TIER=3
 if [ -f "$SCRIPT_DIR/_rebar-config.sh" ]; then
   source "$SCRIPT_DIR/_rebar-config.sh"
+  # Under `REBAR_CHECK_IMPL=go rebar check` (the default) the CLI's native port runs instead.
+  _rebar_native check-prefix-uniqueness "$@"
   _rebar_skip 2 check-prefix-uniqueness && exit 0
   TIER="$(_rebar_check_tier check-prefix-uniqueness)"
   CONTRACTS_DIR=$(_rebar_contracts_dir)

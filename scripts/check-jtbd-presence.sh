@@ -46,6 +46,8 @@ CONTRACTS_DIR=architecture
 TIER=3
 if [ -f "$SCRIPT_DIR/_rebar-config.sh" ]; then
   source "$SCRIPT_DIR/_rebar-config.sh"
+  # Under `REBAR_CHECK_IMPL=go rebar check` (the default) the CLI's native port runs instead.
+  _rebar_native check-jtbd-presence "$@"
   _rebar_skip 2 check-jtbd-presence && exit 0
   TIER="$(_rebar_check_tier check-jtbd-presence)"
   CONTRACTS_DIR=$(_rebar_contracts_dir)

@@ -11,7 +11,12 @@ set -euo pipefail
 
 # Tier gate: contract headers are Tier 2+ (skip for Tier 1 / partial adoption)
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-[ -f "$SCRIPT_DIR/_rebar-config.sh" ] && source "$SCRIPT_DIR/_rebar-config.sh" && _rebar_skip 2 check-contract-headers && exit 0
+if [ -f "$SCRIPT_DIR/_rebar-config.sh" ]; then
+  source "$SCRIPT_DIR/_rebar-config.sh"
+  # Under `REBAR_CHECK_IMPL=go rebar check` (the default) the CLI's native port runs instead.
+  _rebar_native check-contract-headers "$@"
+  _rebar_skip 2 check-contract-headers && exit 0
+fi
 
 # Configurable: file extensions to check (env CONTRACT_EXTENSIONS, then
 # .rebarrc `source_extensions`, then the default list)
