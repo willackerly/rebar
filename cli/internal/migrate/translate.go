@@ -18,6 +18,10 @@ type MetricDef struct {
 	MaxDepth     string
 	Contains     string
 	Distinct     string
+	// Tracked counts only git-tracked files (metric.<key>.tracked = true).
+	// The translator never sets it; it comes from a declaration already in
+	// .rebarrc.
+	Tracked bool
 	// Notes describe where the translation is looser than the original,
 	// for the report. The value check still has to pass.
 	Notes []string
@@ -44,6 +48,9 @@ func (d MetricDef) Settings(key, source string) []Setting {
 	add("exclude_dirs", strings.Join(d.ExcludeDirs, " "))
 	add("contains", d.Contains)
 	add("distinct", d.Distinct)
+	if d.Tracked {
+		add("tracked", "true")
+	}
 	return out
 }
 

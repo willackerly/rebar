@@ -62,6 +62,57 @@ All notable changes to rebar. Versioned with [semver](https://semver.org/).
 
 ---
 
+## v3.1.0-rc.3 — 2026-11-16
+
+Third release candidate for 3.1.0, still a **pre-release** (default "latest"
+stays `v3.0.0`). Fixes from running rc.2 in a real adopter's CI
+(virtru-analyze #457), and the released-blobs CI guard (#30):
+
+- **Root flags before a pass-through command work:** `rebar --repo-root X run
+  check-todos` (and `-v`, `--json`) failed with `no script "--repo-root"`,
+  because `run` takes its arguments verbatim and cobra handed it the root
+  flags too. Root flags before `run`, `ask` or `push` are now parsed by rebar;
+  for `run` also between `run` and the script name. Everything after the
+  script name (for `ask`/`push`, after the command name) still passes through
+  untouched, so `rebar ask -v …` keeps meaning ask's own `-v`.
+- **SETUP.md's pinned CI wrapper no longer leaks a temp clone per cold run.**
+  It set `trap 'rm -rf "$tmp"' EXIT` and then `exec`'d the pinned rebar, which
+  replaces the shell before any EXIT trap can run. It now removes the temp dir
+  (and drops the trap) once the tree is in place. If you copied the snippet,
+  add `rm -rf "$tmp"; trap - EXIT` after its `mv`. A new test runs the snippet
+  straight from SETUP.md.
+- **`rebar migrate` keeps a `check-ground-truth.sh` that callers source for
+  other functions.** A file sourcing the copy got the thin wrapper, which
+  defines only `compute_metrics()`, so a caller using the copy's `count_*`
+  helpers (virtru-analyze's `rebar-fix.sh`) would break. migrate now keeps
+  the copy, names the caller and functions, and notes how to migrate the
+  caller (read `rebar run check-ground-truth --print`). It also recognizes
+  `. "$(dirname "$0")/x.sh"` as sourcing (a path with spaces inside a
+  command substitution was missed).
+- **`.rebarrc` `metrics_strict = true`** (env `REBAR_METRICS_STRICT`) makes
+  `check-ground-truth` fail when `METRICS` is missing and when a declared
+  metric has no `METRICS` line; by default these still pass (SKIP, NEW).
+  `rebar migrate` now also compares the copy and the install in those two
+  cases: it proposes `metrics_strict = true` when the copy failed both (as
+  virtru-analyze's did; rc.2 judged them equivalent and dropped the
+  failures), and keeps a copy that fails only one of them.
+- **`metric.<key>.tracked = true`** counts only files git tracks (for
+  `type = dirs`, directories holding a tracked file), so gitignored or
+  untracked local files no longer inflate a count such as `shell_scripts`.
+  Outside a git work tree it has no effect (every file counts, with a note on
+  stderr). `rebar migrate` reads and keeps the field on metrics already in
+  `.rebarrc`; it does not derive it from a legacy copy.
+- **Colour only on a terminal:** `check-ground-truth`, `refresh-context` and
+  `test-e2e-live` printed ANSI colour codes into CI logs and pipes. They now
+  colour only when stdout is a terminal and `NO_COLOR` is unset.
+- **Release branches can't go stale for the release workflow:** CI now runs
+  the release workflow's released-blobs coverage test against the head of a
+  `release/**` branch on every push (#30), so a merge that leaves
+  `released-blobs.txt` incomplete fails at once, not at tag time (rc.2's
+  first tag did).
+
+---
+
 ## v3.1.0-rc.2 — 2026-11-15
 
 Second release candidate for 3.1.0, still a **pre-release** (default "latest"

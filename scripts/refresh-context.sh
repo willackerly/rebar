@@ -18,11 +18,15 @@ if [[ "${1:-}" == "--quick" ]]; then
   QUICK_MODE=true
 fi
 
-# Colors (if terminal supports them)
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-NC='\033[0m' # No Color
+# Colour only on a terminal, and never with NO_COLOR set (no-color.org).
+if [ -t 1 ] && [ -z "${NO_COLOR:-}" ]; then
+  RED='\033[0;31m'
+  GREEN='\033[0;32m'
+  YELLOW='\033[1;33m'
+  NC='\033[0m' # No Color
+else
+  RED='' GREEN='' YELLOW='' NC=''
+fi
 
 warn() { echo -e "${YELLOW}WARNING:${NC} $*"; }
 ok()   { echo -e "${GREEN}OK:${NC} $*"; }

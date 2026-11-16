@@ -67,9 +67,8 @@ func TestCommitPrunesStagedDeletions(t *testing.T) {
 func TestExecutePrintsTheError(t *testing.T) {
 	var stderr bytes.Buffer
 	rootCmd.SetErr(&stderr)
-	rootCmd.SetArgs([]string{"commit", "--repo-root", t.TempDir()})
-	t.Cleanup(func() { rootCmd.SetErr(nil); rootCmd.SetArgs(nil) })
-	if err := Execute(); err == nil {
+	t.Cleanup(func() { rootCmd.SetErr(nil); rootCmd.SetArgs(nil); repoRoot = "" })
+	if err := executeArgs([]string{"commit", "--repo-root", t.TempDir()}); err == nil {
 		t.Fatal("rebar commit without -m succeeded")
 	}
 	if !strings.Contains(stderr.String(), "rebar: commit message required") {
