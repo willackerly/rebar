@@ -47,6 +47,19 @@ jobs:
             exit 1
           fi
 
+      # The Release body is the tag's CHANGELOG section, so it must exist
+      # before tagging (like releaseVersion above); checked before the slow steps.
+      - name: Release notes from CHANGELOG
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          if ! scripts/release-notes.sh --link-base "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/blob/$TAG" "$TAG" > "$RUNNER_TEMP/notes.md"; then
+            echo "::error file=CHANGELOG.md::no '## $TAG' section with content; add it and re-tag"
+            exit 1
+          fi
+          printf '\nFull changelog: [CHANGELOG.md](%s/%s/blob/%s/CHANGELOG.md)\n' \
+            "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$TAG" >> "$RUNNER_TEMP/notes.md"
+
       - name: Test
         working-directory: cli
         run: go test ./...
@@ -66,6 +79,7 @@ jobs:
           gh release create "$TAG" dist/* \
             --repo "$GITHUB_REPOSITORY" \
             --title "$TAG" \
+            --notes-file "$RUNNER_TEMP/notes.md" \
             --generate-notes \
             --verify-tag \
             $prerelease
