@@ -54,11 +54,15 @@ func runNative(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-// nativeRoot is the project a native check runs against: REBAR_PROJECT_ROOT
-// (set by the CLI for the scripts it runs, so a hand-off checks the same
-// repo the script would), else the repository around the working
-// directory, else the working directory.
+// nativeRoot is the project a native check runs against: --repo-root when
+// given (`rebar --repo-root X native …`), else REBAR_PROJECT_ROOT (set by the
+// CLI for the scripts it runs, so a hand-off checks the same repo the script
+// would), else the repository around the working directory, else the
+// working directory.
 func nativeRoot() string {
+	if repoRoot != "" {
+		return repoRoot
+	}
 	if root := os.Getenv("REBAR_PROJECT_ROOT"); root != "" {
 		return root
 	}
