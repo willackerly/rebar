@@ -18,6 +18,27 @@ All notable changes to rebar. Versioned with [semver](https://semver.org/).
 
 ## Unreleased
 
+- **check-doc-refs, check-decay-patterns and check-compliance run natively.**
+  The `rebar` binary runs all three by default (`REBAR_CHECK_IMPL=shell`
+  selects the scripts), with the same arguments, output and exit codes.
+  check-doc-refs reads `git ls-files` as the script does (so a non-ASCII
+  path, which git quotes, still counts as untracked), folds `./` and `../`
+  the way its sed does, and matches a directory link as a grep pattern
+  (`d.cs/` matches `docs/`). check-decay-patterns scans the same files
+  (staged, working tree, `--all`, `--paths`) for the same patterns.
+  check-compliance keeps every check, message and badge rule, the tolerant
+  `Status:` parse and the maturity arithmetic (a status outside the
+  vocabulary still counts twice). On adopter repos check-doc-refs takes
+  0.1–0.2 s instead of 1–25 s and `check-decay-patterns --all` 0.3–0.9 s
+  instead of 6–12 s. Under macOS bash 3.2 the script crashed ("Bus error")
+  or hung on a scan set of a few hundred files. Where grep's handling of
+  binary files differs between platforms, the native checks do what GNU
+  grep does: a binary spec file yields no findings and a binary contract
+  has no `Status:` (BSD grep's "Binary file … matches" line was read as a
+  finding and as status "binary"). A directory link whose path is not a
+  valid pattern (an unbalanced `[`) is reported as broken without grep's
+  error message, and a link such as `a//../b` no longer hangs the check (the
+  script's `../` folding looped forever on it).
 - **The git gates run natively.** check-fix-commit (Gate G),
   check-bypass-flags (Gate I) and check-version-bump (the post-commit
   outbox hook) are ported to the `rebar` binary and are its default
