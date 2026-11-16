@@ -1,0 +1,7 @@
+=== Ground Truth Verification ===
+
+FAIL: No metrics declared (metrics_strict = true)
+  Add metric.<key>.* lines to .rebarrc (see this script's header).
+
+Ground truth not verified — metrics_strict = true needs a METRICS file and metric declarations
+--- exit 1 ---

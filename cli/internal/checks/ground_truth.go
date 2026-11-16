@@ -63,6 +63,9 @@ func runGroundTruth(ctx *Context, args []string) int {
 	echo := func(line string) { fmt.Fprint(w, line+"\n") }
 	echoE := func(line string) { fmt.Fprint(w, echoEscapes(line)) }
 	exit := 0
+	// drift: a DRIFT or MISSING line failed the check, rather than a
+	// missing METRICS file or missing declarations under metrics_strict.
+	drift := false
 	echo("=== Ground Truth Verification ===")
 	echo("")
 	func() { // verify
@@ -79,7 +82,13 @@ func runGroundTruth(ctx *Context, args []string) int {
 		}
 		computed := computeMetrics(ctx.Stderr, root, rcFile)
 		if len(computed) == 0 {
-			echo("No metrics declared. Add metric.<key>.* lines to .rebarrc (see this script's header).")
+			if strict {
+				echoE(gtRed + "FAIL" + gtNC + ": No metrics declared (metrics_strict = true)")
+				exit = 1
+			} else {
+				echo("No metrics declared.")
+			}
+			echo("  Add metric.<key>.* lines to .rebarrc (see this script's header).")
 			return
 		}
 		data, _ := os.ReadFile(metricsFile)
@@ -106,7 +115,7 @@ func runGroundTruth(ctx *Context, args []string) int {
 			switch {
 			case documented == "" && strict:
 				echoE(gtRed + "MISSING" + gtNC + ": " + key + " = " + value + "  (not in METRICS file; metrics_strict = true)")
-				exit = 1
+				exit, drift = 1, true
 			case documented == "":
 				echoE(gtYellow + "NEW" + gtNC + ":   " + key + " = " + value + "  (not in METRICS file)")
 			case floor:
@@ -114,13 +123,13 @@ func runGroundTruth(ctx *Context, args []string) int {
 					echoE(gtGreen + "OK" + gtNC + ":    " + key + " = " + value + "  (floor " + documented + ")")
 				} else {
 					echoE(gtRed + "DRIFT" + gtNC + ": " + key + " — METRICS floor is " + documented + ", code says " + value)
-					exit = 1
+					exit, drift = 1, true
 				}
 			case value == documented:
 				echoE(gtGreen + "OK" + gtNC + ":    " + key + " = " + value)
 			default:
 				echoE(gtRed + "DRIFT" + gtNC + ": " + key + " — METRICS says " + documented + ", code says " + value)
-				exit = 1
+				exit, drift = 1, true
 			}
 		}
 	}()
@@ -130,8 +139,10 @@ func runGroundTruth(ctx *Context, args []string) int {
 	echo("")
 	if exit == 0 {
 		echoE(gtGreen + "All documented metrics match codebase reality" + gtNC)
-	} else {
+	} else if drift {
 		echoE(gtRed + "Metric drift detected — update METRICS to match reality" + gtNC)
+	} else {
+		echoE(gtRed + "Ground truth not verified — metrics_strict = true needs a METRICS file and metric declarations" + gtNC)
 	}
 	return exit
 }
