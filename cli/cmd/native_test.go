@@ -165,6 +165,13 @@ type parityCase struct {
 	divergesOn string
 	want       string
 	wantExit   int
+	// git makes the tree a git work tree with files (and links) staged;
+	// untracked files are written after staging.
+	git       bool
+	untracked map[string]string
+	// pending skips the case while the script lacks this text: a feature
+	// the native check has ahead of the script in this branch.
+	pending string
 }
 
 var todosParityCases = []parityCase{
@@ -465,6 +472,7 @@ func fixtureText(s string, loc *time.Location) string {
 var scriptSettings = []string{
 	"REBAR_TIER", "REBAR_CHECKS_ENABLE", "REBAR_CONTRACTS_DIR", "REBAR_CONTRACT_NAMESPACE", "REBAR_RCFILE",
 	"_REBAR_CHECKS_VALIDATED", "_REBAR_NAMESPACE_VALIDATED", "CONTRACT_EXTENSIONS", "SKIP_JTBD", "SKIP_PREFIX_UNIQUENESS",
+	"REBAR_REGISTRY_IMPL_COUNTS", "REBAR_METRICS_STRICT",
 }
 
 // testErrorLine is bash's complaint when a script compares a setting that
@@ -502,6 +510,12 @@ type parityCheck struct {
 	// exercised reports whether a fixture's script output shows it tested
 	// something (nil: anything goes).
 	exercised func(out string) bool
+	// writes makes the files a run writes or removes part of its output
+	// (see takeChanges); the tree is restored after each run.
+	writes bool
+	// golden names the testdata directory holding the expected output of
+	// every case (see checkGolden), which must match want.
+	golden string
 }
 
 // runParity runs scripts/<check>.sh, the native check in process, and the
@@ -519,8 +533,12 @@ func runParity(t *testing.T, check parityCheck, cases []parityCase) {
 		t.Fatalf("%s is not registered", check.name)
 	}
 	flavour := grepFlavour(t)
+	scriptText, _ := os.ReadFile(script)
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
+			if tc.pending != "" && !strings.Contains(string(scriptText), tc.pending) {
+				t.Skipf("pending: %s lacks %q", filepath.Base(script), tc.pending)
+			}
 			loc := time.Local
 			var env []string
 			for _, kv := range tc.env {
@@ -537,6 +555,15 @@ func runParity(t *testing.T, check parityCheck, cases []parityCase) {
 				files[rel] = fixtureText(body, loc)
 			}
 			root := writeTree(t, files, tc.links)
+			if tc.git {
+				gitTree(t, root, tc.untracked, loc)
+			}
+			var before map[string]string
+			changes := func() string { return "" }
+			if check.writes {
+				before = treeState(t, root)
+				changes = func() string { return takeChanges(t, root, before) }
+			}
 			for _, k := range scriptSettings {
 				t.Setenv(k, "")
 			}
@@ -556,10 +583,11 @@ func runParity(t *testing.T, check parityCheck, cases []parityCase) {
 			base := append([]string{"REBAR_PROJECT_ROOT=" + root, "LC_COLLATE=C"}, env...)
 
 			shellOut, shellCode := testutil.RunEnv(t, root, testutil.IsolatedEnv(base...), "bash", args...)
-			shellOut = testErrorLine.ReplaceAllString(shellOut, "")
+			shellOut = testErrorLine.ReplaceAllString(shellOut, "") + changes()
 
 			var native strings.Builder
 			nativeCode := c.Run(&checks.Context{Root: root, Stdout: &native, Stderr: &native}, tc.args)
+			native.WriteString(changes())
 
 			// The hand-off goes through a wrapper that logs it, so a script
 			// that ran itself instead cannot pass for the native check.
@@ -567,6 +595,7 @@ func runParity(t *testing.T, check parityCheck, cases []parityCase) {
 			handEnv := append(append([]string{"REBAR_PROJECT_ROOT=" + root, "LC_COLLATE=C"}, handOffEnv(t, scriptsDir)...), env...)
 			handEnv = append(handEnv, "REBAR_BIN="+wrapper)
 			handOut, handCode := testutil.RunEnv(t, root, testutil.IsolatedEnv(handEnv...), "bash", args...)
+			handOut += changes()
 			if logged, _ := os.ReadFile(log); !strings.Contains(string(logged), "native "+check.name) && !skippedEarly(env) {
 				t.Errorf("the script did not hand off to the native check:\n%s", handOut)
 			}
@@ -584,6 +613,9 @@ func runParity(t *testing.T, check parityCheck, cases []parityCase) {
 				if flavour == tc.divergesOn {
 					t.Logf("%s userland diverges here, as documented; the script gave (exit %d):\n%s", flavour, shellCode, shellOut)
 				}
+			}
+			if check.golden != "" {
+				checkGolden(t, check.golden, tc.name, want, root, wantCode)
 			}
 			results := []struct {
 				how  string

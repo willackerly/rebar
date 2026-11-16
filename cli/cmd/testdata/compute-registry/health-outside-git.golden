@@ -1,0 +1,26 @@
+## Implementing Files
+
+| ID | Impl Files |
+|----|------------|
+| S1-API | 1 |
+| S2-ORPHAN | 0 |
+| S3-LOST | 0 |
+
+## Contract Health
+
+### Zombies — contract files with no implementing code
+
+(Deletion candidates unless intentionally pre-impl. Add a TODO.md entry
+to suppress this warning while implementation is in flight.)
+
+- **S2-ORPHAN** — tracked in TODO.md
+- **S3-LOST** — ⚠ untracked, 0 implementing files
+
+### Shadow refs — code references to nonexistent contracts
+
+(Either write the missing contract file or fix the typo in source.)
+
+- **S8-OTHER** — referenced in source, no architecture/CONTRACT-S8-OTHER.*.md found
+- **S9-SHADOW** — referenced in source, no architecture/CONTRACT-S9-SHADOW.*.md found
+
+--- exit 0 ---

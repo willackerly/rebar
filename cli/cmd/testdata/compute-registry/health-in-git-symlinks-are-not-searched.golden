@@ -1,0 +1,16 @@
+## Implementing Files
+
+| ID | Impl Files |
+|----|------------|
+| S1-API | 0 |
+
+## Contract Health
+
+### Zombies — contract files with no implementing code
+
+(Deletion candidates unless intentionally pre-impl. Add a TODO.md entry
+to suppress this warning while implementation is in flight.)
+
+- **S1-API** — ⚠ untracked, 0 implementing files
+
+--- exit 0 ---

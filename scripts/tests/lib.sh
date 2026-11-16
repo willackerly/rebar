@@ -13,6 +13,8 @@
 #   run_in DIR SCRIPT [ARGS...]
 #                         run SCRIPT from REBAR_SCRIPTS against project DIR, the
 #                         way `rebar check` does (REBAR_PROJECT_ROOT); stderr is merged
+#   run_from CWD DIR SCRIPT [ARGS...]
+#                         run_in, started in CWD instead of DIR
 #
 # The tests exercise the scripts: tests that drive the CLI get
 # REBAR_CHECK_IMPL=shell (the CLI's default is go). REBAR_TEST_NATIVE_BIN=<rebar
@@ -57,14 +59,18 @@ trap _rebar_exit EXIT
 rebar_tmpdir() { TMP="$(mktemp -d "${TMPDIR:-/tmp}/rebar-${1:-test}.XXXXXX")"; }
 
 run_in() {
-  local dir="$1" script="$2"
-  shift 2
+  local dir="$1"
+  run_from "$dir" "$@"
+}
+run_from() {
+  local cwd="$1" dir="$2" script="$3"
+  shift 3
   if [ -n "${REBAR_TEST_NATIVE_BIN:-}" ]; then
-    ( cd "$dir" && REBAR_PROJECT_ROOT="$dir" REBAR_BIN="$REBAR_TEST_NATIVE_BIN" \
+    ( cd "$cwd" && REBAR_PROJECT_ROOT="$dir" REBAR_BIN="$REBAR_TEST_NATIVE_BIN" \
       REBAR_NATIVE_CHECKS="$("$REBAR_TEST_NATIVE_BIN" native | tr '\n' ' ')" \
       REBAR_NATIVE_SCRIPTS="$(cd "$REBAR_SCRIPTS" && pwd -P)" \
       "$REBAR_SCRIPTS/$script" "$@" ) 2>&1
     return
   fi
-  ( cd "$dir" && REBAR_PROJECT_ROOT="$dir" "$REBAR_SCRIPTS/$script" "$@" ) 2>&1
+  ( cd "$cwd" && REBAR_PROJECT_ROOT="$dir" "$REBAR_SCRIPTS/$script" "$@" ) 2>&1
 }

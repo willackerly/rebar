@@ -73,7 +73,7 @@ metric.nothing.paths = no-such-dir
 EOF
 ( cd "$P" && g init -q -b main && g add . && g commit -q -m init ) || fail "setup"
 
-gt() { ( cd / && REBAR_PROJECT_ROOT="$P" "$SRC/check-ground-truth.sh" ) 2>&1; }
+gt() { run_from / "$P" check-ground-truth.sh; }
 
 # T1 — every metric computes the expected value.
 printf 'test_files = 2\nsdks = 2\nagents = 2\ncontract_files = 3\ncontract_ids = 2\nheaded_sources = 1\nnothing = 0\n' \
@@ -96,7 +96,7 @@ gt >/dev/null && fail "T2: exact mismatch should fail"
 ok "T2: METRICS exact and floor semantics hold for declared metrics"
 
 # T3 — registry classification and purpose rendering come from .rebarrc.
-reg() { ( cd / && REBAR_PROJECT_ROOT="$P" "$SRC/compute-registry.sh" --stdout ); }
+reg() { run_from / "$P" compute-registry.sh --stdout; }
 out="$(reg)"
 # Unscoped, SDK-C2-BAR starts with S and lands in Services.
 printf '%s\n' "$out" | grep -A6 '^## Services' | grep -q 'SDK-C2-BAR' \
@@ -142,12 +142,12 @@ ok "T5: project copies run with a deprecation notice; thin wrappers are skipped"
 # T6 — --print and REBAR_RCFILE, as rebar migrate uses them.
 rm -f "$P/scripts/check-ground-truth.sh" "$P/scripts/ci-check.sh"
 mv "$P/METRICS" "$P/METRICS.off"
-out="$( cd / && REBAR_TIER=1 REBAR_PROJECT_ROOT="$P" "$SRC/check-ground-truth.sh" --print 2>&1 )" \
+out="$(REBAR_TIER=1 run_from / "$P" check-ground-truth.sh --print)" \
   || { echo "$out"; fail "T6: --print exited non-zero"; }
 printf '%s\n' "$out" | grep -qx 'test_files=2' || { echo "$out"; fail "T6: --print lacks test_files=2"; }
 printf '%s\n' "$out" | grep -qx 'sdks=2' || { echo "$out"; fail "T6: --print lacks sdks=2"; }
 printf 'metric.only_this.paths = api\nmetric.only_this.names = main.go\n' > "$TMP/alt.rc"
-out="$( cd / && REBAR_RCFILE="$TMP/alt.rc" REBAR_PROJECT_ROOT="$P" "$SRC/check-ground-truth.sh" --print 2>&1 )"
+out="$(REBAR_RCFILE="$TMP/alt.rc" run_from / "$P" check-ground-truth.sh --print)"
 [ "$out" = "only_this=1" ] || { echo "$out"; fail "T6: REBAR_RCFILE not used instead of .rebarrc"; }
 mv "$P/METRICS.off" "$P/METRICS"
 ok "T6: --print ignores tier and METRICS; REBAR_RCFILE replaces .rebarrc"
