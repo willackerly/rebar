@@ -945,3 +945,21 @@ func TestScannerChecksImplSwitch(t *testing.T) {
 		}
 	}
 }
+
+// TestNativeRepoRootFlag: root flags before `native` are taken by the CLI
+// (hoistRootFlags), so `rebar --repo-root X native <check>` reads X's
+// settings (relative paths still resolve against the working directory, as
+// for the script), while arguments after the check name reach the check.
+func TestNativeRepoRootFlag(t *testing.T) {
+	root := writeTree(t, map[string]string{".rebarrc": "source_dirs = only\n"}, nil)
+	work := writeTree(t, map[string]string{"only/a.go": "// @todo in only\n", "src/b.go": "// @todo in src\n"}, nil)
+	env := testutil.IsolatedEnv("REBAR_TEST_RUN_CLI=1")
+	out, code := testutil.RunEnv(t, work, env, testBinary(t), "--repo-root", root, "native", "check-todos")
+	if code != 1 || !strings.Contains(out, "only/a.go") || strings.Contains(out, "src/b.go") {
+		t.Errorf("--repo-root before native: exit %d\n%s", code, out)
+	}
+	out, code = testutil.RunEnv(t, work, env, testBinary(t), "-v", "native", "check-todos", "src")
+	if code != 1 || !strings.Contains(out, "src/b.go") || strings.Contains(out, "only/a.go") {
+		t.Errorf("-v before native, operand after: exit %d\n%s", code, out)
+	}
+}
