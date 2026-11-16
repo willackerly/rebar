@@ -34,7 +34,7 @@ All notable changes to rebar. Versioned with [semver](https://semver.org/).
   operand, not a directory below one; a trailing `/` is ignored); a symlinked
   source directory is scanned on macOS too (BSD grep skipped it); and a file
   is binary when its first 32 KiB hold a NUL, as macOS grep decides, also on
-  Linux (GNU grep stopped at a later NUL). `config.RCValue` now honors
+  Linux (GNU grep checked a larger first block and stopped at a later NUL). `config.RCValue` now honors
   `REBAR_RCFILE`, as the scripts do.
 
 ---

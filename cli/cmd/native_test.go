@@ -335,11 +335,30 @@ Also found 0 tracked tasks (OK).
 		},
 	},
 	{
-		name: "binary: TODO before a later NUL",
+		name: "binary: TODO before a NUL 300 KiB in",
 		files: map[string]string{
-			"src/mid.go":  "// @todo before a NUL 70 KiB in\n" + filler(70<<10) + "\x00\n",
 			"src/late.go": "// @todo before a NUL 300 KiB in\n" + filler(300<<10) + "\x00\n",
 		},
+	},
+	{
+		name: "binary: TODO before a NUL 70 KiB in",
+		files: map[string]string{
+			"src/mid.go": "// @todo before a NUL 70 KiB in\n" + filler(70<<10) + "\x00\n",
+		},
+		// BSD grep looks at the first 32 KiB, as the native check, and
+		// reports the TODO; GNU grep's first buffer is larger and holds
+		// the NUL, so it skips the file.
+		divergesOn: "gnu",
+		want: `FAIL: 1 untracked TODO(s) found:
+
+src/mid.go:1:// @todo before a NUL 70 KiB in
+
+Before committing, you must either:
+  1. Fix the TODO immediately (remove it), OR
+  2. Add it to TODO.md and convert to: @tracked description
+
+Also found 0 tracked tasks (OK).
+`,
 	},
 	{
 		name: "binary: TODO after a NUL past the first 32 KiB",

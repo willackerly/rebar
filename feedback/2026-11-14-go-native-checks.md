@@ -131,14 +131,15 @@ the other source scanners:
   src/gen while walking src; GNU grep: never), keeps a trailing slash (`gen/`
   matches nothing; GNU drops it), and matches an operand by its whole path
   or last component only (GNU: any tail after a `/`).
-- **Binary files:** both greps look for a NUL in the first 32 KiB; after a
-  later NUL macOS grep keeps searching, GNU grep stops.
+- **Binary files:** macOS grep looks for a NUL in the first 32 KiB and then
+  searches the whole file; GNU grep checks a larger first buffer (a NUL
+  70 KiB in skips the file on ubuntu-latest) and stops at a later NUL.
 
 The Go walker picks one behaviour everywhere: bytes, not locale; symlinks
 met while walking are skipped (both); a symlinked operand is followed
 (GNU); exclude patterns are matched as GNU grep matches them; a file is
-binary when its first 32 KiB hold a NUL (both), and is otherwise searched to
-the end (BSD). `TestTodosParity` pins each choice to the grep that agrees
+binary when its first 32 KiB hold a NUL, and is otherwise searched to the
+end (BSD). `TestTodosParity` pins each choice to the grep that agrees
 with it and runs on both in CI.
 
 ## Target architecture
@@ -308,7 +309,7 @@ tooling: `scripts/tests/*`, `sync-bootstrap.sh`, `gen-released-blobs.sh`,
    order (grep -r lists files in directory order). Cases where the script
    depends on the platform's grep stay in the table, marked with the grep
    that diverges and the native output expected; they are compared with the
-   script on the other platform. `TestTodosParity` has 18 fixture trees.
+   script on the other platform. `TestTodosParity` has 19 fixture trees.
 2. **The existing shell tests, against Go:** `REBAR_TEST_NATIVE_BIN=<rebar>`
    makes lib.sh's `run_in` hand off (and sets `REBAR_CHECK_IMPL=go` for tests
    that drive the CLI). `TestShellRegressionTestsAgainstNative` runs every
@@ -420,7 +421,7 @@ estimates per PR, Go incl. tests: S0 ~2,050 [M]; S1 ~2,000; S2 ~2,200; S3
   `REBAR_TEST_NATIVE_BIN`.
 - Test helpers for the stack in `cli/internal/testutil`: `IsolatedEnv`,
   `RunEnv`, `Tags`, `RebarSource`.
-- Parity: `TestTodosParity` (18 trees × script / in-process / hand-off),
+- Parity: `TestTodosParity` (19 trees × script / in-process / hand-off),
   `TestShellRegressionTestsAgainstNative` (every script test naming a ported
   check), `TestNativeHandOffOnlyFromInstall`,
   `TestNativeArgsResolveAgainstWorkingDir`, `TestRCFileParity`,

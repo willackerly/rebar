@@ -226,18 +226,18 @@ func trimTrailingSlashes(op string) string {
 	return op
 }
 
-// BinaryBlock is how much of a file grep -I inspects for a NUL byte when
-// it decides whether the file is binary (the first buffer it reads, in GNU
-// and BSD grep alike).
+// BinaryBlock is how much of a file BSD grep -I inspects for a NUL byte
+// when it decides whether the file is binary (its first buffer).
 const BinaryBlock = 32 << 10
 
 // TextPart returns the part of a file's contents that is searched: nothing
 // when its first BinaryBlock bytes hold a NUL (a binary file, which grep -I
 // skips), else all of it.
 //
-// That is BSD grep's rule. GNU grep agrees on the first block, but when it
-// meets a NUL further in it stops searching the file, so it misses lines in
-// and after the block holding that NUL, which are reported here.
+// That is BSD grep's rule. GNU grep reads a larger first buffer (more than
+// 70 KiB on ubuntu-latest), skipping the whole file when that buffer holds
+// a NUL, and stops searching at a NUL further in; lines it so misses are
+// reported here.
 func TextPart(data []byte) []byte {
 	head := data
 	if len(head) > BinaryBlock {
