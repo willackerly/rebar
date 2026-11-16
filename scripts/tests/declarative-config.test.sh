@@ -16,6 +16,8 @@
 #   T6  check-ground-truth.sh --print prints values at any tier, with no
 #       METRICS; REBAR_RCFILE replaces the project's .rebarrc (rebar migrate)
 #
+#   T7  check-ground-truth colours only on a terminal, never with NO_COLOR
+#
 # Usage: bash scripts/tests/declarative-config.test.sh
 # Override the scripts under test with REBAR_SCRIPTS_DIR.
 # Bash 3.2 compatible (macOS default).
@@ -220,5 +222,20 @@ out="$( cd / && REBAR_RCFILE="$TMP/alt.rc" REBAR_PROJECT_ROOT="$P" "$SRC/check-g
 [ "$out" = "only_this=1" ] || { echo "$out"; fail "T6: REBAR_RCFILE not used instead of .rebarrc"; }
 mv "$P/METRICS.off" "$P/METRICS"
 ok "T6: --print ignores tier and METRICS; REBAR_RCFILE replaces .rebarrc"
+
+# T7 — colour only on a terminal, and never with NO_COLOR.
+ESC=$(printf '\033')
+out="$(gt)"
+case "$out" in *"$ESC"*) fail "T7: colour codes in piped output" ;; esac
+tty_out="$(cd / && REBAR_PROJECT_ROOT="$P" run_tty "$SRC/check-ground-truth.sh" 2>&1)"
+rc=$?
+if [ "$rc" -eq 77 ]; then
+  ok "T7: piped output has no colour (no script(1) for the terminal case)"
+else
+  case "$tty_out" in *"$ESC["*) ;; *) echo "$tty_out"; fail "T7: no colour on a terminal" ;; esac
+  tty_out="$(cd / && NO_COLOR=1 REBAR_PROJECT_ROOT="$P" run_tty "$SRC/check-ground-truth.sh" 2>&1)"
+  case "$tty_out" in *"$ESC["*) echo "$tty_out"; fail "T7: colour despite NO_COLOR" ;; esac
+  ok "T7: colour on a terminal only, and not with NO_COLOR"
+fi
 
 echo "PASS: declarative .rebarrc config"

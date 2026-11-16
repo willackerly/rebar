@@ -52,10 +52,15 @@ if type _rebar_config >/dev/null 2>&1; then
   esac
 fi
 
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-NC='\033[0m'
+# Colour only on a terminal, and never with NO_COLOR set (no-color.org).
+if [ -t 1 ] && [ -z "${NO_COLOR:-}" ]; then
+  RED='\033[0;31m'
+  GREEN='\033[0;32m'
+  YELLOW='\033[1;33m'
+  NC='\033[0m'
+else
+  RED='' GREEN='' YELLOW='' NC=''
+fi
 exit_code=0
 
 # ── Metrics declared in .rebarrc ──

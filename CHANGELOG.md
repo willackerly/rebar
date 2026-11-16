@@ -52,6 +52,9 @@ All notable changes to rebar. Versioned with [semver](https://semver.org/).
   Outside a git work tree it has no effect (every file counts, with a note on
   stderr). `rebar migrate` reads and keeps the field on metrics already in
   `.rebarrc`; it does not derive it from a legacy copy.
+- **Colour only on a terminal:** `check-ground-truth`, `refresh-context` and
+  `test-e2e-live` printed ANSI colour codes into CI logs and pipes. They now
+  colour only when stdout is a terminal and `NO_COLOR` is unset.
 
 ---
 

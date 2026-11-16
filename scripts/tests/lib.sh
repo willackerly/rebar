@@ -13,6 +13,8 @@
 #   run_in DIR SCRIPT [ARGS...]
 #                         run SCRIPT from REBAR_SCRIPTS against project DIR, the
 #                         way `rebar check` does (REBAR_PROJECT_ROOT); stderr is merged
+#   run_tty CMD [ARGS...] run CMD with stdout on a pseudo-terminal (script(1), BSD or
+#                         util-linux); returns 77 when no script(1) is available
 #   doc_snippet FILE MARKER
 #                         print the first fenced code block after the first line of
 #                         FILE containing MARKER (fixed string), without the fences
@@ -58,4 +60,15 @@ doc_snippet() {
     inblock && /^```/ { exit }
     inblock { print }
   ' "$1"
+}
+
+run_tty() {
+  command -v script >/dev/null 2>&1 || return 77
+  if script -q /dev/null true >/dev/null 2>&1 </dev/null; then
+    script -q /dev/null "$@" </dev/null   # BSD / macOS
+  else
+    local cmd="" a
+    for a in "$@"; do cmd="$cmd $(printf '%q' "$a")"; done
+    script -qec "$cmd" /dev/null </dev/null   # util-linux
+  fi
 }
