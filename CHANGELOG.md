@@ -39,7 +39,9 @@ All notable changes to rebar. Versioned with [semver](https://semver.org/).
   HTTP requests) and `TestAskLoopParity`, goldens in
   `cli/cmd/testdata/ask`. Deliberate deviations from the bash:
   `ask --help` / `ask -h` show the help (the flag loop rejected them as
-  unknown flags); `ask where` prints the canonical-case directory;
+  unknown flags); agent names resolve to the directory's own spelling on
+  every file system (on a case-insensitive one the script kept the
+  spelling as typed, in prompts, events and `ask where`);
   `LAST_ACTIVE` of `ask status` is computed on every platform (the
   script's `stat -f %m` crashed it with GNU stat); re-registering a moved
   project that was the registry's only entry works (the script's `grep -v`
