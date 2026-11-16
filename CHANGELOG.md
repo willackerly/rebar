@@ -18,7 +18,12 @@ All notable changes to rebar. Versioned with [semver](https://semver.org/).
 
 ## Unreleased
 
-_Nothing yet._
+- **`metrics_strict = true` also fails when `.rebarrc` declares no metrics.**
+  In rc.3, a strict check with no `metric.<key>.*` lines passed ("No metrics
+  declared"), so deleting the declarations silently turned enforcement off.
+  A strict failure for a missing `METRICS` file or missing declarations now
+  ends with "Ground truth not verified" instead of the misleading "Metric
+  drift detected".
 
 ---
 
