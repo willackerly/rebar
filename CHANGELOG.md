@@ -18,7 +18,11 @@ All notable changes to rebar. Versioned with [semver](https://semver.org/).
 
 ## Unreleased
 
-_Nothing yet._
+- **GitHub Release notes come from the CHANGELOG.** The release workflow puts
+  the tag's `## vX.Y.Z` section first (relative links made absolute, then a
+  link to the full CHANGELOG), followed by GitHub's list of merged PRs, and
+  refuses to publish a tag with no such section — write the CHANGELOG before
+  tagging. `scripts/release-notes.sh <tag>` prints the same section locally.
 
 ---
 
