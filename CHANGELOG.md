@@ -25,6 +25,12 @@ All notable changes to rebar. Versioned with [semver](https://semver.org/).
   for `run` also between `run` and the script name. Everything after the
   script name (for `ask`/`push`, after the command name) still passes through
   untouched, so `rebar ask -v …` keeps meaning ask's own `-v`.
+- **SETUP.md's pinned CI wrapper no longer leaks a temp clone per cold run.**
+  It set `trap 'rm -rf "$tmp"' EXIT` and then `exec`'d the pinned rebar, which
+  replaces the shell before any EXIT trap can run. It now removes the temp dir
+  (and drops the trap) once the tree is in place. If you copied the snippet,
+  add `rm -rf "$tmp"; trap - EXIT` after its `mv`. A new test runs the snippet
+  straight from SETUP.md.
 
 ---
 

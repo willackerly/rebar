@@ -13,6 +13,9 @@
 #   run_in DIR SCRIPT [ARGS...]
 #                         run SCRIPT from REBAR_SCRIPTS against project DIR, the
 #                         way `rebar check` does (REBAR_PROJECT_ROOT); stderr is merged
+#   doc_snippet FILE MARKER
+#                         print the first fenced code block after the first line of
+#                         FILE containing MARKER (fixed string), without the fences
 #
 # Bash 3.2 compatible.
 
@@ -46,4 +49,13 @@ run_in() {
   local dir="$1" script="$2"
   shift 2
   ( cd "$dir" && REBAR_PROJECT_ROOT="$dir" "$REBAR_SCRIPTS/$script" "$@" ) 2>&1
+}
+
+doc_snippet() {
+  awk -v marker="$2" '
+    !found && index($0, marker) { found = 1; next }
+    found && !inblock && /^```/ { inblock = 1; next }
+    inblock && /^```/ { exit }
+    inblock { print }
+  ' "$1"
 }
