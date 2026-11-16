@@ -1,0 +1,2 @@
+Usage: scan-consumers.sh <contract-id>
+--- exit 2 ---

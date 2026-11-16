@@ -64,7 +64,9 @@ OUT="$TMP/out.log"
 # Arm the watcher UNDER THE DIVERGENT LOCALE. A correct watcher pins LC_ALL=C
 # internally for every sort/merge and is immune; a broken one inherits this
 # locale in its union and phantom-emits.
-LC_ALL="$DIVERGENT" bash "$WATCH" -i 1 "$TMP/inbox" > "$OUT" 2> "$TMP/err.log" &
+# native_env: under REBAR_TEST_NATIVE_BIN the script hands off to the binary
+# (exec keeps the PID, so $! is still the watcher).
+( native_env && LC_ALL="$DIVERGENT" exec bash "$WATCH" -i 1 "$TMP/inbox" ) > "$OUT" 2> "$TMP/err.log" &
 W=$!
 
 poll() { sleep 2; }   # >= one 1s poll, with margin

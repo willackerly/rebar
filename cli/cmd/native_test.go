@@ -733,7 +733,8 @@ func TestShellRegressionTestsAgainstNative(t *testing.T) {
 			continue
 		}
 		ran++
-		usesRunIn := strings.Contains(string(data), "run_in ")
+		// run_in (run_from) and native_env set up the hand-off.
+		usesRunIn := strings.Contains(string(data), "run_in ") || strings.Contains(string(data), "native_env")
 		t.Run(filepath.Base(test), func(t *testing.T) {
 			t.Parallel()
 			wrapper, log := loggingCLI(t)
@@ -878,11 +879,15 @@ func TestNativeHandOffOnlyFromInstall(t *testing.T) {
 
 	plain := writeTree(t, map[string]string{".rebarrc": "tier = 1\n", "src/a.go": "package a\n"}, nil)
 	for _, name := range checks.Names() {
-		out, _ := testutil.RunEnv(t, plain, cliEnv(home, "", install), bin, "run", name)
+		args := []string{"run", name}
+		if name == "inbox-watch" {
+			args = append(args, "--help") // it watches until killed
+		}
+		out, _ := testutil.RunEnv(t, plain, cliEnv(home, "", install), bin, args...)
 		if strings.Contains(out, "install script ran") {
 			t.Errorf("go: rebar run %s ran the script:\n%s", name, out)
 		}
-		out, _ = testutil.RunEnv(t, plain, cliEnv(home, "shell", install), bin, "run", name)
+		out, _ = testutil.RunEnv(t, plain, cliEnv(home, "shell", install), bin, args...)
 		if !strings.Contains(out, "install script ran: "+name) {
 			t.Errorf("shell: rebar run %s did not run the install's script:\n%s", name, out)
 		}

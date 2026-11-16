@@ -1,0 +1,108 @@
+flush-notifications: 001 has 2 pending notification(s)
+
+→ C1-API: 1.0 → 2.0 (breaking)
+    sent: alpha
+    skip: beta (notify_on_change=false)
+    sent: gamma
+
+→ C2-LIB: 1.0 → 1.1 (additive)
+    sent: alpha
+    FAIL: broken (ask invocation failed; entry stays pending)
+
+flush-notifications: processed=3 sent=3 skipped=1
+--- wrote architecture/.state/pending-notifications.md ---
+# Pending notifications
+
+## C1-API: 1.0 → 2.0
+- **detected:** 2026-01-02T03:04:05Z
+- **status:** sent
+- **commit:** abc1234
+
+## C2-LIB: 1.0 → 1.1
+- **status:** sent (retry)
+- **commit:** def5678
+
+## C3-OLD: 1.0 → 1.0.1
+- **status:** sent
+--- wrote ask.log ---
+alpha:featurerequest Upstream change notice (auto-generated): 001/C1-API has been revised.
+
+  C1-API: 1.0 → 2.0 (breaking)
+  commit: abc1234
+
+You're listed as a consumer of this contract per your CONSUMES.md. This
+notification is filed via the rebar federation outbox flow (CHARTER §1.6).
+
+Suggested triage:
+  rebar contract drift-check
+  # Then either bump your version_pinned in CONSUMES.md if you've
+  # adopted the new version, or pin a planned upgrade date.
+
+Severity classification (semver delta):
+  breaking = MAJOR bump (likely interface-breaking)
+  additive = MINOR bump (new behavior, backwards-compat expected)
+  patch    = PATCH bump (clarification, doc, small-fix)
+
+Source: 001 repo, commit abc1234
+---
+gamma:featurerequest Upstream change notice (auto-generated): 001/C1-API has been revised.
+
+  C1-API: 1.0 → 2.0 (breaking)
+  commit: abc1234
+
+You're listed as a consumer of this contract per your CONSUMES.md. This
+notification is filed via the rebar federation outbox flow (CHARTER §1.6).
+
+Suggested triage:
+  rebar contract drift-check
+  # Then either bump your version_pinned in CONSUMES.md if you've
+  # adopted the new version, or pin a planned upgrade date.
+
+Severity classification (semver delta):
+  breaking = MAJOR bump (likely interface-breaking)
+  additive = MINOR bump (new behavior, backwards-compat expected)
+  patch    = PATCH bump (clarification, doc, small-fix)
+
+Source: 001 repo, commit abc1234
+---
+alpha:featurerequest Upstream change notice (auto-generated): 001/C2-LIB has been revised.
+
+  C2-LIB: 1.0 → 1.1 (additive)
+  commit: def5678
+
+You're listed as a consumer of this contract per your CONSUMES.md. This
+notification is filed via the rebar federation outbox flow (CHARTER §1.6).
+
+Suggested triage:
+  rebar contract drift-check
+  # Then either bump your version_pinned in CONSUMES.md if you've
+  # adopted the new version, or pin a planned upgrade date.
+
+Severity classification (semver delta):
+  breaking = MAJOR bump (likely interface-breaking)
+  additive = MINOR bump (new behavior, backwards-compat expected)
+  patch    = PATCH bump (clarification, doc, small-fix)
+
+Source: 001 repo, commit def5678
+---
+broken:featurerequest Upstream change notice (auto-generated): 001/C2-LIB has been revised.
+
+  C2-LIB: 1.0 → 1.1 (additive)
+  commit: def5678
+
+You're listed as a consumer of this contract per your CONSUMES.md. This
+notification is filed via the rebar federation outbox flow (CHARTER §1.6).
+
+Suggested triage:
+  rebar contract drift-check
+  # Then either bump your version_pinned in CONSUMES.md if you've
+  # adopted the new version, or pin a planned upgrade date.
+
+Severity classification (semver delta):
+  breaking = MAJOR bump (likely interface-breaking)
+  additive = MINOR bump (new behavior, backwards-compat expected)
+  patch    = PATCH bump (clarification, doc, small-fix)
+
+Source: 001 repo, commit def5678
+---
+--- exit 1 ---

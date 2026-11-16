@@ -1,0 +1,18 @@
+=== QUICKCONTEXT Freshness Check ===
+
+WARNING: No last-synced date found in QUICKCONTEXT.md
+WARNING: Cannot determine freshness — treat all claims as suspect
+
+=== TODO Freshness ===
+TODO.md last synced: 2026-11-07
+Open items: 2 | Completed items: 1
+
+=== Untracked TODOs in Code ===
+WARNING: Untracked TODO comments found:
+src/a.go:1:// TODO: first
+src/b/c.ts:1:// TODO: nested
+lib/d.py:1:# TODO: python
+packages/g.rs:1:// TODO: rust
+
+=== Worktree State ===
+--- exit 128 ---

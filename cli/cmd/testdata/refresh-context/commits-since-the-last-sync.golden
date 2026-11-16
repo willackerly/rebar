@@ -1,0 +1,31 @@
+=== QUICKCONTEXT Freshness Check ===
+
+Last synced: 2026-01-01
+WARNING: QUICKCONTEXT is N days stale — treat ALL claims as suspect
+
+Commits since last sync:
+ac71e69 three
+3d2dbc7 two
+bface04 one
+  (3 commits — review against QUICKCONTEXT claims)
+
+=== TODO Freshness ===
+TODO.md last synced: 2026-11-07
+Open items: 2 | Completed items: 1
+
+=== Untracked TODOs in Code ===
+WARNING: Untracked TODO comments found:
+src/a.go:1:// TODO: first
+src/b/c.ts:1:// TODO: nested
+lib/d.py:1:# TODO: python
+packages/g.rs:1:// TODO: rust
+
+=== Worktree State ===
+<worktree> ac71e69 [main]
+OK: No extra worktrees
+
+=== Summary ===
+Run 'rebar context session-start' for full context loading
+Run 'rebar context' for the Cold Start Quad
+Run 'scripts/refresh-context.sh --test-baseline' to verify tests pass
+--- exit 0 ---

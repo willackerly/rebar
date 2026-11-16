@@ -11,6 +11,10 @@
 #
 # All output goes to /tmp/agent-<id>.* files. The parent can poll these
 # or the shared progress file to monitor the swarm.
+#
+# Run as a command, it runs one function and exits:
+#   scripts/agent-health.sh checkpoint "msg" | heartbeat | metric KEY VALUE | rmse DOC BEFORE AFTER
+# (`rebar run agent-health …` runs the CLI's native port of it).
 
 set -euo pipefail
 
@@ -79,5 +83,23 @@ agent_rmse() {
       "$AGENT_ID" "$(_agent_ts)" "$doc" "$before" "$after" >> "$PROGRESS_FILE" 2>/dev/null || true
   fi
 }
+
+# Run as a command (not sourced): hand off to the CLI's native port under
+# `rebar run`, else run the named function.
+if [ "${BASH_SOURCE[0]}" = "$0" ]; then
+  if [ -f "$(dirname "$0")/_rebar-config.sh" ]; then
+    # shellcheck source=scripts/_rebar-config.sh
+    source "$(dirname "$0")/_rebar-config.sh"
+    _rebar_native agent-health "$@"
+  fi
+  case "${1:-}" in
+    checkpoint|heartbeat|metric|rmse)
+      _agent_fn="agent_$1"
+      shift
+      "$_agent_fn" "$@"
+      exit $?
+      ;;
+  esac
+fi
 
 echo "[agent-health] loaded for agent=$AGENT_ID"

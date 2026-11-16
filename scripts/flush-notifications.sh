@@ -21,6 +21,8 @@ CONTRACTS_DIR=architecture
 if [ -f "$(dirname "$0")/_rebar-config.sh" ]; then
   # shellcheck source=scripts/_rebar-config.sh
   source "$(dirname "$0")/_rebar-config.sh"
+  # Under `rebar run` (REBAR_CHECK_IMPL=go, the default) the CLI's native port runs instead.
+  _rebar_native flush-notifications "$@"
   CONTRACTS_DIR=$(_rebar_contracts_dir)
 fi
 REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"

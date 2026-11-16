@@ -35,7 +35,9 @@ arm() { # arm a watcher on $INBOX, redirecting out/err to given files; echo pid
   # (The watcher warns that $INBOX is outside $PWD — harmless here; the
   # assertions grep for "already holds", a different line.)
   local out="$1" err="$2"
-  bash "$WATCH" -i 1 "$INBOX" > "$out" 2> "$err" &
+  # The subshell only sets up the hand-off (native_env, under
+  # REBAR_TEST_NATIVE_BIN) and execs, so `$!` is still the watcher's PID.
+  ( native_env && exec bash "$WATCH" -i 1 "$INBOX" ) > "$out" 2> "$err" &
   echo "$!"
 }
 settle() { sleep 2; }

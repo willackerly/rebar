@@ -7,12 +7,14 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+	"github.com/willackerly/rebar/cli/internal/utils"
 )
 
 // doc.go implements `rebar doc <ref>` — one of the two resolvers of
 // record for abstract cross-repo `rebar:` refs (the other is
-// scripts/rebar-doc.sh; both implement conventions.md §Cross-Repo
-// References and docs/v3-beta-plan.md D10 identically).
+// scripts/rebar-doc.sh, natively `rebar run rebar-doc`; both implement
+// conventions.md §Cross-Repo References and docs/v3-beta-plan.md D10, and
+// share the kind table and name rules, utils.DocCandidates).
 //
 // Grammar:   rebar:<kind>/<name>   (the `rebar:` prefix is optional here)
 //
@@ -106,9 +108,9 @@ func runDoc(cmd *cobra.Command, args []string) error {
 		kind, name = ref[:i], ref[i+1:]
 	}
 
-	candidates, err := docCandidates(kind, name)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "rebar doc: %s: %v\n", displayRef, err)
+	candidates, problem := utils.DocCandidates(displayRef, kind, name)
+	if problem != "" {
+		fmt.Fprintf(os.Stderr, "rebar doc: %s\n", problem)
 		os.Exit(2)
 	}
 
@@ -139,48 +141,6 @@ func runDoc(cmd *cobra.Command, args []string) error {
 	fmt.Println("unresolved locally — ask rebar architect (or the relevant role) for questions")
 	os.Exit(4)
 	return nil
-}
-
-// docCandidates maps a parsed <kind>/<name> to its ordered repo-relative
-// candidate paths, per the kind table in conventions.md §Cross-Repo
-// References. A nil slice + error means the ref is malformed or the kind
-// unknown (exit 2 territory).
-func docCandidates(kind, name string) ([]string, error) {
-	// needName also enforces the single-segment name rule (same as
-	// rebar-doc.sh): a bare name, no '/' — which doubles as the
-	// path-traversal guard.
-	needName := func(rel ...string) ([]string, error) {
-		if name == "" {
-			return nil, fmt.Errorf("kind %q requires a name", kind)
-		}
-		if strings.Contains(name, "/") {
-			return nil, fmt.Errorf("name must not contain '/'")
-		}
-		return rel, nil
-	}
-
-	switch kind {
-	case "practice":
-		return needName("practices/" + name + ".md")
-	case "script":
-		return needName("scripts/" + name + ".sh")
-	case "agents":
-		return needName("agents/" + name + ".md")
-	case "convention":
-		// Optional section is informational only — not validated.
-		return []string{"conventions.md"}, nil
-	case "charter":
-		if name != "" {
-			return nil, fmt.Errorf("'charter' takes no name")
-		}
-		return []string{"CHARTER.md"}, nil
-	case "doc":
-		return needName(name+".md", "docs/"+name+".md")
-	case "feedback":
-		return needName("feedback/"+name+".md", "feedback/processed/"+name+".md")
-	default:
-		return nil, fmt.Errorf("unknown kind %q (expected practice|script|agents|convention|charter|doc|feedback)", kind)
-	}
 }
 
 // docRoot is one directory a ref may resolve against, tagged with the

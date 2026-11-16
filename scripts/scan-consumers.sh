@@ -12,6 +12,14 @@
 
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+if [ -f "$SCRIPT_DIR/_rebar-config.sh" ]; then
+  # shellcheck source=scripts/_rebar-config.sh
+  source "$SCRIPT_DIR/_rebar-config.sh"
+  # Under `rebar run` (REBAR_CHECK_IMPL=go, the default) the CLI's native port runs instead.
+  _rebar_native scan-consumers "$@"
+fi
+
 CONTRACT_ID=""
 JSON=0
 
