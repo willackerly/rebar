@@ -48,7 +48,7 @@ for routine work.
 | Modifying a contract (breaking) | **Plan mode** |
 | Modifying a contract (non-breaking minor bump) | Full |
 | Removing or deprecating a contract | **Plan mode** |
-| Touching `bin/ask-mcp-server` protocol behavior | **Plan mode** (Claude Code clients depend on it) |
+| Touching the MCP server's protocol behavior (`cli/internal/mcp`) | **Plan mode** (Claude Code clients depend on it) |
 
 Rule of thumb: if your change is reversible and follows existing patterns,
 just do it. If it establishes new patterns or affects MCP-connected clients,
@@ -71,8 +71,8 @@ The rebar source repo has contracts for its own load-bearing components:
 | Contract | Component | Source location |
 |----------|-----------|-----------------|
 | `CONTRACT:S1-STEWARD.2.0` | Quality scanner (steward.sh + companion infra) | `scripts/steward.sh`, `agents/steward/` |
-| `CONTRACT:S2-ASK-CLI.1.0` | Persistent role-agent CLI | `bin/ask`, `bin/ask-server`, `bin/ask-agent-loop` |
-| `CONTRACT:S3-MCP-SERVER.1.0` | MCP bridge exposing ASK as Claude-Code-native tools | `bin/ask-mcp-server` |
+| `CONTRACT:S2-ASK-CLI.1.0` | Persistent role-agent CLI | `cli/internal/ask`, `bin/ask`, `bin/ask-server`, `bin/ask-agent-loop` |
+| `CONTRACT:S3-MCP-SERVER.1.0` | MCP bridge exposing ASK as Claude-Code-native tools | `cli/internal/mcp`, `bin/ask-mcp-server` |
 
 **Rules:**
 1. Don't modify these without checking the contract first.

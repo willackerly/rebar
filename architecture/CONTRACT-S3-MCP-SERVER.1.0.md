@@ -120,8 +120,7 @@ JSON-RPC surface:
 ## Dependencies
 
 - Depends on: `CONTRACT:S2-ASK-CLI.1.0` (subprocess executor for every tools/call)
-- Depends on: Python 3.10+
-- Depends on: standard library only (no third-party deps — keeps install zero-friction)
+- Depends on: the `rebar` binary (native Go, no third-party MCP SDK — a minimal JSON-RPC 2.0 implementation keeps the wire behaviour above exactly)
 - Configuration: `.mcp.json` in adopted repos (auto-written by `rebar init`)
   and `~/.claude.json` (user-level, manual)
 
@@ -154,8 +153,11 @@ This is the latest version. No predecessor.
 
 ## Implementing Files
 
-- `bin/ask-mcp-server` — the entire server (Python, ~870 lines)
-- `cli/cmd/init.go` — writes `.mcp.json` referencing this server (`ensureMCPConfig`, `findMCPServerPath`)
+- `cli/internal/mcp/` — the server (native Go: `rebar mcp serve`)
+- `cli/cmd/mcp.go` — the `rebar mcp serve` / `rebar mcp client` commands
+- `bin/ask-mcp-server` — hand-off to `rebar mcp serve` (python original: `bin/legacy/ask-mcp-server.py`, run under `REBAR_CHECK_IMPL=shell`)
+- `cli/cmd/init.go` — writes `.mcp.json` running `rebar mcp serve` (`ensureMCPConfig`, `findRebarCommand`)
+- `cli/internal/migrate/mcpjson.go` — `rebar migrate` rewrites `.mcp.json` servers from `ask-mcp-server` to `rebar mcp serve`
 - `cli/cmd/adopt.go` — same, in the adoption flow
 
 ## Test Requirements

@@ -363,7 +363,7 @@ rebar/
 ├── architecture/                # Contract system + CONTRACT-TEMPLATE.md
 ├── agents/                      # Role agents (architect/product/englead/steward/tester/merger)
 │                                #   + subagent prompt templates
-├── bin/                         # ASK CLI (Python) + ask-mcp-server
+├── bin/                         # rebar binary + ASK hand-offs (ask, ask-mcp-server, …)
 ├── cli/                         # rebar CLI (Go binary — init, commit, verify, audit)
 ├── scripts/                     # Enforcement + quality scanning (canonical bash)
 ├── practices/                   # Session lifecycle, orchestration, red team, fidelity

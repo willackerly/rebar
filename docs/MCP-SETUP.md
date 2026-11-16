@@ -45,14 +45,24 @@ the project root automatically:
 {
   "mcpServers": {
     "rebar-ask": {
-      "command": "/absolute/path/to/ask-mcp-server",
-      "args": ["--stdio", "--repos-dir", "/absolute/path/to/parent"]
+      "command": "/absolute/path/to/rebar",
+      "args": ["mcp", "serve", "--stdio", "--repos-dir", "/absolute/path/to/parent"]
     }
   }
 }
 ```
 
-Claude Code picks this up when you open the project.
+Claude Code picks this up when you open the project. The MCP server is
+built into the `rebar` binary (`rebar mcp serve`); `command` is that binary,
+through `~/.rebar/current/bin/rebar` for a `setup-rebar.sh` install so it
+follows version switches.
+
+**Older `.mcp.json` files** run `…/bin/ask-mcp-server` (the python server of
+rebar ≤ 3.1). They keep working: `bin/ask-mcp-server` is now a thin
+hand-off that runs `rebar mcp serve` with the same arguments, so no python
+is needed. `rebar migrate` reports the rewrite to the native command and
+`rebar migrate --apply` writes it (same arguments, other servers and keys
+kept).
 
 **`--repos-dir`** is the parent of your project by default, so sibling
 rebar-adopted repos register alongside this one. Adjust if your projects
@@ -78,8 +88,8 @@ without touching each, add rebar to your Claude Code user config:
 {
   "mcpServers": {
     "rebar-ask": {
-      "command": "/Users/you/dev/rebar/bin/ask-mcp-server",
-      "args": ["--stdio", "--repos-dir", "/Users/you/dev"]
+      "command": "/Users/you/.rebar/current/bin/rebar",
+      "args": ["mcp", "serve", "--stdio", "--repos-dir", "/Users/you/dev"]
     }
   }
 }
@@ -97,7 +107,10 @@ overrides when a project has different `--repos-dir` needs.
 ## How `--repos-dir` works
 
 The MCP server scans the directory you point it at and registers **every
-immediate subdirectory that contains an `agents/` folder**. Given:
+immediate subdirectory that contains an `agents/` folder** (and, one level
+further down, those inside subdirectories without one; hidden directories,
+`node_modules`, `vendor`, build outputs and repos holding a
+`.rebar-skip-mcp` file are skipped). Given:
 
 ```
 ~/dev/
@@ -117,7 +130,7 @@ To register a non-standard location, use `--repos` instead of (or with)
 `--repos-dir`:
 
 ```json
-"args": ["--stdio", "--repos", "/path/to/repo1,/path/to/repo2"]
+"args": ["mcp", "serve", "--stdio", "--repos", "/path/to/repo1,/path/to/repo2"]
 ```
 
 ---
@@ -127,23 +140,15 @@ To register a non-standard location, use `--repos` instead of (or with)
 ### 1. Dogfood the server directly
 
 ```bash
-# stdio handshake — expect clean JSON-RPC, no banner on stdout
-python3 -c '
-import json, subprocess
-p = subprocess.Popen(
-    ["/path/to/ask-mcp-server", "--stdio", "--repos-dir", "/path/to/parent"],
-    stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-    text=True)
-p.stdin.write(json.dumps({"jsonrpc":"2.0","id":1,"method":"initialize",
-    "params":{"protocolVersion":"2024-11-05","clientInfo":{"name":"t","version":"0"},
-    "capabilities":{}}})+"\n"); p.stdin.flush()
-print(p.stdout.readline())
-'
+# stdio handshake — expect clean JSON-RPC on stdout, the banner on stderr
+printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}' \
+  '{"jsonrpc":"2.0","id":2,"method":"tools/list"}' |
+  rebar mcp serve --stdio --repos-dir /path/to/parent 2>/dev/null
 ```
 
-Expect a JSON response starting with `{"jsonrpc":"2.0","id":1,"result":{...}}`.
-If you see a `scanning repos...` banner, your `ask-mcp-server` is out of
-date — that banner belongs on stderr (fixed in rebar v2.0.0+).
+Expect one JSON response per request, starting with
+`{"jsonrpc": "2.0", "id": 1, "result": {...}}`. Every status line
+(`scanning repos...`, `registered: …`) goes to stderr.
 
 ### 2. From Claude Code
 
@@ -155,7 +160,9 @@ You should see `ask_<repo>_<role>` tools in the list. If they're not
 visible:
 - Confirm `.mcp.json` is at the project root (or `~/.claude.json` has the
   entry)
-- Confirm the `command:` path exists and is executable
+- Confirm the `command:` path exists and is executable (an old
+  `bin/ask-mcp-server` needs a `rebar` beside it, in `REBAR_BIN` or on
+  `PATH`)
 - Check `--repos-dir` points at a directory that actually contains repos
   with `agents/` subdirs
 - Run Claude Code with MCP debug output (see Claude Code docs)
@@ -176,29 +183,18 @@ the architect agent's response.
 ### Path is absolute and machine-specific
 
 The generated `.mcp.json` contains absolute paths to
-`ask-mcp-server` and `--repos-dir`. Moving the rebar repo or the project
+`rebar` and `--repos-dir`. Moving the rebar repo or the project
 breaks the config — regenerate via `rebar init --force` or edit by hand.
 
-### `ask-mcp-server` not found by `rebar init`
+### Which `rebar` `rebar init` writes
 
-`rebar init` tries three locations for `ask-mcp-server`:
-1. Same directory as the `rebar` binary (`os.Executable()` + `../bin/`)
-2. The rebar repo root via `findRebarRoot()` (checks `$HOME/dev/rebar`,
-   `$HOME/src/rebar`, `$HOME/code/rebar`)
-3. `PATH`
-
-If all three fail, `.mcp.json` is **not** written and you'll see:
-
-```
-Skipped .mcp.json — ask-mcp-server not found; see SETUP.md §MCP to configure manually
-```
-
-Fix: either symlink `ask-mcp-server` into your `$PATH`, or write
-`.mcp.json` by hand with the correct path.
+`rebar init` records the `rebar` binary that runs it (as
+`~/.rebar/current/bin/rebar` when that is the active version), else the
+rebar install's `bin/rebar`, else `rebar` on `PATH`.
 
 ### Stdio banner corrupting JSON-RPC
 
-Prior to v2.0.0, `ask-mcp-server` printed a `scanning repos...` banner
+Prior to v2.0.0, the python `ask-mcp-server` printed a `scanning repos...` banner
 to stdout. That's a protocol violation — MCP clients see it as a
 malformed JSON-RPC message and disconnect. If you cloned rebar before
 v2.0.0, pull the fix (commit on `main`) and Claude Code will reconnect.
@@ -209,9 +205,9 @@ If developers clone rebar at different locations, absolute paths in a
 committed `.mcp.json` won't work universally. Options:
 
 1. **Gitignore `.mcp.json`** and let each dev run `rebar init` locally
-2. **Symlink `ask-mcp-server`** into a shared PATH location (e.g.,
-   `/usr/local/bin/ask-mcp-server`) and write `.mcp.json` with
-   `"command": "ask-mcp-server"` — portable but requires manual edit
+2. **Put `rebar` on a shared PATH location** (e.g. `/usr/local/bin/rebar`)
+   and write `.mcp.json` with `"command": "rebar"` — portable but requires
+   manual edit
 3. **Env var expansion** — MCP config does not currently expand `${HOME}`,
    so this is not yet viable
 
@@ -219,7 +215,8 @@ committed `.mcp.json` won't work universally. Options:
 
 ## Security considerations
 
-- The MCP server spawns subprocess `ask` invocations. These inherit the
+- The MCP server spawns `rebar ask` subprocesses (or `--ask-bin` /
+  `ASK_BIN`), one per tool call, in the repo, with `ASK_SERVER` cleared. These inherit the
   user's environment and filesystem access. Treat ASK agents as trusted
   local code, not sandboxed.
 - `--repos-dir` exposes every registered repo's `agents/memory.md` and
@@ -239,10 +236,14 @@ rebar init                              # new project
 rebar adopt                             # existing project
 
 # Start MCP server manually for debugging
-ask-mcp-server --stdio --repos-dir ~/dev
+rebar mcp serve --stdio --repos-dir ~/dev     # bin/ask-mcp-server runs this
 
 # HTTP mode (enterprise server) — for multi-user orgs
-ask-mcp-server --port 7232 --repos-dir /srv/repos --mcp-only
+rebar mcp serve --port 7232 --repos-dir /srv/repos --mcp-only
+
+# Point an old .mcp.json at the native server
+rebar migrate            # report
+rebar migrate --apply    # rewrite
 ```
 
 See also: [docs/MCP-IMPLEMENTATION.md](MCP-IMPLEMENTATION.md) for the

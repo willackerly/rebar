@@ -50,8 +50,9 @@ Then apply with `source ~/.zshrc` (or open a new terminal).
 `rebar` (`rebar ask …`); `bin/ask` and `bin/ask-agent-loop` hand off to the
 `rebar` beside them (else `REBAR_BIN`, else the one on `PATH`), so the two
 spellings behave the same. `REBAR_CHECK_IMPL=shell` runs the original bash
-implementation instead (needs bash, jq, uuidgen) until it is removed.
-python3 is still needed for `ask serve` (ask-server).
+implementation instead (needs bash, jq, uuidgen; python3 for the servers)
+until it is removed. No python is needed: `ask serve`, `bin/ask-server`,
+`bin/ask-mcp-server` and `bin/test-mcp-client` run the binary too.
 
 ## Commands
 
@@ -276,24 +277,26 @@ ask reset billing:architect
 
 ### How it works
 
-The server is a thin HTTP wrapper around the `ask` CLI. Each request
-invokes `ask` with `cwd` set to the target repo — all existing logic
+The server (`rebar ask serve`; `bin/ask-server` runs it) is a thin HTTP
+wrapper around the `ask` CLI. Each request invokes `rebar ask` (or
+`--ask-bin` / `ASK_BIN`) with `cwd` set to the target repo — all existing logic
 (sessions, memory, context loading) works unchanged. Agents spin up
 on demand, not ahead of time.
 
 Local agents (no `:` prefix) always run locally. The `ASK_SERVER`
 variable only affects `repo:agent` cross-project queries.
 
-**Dependencies:** Python 3.7+ (zero external packages), plus the
-standard `ask` dependencies (bash 4.0+, jq, claude CLI).
+**Dependencies:** the `rebar` binary and the claude CLI.
 
 ### MCP server
 
-`ask-mcp-server` exposes every registered ASK agent as an MCP tool
+`rebar mcp serve` (`bin/ask-mcp-server` runs it) exposes every registered ASK agent as an MCP tool
 (`ask_<repo>_<role>`) plus resources (`ask://memory/...`,
 `ask://log/...`, `ask://agent/...`) via stdio or HTTP transport.
 
 - `rebar init` / `rebar adopt` auto-write `.mcp.json` for Claude Code
+  (`rebar mcp serve --stdio`); `rebar migrate` points older ones that run
+  `bin/ask-mcp-server` at it
 - User-level wiring (available in all projects) via `~/.claude.json`
 - Full setup + troubleshooting: **[docs/MCP-SETUP.md](../docs/MCP-SETUP.md)**
 - Protocol-level implementation: [docs/MCP-IMPLEMENTATION.md](../docs/MCP-IMPLEMENTATION.md)

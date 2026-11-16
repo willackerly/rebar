@@ -1,5 +1,24 @@
 # MCP Implementation for ASK - Complete Technical Guide
 
+> **Implementation status (rebar 3.2):** the MCP server is native Go in the
+> `rebar` binary — `rebar mcp serve` (package `cli/internal/mcp`). The
+> python snippets below are the original design (`bin/legacy/ask-mcp-server.py`,
+> runnable with `REBAR_CHECK_IMPL=shell` until it is removed); the Go server
+> keeps its wire behaviour: the same tool names, input schema, descriptions,
+> resource URIs, error codes/messages/data, notification handling and
+> `json.dumps` formatting, verified by parity tests that replay one JSON-RPC
+> session and HTTP transcripts through both (`cli/cmd/native_mcp_test.go`).
+>
+> It is a minimal JSON-RPC 2.0 implementation rather than the official MCP
+> Go SDK: the SDK negotiates its own protocol version and answers unknown or
+> failing tools with its own error codes and `isError` results, which would
+> change what deployed Claude Code sessions see. Deliberate differences from
+> the python server: over HTTP the session (initialize) is kept across
+> requests (python started a fresh, uninitialized session per request, so
+> every `tools/list` after `initialize` failed with -32002), and a tool of a
+> repo whose name contains `_` (`ask_dsp_2_8_steward`) resolves to that
+> repo's agent (python split the name at the first `_`).
+
 ## What I Built: Full MCP Enablement
 
 This document explains **exactly** what I implemented to make ASK fully MCP-enabled, serving as a worked example for understanding MCP implementation.
@@ -266,13 +285,13 @@ def _handle_resources_read(self, params, req_id):
 
 **HTTP Transport** (default):
 ```bash
-ask-mcp-server --port 7232 --repos-dir /path/to/repos
+rebar mcp serve --port 7232 --repos-dir /path/to/repos   # or bin/ask-mcp-server …
 # MCP endpoint: POST http://localhost:7232/mcp
 ```
 
 **Stdio Transport** (for MCP clients):
 ```bash
-ask-mcp-server --stdio --repos-dir /path/to/repos
+rebar mcp serve --stdio --repos-dir /path/to/repos
 # JSON-RPC over stdin/stdout
 ```
 
@@ -318,10 +337,10 @@ answer = response.json()["result"]["content"][0]["text"]
 
 ```bash
 # Start MCP server
-./bin/ask-mcp-server --port 7232 --repos-dir .
+rebar mcp serve --port 7232 --repos-dir ..
 
-# Test with provided client
-./bin/test-mcp-client http://localhost:7232
+# Test with provided client (bin/test-mcp-client runs the same)
+rebar mcp client http://localhost:7232
 ```
 
 ---
@@ -406,8 +425,8 @@ ask://agent/repo:role   → agents/role/AGENT.md
 
 ## Files Created
 
-1. **`bin/ask-mcp-server`** - Complete MCP server implementation (645 lines)
-2. **`bin/test-mcp-client`** - MCP client for testing (120 lines)
+1. **`cli/internal/mcp/`** - the MCP server, ask-server and test client (Go; `rebar mcp serve`, `rebar ask serve`, `rebar mcp client`)
+2. **`bin/ask-mcp-server`, `bin/ask-server`, `bin/test-mcp-client`** - hand-offs to those commands (the python originals are in `bin/legacy/`)
 3. **`docs/MCP-IMPLEMENTATION.md`** - This documentation
 
 ---

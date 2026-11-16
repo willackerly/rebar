@@ -18,6 +18,35 @@ All notable changes to rebar. Versioned with [semver](https://semver.org/).
 
 ## Unreleased
 
+- **ASK's servers run natively.** `rebar mcp serve` is the MCP server
+  (was the python `bin/ask-mcp-server`): stdio and HTTP, the same flags,
+  tool names (`ask_<repo>_<role>`), input schema, descriptions, resources
+  (`ask://memory|log|agent/<repo>:<role>`), JSON-RPC error codes, messages
+  and data, notification handling, and Python's `json.dumps` output byte for
+  byte. It is a minimal JSON-RPC implementation, not the official MCP Go
+  SDK, whose protocol negotiation and error shapes would change what Claude
+  Code sees. `rebar ask serve` is the enterprise server (was the python
+  `bin/ask-server`): the same `/v1/*` endpoints, statuses and bodies.
+  `rebar mcp client` replaces `bin/test-mcp-client` (no `requests` module
+  needed). tools/call and `/v1/ask` run `rebar ask` (or `--ask-bin` /
+  `ASK_BIN`) in the repo. No python is needed any more: `bin/ask-mcp-server`,
+  `bin/ask-server` and `bin/test-mcp-client` are POSIX sh hand-offs to the
+  binary, so adopters' `.mcp.json` files keep working; the python originals
+  moved to `bin/legacy/*.py` and run under `REBAR_CHECK_IMPL=shell` until
+  they are removed. `rebar init/new/adopt` write a `.mcp.json` that runs
+  `rebar mcp serve --stdio` (through `~/.rebar/current/bin/rebar`), and
+  `rebar migrate` reports, and with `--apply` writes, the rewrite of
+  `.mcp.json` servers that run `ask-mcp-server` (directly or via python3)
+  to `rebar mcp serve` with the same arguments. Parity: one recorded stdio
+  session (44 messages: lifecycle, every method, every error path, odd ids,
+  parse errors, notifications) byte-identical, HTTP transcripts of both
+  servers structurally identical (`cli/cmd/native_mcp_test.go`, goldens in
+  `cli/cmd/testdata/mcp`; skipped without python3). Deliberate deviations:
+  over HTTP the MCP session survives across requests (python made a new,
+  uninitialized one per request, so `tools/list` after `initialize` always
+  failed with -32002); `ask_<repo>_<role>` resolves repos with `_` in their
+  name (python split at the first `_`); usage/help text is rebar's own
+  (exit codes match).
 - **ASK runs natively.** `rebar ask` no longer execs `bin/ask`: the Go
   port in the binary implements every subcommand (`who`, `where`,
   `status`, `log`, `peek`, `tail`, `watch`, `up`, `reset`, `compact`,
