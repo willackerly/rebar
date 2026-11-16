@@ -76,7 +76,7 @@ func TestRebarSource(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(root, "cli", "go.mod")); err != nil {
 		t.Fatalf("RebarSource = %s, which has no cli/go.mod: %v", root, err)
 	}
-	if got := Tags.Replace("@todo x @tracked y"); got != "TO"+"DO: x TRACKED"+"-TASK: y" {
+	if got := Tags.Replace("@todo x @tracked y @contract:S1-X.1.0"); got != "TO"+"DO: x TRACKED"+"-TASK: y CONTRACT"+":S1-X.1.0" {
 		t.Fatalf("Tags = %q", got)
 	}
 }

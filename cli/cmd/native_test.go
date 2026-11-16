@@ -6,8 +6,10 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/willackerly/rebar/cli/internal/checks"
 	"github.com/willackerly/rebar/cli/internal/sourcescan"
@@ -89,22 +91,31 @@ var findingLine = regexp.MustCompile(`^([^ :]+):[0-9]+:`)
 // files in directory order, which differs between filesystems; nothing
 // else is normalized, so the native output must match it byte for byte.
 func inWalkOrder(out string, operands []string) string {
+	return inWalkOrderBy(out, operands, findingLine, 1)
+}
+
+// inWalkOrderBy is inWalkOrder for findings that start with a line
+// matching finding (whose first group is the file's path) and span that
+// many lines (BROKEN: and its Expected: line).
+func inWalkOrderBy(out string, operands []string, finding *regexp.Regexp, span int) string {
 	lines := strings.Split(out, "\n")
-	type finding struct {
-		line string
-		op   int
-		path []string
+	type record struct {
+		lines []string
+		op    int
+		path  []string
 	}
 	var slots []int
-	var found []finding
-	for i, l := range lines {
-		m := findingLine.FindStringSubmatch(l)
-		if m == nil {
+	var found []record
+	for i := 0; i < len(lines); i++ {
+		m := finding.FindStringSubmatch(lines[i])
+		if m == nil || i+span > len(lines) {
 			continue
 		}
-		f := finding{line: l, op: len(operands)}
+		f := record{lines: append([]string(nil), lines[i:i+span]...), op: len(operands)}
 		for j, op := range operands {
-			op = strings.TrimRight(op, "/")
+			if op != "/" {
+				op = strings.TrimRight(op, "/")
+			}
 			if m[1] == op || strings.HasPrefix(m[1], op+"/") {
 				f.op, f.path = j, strings.Split(strings.TrimPrefix(m[1], op), "/")
 				break
@@ -112,6 +123,7 @@ func inWalkOrder(out string, operands []string) string {
 		}
 		slots = append(slots, i)
 		found = append(found, f)
+		i += span - 1
 	}
 	sort.SliceStable(found, func(a, b int) bool {
 		fa, fb := found[a], found[b]
@@ -126,7 +138,7 @@ func inWalkOrder(out string, operands []string) string {
 		return len(fa.path) < len(fb.path)
 	})
 	for k, i := range slots {
-		lines[i] = found[k].line
+		copy(lines[i:], found[k].lines)
 	}
 	return strings.Join(lines, "\n")
 }
@@ -136,13 +148,15 @@ func filler(n int) string {
 	return strings.Repeat("filler text\n", n/12+1)
 }
 
-// todosParityCase is a fixture tree for check-todos. The script and the
+// parityCase is a fixture tree for a ported check. The script and the
 // native check must give the same output and exit code on it, except on
-// the grep flavour named by divergesOn, where the script's behaviour is
-// platform-dependent and the native check picks the other platform's (want
-// is then the native output, checked everywhere). Bodies spell the tags
-// @todo / @tracked (testutil.Tags); "$ROOT" in env is the tree's root.
-type todosParityCase struct {
+// the userland named by divergesOn ("bsd" or "gnu" grep, find and date),
+// where the script's behaviour is platform-dependent and the native check
+// picks the other platform's (want and wantExit are then the native
+// result, checked everywhere). Bodies and want go through fixtureText
+// (testutil.Tags spellings, dates relative to today); "$ROOT" in env is
+// the tree's root.
+type parityCase struct {
 	name       string
 	files      map[string]string
 	links      map[string]string // link → target, relative to the link
@@ -150,9 +164,10 @@ type todosParityCase struct {
 	env        []string
 	divergesOn string
 	want       string
+	wantExit   int
 }
 
-var todosParityCases = []todosParityCase{
+var todosParityCases = []parityCase{
 	{
 		name: "source-scan-excludes: by directory, not by substring",
 		files: map[string]string{
@@ -282,6 +297,7 @@ Before committing, you must either:
 
 Also found 0 tracked tasks (OK).
 `,
+		wantExit: 1,
 	},
 	{
 		name: "exclude-dir: a pattern with a slash below an operand",
@@ -304,6 +320,7 @@ Before committing, you must either:
 
 Also found 0 tracked tasks (OK).
 `,
+		wantExit: 1,
 	},
 	{
 		name: "exclude-dir: a trailing slash",
@@ -325,6 +342,7 @@ Before committing, you must either:
 
 Also found 0 tracked tasks (OK).
 `,
+		wantExit: 1,
 	},
 	{
 		name: "binary: NUL in the first 32 KiB skips the file",
@@ -359,6 +377,7 @@ Before committing, you must either:
 
 Also found 0 tracked tasks (OK).
 `,
+		wantExit: 1,
 	},
 	{
 		name: "binary: TODO after a NUL past the first 32 KiB",
@@ -378,6 +397,7 @@ Before committing, you must either:
 
 Also found 0 tracked tasks (OK).
 `,
+		wantExit: 1,
 	},
 	{
 		name: "Latin-1 bytes in the C locale",
@@ -406,6 +426,7 @@ Before committing, you must either:
 
 Also found 0 tracked tasks (OK).
 `,
+		wantExit: 1,
 	},
 }
 
@@ -423,42 +444,179 @@ func writeTree(t *testing.T, files, links map[string]string) string {
 	return root
 }
 
-// TestTodosParity runs scripts/check-todos.sh, the native check in process,
-// and the script handing off to this binary (the REBAR_CHECK_IMPL=go path)
-// on the same trees, and requires the same exit code and output, finding
-// lines aside put in the native checks' order.
-func TestTodosParity(t *testing.T) {
+// agoRE is a date placeholder in fixture text: {{ago:N}} is the date N days
+// before today (negative N: after).
+var agoRE = regexp.MustCompile(`\{\{ago:(-?[0-9]+)\}\}`)
+
+// fixtureText spells the tags (testutil.Tags) and expands {{ago:N}} to a
+// date in loc.
+func fixtureText(s string, loc *time.Location) string {
+	today := time.Now().In(loc)
+	return agoRE.ReplaceAllStringFunc(testutil.Tags.Replace(s), func(m string) string {
+		n, _ := strconv.Atoi(agoRE.FindStringSubmatch(m)[1])
+		return today.AddDate(0, 0, -n).Format("2006-01-02")
+	})
+}
+
+// scriptSettings are the variables a check script reads from the
+// environment. Each in-process run starts with them unset, as the script
+// runs do (testutil.IsolatedEnv drops REBAR_* and _REBAR_*), and then gets
+// the case's values.
+var scriptSettings = []string{
+	"REBAR_TIER", "REBAR_CHECKS_ENABLE", "REBAR_CONTRACTS_DIR", "REBAR_CONTRACT_NAMESPACE", "REBAR_RCFILE",
+	"_REBAR_CHECKS_VALIDATED", "_REBAR_NAMESPACE_VALIDATED", "CONTRACT_EXTENSIONS", "SKIP_JTBD", "SKIP_PREFIX_UNIQUENESS",
+}
+
+// testErrorLine is bash's complaint when a script compares a setting that
+// is not a number (REBAR_TIER=two): the comparison fails and the script
+// goes on, as the native check does, silently.
+var testErrorLine = regexp.MustCompile(`(?m)^.*: line [0-9]+: \[: .*: integer (expression )?expected\n`)
+
+// loggingCLI returns a rebar command that runs this binary (as the CLI,
+// with REBAR_TEST_RUN_CLI=1) and appends each command line to log.
+func loggingCLI(t *testing.T) (wrapper, log string) {
+	t.Helper()
+	dir := t.TempDir()
+	log = filepath.Join(dir, "hand-offs.log")
+	wrapper = testutil.WriteExecutable(t, dir, "rebar",
+		"#!/bin/sh\nprintf '%s\\n' \"$*\" >> '"+log+"'\nexec '"+testBinary(t)+"' \"$@\"\n")
+	return wrapper, log
+}
+
+// skippedEarly reports whether env makes a script exit before its hand-off
+// line (SKIP_JTBD=1, SKIP_PREFIX_UNIQUENESS=1).
+func skippedEarly(env []string) bool {
+	for _, kv := range env {
+		if strings.HasPrefix(kv, "SKIP_") && strings.HasSuffix(kv, "=1") {
+			return true
+		}
+	}
+	return false
+}
+
+// parityCheck says how to compare a check's script and native outputs.
+type parityCheck struct {
+	name string
+	// order puts the script's output into the native order (nil: as is).
+	order func(out, root string, args []string) string
+	// exercised reports whether a fixture's script output shows it tested
+	// something (nil: anything goes).
+	exercised func(out string) bool
+}
+
+// runParity runs scripts/<check>.sh, the native check in process, and the
+// script handing off to this binary (the default `rebar check` path) on
+// every case's tree, and requires the same exit code and output, after
+// check.order. Script runs pin LC_COLLATE=C: where the scripts sort (globs,
+// sort) they follow the locale, and the native checks sort bytes.
+func runParity(t *testing.T, check parityCheck, cases []parityCase) {
+	t.Helper()
 	requireBash(t)
 	scriptsDir := filepath.Join(testutil.RebarSource(t), "scripts")
-	script := filepath.Join(scriptsDir, "check-todos.sh")
-	c, ok := checks.Lookup("check-todos")
+	script := filepath.Join(scriptsDir, check.name+".sh")
+	c, ok := checks.Lookup(check.name)
 	if !ok {
-		t.Fatal("check-todos is not registered")
+		t.Fatalf("%s is not registered", check.name)
 	}
 	flavour := grepFlavour(t)
-	for _, tc := range todosParityCases {
+	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			root := writeTree(t, tc.files, tc.links)
+			loc := time.Local
 			var env []string
+			for _, kv := range tc.env {
+				if tz, ok := strings.CutPrefix(kv, "TZ="); ok {
+					l, err := time.LoadLocation(tz)
+					if err != nil {
+						t.Skip("no zone data:", err)
+					}
+					loc = l
+				}
+			}
+			files := map[string]string{}
+			for rel, body := range tc.files {
+				files[rel] = fixtureText(body, loc)
+			}
+			root := writeTree(t, files, tc.links)
+			for _, k := range scriptSettings {
+				t.Setenv(k, "")
+			}
+			inProcess := true
 			for _, kv := range tc.env {
 				kv = strings.ReplaceAll(kv, "$ROOT", root)
 				env = append(env, kv)
 				k, v, _ := strings.Cut(kv, "=")
-				if strings.HasPrefix(k, "REBAR_") {
-					t.Setenv(k, v) // for the in-process run
+				switch {
+				case k == "TZ":
+					inProcess = false // time.Local is set once per process
+				case !strings.HasPrefix(k, "LC_") && k != "LANG":
+					t.Setenv(k, v)
 				}
 			}
 			args := append([]string{script}, tc.args...)
+			base := append([]string{"REBAR_PROJECT_ROOT=" + root, "LC_COLLATE=C"}, env...)
 
-			shellOut, shellCode := testutil.RunEnv(t, root, testutil.IsolatedEnv(append([]string{"REBAR_PROJECT_ROOT=" + root}, env...)...), "bash", args...)
+			shellOut, shellCode := testutil.RunEnv(t, root, testutil.IsolatedEnv(base...), "bash", args...)
+			shellOut = testErrorLine.ReplaceAllString(shellOut, "")
 
 			var native strings.Builder
 			nativeCode := c.Run(&checks.Context{Root: root, Stdout: &native, Stderr: &native}, tc.args)
 
-			handEnv := append(append([]string{"REBAR_PROJECT_ROOT=" + root}, handOffEnv(t, scriptsDir)...), env...)
+			// The hand-off goes through a wrapper that logs it, so a script
+			// that ran itself instead cannot pass for the native check.
+			wrapper, log := loggingCLI(t)
+			handEnv := append(append([]string{"REBAR_PROJECT_ROOT=" + root, "LC_COLLATE=C"}, handOffEnv(t, scriptsDir)...), env...)
+			handEnv = append(handEnv, "REBAR_BIN="+wrapper)
 			handOut, handCode := testutil.RunEnv(t, root, testutil.IsolatedEnv(handEnv...), "bash", args...)
+			if logged, _ := os.ReadFile(log); !strings.Contains(string(logged), "native "+check.name) && !skippedEarly(env) {
+				t.Errorf("the script did not hand off to the native check:\n%s", handOut)
+			}
 
-			operands := tc.args
+			order := func(out string) string { return out }
+			if check.order != nil {
+				order = func(out string) string { return check.order(out, root, tc.args) }
+			}
+			want, wantCode, from := order(shellOut), shellCode, "the script"
+			if tc.want != "" {
+				want, wantCode, from = fixtureText(tc.want, loc), tc.wantExit, "want"
+				if flavour != tc.divergesOn && (shellCode != wantCode || order(shellOut) != want) {
+					t.Errorf("on %s userland the script should give want:\nscript (exit %d):\n%s\nwant (exit %d):\n%s", flavour, shellCode, shellOut, wantCode, want)
+				}
+				if flavour == tc.divergesOn {
+					t.Logf("%s userland diverges here, as documented; the script gave (exit %d):\n%s", flavour, shellCode, shellOut)
+				}
+			}
+			results := []struct {
+				how  string
+				out  string
+				code int
+			}{{"hand-off", handOut, handCode}}
+			if inProcess {
+				results = append(results, struct {
+					how  string
+					out  string
+					code int
+				}{"native", native.String(), nativeCode})
+			}
+			for _, got := range results {
+				if got.code != wantCode || got.out != want {
+					t.Errorf("%s differs from %s:\n%s (exit %d):\n%s\n%s (exit %d):\n%s",
+						got.how, from, from, wantCode, want, got.how, got.code, got.out)
+				}
+			}
+			if check.exercised != nil && !check.exercised(shellOut) {
+				t.Errorf("fixture exercised nothing: %s", shellOut)
+			}
+		})
+	}
+}
+
+// TestTodosParity: check-todos.sh and its native port (runParity), finding
+// lines put in the native order.
+func TestTodosParity(t *testing.T) {
+	runParity(t, parityCheck{
+		name: "check-todos",
+		order: func(out, root string, args []string) string {
+			operands := args
 			if len(operands) == 0 {
 				for _, d := range sourcescan.ScopeFor(root).Dirs {
 					if info, err := os.Stat(filepath.Join(root, d)); err == nil && info.IsDir() {
@@ -466,37 +624,12 @@ func TestTodosParity(t *testing.T) {
 					}
 				}
 			}
-			want, wantCode, from := inWalkOrder(shellOut, operands), shellCode, "the script"
-			if tc.want != "" {
-				want, wantCode, from = testutil.Tags.Replace(tc.want), 1, "want"
-				if strings.HasPrefix(want, "OK:") {
-					wantCode = 0
-				}
-				if flavour != tc.divergesOn && (shellCode != wantCode || inWalkOrder(shellOut, operands) != want) {
-					t.Errorf("on %s grep the script should give want:\nscript (exit %d):\n%s\nwant (exit %d):\n%s", flavour, shellCode, shellOut, wantCode, want)
-				}
-				if flavour == tc.divergesOn {
-					t.Logf("%s grep diverges here, as documented; the script gave (exit %d):\n%s", flavour, shellCode, shellOut)
-				}
-			}
-			for _, got := range []struct {
-				how  string
-				out  string
-				code int
-			}{
-				{"native", native.String(), nativeCode},
-				{"hand-off", handOut, handCode},
-			} {
-				if got.code != wantCode || got.out != want {
-					t.Errorf("%s differs from %s:\n%s (exit %d):\n%s\n%s (exit %d):\n%s",
-						got.how, from, from, wantCode, want, got.how, got.code, got.out)
-				}
-			}
-			if !strings.Contains(shellOut, "TODO") && !strings.Contains(shellOut, "No source directories") {
-				t.Errorf("fixture exercised nothing: %s", shellOut)
-			}
-		})
-	}
+			return inWalkOrder(out, operands)
+		},
+		exercised: func(out string) bool {
+			return strings.Contains(out, "TODO") || strings.Contains(out, "No source directories")
+		},
+	}, todosParityCases)
 }
 
 // TestShellRegressionTestsAgainstNative runs every script regression test
@@ -531,10 +664,7 @@ func TestShellRegressionTestsAgainstNative(t *testing.T) {
 		usesRunIn := strings.Contains(string(data), "run_in ")
 		t.Run(filepath.Base(test), func(t *testing.T) {
 			t.Parallel()
-			dir := t.TempDir()
-			log := filepath.Join(dir, "hand-offs.log")
-			wrapper := testutil.WriteExecutable(t, dir, "rebar",
-				"#!/bin/sh\nprintf '%s\\n' \"$*\" >> '"+log+"'\nexec '"+testBinary(t)+"' \"$@\"\n")
+			wrapper, log := loggingCLI(t)
 			out, code := testutil.RunEnv(t, src, testutil.IsolatedEnv("REBAR_TEST_NATIVE_BIN="+wrapper, "REBAR_TEST_RUN_CLI=1"), "bash", test)
 			if code != 0 {
 				t.Fatalf("%s against the native checks (exit %d):\n%s", filepath.Base(test), code, out)
@@ -622,16 +752,16 @@ func TestCheckImplSwitch(t *testing.T) {
 }
 
 // TestNativeHandOffOnlyFromInstall: under REBAR_CHECK_IMPL=go the install's
-// check-todos.sh hands off to the native check, but a project's own copy,
+// scripts of the ported checks hand off to the native checks (and under
+// shell they run), but a project's own copy,
 // even one made from a script that carries the hand-off hook, runs itself
 // and keeps its customizations, whether `rebar run` starts it or the
 // install's pre-commit.sh reaches it through _rebar_script.
 func TestNativeHandOffOnlyFromInstall(t *testing.T) {
 	requireBash(t)
 	src := testutil.RebarSource(t)
-	hook := `_rebar_native check-todos "$@"`
 
-	// An install whose check-todos.sh says so when it runs past the hook.
+	// An install whose ported scripts say so when they run past the hook.
 	install := t.TempDir()
 	scripts, err := filepath.Glob(filepath.Join(src, "scripts", "*.sh"))
 	if err != nil {
@@ -643,11 +773,13 @@ func TestNativeHandOffOnlyFromInstall(t *testing.T) {
 			t.Fatal(err)
 		}
 		text := string(body)
-		if filepath.Base(s) == "check-todos.sh" {
-			if !strings.Contains(text, hook) {
-				t.Fatalf("check-todos.sh has no hand-off hook %q", hook)
+		name := strings.TrimSuffix(filepath.Base(s), ".sh")
+		if _, ported := checks.Lookup(name); ported {
+			h := `_rebar_native ` + name + ` "$@"`
+			if !strings.Contains(text, h) {
+				t.Fatalf("%s.sh has no hand-off hook %q", name, h)
 			}
-			text = strings.Replace(text, hook, hook+"\necho 'install script ran'; exit 0", 1)
+			text = strings.Replace(text, h, h+"\necho 'install script ran: "+name+"'; exit 0", 1)
 		}
 		testutil.WriteExecutable(t, install, filepath.Join("scripts", filepath.Base(s)), text)
 	}
@@ -656,6 +788,20 @@ func TestNativeHandOffOnlyFromInstall(t *testing.T) {
 	bin := testBinary(t)
 
 	plain := writeTree(t, map[string]string{".rebarrc": "tier = 1\n", "src/a.go": "package a\n"}, nil)
+	for _, name := range checks.Names() {
+		out, _ := testutil.RunEnv(t, plain, cliEnv(home, "", install), bin, "run", name)
+		if strings.Contains(out, "install script ran") {
+			t.Errorf("go: rebar run %s ran the script:\n%s", name, out)
+		}
+		out, _ = testutil.RunEnv(t, plain, cliEnv(home, "shell", install), bin, "run", name)
+		if !strings.Contains(out, "install script ran: "+name) {
+			t.Errorf("shell: rebar run %s did not run the install's script:\n%s", name, out)
+		}
+	}
+	tier3 := writeTree(t, map[string]string{".rebarrc": "tier = 3\n", "src/a.go": "package a\n", "architecture/README.md": "x\n"}, nil)
+	if out, _ := testutil.RunEnv(t, tier3, append(cliEnv(home, "", install), "SKIP_STEWARD=1", "SKIP_SCRIPT_TESTS=1"), bin, "check"); strings.Contains(out, "install script ran") || !strings.Contains(out, "TODO Tracking") {
+		t.Errorf("go: rebar check ran a ported script instead of handing off:\n%s", out)
+	}
 	for _, args := range [][]string{{"run", "check-todos"}, {"check", "--pre-commit"}} {
 		out, _ := testutil.RunEnv(t, plain, cliEnv(home, "go", install), bin, args...)
 		if strings.Contains(out, "install script ran") || !strings.Contains(out, "OK: 0 untracked TODOs. 0 tracked tasks.") {
@@ -717,6 +863,53 @@ func TestNativeArgsResolveAgainstWorkingDir(t *testing.T) {
 		}
 		if !strings.Contains(shellOut, "TODO") {
 			t.Errorf("%v exercised nothing: %s", args, shellOut)
+		}
+	}
+}
+
+// TestScannerChecksImplSwitch runs the CLI (this binary) end to end on a
+// project that trips every ported check: `rebar run <check>` and `rebar
+// check` print the same and exit the same under REBAR_CHECK_IMPL=shell and
+// the default (go). (TestNativeHandOffOnlyFromInstall shows that go runs
+// the native checks.)
+func TestScannerChecksImplSwitch(t *testing.T) {
+	requireBash(t)
+	files := map[string]string{
+		".rebarrc":                            "tier = 3\nsource_dirs = src\n",
+		"architecture/CONTRACT-S1-FOO.1.0.md": "# S1-FOO\n\n**Status:** active\n\n## Why this exists\n\nx\n",
+		"architecture/CONTRACT-S1-BAR.1.0.md": contract,
+		"architecture/CONTRACT-REGISTRY.md":   registry("CONTRACT-S1-FOO.1.0.md", "CONTRACT-S1-BAR.1.0.md"),
+		"src/a.go":                            "// @contract:S1-FOO.1.0\npackage a\n",
+		"src/b.go":                            "package b\n// @contract:S9-GONE.1.0\n// @todo untracked\n",
+		"docs/old.md":                         "<!-- freshness: {{ago:40}} -->\n",
+	}
+	for rel, body := range files {
+		files[rel] = fixtureText(body, time.Local)
+	}
+	project := func() string {
+		root := writeTree(t, files, nil)
+		testutil.Git(t, root, "init", "-q", "-b", "main")
+		testutil.Git(t, root, "add", ".")
+		testutil.Git(t, root, "commit", "-q", "-m", "init")
+		return root
+	}
+	bin := testBinary(t)
+	home := t.TempDir()
+	src := testutil.RebarSource(t)
+	ported := []string{"check-freshness", "check-contract-refs", "check-registry", "check-contract-headers", "check-prefix-uniqueness", "check-jtbd-presence", "check-todos"}
+	runs := [][]string{{"check", "--strict=false"}, {"check", "--pre-commit"}}
+	for _, c := range ported {
+		runs = append(runs, []string{"run", c})
+	}
+	skips := []string{"SKIP_STEWARD=1", "SKIP_SCRIPT_TESTS=1", "SKIP_BOOTSTRAP_SYNC=1"}
+	for _, args := range runs {
+		shellOut, shellCode := testutil.RunEnv(t, project(), append(cliEnv(home, "shell", src), skips...), bin, args...)
+		goOut, goCode := testutil.RunEnv(t, project(), append(cliEnv(home, "", src), skips...), bin, args...)
+		if shellCode != goCode || shellOut != goOut {
+			t.Errorf("rebar %v: shell (exit %d):\n%s\ngo (exit %d):\n%s", args, shellCode, shellOut, goCode, goOut)
+		}
+		if args[0] == "check" && !strings.Contains(goOut, "TODO") {
+			t.Errorf("rebar %v ran no checks:\n%s", args, goOut)
 		}
 	}
 }

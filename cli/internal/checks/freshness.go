@@ -157,17 +157,23 @@ func dayOf(t time.Time) time.Time {
 }
 
 // parseDay is local midnight of a YYYY-MM-DD date, as GNU `date -d` reads
-// it: false for a date that does not exist (2026-02-30, month 13). BSD
-// `date -j -f` rolls a day past the month's end over into the next month
-// instead; the native check follows GNU on every platform.
+// it: false for a date that does not exist (2026-02-30, month 13) or whose
+// midnight was skipped by a DST change (2018-11-04 in Sao Paulo). BSD
+// `date -j -f` rolls such dates forward instead (to March 2, to 01:00);
+// the native check follows GNU on every platform.
 func parseDay(s string) (time.Time, bool) {
+	return parseDayIn(s, time.Local)
+}
+
+// parseDayIn is parseDay in loc.
+func parseDayIn(s string, loc *time.Location) (time.Time, bool) {
 	y, errY := strconv.Atoi(s[0:4])
 	m, errM := strconv.Atoi(s[5:7])
 	d, errD := strconv.Atoi(s[8:10])
 	if errY != nil || errM != nil || errD != nil {
 		return time.Time{}, false
 	}
-	t := time.Date(y, time.Month(m), d, 0, 0, 0, 0, time.Local)
+	t := time.Date(y, time.Month(m), d, 0, 0, 0, 0, loc)
 	if t.Year() != y || int(t.Month()) != m || t.Day() != d {
 		return time.Time{}, false
 	}

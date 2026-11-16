@@ -136,10 +136,12 @@ func RunEnv(t testing.TB, dir string, env []string, name string, args ...string)
 	return string(out), 0
 }
 
-// Tags spells the TODO tags in fixture bodies: @todo becomes the untracked
-// tag and @tracked the tracked one, so that rebar's own check-todos,
-// scanning the test sources, does not count the fixtures.
-var Tags = strings.NewReplacer("@todo", "TO"+"DO:", "@tracked", "TRACKED"+"-TASK:")
+// Tags spells the tags rebar's own checks look for in fixture bodies: @todo
+// becomes the untracked TODO tag, @tracked the tracked one, and @contract:
+// the contract reference marker, so that rebar's check-todos,
+// check-contract-refs and compute-registry, scanning the test sources, do
+// not count the fixtures.
+var Tags = strings.NewReplacer("@todo", "TO"+"DO:", "@tracked", "TRACKED"+"-TASK:", "@contract:", "CONTRACT"+":")
 
 // RebarSource returns the root of the rebar checkout the test runs in (the
 // directory holding scripts/_rebar-config.sh above the working directory),
