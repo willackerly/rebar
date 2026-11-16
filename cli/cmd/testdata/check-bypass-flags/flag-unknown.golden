@@ -1,0 +1,2 @@
+check-bypass-flags: unknown flag '--nope'
+--- exit 2 ---

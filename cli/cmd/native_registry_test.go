@@ -160,6 +160,9 @@ func runGolden(t *testing.T, check parityCheck, cases []parityCase) {
 			if tc.git {
 				gitTree(t, root, tc.untracked, time.Local)
 			}
+			if tc.setup != nil {
+				tc.setup(t, root)
+			}
 			before := treeState(t, root)
 			for _, k := range scriptSettings {
 				t.Setenv(k, "")
@@ -170,8 +173,11 @@ func runGolden(t *testing.T, check parityCheck, cases []parityCase) {
 			}
 			var out strings.Builder
 			code := c.Run(&checks.Context{Root: root, Stdout: &out, Stderr: &out}, tc.args)
-			out.WriteString(takeChanges(t, root, before))
-			checkGolden(t, check.golden, tc.name, out.String(), root, code)
+			got := out.String() + takeChanges(t, root, before)
+			if check.normalize != nil {
+				got = check.normalize(got)
+			}
+			checkGolden(t, check.golden, tc.name, got, root, code)
 		})
 	}
 }

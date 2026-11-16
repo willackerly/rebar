@@ -1,0 +1,2 @@
+check-fix-commit: unknown flag '-x'
+--- exit 2 ---

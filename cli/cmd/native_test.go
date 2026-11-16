@@ -153,7 +153,9 @@ func filler(n int) string {
 // the userland named by divergesOn ("bsd" or "gnu" grep, find and date),
 // where the script's behaviour is platform-dependent and the native check
 // picks the other platform's (want and wantExit are then the native
-// result, checked everywhere). Bodies and want go through fixtureText
+// result, checked everywhere), or everywhere for divergesOn "all" (where
+// the script fails in a way that names itself, like bash's "unbound
+// variable", and the native check says what is wrong instead). Bodies and want go through fixtureText
 // (testutil.Tags spellings, dates relative to today); "$ROOT" in env is
 // the tree's root.
 type parityCase struct {
@@ -172,6 +174,9 @@ type parityCase struct {
 	// pending skips the case while the script lacks this text: a feature
 	// the native check has ahead of the script in this branch.
 	pending string
+	// setup runs after the tree is written (and staged, with git), for
+	// fixtures that need more: commits, branches, clones.
+	setup func(t *testing.T, root string)
 }
 
 var todosParityCases = []parityCase{
@@ -516,6 +521,9 @@ type parityCheck struct {
 	// golden names the testdata directory holding the expected output of
 	// every case (see checkGolden), which must match want.
 	golden string
+	// normalize rewrites what differs between runs (a timestamp) in every
+	// output, the script's, the native check's and the golden's (nil: as is).
+	normalize func(out string) string
 }
 
 // runParity runs scripts/<check>.sh, the native check in process, and the
@@ -557,6 +565,9 @@ func runParity(t *testing.T, check parityCheck, cases []parityCase) {
 			root := writeTree(t, files, tc.links)
 			if tc.git {
 				gitTree(t, root, tc.untracked, loc)
+			}
+			if tc.setup != nil {
+				tc.setup(t, root)
 			}
 			var before map[string]string
 			changes := func() string { return "" }
@@ -604,13 +615,20 @@ func runParity(t *testing.T, check parityCheck, cases []parityCase) {
 			if check.order != nil {
 				order = func(out string) string { return check.order(out, root, tc.args) }
 			}
+			if check.normalize != nil {
+				shellOut, handOut = check.normalize(shellOut), check.normalize(handOut)
+				nativeOut := check.normalize(native.String())
+				native.Reset()
+				native.WriteString(nativeOut)
+			}
 			want, wantCode, from := order(shellOut), shellCode, "the script"
 			if tc.want != "" {
 				want, wantCode, from = fixtureText(tc.want, loc), tc.wantExit, "want"
-				if flavour != tc.divergesOn && (shellCode != wantCode || order(shellOut) != want) {
+				diverges := flavour == tc.divergesOn || tc.divergesOn == "all"
+				if !diverges && (shellCode != wantCode || order(shellOut) != want) {
 					t.Errorf("on %s userland the script should give want:\nscript (exit %d):\n%s\nwant (exit %d):\n%s", flavour, shellCode, shellOut, wantCode, want)
 				}
-				if flavour == tc.divergesOn {
+				if diverges {
 					t.Logf("%s userland diverges here, as documented; the script gave (exit %d):\n%s", flavour, shellCode, shellOut)
 				}
 			}

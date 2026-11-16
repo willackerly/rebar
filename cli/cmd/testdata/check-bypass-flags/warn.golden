@@ -1,0 +1,14 @@
+
+check-bypass-flags: VIOLATION (HEAD)
+  subject:  chore: x
+
+  Body mentions a test-bypass flag (matched: --no-verify )
+  Gate I requires a line of the form:
+    Bypass tickets: TICKET-1, TICKET-2 (one ticket per broken test)
+
+  And a justification per ticket. Without this, bypassing a test
+  ships an unowned regression. Source: practices/regression-fix-protocol.md §Gate I
+
+check-bypass-flags: 1 violation(s)
+Wire as commit-msg hook:  ln -sf ../../scripts/check-bypass-flags.sh .git/hooks/commit-msg
+--- exit 0 ---

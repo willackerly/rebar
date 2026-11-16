@@ -1,0 +1,26 @@
+rebar: contract version bump recorded → outbox has 3 pending notification(s); flush with scripts/flush-notifications.sh
+--- wrote architecture/.state/pending-notifications.md ---
+# Pending
+
+## OLD: 1.0 → 2.0
+- **status:** pending
+
+## GONE: 1.0 → 1.1
+- **status:** sent
+
+## S1-FOO: 1.0 → 2.0
+- **detected:** <now>
+- **status:** pending
+- **commit:** cb61527
+- **old_path:** architecture/CONTRACT-S1-FOO.1.0.md
+- **new_path:** architecture/CONTRACT-S1-FOO.2.0.md
+- **severity:** (auto)
+
+## S2-BAR: 2.0 → 2.1
+- **detected:** <now>
+- **status:** pending
+- **commit:** cb61527
+- **old_path:** architecture/CONTRACT-S2-BAR.2.0.md
+- **new_path:** architecture/CONTRACT-S2-BAR.2.1.md
+- **severity:** (auto)
+--- exit 0 ---
