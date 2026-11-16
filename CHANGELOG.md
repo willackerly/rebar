@@ -18,10 +18,32 @@ All notable changes to rebar. Versioned with [semver](https://semver.org/).
 
 ## Unreleased
 
+- **Native (Go) checks are the default for seven checks.** check-todos and
+  six more ported scanners, check-freshness, check-contract-refs,
+  check-registry, check-contract-headers, check-prefix-uniqueness and
+  check-jtbd-presence, now run in the `rebar` binary unless
+  `REBAR_CHECK_IMPL=shell` (the scripts stay until the end of the stack).
+  Same arguments, `.rebarrc` keys, tier gate (`REBAR_TIER`, `checks_enable`,
+  the `SKIP:` / `NOTE:` lines), output and exit codes; on virtru-analyze the
+  six scanners take 0.2 s instead of 19 s (check-contract-refs and
+  check-registry spawned processes per match). Where the scripts depended on
+  the platform, the native checks pick one behaviour: findings are listed in
+  file-name order (find and grep -r used directory order) and contracts,
+  registry IDs and JTBD findings in byte order whatever the locale (bash globs
+  and `sort` used its collation); check-freshness treats a date that does not
+  exist (`2025-02-30`) or whose midnight a DST change skipped as GNU date does
+  on every platform (counted, not aged; BSD date rolled it forward and could
+  report it stale); and check-contract-refs / check-registry select files as
+  check-todos does (below). The scripts' quirks are kept: `tier = 1 # note`
+  in `.rebarrc` still reads as tier 3, and contract IDs are still matched as
+  patterns (a `.` matches any character). The script tests pin
+  `REBAR_CHECK_IMPL=shell`; `REBAR_TEST_NATIVE_BIN` runs them against the
+  binary.
 - **Experimental: native (Go) checks behind `REBAR_CHECK_IMPL=go`.** First
   PR of a stack that ends with a Go-binary-only rebar (proposal and plan:
   `feedback/2026-11-14-go-native-checks.md`). Here the default stays `shell`
-  and nothing changes unless the variable is set. With `REBAR_CHECK_IMPL=go`,
+  (the entry above makes `go` the default) and nothing changes unless the
+  variable is set. With `REBAR_CHECK_IMPL=go`,
   `rebar check` (all modes) and `rebar run check-todos` use a Go port of
   check-todos.sh; `rebar run` works for it even without a rebar install. Only
   the install's scripts hand off to the binary: a project's own copy of a
