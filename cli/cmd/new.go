@@ -11,6 +11,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/willackerly/rebar/cli/internal/config"
 	"github.com/willackerly/rebar/cli/internal/llm"
+	"github.com/willackerly/rebar/cli/internal/scripts"
 )
 
 var (
@@ -211,6 +212,17 @@ Be practical and specific. Don't over-engineer — this is a fresh project.`, na
 				fmt.Println()
 				fmt.Printf("  Create these using: %s/CONTRACT-TEMPLATE.md\n", contractsDir)
 			}
+		}
+	}
+
+	// The registry check runs at every tier, so the first `rebar check` fails
+	// without a registry. It lists tracked files, so stage first.
+	exec.Command("git", "-C", root, "add", "-A").Run()
+	if s, ok := resolveScript(root, rebarRoot, "compute-registry"); ok {
+		if out, code, err := scripts.OutputInProject(s.Path, root); err != nil || code != 0 {
+			fmt.Fprintf(os.Stderr, "  ⚠ compute-registry failed (exit %d): %s\n", code, strings.TrimSpace(string(out)))
+		} else {
+			fmt.Printf("  ✓ %s/CONTRACT-REGISTRY.md\n", contractsDir)
 		}
 	}
 

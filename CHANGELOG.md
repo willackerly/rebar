@@ -38,6 +38,11 @@ Field-tested on virtru-analyze: upgrades from v2.0.0 and v3.0.0-beta.4 copies,
 and the adopter's own CI running a pinned 3.1 tree. The full list of changes is
 in the release candidates below; since rc.3:
 
+- **`rebar new` writes the contract registry,** so a new project passes its
+  first `rebar check`. The registry check runs at every tier and failed with
+  "CONTRACT-REGISTRY.md does not exist" (15/16) until the user ran
+  `rebar run compute-registry`; the registry is now generated before the
+  initial commit and included in it.
 - **`metrics_strict = true` also fails when `.rebarrc` declares no metrics.**
   In rc.3, a strict check with no `metric.<key>.*` lines passed ("No metrics
   declared"), so deleting the declarations silently turned enforcement off.
