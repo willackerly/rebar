@@ -2,7 +2,7 @@
 
 last-synced: 2026-11-16
 <!-- freshness: 2026-11-16 -->
-**Branch:** main — **v3 line, graduated to `v3.0.0`** 2026-11-14 (plan D12); `release/v3.1.0-rc` at `v3.1.0-rc.3`
+**Branch:** main — **v3 line, graduated to `v3.0.0`** 2026-11-14 (plan D12); `v3.1.0` released 2026-11-16 (from `release/v3.1.0-rc`)
 **Tier:** 3 (ENFORCED) — rebar dogfoods its own methodology
 
 ---
@@ -15,6 +15,9 @@ last-synced: 2026-11-16
   re-verified after its expected 2026-08-16 close, and beta.3/beta.4 shipped
   after it. Recorded as D12 + a final scoreboard in `docs/v3-beta-plan.md`.
   No code change since beta.4. Tag `v2.0.0` remains the stable v2 point.
+- **`v3.1.0` (2026-11-16)** — the 3.1 line graduated after three release
+  candidates field-tested on virtru-analyze (#457); plus `metrics_strict`
+  failing on zero declarations. Next: the Go-native stack (#23 → …) for 3.2.
 - **`v3.1.0-rc.3` (2026-11-16) on `release/v3.1.0-rc`** — #33, fixes from
   running rc.2 in virtru-analyze's CI (#457): root flags before `run`,
   SETUP CI snippet cleanup, migrate keeps sourced ground-truth copies,
@@ -106,8 +109,8 @@ Ordered roughly by cost.
 
 ## What's Next — proposed go-forward
 
-**Now — test `v3.1.0-rc.3`.** Install it (`… | bash -s -- v3.1.0-rc.3`),
-run UPGRADING.md on a real adopter, fix forward into `release/v3.1.0-rc`.
+**Now — `v3.1.0` is out.** Install it (`… | bash -s -- v3.1.0`),
+run UPGRADING.md on adopters; 3.1.x fixes go to `main`, the Go-native stack targets 3.2.
 
 **Done — `v3.0.0` tagged and released 2026-11-14.** After the release PR merges, tag
 the merge commit and announce (action 1).
