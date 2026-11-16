@@ -48,7 +48,6 @@ func TestFreshnessParity(t *testing.T) {
 				".md":                 "freshness: {{ago:17}}\n",
 				"notes.txt":           "freshness: {{ago:300}}\n",
 				"plain.md":            "no marker\n",
-				"bin.md":              "freshness: {{ago:300}}\n\x00\n",
 			},
 		},
 		{
@@ -143,14 +142,20 @@ func TestFreshnessParity(t *testing.T) {
 		},
 		{
 			name:  "a date whose midnight did not exist",
-			files: map[string]string{"gap.md": "freshness: 2018-11-04\n"},
+			files: map[string]string{"gap.md": "freshness: 2018-11-04\n", "before.md": "freshness: 2018-10-21\n"},
 			env:   []string{"TZ=America/Sao_Paulo"},
-			// GNU date rejects it, as the native check; BSD date moves it
-			// to 01:00 and reports it stale.
-			divergesOn: "bsd",
+		},
+		{
+			name:  "a binary file",
+			files: map[string]string{"bin.md": "freshness: {{ago:300}}\n\x00\n", "text.md": "plain\n"},
+			// BSD grep -o prints "Binary file … matches" on stdout, which
+			// the script counts and cannot parse, as the native check;
+			// GNU grep (3.5+) prints it on stderr, so the file counts as
+			// unmarked.
+			divergesOn: "gnu",
 			want: `
 Checked 1 docs with currency markers (freshness:/last-synced:), 0 stale (>14 days).
-0 .md file(s) carry no currency marker at all — unchecked, not verified.
+1 .md file(s) carry no currency marker at all — unchecked, not verified.
 `,
 		},
 		{

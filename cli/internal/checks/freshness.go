@@ -157,10 +157,11 @@ func dayOf(t time.Time) time.Time {
 }
 
 // parseDay is local midnight of a YYYY-MM-DD date, as GNU `date -d` reads
-// it: false for a date that does not exist (2026-02-30, month 13) or whose
-// midnight was skipped by a DST change (2018-11-04 in Sao Paulo). BSD
-// `date -j -f` rolls such dates forward instead (to March 2, to 01:00);
-// the native check follows GNU on every platform.
+// it: false for a date that does not exist (2026-02-30, month 13), where
+// BSD `date -j -f` rolls over into the next month; the native check
+// follows GNU on every platform. A day whose midnight a DST change skipped
+// (2018-11-04 in Sao Paulo) is valid, an hour off midnight, which ageDays
+// absorbs.
 func parseDay(s string) (time.Time, bool) {
 	return parseDayIn(s, time.Local)
 }
@@ -173,11 +174,10 @@ func parseDayIn(s string, loc *time.Location) (time.Time, bool) {
 	if errY != nil || errM != nil || errD != nil {
 		return time.Time{}, false
 	}
-	t := time.Date(y, time.Month(m), d, 0, 0, 0, 0, loc)
-	if t.Year() != y || int(t.Month()) != m || t.Day() != d {
+	if c := time.Date(y, time.Month(m), d, 0, 0, 0, 0, time.UTC); c.Year() != y || int(c.Month()) != m || c.Day() != d {
 		return time.Time{}, false
 	}
-	return t, true
+	return time.Date(y, time.Month(m), d, 0, 0, 0, 0, loc), true
 }
 
 // ageDays is the number of calendar days from doc to today, both local

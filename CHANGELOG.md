@@ -31,9 +31,10 @@ All notable changes to rebar. Versioned with [semver](https://semver.org/).
   file-name order (find and grep -r used directory order) and contracts,
   registry IDs and JTBD findings in byte order whatever the locale (bash globs
   and `sort` used its collation); check-freshness treats a date that does not
-  exist (`2025-02-30`) or whose midnight a DST change skipped as GNU date does
-  on every platform (counted, not aged; BSD date rolled it forward and could
-  report it stale); and check-contract-refs / check-registry select files as
+  exist (`2025-02-30`) as GNU date does on every platform (counted, not aged;
+  BSD date rolled it into the next month and could report it stale) and a
+  binary `.md` with a marker as macOS did (counted, not aged; GNU grep 3.5+
+  made it unmarked); and check-contract-refs / check-registry select files as
   check-todos does (below). The scripts' quirks are kept: `tier = 1 # note`
   in `.rebarrc` still reads as tier 3, and contract IDs are still matched as
   patterns (a `.` matches any character). The script tests pin

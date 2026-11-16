@@ -146,6 +146,8 @@ func TestAgeDays(t *testing.T) {
 		{"Europe/London", "2025-11-15", "2026-11-15", 365},
 		{"Australia/Lord_Howe", "2026-03-30", "2026-04-13", 14}, // a 30-minute DST change
 		{"America/Sao_Paulo", "2018-10-28", "2018-11-11", 14},   // across a day without a midnight
+		{"America/Sao_Paulo", "2018-11-04", "2018-11-18", 14},   // that day, an hour off midnight
+		{"America/Sao_Paulo", "2018-10-21", "2018-11-04", 14},
 	} {
 		loc, err := time.LoadLocation(tc.zone)
 		if err != nil {
@@ -164,8 +166,8 @@ func TestAgeDays(t *testing.T) {
 
 func TestParseDay(t *testing.T) {
 	if loc, err := time.LoadLocation("America/Sao_Paulo"); err == nil {
-		if _, ok := parseDayIn("2018-11-04", loc); ok {
-			t.Error("2018-11-04 had no midnight in Sao Paulo; GNU date rejects it")
+		if _, ok := parseDayIn("2018-11-04", loc); !ok {
+			t.Error("2018-11-04 had no midnight in Sao Paulo; GNU and BSD date still read it")
 		}
 	}
 	for _, s := range []string{"2026-02-28", "2024-02-29", "1969-12-31", "0001-01-01", "9999-12-31"} {
