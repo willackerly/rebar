@@ -3,7 +3,9 @@ package checks
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"os"
+	"os/exec"
 	"regexp"
 	"sort"
 	"strconv"
@@ -21,12 +23,13 @@ func init() {
 	register(&Check{Name: "check-ground-truth", Run: runGroundTruth})
 }
 
-// The script's colours, as echo -e reads them.
+// The script's colours, as echo -e reads them (used on a terminal only;
+// see UseColour).
 const (
-	gtRed    = `\033[0;31m`
-	gtGreen  = `\033[0;32m`
-	gtYellow = `\033[1;33m`
-	gtNC     = `\033[0m`
+	gtRedCode    = `\033[0;31m`
+	gtGreenCode  = `\033[0;32m`
+	gtYellowCode = `\033[1;33m`
+	gtNCCode     = `\033[0m`
 )
 
 func runGroundTruth(ctx *Context, args []string) int {
@@ -38,7 +41,7 @@ func runGroundTruth(ctx *Context, args []string) int {
 	rcFile := config.RCFile(root)
 	w := ctx.Stdout
 	if printOnly {
-		for _, m := range computeMetrics(root, rcFile) {
+		for _, m := range computeMetrics(ctx.Stderr, root, rcFile) {
 			fmt.Fprintf(w, "%s=%s\n", m.name, m.value)
 		}
 		return 0
@@ -53,6 +56,10 @@ func runGroundTruth(ctx *Context, args []string) int {
 		strict = true
 	}
 
+	var gtRed, gtGreen, gtYellow, gtNC string
+	if UseColour(ctx.Stdout) {
+		gtRed, gtGreen, gtYellow, gtNC = gtRedCode, gtGreenCode, gtYellowCode, gtNCCode
+	}
 	echo := func(line string) { fmt.Fprint(w, line+"\n") }
 	echoE := func(line string) { fmt.Fprint(w, echoEscapes(line)) }
 	exit := 0
@@ -70,7 +77,7 @@ func runGroundTruth(ctx *Context, args []string) int {
 			echo("  to compute each one as metric.<key>.* lines in .rebarrc.")
 			return
 		}
-		computed := computeMetrics(root, rcFile)
+		computed := computeMetrics(ctx.Stderr, root, rcFile)
 		if len(computed) == 0 {
 			echo("No metrics declared. Add metric.<key>.* lines to .rebarrc (see this script's header).")
 			return
@@ -224,7 +231,7 @@ var metricLineRE = regexp.MustCompilePOSIX(`^metric\.([A-Za-z0-9_-]+)\.[a-z_]+[[
 
 // computeMetrics computes every metric declared in rcFile, in the order of
 // their first lines (compute_metrics).
-func computeMetrics(root, rcFile string) []metric {
+func computeMetrics(stderr io.Writer, root, rcFile string) []metric {
 	data, err := os.ReadFile(rcFile)
 	if err != nil {
 		return nil
@@ -239,7 +246,7 @@ func computeMetrics(root, rcFile string) []metric {
 	}
 	var out []metric
 	for _, name := range names {
-		out = append(out, metric{name, strconv.Itoa(countMetric(root, data, name))})
+		out = append(out, metric{name, strconv.Itoa(countMetric(stderr, root, data, name))})
 	}
 	return out
 }
@@ -282,7 +289,7 @@ type metricDef struct {
 // countMetric is count_metric: the number of files (or directories) the
 // script's find prints for the metric, or, with distinct, the number of
 // distinct values its pattern makes of their names.
-func countMetric(root string, rc []byte, name string) int {
+func countMetric(stderr io.Writer, root string, rc []byte, name string) int {
 	f := func(field, def string) string { return rcField(rc, name, field, def) }
 	d := metricDef{
 		dirs:         f("type", "files") == "dirs",
@@ -292,6 +299,15 @@ func countMetric(root string, rc []byte, name string) int {
 		excludeDir:   append([]string{".git"}, ifsFields(f("exclude_dirs", ""))...),
 		min:          -1,
 		max:          -1,
+	}
+	tracked := false
+	switch f("tracked", "false") {
+	case "true", "1", "yes", "on":
+		if insideGitWorkTree(root) {
+			tracked = true
+		} else {
+			fmt.Fprintf(stderr, "rebar: metric.%s.tracked: %s is not a git work tree; counting every file\n", name, root)
+		}
 	}
 	var starts []string
 	for _, p := range d.paths {
@@ -331,6 +347,9 @@ func countMetric(root string, rc []byte, name string) int {
 	var found []string
 	for _, s := range starts {
 		found = d.walk(s, lastName(s), 0, found)
+	}
+	if tracked {
+		found = onlyTracked(root, found)
 	}
 	if !d.distinctSet {
 		return len(found)
@@ -447,4 +466,46 @@ func matchesAny(globs []string, name string) bool {
 		}
 	}
 	return false
+}
+
+var (
+	repeatedSlashes = regexp.MustCompile(`//+`)
+	dotComponent    = regexp.MustCompile(`/\./`)
+)
+
+// onlyTracked keeps the paths (below root, as find prints them) that git
+// tracks, and the directories holding a tracked file, as the script's
+// only_tracked filter does with `git ls-files` (core.quotepath=off) and awk.
+func onlyTracked(root string, paths []string) []string {
+	out, _ := exec.Command("git", "-C", root, "-c", "core.quotepath=off", "ls-files").Output()
+	tracked := map[string]bool{}
+	for _, l := range textLines(out) {
+		tracked["."] = true
+		for p := l; ; {
+			tracked[p] = true
+			i := strings.LastIndexByte(p, '/')
+			if i < 0 {
+				break
+			}
+			p = p[:i]
+		}
+	}
+	prefix := root + "/"
+	var kept []string
+	for _, p := range paths {
+		rel := p
+		if strings.HasPrefix(rel, prefix) {
+			rel = rel[len(prefix):]
+		} else if rel == root {
+			rel = "."
+		}
+		rel = repeatedSlashes.ReplaceAllString(rel, "/")
+		rel = dotComponent.ReplaceAllString(rel, "/")
+		rel = strings.TrimPrefix(rel, "./")
+		rel = strings.TrimSuffix(rel, "/")
+		if tracked[rel] {
+			kept = append(kept, p)
+		}
+	}
+	return kept
 }

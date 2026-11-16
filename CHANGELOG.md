@@ -29,9 +29,11 @@ All notable changes to rebar. Versioned with [semver](https://semver.org/).
   6.1 s (the script ran one `git grep` per contract). check-ground-truth
   computes the `metric.<key>.*` DSL as the script's `find` does (depths,
   pruning, symlinks not followed, `contains`, `distinct`) and compares
-  METRICS the same way, colours, `--print` and the tier gate included, and
-  knows rc.3's `metrics_strict` (env `REBAR_METRICS_STRICT`: a missing METRICS
-  or a key missing from it fails). The expected outputs live as golden files
+  METRICS the same way, `--print` and the tier gate included, with rc.3's
+  `metrics_strict` (env `REBAR_METRICS_STRICT`), `metric.<key>.tracked` (git
+  tracked files and the directories holding one) and colour only on a
+  terminal without `NO_COLOR` (`checks.UseColour`, shared by the native
+  checks that colour). The expected outputs live as golden files
   in `cli/cmd/testdata/`, so the coverage outlives the scripts. Platform
   quirks are settled one way: a status right after its colon
   (`Status:stable`) keeps its first letter (BSD sed read `\s` as `s`), and a

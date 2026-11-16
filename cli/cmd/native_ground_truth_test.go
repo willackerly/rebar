@@ -139,26 +139,69 @@ metricXodd.names = *.md
 		args:  []string{"--print"},
 	},
 	{
-		name:    "metrics_strict: a key missing from METRICS fails",
-		files:   gtCase(gtRC+"metrics_strict = true\n", "test_files = 2\n", nil),
-		pending: "metrics_strict",
+		name:  "metrics_strict: a key missing from METRICS fails",
+		files: gtCase(gtRC+"metrics_strict = true\n", "test_files = 2\n", nil),
 	},
 	{
-		name:    "metrics_strict: a missing METRICS fails",
-		files:   gtCase(gtRC, "", nil),
-		env:     []string{"REBAR_METRICS_STRICT=yes"},
-		pending: "metrics_strict",
+		name:  "metrics_strict: a missing METRICS fails",
+		files: gtCase(gtRC, "", nil),
+		env:   []string{"REBAR_METRICS_STRICT=yes"},
 	},
 	{
-		name:    "metrics_strict: every key present passes",
-		files:   gtCase(gtRC+"metrics_strict = on\n", gtMetrics, nil),
-		pending: "metrics_strict",
+		name:  "metrics_strict: every key present passes",
+		files: gtCase(gtRC+"metrics_strict = on\n", gtMetrics, nil),
 	},
 	{
-		name:    "metrics_strict off by env",
-		files:   gtCase(gtRC+"metrics_strict = true\n", "test_files = 2\n", nil),
-		env:     []string{"REBAR_METRICS_STRICT=false"},
-		pending: "metrics_strict",
+		name:  "metrics_strict off by env",
+		files: gtCase(gtRC+"metrics_strict = true\n", "test_files = 2\n", nil),
+		env:   []string{"REBAR_METRICS_STRICT=false"},
+	},
+	{
+		name: "tracked: git-tracked files and dirs only",
+		files: gtCase(`metric.all_sh.paths = ops
+metric.all_sh.names = *.sh
+metric.tracked_sh.paths = ./ops/
+metric.tracked_sh.names = *.sh
+metric.tracked_sh.tracked = true
+metric.tracked_dirs.type = dirs
+metric.tracked_dirs.paths = ops
+metric.tracked_dirs.min_depth = 1
+metric.tracked_dirs.tracked = yes
+metric.tracked_root.type = dirs
+metric.tracked_root.paths = . ops
+metric.tracked_root.max_depth = 0
+metric.tracked_root.tracked = on
+metric.tracked_marked.paths = ops
+metric.tracked_marked.contains = MARK
+metric.tracked_marked.tracked = 1
+metric.tracked_names.paths = ops
+metric.tracked_names.names = *.sh
+metric.tracked_names.distinct = ^(.*)$
+metric.tracked_names.tracked = true
+metric.not_tracked.paths = ops
+metric.not_tracked.tracked = false
+`, "", map[string]string{
+			"ops/kept/a.sh":   "MARK\n",
+			"ops/b.sh":        "",
+			"ops/.gitignore":  "local/\n",
+			"ops/dup/b.sh":    "",
+			"ops/emptydir/.x": "",
+		}),
+		untracked: map[string]string{
+			"ops/local/ignored.sh": "",
+			"ops/untracked.sh":     "MARK\n",
+			"ops/newdir/n.sh":      "",
+		},
+		git:  true,
+		args: []string{"--print"},
+	},
+	{
+		name: "tracked outside git counts everything, with a note",
+		files: gtCase(`metric.tracked_sh.paths = ops
+metric.tracked_sh.tracked = true
+metric.tracked_none.paths = nowhere
+metric.tracked_none.tracked = true
+`, "tracked_sh = 2\n", map[string]string{"ops/a.sh": "", "ops/b.sh": ""}),
 	},
 }
 

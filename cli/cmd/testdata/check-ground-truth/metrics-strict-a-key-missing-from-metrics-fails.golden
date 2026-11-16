@@ -1,13 +1,13 @@
 === Ground Truth Verification ===
 
-[0;32mOK[0m:    test_files = 2
-[0;31mMISSING[0m: sdks = 2  (not in METRICS file; metrics_strict = true)
-[0;31mMISSING[0m: agents = 2  (not in METRICS file; metrics_strict = true)
-[0;31mMISSING[0m: contract_files = 3  (not in METRICS file; metrics_strict = true)
-[0;31mMISSING[0m: contract_ids = 2  (not in METRICS file; metrics_strict = true)
-[0;31mMISSING[0m: headed = 1  (not in METRICS file; metrics_strict = true)
-[0;31mMISSING[0m: go_all = 3  (not in METRICS file; metrics_strict = true)
-[0;31mMISSING[0m: nothing = 0  (not in METRICS file; metrics_strict = true)
+OK:    test_files = 2
+MISSING: sdks = 2  (not in METRICS file; metrics_strict = true)
+MISSING: agents = 2  (not in METRICS file; metrics_strict = true)
+MISSING: contract_files = 3  (not in METRICS file; metrics_strict = true)
+MISSING: contract_ids = 2  (not in METRICS file; metrics_strict = true)
+MISSING: headed = 1  (not in METRICS file; metrics_strict = true)
+MISSING: go_all = 3  (not in METRICS file; metrics_strict = true)
+MISSING: nothing = 0  (not in METRICS file; metrics_strict = true)
 
-[0;31mMetric drift detected — update METRICS to match reality[0m
+Metric drift detected — update METRICS to match reality
 --- exit 1 ---

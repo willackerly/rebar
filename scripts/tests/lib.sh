@@ -15,6 +15,9 @@
 #                         way `rebar check` does (REBAR_PROJECT_ROOT); stderr is merged
 #   run_from CWD DIR SCRIPT [ARGS...]
 #                         run_in, started in CWD instead of DIR
+#   native_env            under REBAR_TEST_NATIVE_BIN, export the hand-off variables
+#                         run_in sets (call it in a subshell before running a script
+#                         directly, e.g. under run_tty)
 #   run_tty CMD [ARGS...] run CMD with stdout on a pseudo-terminal (script(1), BSD or
 #                         util-linux); returns 77 when no script(1) is available
 #   doc_snippet FILE MARKER
@@ -70,14 +73,14 @@ run_in() {
 run_from() {
   local cwd="$1" dir="$2" script="$3"
   shift 3
-  if [ -n "${REBAR_TEST_NATIVE_BIN:-}" ]; then
-    ( cd "$cwd" && REBAR_PROJECT_ROOT="$dir" REBAR_BIN="$REBAR_TEST_NATIVE_BIN" \
-      REBAR_NATIVE_CHECKS="$("$REBAR_TEST_NATIVE_BIN" native | tr '\n' ' ')" \
-      REBAR_NATIVE_SCRIPTS="$(cd "$REBAR_SCRIPTS" && pwd -P)" \
-      "$REBAR_SCRIPTS/$script" "$@" ) 2>&1
-    return
-  fi
-  ( cd "$cwd" && REBAR_PROJECT_ROOT="$dir" "$REBAR_SCRIPTS/$script" "$@" ) 2>&1
+  ( native_env && cd "$cwd" && REBAR_PROJECT_ROOT="$dir" "$REBAR_SCRIPTS/$script" "$@" ) 2>&1
+}
+native_env() {
+  [ -n "${REBAR_TEST_NATIVE_BIN:-}" ] || return 0
+  REBAR_BIN="$REBAR_TEST_NATIVE_BIN"
+  REBAR_NATIVE_CHECKS="$("$REBAR_TEST_NATIVE_BIN" native | tr '\n' ' ')"
+  REBAR_NATIVE_SCRIPTS="$(cd "$REBAR_SCRIPTS" && pwd -P)"
+  export REBAR_BIN REBAR_NATIVE_CHECKS REBAR_NATIVE_SCRIPTS
 }
 
 doc_snippet() {

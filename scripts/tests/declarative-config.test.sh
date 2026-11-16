@@ -117,7 +117,7 @@ metric.tracked_names.names    = *.sh
 metric.tracked_names.distinct = ^(.*)$
 metric.tracked_names.tracked  = true
 RC
-out="$( cd / && REBAR_RCFILE="$TMP/tracked.rc" REBAR_PROJECT_ROOT="$P" "$SRC/check-ground-truth.sh" --print 2>&1 )"
+out="$( native_env; cd / && REBAR_RCFILE="$TMP/tracked.rc" REBAR_PROJECT_ROOT="$P" "$SRC/check-ground-truth.sh" --print 2>&1 )"
 want='all_sh=4
 tracked_sh=2
 tracked_dirs=1
@@ -126,7 +126,7 @@ tracked_names=2'
 [ "$out" = "$want" ] || { echo "$out"; fail "T1b: tracked counts"; }
 NG="$TMP/nogit"
 mkdir -p "$NG" && cp -R "$P/ops" "$NG/ops"
-out="$( cd / && REBAR_RCFILE="$TMP/tracked.rc" REBAR_PROJECT_ROOT="$NG" "$SRC/check-ground-truth.sh" --print 2>"$TMP/err" )"
+out="$( native_env; cd / && REBAR_RCFILE="$TMP/tracked.rc" REBAR_PROJECT_ROOT="$NG" "$SRC/check-ground-truth.sh" --print 2>"$TMP/err" )"
 printf '%s\n' "$out" | grep -qx 'tracked_sh=4' || { echo "$out"; fail "T1b: outside git, tracked should count every file"; }
 grep -q 'not a git work tree' "$TMP/err" || { cat "$TMP/err"; fail "T1b: no note outside git"; }
 ( cd "$P" && g rm -rq ops && g commit -q -m "drop ops" ) || fail "T1b: cleanup"
@@ -227,13 +227,13 @@ ok "T6: --print ignores tier and METRICS; REBAR_RCFILE replaces .rebarrc"
 ESC=$(printf '\033')
 out="$(gt)"
 case "$out" in *"$ESC"*) fail "T7: colour codes in piped output" ;; esac
-tty_out="$(cd / && REBAR_PROJECT_ROOT="$P" run_tty "$SRC/check-ground-truth.sh" 2>&1)"
+tty_out="$(native_env; cd / && REBAR_PROJECT_ROOT="$P" run_tty "$SRC/check-ground-truth.sh" 2>&1)"
 rc=$?
 if [ "$rc" -eq 77 ]; then
   ok "T7: piped output has no colour (no script(1) for the terminal case)"
 else
   case "$tty_out" in *"$ESC["*) ;; *) echo "$tty_out"; fail "T7: no colour on a terminal" ;; esac
-  tty_out="$(cd / && NO_COLOR=1 REBAR_PROJECT_ROOT="$P" run_tty "$SRC/check-ground-truth.sh" 2>&1)"
+  tty_out="$(native_env; cd / && NO_COLOR=1 REBAR_PROJECT_ROOT="$P" run_tty "$SRC/check-ground-truth.sh" 2>&1)"
   case "$tty_out" in *"$ESC["*) echo "$tty_out"; fail "T7: colour despite NO_COLOR" ;; esac
   ok "T7: colour on a terminal only, and not with NO_COLOR"
 fi

@@ -2,5 +2,5 @@
 
 No metrics declared. Add metric.<key>.* lines to .rebarrc (see this script's header).
 
-[0;32mAll documented metrics match codebase reality[0m
+All documented metrics match codebase reality
 --- exit 0 ---

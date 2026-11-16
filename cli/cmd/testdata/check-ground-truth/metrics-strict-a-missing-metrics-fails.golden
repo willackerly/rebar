@@ -1,8 +1,8 @@
 === Ground Truth Verification ===
 
-[0;31mFAIL[0m: No METRICS file found (metrics_strict = true)
+FAIL: No METRICS file found (metrics_strict = true)
   Create a METRICS file with key = value pairs and declare how
   to compute each one as metric.<key>.* lines in .rebarrc.
 
-[0;31mMetric drift detected — update METRICS to match reality[0m
+Metric drift detected — update METRICS to match reality
 --- exit 1 ---
