@@ -5,3 +5,5 @@ package checks
 // isTerminal: without a terminal ioctl to ask, nothing is a terminal, so
 // checks print no colour codes.
 func isTerminal(uintptr) bool { return false }
+
+func terminalWidth(uintptr) int { return 0 }

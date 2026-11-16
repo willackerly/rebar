@@ -20,3 +20,13 @@ func IsTerminal(w io.Writer) bool {
 	f, ok := w.(*os.File)
 	return ok && isTerminal(f.Fd())
 }
+
+// TerminalWidth is the column count of the terminal w is open on (the
+// TIOCGWINSZ ioctl), 0 when w is not a terminal or does not say.
+func TerminalWidth(w io.Writer) int {
+	f, ok := w.(*os.File)
+	if !ok {
+		return 0
+	}
+	return terminalWidth(f.Fd())
+}
