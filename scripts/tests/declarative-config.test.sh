@@ -7,8 +7,9 @@
 #       contains, distinct, missing path
 #   T1b metric tracked = true: only git-tracked files / dirs (all outside git)
 #   T2  METRICS exact and >= floor pass; drift and a broken floor fail
-#   T2b metrics_strict (.rebarrc or REBAR_METRICS_STRICT): a missing METRICS
-#       and a computed key missing from it fail; by default both pass
+#   T2b metrics_strict (.rebarrc or REBAR_METRICS_STRICT): a missing METRICS,
+#       a computed key missing from it, and no metric declarations fail (the
+#       first two not reported as drift); by default all three pass
 #   T3  registry_scope_prefixes / registry_purpose_heading / _style
 #   T4  source_dirs / source_extensions reach check-todos
 #   T5  a project copy of a check still runs, with a deprecation notice;
@@ -159,12 +160,23 @@ out="$(gt)" || { echo "$out"; fail "T2b: strict with every key in METRICS should
 rm "$P/METRICS"
 out="$(gt)" && { echo "$out"; fail "T2b: strict, a missing METRICS should fail"; }
 printf '%s\n' "$out" | grep -q 'FAIL.*No METRICS file' || { echo "$out"; fail "T2b: missing METRICS not reported"; }
+printf '%s\n' "$out" | grep -q 'drift' && { echo "$out"; fail "T2b: a missing METRICS is not drift"; }
+printf '%s\n' "$out" | grep -q 'Ground truth not verified' || { echo "$out"; fail "T2b: missing METRICS summary"; }
 cp "$TMP/rc.bak" "$P/.rebarrc"
 out="$(gt)" || { echo "$out"; fail "T2b: a missing METRICS should pass by default"; }
 printf '%s\n' "$out" | grep -q 'SKIP.*No METRICS file' || { echo "$out"; fail "T2b: SKIP not reported"; }
 out="$(REBAR_METRICS_STRICT=false gt)" || fail "T2b: REBAR_METRICS_STRICT=false should not be strict"
 printf "$FULL" > "$P/METRICS"
-ok "T2b: metrics_strict fails a missing METRICS and keys missing from it"
+# No metric.* lines at all: passes by default, fails strict (not as drift).
+printf 'tier = 3\n' > "$TMP/nometrics.rc"
+gtrc() { ( native_env; cd / && REBAR_RCFILE="$TMP/nometrics.rc" REBAR_PROJECT_ROOT="$P" "$SRC/check-ground-truth.sh" ) 2>&1; }
+out="$(gtrc)" || { echo "$out"; fail "T2b: no metric declarations should pass by default"; }
+printf '%s\n' "$out" | grep -q 'No metrics declared' || { echo "$out"; fail "T2b: no-declarations note missing"; }
+printf 'metrics_strict = true\n' >> "$TMP/nometrics.rc"
+out="$(gtrc)" && { echo "$out"; fail "T2b: strict, no metric declarations should fail"; }
+printf '%s\n' "$out" | grep -q 'FAIL.*No metrics declared' || { echo "$out"; fail "T2b: strict no-declarations FAIL not reported"; }
+printf '%s\n' "$out" | grep -q 'drift' && { echo "$out"; fail "T2b: no declarations is not drift"; }
+ok "T2b: metrics_strict fails a missing METRICS, keys missing from it, and no declarations"
 
 # T3 — registry classification and purpose rendering come from .rebarrc.
 reg() { run_from / "$P" compute-registry.sh --stdout; }

@@ -64,7 +64,7 @@ REBAR_TIER=1
 # min_depth, max_depth, contains (ERE on content), distinct (ERE, one group),
 # tracked (true: only files git tracks).
 # METRICS then holds `key = N` (exact) or `key >= N` (floor).
-# metrics_strict = true     # fail on a missing METRICS or a key missing from it
+# metrics_strict = true     # fail on a missing METRICS, a key missing from it, or no metric.* lines
 # metric.test_files.paths        = src tests
 # metric.test_files.names        = *_test.go *.test.ts
 # metric.test_files.exclude_dirs = node_modules vendor dist
