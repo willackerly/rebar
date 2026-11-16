@@ -17,7 +17,9 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 	"testing"
+	"time"
 
 	"github.com/willackerly/rebar/cli/internal/testutil"
 )
@@ -196,13 +198,24 @@ func changes(before, after map[string]string) string {
 // stderr and exit code.
 func runSplit(t *testing.T, dir string, env []string, stdin, name string, args ...string) (string, string, int) {
 	t.Helper()
-	cmd := exec.Command(name, args...)
-	cmd.Dir = dir
-	cmd.Env = env
-	cmd.Stdin = strings.NewReader(stdin)
 	var stdout, stderr bytes.Buffer
-	cmd.Stdout, cmd.Stderr = &stdout, &stderr
-	err := cmd.Run()
+	var err error
+	for try := 0; ; try++ {
+		cmd := exec.Command(name, args...)
+		cmd.Dir = dir
+		cmd.Env = env
+		cmd.Stdin = strings.NewReader(stdin)
+		stdout.Reset()
+		stderr.Reset()
+		cmd.Stdout, cmd.Stderr = &stdout, &stderr
+		err = cmd.Run()
+		// Linux: a script just written may still be open for writing in a
+		// child another parallel test is forking (golang/go#22315).
+		if !errors.Is(err, syscall.ETXTBSY) || try == 50 {
+			break
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
 	code := 0
 	if err != nil {
 		var ee *exec.ExitError
