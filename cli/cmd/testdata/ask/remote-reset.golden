@@ -1,0 +1,12 @@
+--- stdout ---
+Session cleared for architect (was: abc)
+--- stderr ---
+--- changes ---
+--- made home/.config/ ---
+--- made home/.config/ask/ ---
+--- wrote home/.config/ask/.rr-index ---
+0
+--- requests ---
+server1 POST /v1/reset/web/architect auth="" type="application/json"
+
+--- exit 0 ---

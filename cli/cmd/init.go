@@ -3,6 +3,8 @@ package cmd
 import (
 	"crypto/rand"
 	"fmt"
+	"github.com/willackerly/rebar/cli/internal/ask"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -460,48 +462,18 @@ func mcpServerPathFrom(exe string) string {
 	return ""
 }
 
-// findAskBin locates the ask CLI executable using the same lookup chain
-// as findMCPServerPath. Returns empty string if not found.
-func findAskBin() string {
-	if exe, err := os.Executable(); err == nil {
-		candidate := filepath.Join(filepath.Dir(exe), "ask")
-		if _, err := os.Stat(candidate); err == nil {
-			return candidate
-		}
-	}
-	if rebarRoot := findRebarRoot(); rebarRoot != "" {
-		candidate := filepath.Join(rebarRoot, "bin", "ask")
-		if _, err := os.Stat(candidate); err == nil {
-			return candidate
-		}
-	}
-	if p, err := exec.LookPath("ask"); err == nil {
-		return p
-	}
-	return ""
-}
-
-// ensureAgentsScaffolding runs `ask init` in the project root to populate
-// agents/<role>/AGENT.md skeletons. Without this step, a fresh `rebar new`
-// or `rebar adopt` produces a project with .mcp.json wired but zero ASK
-// agents — and `ask architect` will fail with "no agents directory."
-// Skipped silently when agents/ already exists or `ask` can't be located.
+// ensureAgentsScaffolding runs `ask init` (rebar's native ASK) in the
+// project root to populate agents/<role>/AGENT.md skeletons. Without this
+// step, a fresh `rebar new` or `rebar adopt` produces a project with
+// .mcp.json wired but zero ASK agents — and `ask architect` will fail with
+// "no agents directory." Skipped silently when agents/ already exists.
 func ensureAgentsScaffolding(root string) bool {
 	if _, err := os.Stat(filepath.Join(root, "agents")); err == nil {
 		return false
 	}
-
-	askBin := findAskBin()
-	if askBin == "" {
-		fmt.Println("  Skipped agents/ — ask CLI not found; run `ask init` from the project to create role agents")
-		return false
-	}
-
-	cmd := exec.Command(askBin, "init")
-	cmd.Dir = root
 	// Suppress ask init's verbose output — surface a single tidy line instead.
-	if _, err := cmd.CombinedOutput(); err != nil {
-		fmt.Printf("  ⚠ ask init failed: %v — run `ask init` manually from the project\n", err)
+	if code := ask.RunIn(root, []string{"init"}, io.Discard, io.Discard); code != 0 {
+		fmt.Printf("  ⚠ ask init failed (exit %d) — run `ask init` manually from the project\n", code)
 		return false
 	}
 	fmt.Println("  Created agents/ (architect, product, englead, steward, merger, featurerequest)")

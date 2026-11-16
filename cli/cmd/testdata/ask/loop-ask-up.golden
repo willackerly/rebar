@@ -1,0 +1,120 @@
+--- exit 0 ---
+--- stdout ---
+[architect] online, watching ./agents/architect/inbox (pid $PID)
+[architect] processing (q1): Which DB?
+[architect] answered: q1
+[architect] processing (q2): And the cache?
+[architect] answered: q2
+[architect] offline
+[architect] offline
+--- stderr ---
+--- claude ---
+=== claude call 1 (cwd: $BASE/proj)
+[--print]
+[--model]
+[sonnet]
+[You are the architect agent.
+
+Your role and context:
+# Agent: Architect
+
+## Role
+You are the architect agent for Demo. You own system
+design, contracts, and technical architecture.
+
+## Responsibilities
+- Answer questions about system architecture
+- Evaluate trade-offs
+
+--- Current Memory ---
+Remembered: the calc module is pure.
+
+Question from englead: Which DB?
+
+Respond as JSON with these fields:
+{
+  "answer": "your concise answer",
+  "rationale": "your reasoning",
+  "refs": ["relevant/file.md"]
+}
+
+Rules:
+- answer should be direct and concise
+- rationale explains your reasoning briefly
+- refs lists relevant files (empty array if none)
+- respond ONLY with the JSON object, no other text]
+--- stdin:
+=== claude call 2 (cwd: $BASE/proj)
+[--print]
+[--model]
+[sonnet]
+[You are the architect agent.
+
+Your role and context:
+# Agent: Architect
+
+## Role
+You are the architect agent for Demo. You own system
+design, contracts, and technical architecture.
+
+## Responsibilities
+- Answer questions about system architecture
+- Evaluate trade-offs
+
+--- Current Memory ---
+Remembered: the calc module is pure.
+
+Question from unknown: And the cache?
+
+Respond as JSON with these fields:
+{
+  "answer": "your concise answer",
+  "rationale": "your reasoning",
+  "refs": ["relevant/file.md"]
+}
+
+Rules:
+- answer should be direct and concise
+- rationale explains your reasoning briefly
+- refs lists relevant files (empty array if none)
+- respond ONLY with the JSON object, no other text]
+--- stdin:
+--- changes ---
+--- made home/.config/ ---
+--- made home/.config/ask/ ---
+--- wrote home/.config/ask/projects ---
+proj = $BASE/proj
+--- removed proj/agents/architect/inbox/q1.json ---
+--- removed proj/agents/architect/inbox/q2.json ---
+--- wrote proj/agents/architect/memory.log.md ---
+---
+**<TS>** Q: Which DB?
+A: Postgres.
+---
+**<TS>** Q: And the cache?
+A: error
+--- made proj/agents/architect/outbox/ ---
+--- wrote proj/agents/architect/outbox/q1.json ---
+{"answer": "Postgres.", "rationale": "It is what we run.", "refs": ["docs/db.md"]}
+--- wrote proj/agents/architect/outbox/q2.json ---
+{"answer": "error", "rationale": "claude invocation failed", "refs": []}
+--- made proj/shared/ ---
+--- made proj/shared/messages/ ---
+--- wrote proj/shared/messages/events.jsonl ---
+{
+  "id": "q1",
+  "from": "architect",
+  "to": "englead",
+  "type": "answer",
+  "timestamp": "<TS>",
+  "body": "{\"answer\": \"Postgres.\", \"rationale\": \"It is what we run.\", \"refs\": [\"docs/db.md\"]}"
+}
+{
+  "id": "q2",
+  "from": "architect",
+  "to": "unknown",
+  "type": "answer",
+  "timestamp": "<TS>",
+  "body": "{\"answer\": \"error\", \"rationale\": \"claude invocation failed\", \"refs\": []}"
+}
+--- exit 0 ---

@@ -1,0 +1,55 @@
+--- stdout ---
+Compacting architect memory: 4 entries, 0KB...
+Compacted: 4 -> 2 entries, 0KB -> 0KB
+Summary written to: ./agents/architect/memory.md
+--- stderr ---
+--- claude ---
+=== claude call 1 (cwd: $BASE/proj)
+[--print]
+[--model]
+[sonnet]
+--- stdin:
+Summarize these agent interaction logs into a concise memory document.
+Preserve: key decisions, facts learned, important context, open questions, recurring patterns.
+Discard: routine Q&A, greetings, obvious/redundant information.
+Format: bullet points grouped by topic. Be concise but preserve critical details.
+
+LOGS TO SUMMARIZE:
+<!-- header -->
+---
+**<TS>** Q: question 1
+A: answer 1
+---
+**<TS>** Q: question 2
+A: answer 2
+--- changes ---
+--- made home/.config/ ---
+--- made home/.config/ask/ ---
+--- wrote home/.config/ask/projects ---
+proj = $BASE/proj
+--- wrote proj/agents/architect/memory.log.md ---
+<!-- Compacted at <TS>. Prior history summarized in memory.md -->
+---
+**<TS>** Q: question 3
+A: answer 3
+---
+**<TS>** Q: question 4
+A: answer 4
+--- wrote proj/agents/architect/memory.md ---
+# Agent Memory: architect
+
+<!-- Compacted at <TS>. Source: memory.log.md -->
+<!-- Older entries summarized, recent entries in memory.log.md -->
+
+## Compacted Memory (<TS>)
+
+<!-- header -->
+---
+**<TS>** Q: question 1
+A: answer 1
+---
+**<TS>** Q: question 2
+A: answer 2
+
+_[4 older entries truncated during compaction]_
+--- exit 0 ---

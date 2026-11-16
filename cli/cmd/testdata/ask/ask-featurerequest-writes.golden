@@ -1,0 +1,101 @@
+--- stdout ---
+Edited src/calc.go.
+--- stderr ---
+[ask] Auto-enabling write mode for write-capable role: featurerequest
+[ask] Direct invocation for agent 'featurerequest'
+[ask] Created new session <UUID>
+[ask] Invoking claude...
+[ask] Write mode enabled — agent can edit/create files
+[ask] Progress file: ./agents/featurerequest/.progress (use 'ask watch featurerequest' to follow)
+[ask] Session saved: <UUID>
+[ask] Context usage: 1% (limit: 70%)
+--- claude ---
+=== claude call 1 (cwd: $BASE/proj)
+[--print]
+[--model]
+[sonnet]
+[--session-id]
+[<UUID>]
+[--allowedTools]
+[Read Grep Glob Edit Write Bash]
+[--permission-mode]
+[acceptEdits]
+[--output-format]
+[stream-json]
+[--verbose]
+[You are the featurerequest agent.
+
+Your role and context:
+# FR
+
+Intake.
+
+You have full access to the project filesystem including write access.
+Use Read, Grep, and Glob to research. Use Edit and Write to modify or
+create files. Use Bash for shell commands (tests, builds, git).
+Do not guess — look it up, then act on it.
+
+Question: Please add X
+
+Respond in this exact format (plain text, no labels or prefixes):
+
+<one concise paragraph answering the question directly>
+
+<blank line>
+<1-3 sentences of reasoning — how you arrived at this answer>
+
+<blank line>
+- <relevant file path or document>
+- <another ref if applicable>
+
+Rules:
+- First paragraph is the answer — direct, no preamble, no label
+- Second block is reasoning — only if it adds value
+- Third block is file references — only list files that exist and matter
+- If you cannot answer, say so directly and explain why]
+--- stdin:
+--- changes ---
+--- made home/.config/ ---
+--- made home/.config/ask/ ---
+--- wrote home/.config/ask/projects ---
+proj = $BASE/proj
+--- wrote proj/agents/featurerequest/.last-stderr ---
+--- wrote proj/agents/featurerequest/.progress ---
+# ask featurerequest — <TS>
+# Q: Please add X
+# status: running
+---
+  ... Let me look at the code first, then edit it.
+[1] Read src/calc.go
+[2] Bash go test ./... -run 'TestCalculatorHandlesEveryOperatorWithoutPanicking' -coun...
+[3] Glob 
+---
+# status: done — <TS>
+--- wrote proj/agents/featurerequest/.session-id ---
+<UUID>
+--- made proj/agents/featurerequest/inbox/ ---
+--- wrote proj/agents/featurerequest/memory.log.md ---
+---
+**<TS>** Q: Please add X
+A: Edited src/calc.go.
+--- made proj/agents/featurerequest/outbox/ ---
+--- made proj/shared/ ---
+--- made proj/shared/messages/ ---
+--- wrote proj/shared/messages/events.jsonl ---
+{
+  "id": "<MSGID>",
+  "from": "human",
+  "to": "featurerequest",
+  "type": "question",
+  "timestamp": "<TS>",
+  "body": "Please add X"
+}
+{
+  "id": "<MSGID>",
+  "from": "featurerequest",
+  "to": "human",
+  "type": "answer",
+  "timestamp": "<TS>",
+  "body": "Edited src/calc.go."
+}
+--- exit 0 ---

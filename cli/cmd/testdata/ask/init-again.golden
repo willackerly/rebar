@@ -1,0 +1,124 @@
+--- stdout ---
+Initializing ASK Scoped Knowledge...
+
+Project: Demo Project
+
+Detected project files:
+  - `README.md`
+
+  exists: architect
+  exists: product
+  exists: englead
+  exists: steward
+  created: merger
+  created: featurerequest
+  added 8 entries to .gitignore
+
+Created agents: merger featurerequest
+
+Ready. Try:
+  ask who
+  ask architect "What is the architecture of this project?"
+--- stderr ---
+--- changes ---
+--- made home/.config/ ---
+--- made home/.config/ask/ ---
+--- wrote home/.config/ask/projects ---
+proj = $BASE/proj
+--- wrote proj/.gitignore ---
+node_modules/
+agents/*/inbox/
+# ASK runtime artifacts
+agents/*/outbox/
+agents/*/.pid
+agents/*/.last-stderr
+agents/*/.progress
+agents/*/.session-id
+agents/*/memory.log.md
+shared/messages/events.jsonl
+--- made proj/agents/architect/inbox/ ---
+--- made proj/agents/architect/outbox/ ---
+--- made proj/agents/englead/inbox/ ---
+--- made proj/agents/englead/outbox/ ---
+--- made proj/agents/featurerequest/ ---
+--- wrote proj/agents/featurerequest/AGENT.md ---
+# Agent: Featurerequest
+
+## Role
+You are the featurerequest agent for Demo Project.
+
+## Responsibilities
+- (define responsibilities for this role)
+
+## Project Files
+- `README.md`
+
+## Context Loading
+When answering questions, read relevant project files — do not guess
+from memory alone. Use Read, Grep, and Glob tools to look things up.
+
+Priority for this role: README.md
+
+General reading order:
+1. This file (AGENT.md) + memory.md (your distilled state)
+2. README.md (project orientation)
+3. QUICKCONTEXT.md (current state — verify against git log)
+4. Files relevant to the specific question
+
+## Permissions
+- Read: all project files
+- Write: (scope appropriate to role)
+- Ask: any agent
+--- made proj/agents/featurerequest/inbox/ ---
+--- wrote proj/agents/featurerequest/memory.log.md ---
+--- wrote proj/agents/featurerequest/memory.md ---
+--- made proj/agents/featurerequest/outbox/ ---
+--- made proj/agents/merger/ ---
+--- wrote proj/agents/merger/AGENT.md ---
+# Agent: Merger
+
+## Role
+You are the merger agent for Demo Project. You are a coordination
+specialist that handles branch integration, cherry-picking, and conflict
+resolution. You are an actor agent — you perform actions on the repository.
+
+## Responsibilities
+- Merge worktree branches into the target branch
+- Cherry-pick commits with conflict resolution
+- Produce detailed summaries of all merge decisions
+- Flag ambiguous conflicts for human review
+- Run verification tests after integration
+
+## Project Files
+- `README.md`
+
+## Context Loading
+When answering questions, read relevant project files — do not guess
+from memory alone. Use Read, Grep, and Glob tools to look things up.
+
+Priority for this role: agents/subagent-prompts/merge-coordinator.md, git log, AGENTS.md
+
+General reading order:
+1. This file (AGENT.md) + memory.md (your distilled state)
+2. README.md (project orientation)
+3. QUICKCONTEXT.md (current state — verify against git log)
+4. Files relevant to the specific question
+
+## Permissions
+- Read: all project files
+- Write: (scope appropriate to role)
+- Ask: any agent
+--- made proj/agents/merger/inbox/ ---
+--- wrote proj/agents/merger/memory.log.md ---
+--- wrote proj/agents/merger/memory.md ---
+--- made proj/agents/merger/outbox/ ---
+--- made proj/agents/product/inbox/ ---
+--- made proj/agents/product/outbox/ ---
+--- made proj/agents/steward/inbox/ ---
+--- made proj/agents/steward/outbox/ ---
+--- made proj/shared/ ---
+--- made proj/shared/artifacts/ ---
+--- made proj/shared/decisions/ ---
+--- made proj/shared/messages/ ---
+--- wrote proj/shared/messages/events.jsonl ---
+--- exit 0 ---

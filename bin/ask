@@ -41,6 +41,29 @@
 #   ASK_SERVER       Remote server host:port (enables remote mode for repo:agent queries)
 #   ASK_API_KEY      API key for remote server authentication
 
+# Hand-off (rebar 3.2): the rebar binary implements ASK natively
+# (`rebar ask`) and runs it in place of the bash below: the rebar beside
+# this script (through symlinks), else REBAR_BIN, else the one on PATH.
+# REBAR_CHECK_IMPL=shell keeps the bash until it is removed. The
+# REBAR_ASK_HANDOFF guard stops a loop with a rebar too old for native ASK,
+# whose `rebar ask` runs this script.
+if [ "${REBAR_CHECK_IMPL:-}" != "shell" ] && [ -z "${REBAR_ASK_HANDOFF:-}" ]; then
+  _ask_self="$0"
+  while [ -L "$_ask_self" ]; do
+    _ask_link="$(readlink "$_ask_self")"
+    case "$_ask_link" in
+      /*) _ask_self="$_ask_link" ;;
+      *) _ask_self="$(dirname "$_ask_self")/$_ask_link" ;;
+    esac
+  done
+  _ask_rebar="$(dirname "$_ask_self")/rebar"
+  [ -x "$_ask_rebar" ] || _ask_rebar="${REBAR_BIN:-}"
+  [ -n "$_ask_rebar" ] && [ -x "$_ask_rebar" ] || _ask_rebar="$(command -v rebar 2>/dev/null || true)"
+  if [ -n "$_ask_rebar" ]; then
+    REBAR_ASK_HANDOFF=1 exec "$_ask_rebar" ask "$@"
+  fi
+fi
+
 set -euo pipefail
 
 # Tracks rebar's version line. Bumped together when ASK changes

@@ -1,0 +1,5 @@
+--- stdout ---
+--- stderr ---
+ask: error: no project registry at $BASE/home/.config/ask/projects — run 'ask register <name>' in a project first
+--- changes ---
+--- exit 4 ---

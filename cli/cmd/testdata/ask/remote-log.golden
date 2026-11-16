@@ -1,0 +1,14 @@
+--- stdout ---
+---
+**<TS>** Q: hi
+A: hello
+--- stderr ---
+--- changes ---
+--- made home/.config/ ---
+--- made home/.config/ask/ ---
+--- wrote home/.config/ask/.rr-index ---
+0
+--- requests ---
+server1 GET /v1/log/web/architect auth="" type="application/json"
+
+--- exit 0 ---

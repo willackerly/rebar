@@ -1,0 +1,94 @@
+--- stdout ---
+r
+--- stderr ---
+[ask] Direct invocation for agent 'architect'
+[ask] Created new session <UUID>
+[ask:debug] session=<UUID> has_session=false
+[ask] Invoking claude...
+[ask:debug] claude --print --model sonnet --session-id <UUID> --output-format json <prompt> (attempt 1)
+[ask] Session saved: s1
+[ask:debug] tokens: unavailable
+[ask:debug] session_id returned: s1
+[ask] Context usage: unknown
+--- claude ---
+=== claude call 1 (cwd: $BASE/proj)
+[--print]
+[--model]
+[sonnet]
+[--session-id]
+[<UUID>]
+[--output-format]
+[json]
+[You are the architect agent.
+
+Your role and context:
+# Agent: Architect
+
+## Role
+You are the architect agent for Demo. You own system
+design, contracts, and technical architecture.
+
+## Responsibilities
+- Answer questions about system architecture
+- Evaluate trade-offs
+
+--- Current Memory ---
+Remembered: the calc module is pure.
+
+You have full access to the project filesystem. Use Read, Grep, and Glob
+tools to look up files, search code, and verify claims before answering.
+Do not guess — look it up.
+
+Question: q
+
+Respond in this exact format (plain text, no labels or prefixes):
+
+<one concise paragraph answering the question directly>
+
+<blank line>
+<1-3 sentences of reasoning — how you arrived at this answer>
+
+<blank line>
+- <relevant file path or document>
+- <another ref if applicable>
+
+Rules:
+- First paragraph is the answer — direct, no preamble, no label
+- Second block is reasoning — only if it adds value
+- Third block is file references — only list files that exist and matter
+- If you cannot answer, say so directly and explain why]
+--- stdin:
+--- changes ---
+--- made home/.config/ ---
+--- made home/.config/ask/ ---
+--- wrote home/.config/ask/projects ---
+proj = $BASE/proj
+--- wrote proj/agents/architect/.last-stderr ---
+--- wrote proj/agents/architect/.session-id ---
+s1
+--- made proj/agents/architect/inbox/ ---
+--- wrote proj/agents/architect/memory.log.md ---
+---
+**<TS>** Q: q
+A: r
+--- made proj/agents/architect/outbox/ ---
+--- made proj/shared/ ---
+--- made proj/shared/messages/ ---
+--- wrote proj/shared/messages/events.jsonl ---
+{
+  "id": "<MSGID>",
+  "from": "human",
+  "to": "architect",
+  "type": "question",
+  "timestamp": "<TS>",
+  "body": "q"
+}
+{
+  "id": "<MSGID>",
+  "from": "architect",
+  "to": "human",
+  "type": "answer",
+  "timestamp": "<TS>",
+  "body": "r"
+}
+--- exit 0 ---

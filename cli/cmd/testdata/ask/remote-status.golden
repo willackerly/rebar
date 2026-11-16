@@ -1,0 +1,16 @@
+--- stdout ---
+REPO: web
+ROLE: architect
+STATUS: running
+INBOX: 0 pending
+PID: 77
+--- stderr ---
+--- changes ---
+--- made home/.config/ ---
+--- made home/.config/ask/ ---
+--- wrote home/.config/ask/.rr-index ---
+0
+--- requests ---
+server1 GET /v1/status/web/architect auth="" type="application/json"
+
+--- exit 0 ---

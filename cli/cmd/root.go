@@ -78,6 +78,10 @@ var rootCmd = &cobra.Command{
 		if name == "help" || name == "version" || name == "native" {
 			return nil // native finds its own root (nativeRoot)
 		}
+		// ASK works in any directory, as bin/ask always did.
+		if (name == "ask" || name == "ask-agent-loop") && cmd.Parent() != nil && cmd.Parent().Name() == "rebar" {
+			return nil
+		}
 		// These commands handle their own repo root
 		if name == "init" || name == "new" || name == "audit" || name == "adopt" {
 			if cmd.Parent() != nil && cmd.Parent().Name() == "rebar" {

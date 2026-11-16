@@ -1,0 +1,20 @@
+--- stdout ---
+--- stderr ---
+ask: error: project 'nope' not found in registry
+Registered projects:
+
+  Registered Projects
+
+  Other          $BASE/other
+                 1 agents: architect
+  gone           $BASE/nowhere
+  proj           $BASE/proj
+                 7 agents: .hidden, Mixed, architect, englead, product, steward, tester
+
+--- changes ---
+--- wrote home/.config/ask/projects ---
+Other = $BASE/other
+gone = $BASE/nowhere
+# comment = x
+proj = $BASE/proj
+--- exit 2 ---

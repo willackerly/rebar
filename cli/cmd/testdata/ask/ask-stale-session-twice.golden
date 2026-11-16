@@ -1,0 +1,77 @@
+--- stdout ---
+--- stderr ---
+[architect] session expired, restarting fresh
+ask: error: claude invocation failed
+No conversation found with session ID: x
+--- claude ---
+=== claude call 1 (cwd: $BASE/proj)
+[--print]
+[--model]
+[sonnet]
+[--resume]
+[<UUID>]
+[--output-format]
+[json]
+[q
+
+Respond with a single concise paragraph — the answer itself, nothing else.]
+--- stdin:
+=== claude call 2 (cwd: $BASE/proj)
+[--print]
+[--model]
+[sonnet]
+[--session-id]
+[<UUID>]
+[--output-format]
+[json]
+[You are the architect agent.
+
+Your role and context:
+# Agent: Architect
+
+## Role
+You are the architect agent for Demo. You own system
+design, contracts, and technical architecture.
+
+## Responsibilities
+- Answer questions about system architecture
+- Evaluate trade-offs
+
+--- Current Memory ---
+Remembered: the calc module is pure.
+
+You have full access to the project filesystem. Use Read, Grep, and Glob
+tools to look up files, search code, and verify claims before answering.
+Do not guess — look it up.
+
+Question: q
+
+Rules:
+- Respond with a single concise paragraph — the answer itself, nothing else
+- No labels, no preamble, no "ANSWER:" prefix
+- No rationale or references unless the question explicitly asks for them
+- Be direct and specific]
+--- stdin:
+--- changes ---
+--- made home/.config/ ---
+--- made home/.config/ask/ ---
+--- wrote home/.config/ask/projects ---
+proj = $BASE/proj
+--- wrote proj/agents/architect/.last-stderr ---
+No conversation found with session ID: x
+--- wrote proj/agents/architect/.session-id ---
+<UUID>
+--- made proj/agents/architect/inbox/ ---
+--- made proj/agents/architect/outbox/ ---
+--- made proj/shared/ ---
+--- made proj/shared/messages/ ---
+--- wrote proj/shared/messages/events.jsonl ---
+{
+  "id": "<MSGID>",
+  "from": "human",
+  "to": "architect",
+  "type": "question",
+  "timestamp": "<TS>",
+  "body": "q"
+}
+--- exit 1 ---

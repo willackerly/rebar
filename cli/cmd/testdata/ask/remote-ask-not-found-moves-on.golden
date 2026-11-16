@@ -1,0 +1,24 @@
+--- stdout ---
+Remote answer from server2.
+--- stderr ---
+--- changes ---
+--- made home/.config/ ---
+--- made home/.config/ask/ ---
+--- wrote home/.config/ask/.rr-index ---
+1
+--- requests ---
+server1 POST /v1/ask auth="" type="application/json"
+{
+  "repo": "web",
+  "role": "elsewhere",
+  "question": "q",
+  "verbose": false
+}
+server2 POST /v1/ask auth="" type="application/json"
+{
+  "repo": "web",
+  "role": "elsewhere",
+  "question": "q",
+  "verbose": false
+}
+--- exit 0 ---

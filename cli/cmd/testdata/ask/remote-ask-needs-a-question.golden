@@ -1,0 +1,8 @@
+--- stdout ---
+--- stderr ---
+ask: error: question required for remote agent
+Usage: ask web:architect "<question>"
+--- changes ---
+--- requests ---
+
+--- exit 4 ---

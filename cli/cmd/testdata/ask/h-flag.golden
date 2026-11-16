@@ -1,0 +1,48 @@
+--- stdout ---
+ASK Scoped Knowledge — query an agent
+
+Usage:
+  ask <agent> "<question>"     Send a question, get a concise answer
+  ask -v <agent> "<question>"  Verbose: answer + rationale + refs
+  ask -w <agent> "<question>"  Write mode: agent can edit/create files
+  ask project:agent "question" Query an agent in another project
+  ask <agent>                    Run agent's default command (if configured)
+  ask <agent> <command> [args]   Run a named agent command
+  ask watch <agent>            Follow agent's incremental progress
+  ask up <agent>               Bring an agent online
+  ask who                      List available agents
+  ask status <agent>           Check agent health
+  ask log <agent>              View interaction history
+  ask peek <agent>             Inspect pending inbox messages
+  ask tail <agent>             Follow live event log
+  ask where <agent>            Resolve agent directory path
+  ask reset <agent>            Clear session (start fresh next question)
+  ask compact <agent>          Compact memory log (summarize old entries)
+  ask register [name]          Register current project (default: dir name)
+  ask projects                 List registered projects
+  ask init                     Initialize directory structure
+  ask help                     Show this help
+
+Enterprise (server mode):
+  ask serve [flags]            Start enterprise server (see ask serve --help)
+  ask agents                   List agents on remote server
+
+Exit codes:
+  0  Answer returned
+  1  Agent could not answer
+  2  Agent not available
+  3  Timeout
+  4  Internal error
+
+Environment variables:
+  ASK_AGENTS_DIR   Agents directory (default: ./agents)
+  ASK_SHARED_DIR   Shared directory (default: ./shared)
+  ASK_TIMEOUT      Timeout in seconds (default: 120)
+  ASK_CONTEXT_LIMIT  Auto-reset threshold, percent (default: 70)
+  ASK_VERBOSE      Set to 1 for debug output
+  ASK_WRITE        Set to 1 to enable write mode by default
+  ASK_SERVER       Remote server host:port (routes repo:agent queries over HTTP)
+  ASK_API_KEY      API key for remote server auth
+--- stderr ---
+--- changes ---
+--- exit 0 ---
