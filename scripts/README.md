@@ -49,6 +49,13 @@ Each script is standalone, runs in <5 seconds, and exits 0 (pass) or 1 (fail).
 | `pre-commit.sh` | Git hook — fast checks (TODOs + contract refs) |
 | `cold-start-checks.sh` | Session start (via the `SessionStart` hook in `.claude/settings.json`) — enforcement quad + maturity counts, always exits 0, `<rebar-cold-start>` wrapped |
 
+`rebar check`, `rebar check --pre-commit` and `rebar check --cold-start` run
+native (Go) versions of these three with the same order, output, `SKIP_*`
+variables and exit codes, plus the project's `checks_extra` /
+`checks_extra_pre_commit` ([docs/CONFIGURATION.md](../docs/CONFIGURATION.md));
+`REBAR_CHECK_IMPL=shell` runs the scripts. A project's own customized copy of
+a runner, or of a check a runner calls, still runs (with a deprecation notice).
+
 ## Session Utilities
 
 | Script | Notes |
@@ -96,6 +103,10 @@ variables:
 | `SKIP_BOOTSTRAP_SYNC` | `0` | Skip templates/scripts drift check (rebar-source-only) |
 | `SKIP_SCRIPT_TESTS` | `0` | Skip the shell regression tests, `scripts/tests/run.sh` (rebar-source-only) |
 | `SKIP_STEWARD` | `0` | Skip steward scan |
+| `SKIP_COMPLIANCE` | `0` | Skip rebar compliance check |
+| `SKIP_FIX_COMMIT` | `0` | Skip Gate G (HEAD's `fix:`/`regression:` needs `Reproduced on:`) |
+| `SKIP_BYPASS_FLAGS` | `0` | Skip Gate I (HEAD's bypass mentions need `Bypass tickets:`) |
+| `SKIP_CHECKS_EXTRA` | `0` | Skip the project's own `checks_extra` / `checks_extra_pre_commit` (native suites only) |
 
 ### Skipped directories (`.rebarrc`)
 

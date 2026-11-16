@@ -528,6 +528,10 @@ type parityCheck struct {
 	// source's scripts/): the script side runs the check's script from it,
 	// the native check gets it as its install (checks.Context.Install).
 	install func(t *testing.T, tc parityCase) string
+	// nativeOnly marks goldens of a native-only feature (checks_extra):
+	// runGolden writes them under -update-golden, there being no script to
+	// take them from.
+	nativeOnly bool
 }
 
 // runParity runs scripts/<check>.sh, the native check in process, and the

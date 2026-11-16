@@ -146,7 +146,7 @@ func runGolden(t *testing.T, check parityCheck, cases []parityCase) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			if *updateGolden {
+			if *updateGolden && !check.nativeOnly {
 				t.Skip("goldens are written by the parity test")
 			}
 			if _, err := os.Stat(goldenName(check.golden, tc.name)); err != nil && tc.pending != "" {

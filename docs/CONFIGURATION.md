@@ -40,6 +40,28 @@ tier = 1
 checks_enable = check-ground-truth check-contract-headers
 ```
 
+## Your own checks: `checks_extra`
+
+| Key | Env override | Default | Meaning |
+|-----|--------------|---------|---------|
+| `checks_extra` | `REBAR_CHECKS_EXTRA` | — | Your own check programs, run by `rebar check` after rebar's checks. Space-separated paths, relative to the project root or absolute. |
+| `checks_extra_pre_commit` | `REBAR_CHECKS_EXTRA_PRE_COMMIT` | — | The same for `rebar check --pre-commit`. List a check in both keys to run it in both suites. |
+
+```
+checks_extra = scripts/check-openapi.sh tools/check-licenses.py
+checks_extra_pre_commit = scripts/check-openapi.sh
+```
+
+Each entry is an executable file in any language. It runs in the project
+root with `REBAR_PROJECT_ROOT` set, after rebar's checks, and is listed in the
+summary by its file name without the extension (`PASS  extra: check-openapi`).
+A non-zero exit fails the suite like any check; a missing or non-executable
+file is a failure, not a skip. `SKIP_CHECKS_EXTRA=1` skips them all for one
+run. `rebar run check-openapi` runs one by that name (rebar's own scripts and
+checks keep their names). The suites built into the rebar binary run these;
+`REBAR_CHECK_IMPL=shell` and a project's own copy of `ci-check.sh` /
+`pre-commit.sh` do not (`rebar check` says so).
+
 ## Where things live
 
 | Key | Env override | Default | Used by |

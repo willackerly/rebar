@@ -18,6 +18,28 @@ All notable changes to rebar. Versioned with [semver](https://semver.org/).
 
 ## Unreleased
 
+- **The suites run natively: `rebar check` needs no bash for rebar's
+  checks.** `rebar check`, `rebar check --pre-commit` and `rebar check
+  --cold-start` (and `rebar commit`, `rebar push`, `rebar run ci-check`) run
+  Go versions of ci-check, pre-commit and cold-start-checks in process, with
+  the scripts' check order, output, `SKIP_*` variables, summary line, strict
+  semantics (`--strict` or no argument) and exit codes. Steward,
+  sync-bootstrap and `scripts/tests/run.sh` still run as scripts from the
+  install; a binary-only install lists them as "script not found". A
+  project's own customized `ci-check.sh` / `pre-commit.sh` still runs
+  instead, and so does a project's own copy of a check a suite calls, with
+  the deprecation notice; thin wrappers go native. `REBAR_CHECK_IMPL=shell`
+  runs the scripts. On rebar itself `rebar check` takes ~1.4 s instead of
+  ~18 s.
+- **`checks_extra` / `checks_extra_pre_commit`.** List your own check
+  programs (any language) in `.rebarrc`; `rebar check` (`--pre-commit`)
+  runs them after rebar's checks, in the project root with
+  `REBAR_PROJECT_ROOT` set, and counts them in the summary (`PASS  extra:
+  check-openapi`). A non-zero exit or a missing file fails the suite;
+  `SKIP_CHECKS_EXTRA=1` skips them; `rebar run <name>` runs one. Env
+  overrides `REBAR_CHECKS_EXTRA` / `REBAR_CHECKS_EXTRA_PRE_COMMIT`. Only the
+  built-in suites run them (`rebar check` warns when the shell suite or a
+  project copy runs instead). See docs/CONFIGURATION.md.
 - **check-doc-refs, check-decay-patterns and check-compliance run natively.**
   The `rebar` binary runs all three by default (`REBAR_CHECK_IMPL=shell`
   selects the scripts), with the same arguments, output and exit codes.

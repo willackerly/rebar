@@ -1,0 +1,98 @@
+Running contract and documentation checks...
+
+━━━ Contract Headers ━━━
+SKIP: tier 1 < required tier 2 (set REBAR_TIER or .rebarrc to change, or name it in checks_enable)
+
+━━━ Contract References ━━━
+
+Checked 0 contract references, 0 broken.
+
+━━━ Doc References ━━━
+check-doc-refs: OK — no broken markdown links to untracked files
+
+━━━ TODO Tracking ━━━
+OK: 0 untracked TODOs. 1 tracked tasks.
+
+━━━ Doc Freshness ━━━
+SKIP: tier 1 < required tier 2 (set REBAR_TIER or .rebarrc to change, or name it in checks_enable)
+
+━━━ Registry Consistency ━━━
+OK: Registry is current.
+
+━━━ JTBD Presence ━━━
+SKIP: tier 1 < required tier 2 (set REBAR_TIER or .rebarrc to change, or name it in checks_enable)
+
+━━━ Prefix Uniqueness ━━━
+SKIP: tier 1 < required tier 2 (set REBAR_TIER or .rebarrc to change, or name it in checks_enable)
+
+━━━ Ground Truth ━━━
+SKIP: tier 1 < required tier 3 (set REBAR_TIER or .rebarrc to change, or name it in checks_enable)
+
+━━━ Rebar Compliance ━━━
+=== Rebar compliance check ===
+
+OK: .rebar-version = v3.1.0
+OK: .rebarrc tier = 1 (PARTIAL)
+OK: README.md badge found on line 3
+    Version: v3.1.0 | Tier: 1 (PARTIAL)
+
+=== Contract maturity (declared Status:) ===
+OK: no contracts found — maturity weighting not applicable
+
+OK: Rebar compliance verified.
+
+━━━ Decay Patterns ━━━
+check-decay-patterns: no files to scan.
+
+━━━ Bootstrap Sync ━━━
+check-bootstrap-sync: SKIP — not in rebar source repo (no templates/project-bootstrap/)
+
+━━━ Script Tests ━━━
+SKIP: script tests run only in the rebar source repo
+
+━━━ Fix Commit Gate ━━━
+check-fix-commit: OK — Gate G satisfied (no fix:/regression: commits without Reproduced on:)
+
+━━━ Bypass Flags Gate ━━━
+check-bypass-flags: OK — Gate I satisfied (no bypass mentions without Bypass tickets:)
+
+━━━ extra: check-openapi ━━━
+openapi ok, in the project root: yes, args:0
+
+━━━ extra: check-licenses ━━━
+FAIL: GPL in vendor/x
+
+━━━ extra: plain ━━━
+plain ran under bash
+
+━━━ extra: lint ━━━
+awk lint ok
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SUMMARY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  PASS  Contract Headers
+  PASS  Contract References
+  PASS  Doc References
+  PASS  TODO Tracking
+  PASS  Doc Freshness
+  PASS  Registry Consistency
+  PASS  JTBD Presence
+  PASS  Prefix Uniqueness
+  PASS  Ground Truth
+  PASS  Rebar Compliance
+  PASS  Decay Patterns
+  PASS  Bootstrap Sync
+  PASS  Script Tests
+  PASS  Fix Commit Gate
+  PASS  Bypass Flags Gate
+  SKIP  Steward
+  PASS  extra: check-openapi
+  FAIL  extra: check-licenses
+  FAIL  extra: not-executable (tools/not-executable.sh not found or not executable)
+  FAIL  extra: missing (tools/missing.sh not found or not executable)
+  PASS  extra: plain
+  PASS  extra: lint
+
+  18 passed, 3 failed, 1 skipped
+--- exit 0 ---

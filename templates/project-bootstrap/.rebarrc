@@ -16,6 +16,13 @@ REBAR_TIER=1
 # and ignored. Env override: REBAR_CHECKS_ENABLE.
 # checks_enable = check-ground-truth check-contract-headers
 
+# Your own checks (any language, executable), run after rebar's by
+# `rebar check` (checks_extra) and `rebar check --pre-commit`
+# (checks_extra_pre_commit); listed in the summary as `extra: <name>`.
+# A non-zero exit, or a missing file, fails the suite.
+# checks_extra = scripts/check-openapi.sh
+# checks_extra_pre_commit = scripts/check-openapi.sh
+
 # ── Repo-specific settings ───────────────────────────────────────────────
 # rebar's checks run from the rebar install (`rebar check`); this file is
 # where a project tailors them. Everything below is optional and shown with
