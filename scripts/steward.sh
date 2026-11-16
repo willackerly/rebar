@@ -21,6 +21,8 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_ROOT="${REBAR_PROJECT_ROOT:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 # shellcheck source=scripts/_rebar-config.sh
 source "$SCRIPT_DIR/_rebar-config.sh" 2>/dev/null || true
+# Under `REBAR_CHECK_IMPL=go rebar check` (the default) the CLI's native steward runs instead.
+if type _rebar_native >/dev/null 2>&1; then _rebar_native steward "$@"; fi
 type _rebar_script >/dev/null 2>&1 || _rebar_script() { echo "$SCRIPT_DIR/$1"; }
 CONTRACTS_DIR=architecture
 type _rebar_contracts_dir >/dev/null 2>&1 && CONTRACTS_DIR=$(_rebar_contracts_dir)

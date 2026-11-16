@@ -50,6 +50,13 @@ check-fix-commit: OK — Gate G satisfied (no fix:/regression: commits without R
 ━━━ Bypass Flags Gate ━━━
 check-bypass-flags: OK — Gate I satisfied (no bypass mentions without Bypass tickets:)
 
+━━━ Steward ━━━
+Steward scan complete.
+  JSON:     $ROOT/architecture/.state/steward-report.json
+  Markdown: $ROOT/STEWARD_REPORT.md
+
+  0 contracts, 0 discoveries, 6/7 enforcement passing
+
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 SUMMARY
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -68,9 +75,9 @@ SUMMARY
   SKIP  Script Tests (script not found or not executable)
   PASS  Fix Commit Gate
   PASS  Bypass Flags Gate
-  SKIP  Steward (script not found or not executable)
+  PASS  Steward
 
-  12 passed, 1 failed, 3 skipped
+  13 passed, 1 failed, 2 skipped
 
 CI check failed. Fix the issues above or skip individual checks
 with environment variables (e.g., SKIP_FRESHNESS=1).

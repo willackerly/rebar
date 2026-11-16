@@ -1,0 +1,299 @@
+Steward: 4 contracts (1d/1a/1t/1ip), 6 discoveries, 4/7 enforcement passing
+--- wrote architecture/.state/S1-DRAFT.1.0.json ---
+{
+  "contract_id": "S1-DRAFT",
+  "version": "1.0",
+  "lifecycle": "draft",
+  "spec_gate": {
+    "has_interfaces": true,
+    "has_behavioral": false,
+    "has_errors": true,
+    "has_tests": false,
+    "has_implementing": false,
+    "completeness": "fail"
+  },
+  "impl_gate": {
+    "implementing_files": [],
+    "test_files": [],
+    "implementing_count": 0,
+    "test_count": 0
+  },
+  "discoveries": [
+    {
+      "type": "bug",
+      "description": "- **BUG** S1-DRAFT\r"
+    }
+  ]
+}
+--- wrote architecture/.state/S2-ACTIVE.2.1.json ---
+{
+  "contract_id": "S2-ACTIVE",
+  "version": "2.1",
+  "lifecycle": "active",
+  "spec_gate": {
+    "has_interfaces": true,
+    "has_behavioral": true,
+    "has_errors": true,
+    "has_tests": true,
+    "has_implementing": true,
+    "completeness": "pass"
+  },
+  "impl_gate": {
+    "implementing_files": [],
+    "test_files": [],
+    "implementing_count": 0,
+    "test_count": 0
+  },
+  "discoveries": [
+    {
+      "type": "discovery",
+      "description": "- **DISCOVERY** S2-ACTIVE caf� in Latin-1, ünïcode, del\u007f"
+    }
+  ]
+}
+--- wrote architecture/.state/S3-TEST.1.0.json ---
+{
+  "contract_id": "S3-TEST",
+  "version": "1.0",
+  "lifecycle": "testing",
+  "spec_gate": {
+    "has_interfaces": true,
+    "has_behavioral": true,
+    "has_errors": true,
+    "has_tests": true,
+    "has_implementing": true,
+    "completeness": "pass"
+  },
+  "impl_gate": {
+    "implementing_files": [
+      "$ROOT/src/test.go"
+    ],
+    "test_files": [],
+    "implementing_count": 1,
+    "test_count": 0
+  },
+  "discoveries": [
+    {
+      "type": "drift",
+      "description": "- **Drift** and **DISPUTE** S3-TEST: the first tag counts"
+    },
+    {
+      "type": "dispute",
+      "description": "- **DISPUTE** S3-TEST again"
+    }
+  ]
+}
+--- wrote architecture/.state/S4-DONE.1.0.json ---
+{
+  "contract_id": "S4-DONE",
+  "version": "1.0",
+  "lifecycle": "impl-present",
+  "spec_gate": {
+    "has_interfaces": true,
+    "has_behavioral": true,
+    "has_errors": true,
+    "has_tests": true,
+    "has_implementing": true,
+    "completeness": "pass"
+  },
+  "impl_gate": {
+    "implementing_files": [
+      "$ROOT/conf/done.yaml",
+      "$ROOT/src/a/done.go",
+      "$ROOT/src/done_test.go",
+      "$ROOT/src/prefix.go",
+      "$ROOT/src/z.go",
+      "$ROOT/web/done.spec.ts",
+      "$ROOT/web/done.test.js",
+      "$ROOT/web/done.tsx"
+    ],
+    "test_files": [
+      "$ROOT/src/done_test.go",
+      "$ROOT/web/done.spec.ts",
+      "$ROOT/web/done.test.js"
+    ],
+    "implementing_count": 8,
+    "test_count": 3
+  },
+  "discoveries": [
+    {
+      "type": "bug",
+      "description": "- **BUG** S4-DONE crashes"
+    },
+    {
+      "type": "discovery",
+      "description": "- **discovery** S4-DONE: a \"quoted\" \\path\twith a tab"
+    }
+  ]
+}
+--- wrote architecture/.state/steward-report.json ---
+{
+  "generated_at": "<generated-at>",
+  "summary": {
+    "contracts": {
+      "total": 4,
+      "draft": 1,
+      "active": 1,
+      "testing": 1,
+      "impl_present": 1
+    },
+    "open_discoveries": 6,
+    "enforcement": {
+      "passing": 4,
+      "total": 7
+    }
+  },
+  "contracts": [
+    {
+      "contract_id": "S1-DRAFT",
+      "version": "1.0",
+      "lifecycle": "draft",
+      "spec_gate": {
+        "has_interfaces": true,
+        "has_behavioral": false,
+        "has_errors": true,
+        "has_tests": false,
+        "has_implementing": false,
+        "completeness": "fail"
+      },
+      "impl_gate": {
+        "implementing_files": [],
+        "test_files": [],
+        "implementing_count": 0,
+        "test_count": 0
+      },
+      "discoveries": [
+        {
+          "type": "bug",
+          "description": "- **BUG** S1-DRAFT\r"
+        }
+      ]
+    },
+    {
+      "contract_id": "S2-ACTIVE",
+      "version": "2.1",
+      "lifecycle": "active",
+      "spec_gate": {
+        "has_interfaces": true,
+        "has_behavioral": true,
+        "has_errors": true,
+        "has_tests": true,
+        "has_implementing": true,
+        "completeness": "pass"
+      },
+      "impl_gate": {
+        "implementing_files": [],
+        "test_files": [],
+        "implementing_count": 0,
+        "test_count": 0
+      },
+      "discoveries": [
+        {
+          "type": "discovery",
+          "description": "- **DISCOVERY** S2-ACTIVE caf� in Latin-1, ünïcode, del\u007f"
+        }
+      ]
+    },
+    {
+      "contract_id": "S3-TEST",
+      "version": "1.0",
+      "lifecycle": "testing",
+      "spec_gate": {
+        "has_interfaces": true,
+        "has_behavioral": true,
+        "has_errors": true,
+        "has_tests": true,
+        "has_implementing": true,
+        "completeness": "pass"
+      },
+      "impl_gate": {
+        "implementing_files": [
+          "$ROOT/src/test.go"
+        ],
+        "test_files": [],
+        "implementing_count": 1,
+        "test_count": 0
+      },
+      "discoveries": [
+        {
+          "type": "drift",
+          "description": "- **Drift** and **DISPUTE** S3-TEST: the first tag counts"
+        },
+        {
+          "type": "dispute",
+          "description": "- **DISPUTE** S3-TEST again"
+        }
+      ]
+    },
+    {
+      "contract_id": "S4-DONE",
+      "version": "1.0",
+      "lifecycle": "impl-present",
+      "spec_gate": {
+        "has_interfaces": true,
+        "has_behavioral": true,
+        "has_errors": true,
+        "has_tests": true,
+        "has_implementing": true,
+        "completeness": "pass"
+      },
+      "impl_gate": {
+        "implementing_files": [
+          "$ROOT/conf/done.yaml",
+          "$ROOT/src/a/done.go",
+          "$ROOT/src/done_test.go",
+          "$ROOT/src/prefix.go",
+          "$ROOT/src/z.go",
+          "$ROOT/web/done.spec.ts",
+          "$ROOT/web/done.test.js",
+          "$ROOT/web/done.tsx"
+        ],
+        "test_files": [
+          "$ROOT/src/done_test.go",
+          "$ROOT/web/done.spec.ts",
+          "$ROOT/web/done.test.js"
+        ],
+        "implementing_count": 8,
+        "test_count": 3
+      },
+      "discoveries": [
+        {
+          "type": "bug",
+          "description": "- **BUG** S4-DONE crashes"
+        },
+        {
+          "type": "discovery",
+          "description": "- **discovery** S4-DONE: a \"quoted\" \\path\twith a tab"
+        }
+      ]
+    }
+  ],
+  "action_items": {
+    "architect": [
+      "S1-DRAFT is DRAFT — missing sections: Behavioral,Tests,Implementing Files",
+      "S3-TEST has 1 DISPUTE discovery(ies) — needs resolution"
+    ],
+    "englead": [
+      "S3-TEST is TESTING — needs test files for verification",
+      "3 enforcement check(s) failing"
+    ],
+    "product": [
+      "S2-ACTIVE has 1 DISCOVERY item(s) — needs triage",
+      "S4-DONE has 1 DISCOVERY item(s) — needs triage"
+    ],
+    "dev": [
+      "S2-ACTIVE is ACTIVE — needs implementing files",
+      "S3-TEST is TESTING — needs test files"
+    ]
+  },
+  "enforcement": {
+    "contract_headers": "pass",
+    "contract_refs": "fail",
+    "todo_tracking": "pass",
+    "doc_freshness": "pass",
+    "registry": "fail",
+    "ground_truth": "pass",
+    "compliance": "fail"
+  }
+}
+--- exit 0 ---

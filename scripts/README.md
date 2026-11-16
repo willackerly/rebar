@@ -55,6 +55,8 @@ variables and exit codes, plus the project's `checks_extra` /
 `checks_extra_pre_commit` ([docs/CONFIGURATION.md](../docs/CONFIGURATION.md));
 `REBAR_CHECK_IMPL=shell` runs the scripts. A project's own customized copy of
 a runner, or of a check a runner calls, still runs (with a deprecation notice).
+`steward.sh` has a native version too (`rebar run steward`, and the Steward
+step of `rebar check`): same arguments, output and report files, no jq needed.
 
 ## Session Utilities
 
@@ -163,7 +165,8 @@ Pre-commit (fast, <5s)       CI (thorough, <30s)          Full scan (comprehensi
 ## Dependencies
 
 - **bash 3.2+** — all shell scripts are bash 3.2 compatible (macOS default)
-- **jq** — required by steward.sh and ground truth verification
+- **jq** — required by the steward.sh script (the native steward that `rebar
+  run steward` and `rebar check` use needs none)
 - **grep, find** — standard Unix tools
 - **node** (optional) — only for `templates/scripts/check-tag-ci-coverage.mjs`,
   which is project-specific and not in the universal `ci-check.sh` flow

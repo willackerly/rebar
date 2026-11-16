@@ -751,6 +751,11 @@ func TestShellRegressionTestsAgainstNative(t *testing.T) {
 				if suiteNames[name] && !regexp.MustCompile(`run_(in|from) .*\b`+regexp.QuoteMeta(name)+`\.sh`).Match(data) {
 					continue
 				}
+				// So is "steward" (agents/steward): it counts when the
+				// test names its script.
+				if scriptNamedOnly[name] && !strings.Contains(string(data), name+".sh") {
+					continue
+				}
 				if !strings.Contains(string(logged), "native "+name) {
 					t.Errorf("%s never handed %s off to the native check; hand-offs:\n%s\noutput:\n%s", filepath.Base(test), name, logged, out)
 				}
@@ -764,6 +769,10 @@ func TestShellRegressionTestsAgainstNative(t *testing.T) {
 
 // suiteNames are the native suites (internal/suite).
 var suiteNames = map[string]bool{"ci-check": true, "pre-commit": true, "cold-start-checks": true}
+
+// scriptNamedOnly are native scripts whose names are common words in the
+// tests: a test must hand them off only where it names their script.
+var scriptNamedOnly = map[string]bool{"steward": true}
 
 func TestNativeFor(t *testing.T) {
 	install := resolvedScript{Path: "/install/scripts/check-todos.sh"}
@@ -779,7 +788,7 @@ func TestNativeFor(t *testing.T) {
 		{"go", "check-todos", install, true, true},
 		{"go", "check-todos.sh", resolvedScript{}, false, true}, // binary-only install
 		{"go", "check-todos", legacy, true, false},              // a legacy copy wins
-		{"go", "steward", install, true, false},                 // not ported
+		{"go", "sync-bootstrap", install, true, false},          // not ported
 	}
 	for _, tc := range cases {
 		t.Setenv("REBAR_CHECK_IMPL", tc.impl)

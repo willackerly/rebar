@@ -1,0 +1,97 @@
+$ROOT/architecture/.state/S4-DONE.1.0.json
+{
+  "contract_id": "S4-DONE",
+  "version": "0.9",
+  "n": [
+    1,
+    2.5,
+    {}
+  ],
+  "s": "aé /"
+}
+{
+  "contract_id": "S4-DONE",
+  "version": "1.0",
+  "lifecycle": "impl-present",
+  "spec_gate": {
+    "has_interfaces": true,
+    "has_behavioral": true,
+    "has_errors": true,
+    "has_tests": true,
+    "has_implementing": true,
+    "completeness": "pass"
+  },
+  "impl_gate": {
+    "implementing_files": [
+      "$ROOT/conf/done.yaml",
+      "$ROOT/src/a/done.go",
+      "$ROOT/src/done_test.go",
+      "$ROOT/src/prefix.go",
+      "$ROOT/src/z.go",
+      "$ROOT/web/done.spec.ts",
+      "$ROOT/web/done.test.js",
+      "$ROOT/web/done.tsx"
+    ],
+    "test_files": [
+      "$ROOT/src/done_test.go",
+      "$ROOT/web/done.spec.ts",
+      "$ROOT/web/done.test.js"
+    ],
+    "implementing_count": 8,
+    "test_count": 3
+  },
+  "discoveries": [
+    {
+      "type": "bug",
+      "description": "- **BUG** S4-DONE crashes"
+    },
+    {
+      "type": "discovery",
+      "description": "- **discovery** S4-DONE: a \"quoted\" \\path\twith a tab"
+    }
+  ]
+}
+--- wrote architecture/.state/S4-DONE.1.0.json ---
+{
+  "contract_id": "S4-DONE",
+  "version": "1.0",
+  "lifecycle": "impl-present",
+  "spec_gate": {
+    "has_interfaces": true,
+    "has_behavioral": true,
+    "has_errors": true,
+    "has_tests": true,
+    "has_implementing": true,
+    "completeness": "pass"
+  },
+  "impl_gate": {
+    "implementing_files": [
+      "$ROOT/conf/done.yaml",
+      "$ROOT/src/a/done.go",
+      "$ROOT/src/done_test.go",
+      "$ROOT/src/prefix.go",
+      "$ROOT/src/z.go",
+      "$ROOT/web/done.spec.ts",
+      "$ROOT/web/done.test.js",
+      "$ROOT/web/done.tsx"
+    ],
+    "test_files": [
+      "$ROOT/src/done_test.go",
+      "$ROOT/web/done.spec.ts",
+      "$ROOT/web/done.test.js"
+    ],
+    "implementing_count": 8,
+    "test_count": 3
+  },
+  "discoveries": [
+    {
+      "type": "bug",
+      "description": "- **BUG** S4-DONE crashes"
+    },
+    {
+      "type": "discovery",
+      "description": "- **discovery** S4-DONE: a \"quoted\" \\path\twith a tab"
+    }
+  ]
+}
+--- exit 0 ---

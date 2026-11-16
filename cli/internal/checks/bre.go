@@ -135,3 +135,7 @@ func breBracket(bre string, i int) (end int, class string, ok bool) {
 	}
 	return 0, "", false
 }
+
+// BRE is breRegexp for the native ports outside this package (steward's
+// `grep -n "$id"` and `grep -v "^$dir"`).
+func BRE(bre string) *regexp.Regexp { return breRegexp(bre) }

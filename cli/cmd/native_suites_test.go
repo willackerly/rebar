@@ -73,12 +73,12 @@ var suiteSkipAll = []string{
 	"SKIP_BYPASS_FLAGS=1", "SKIP_STEWARD=1",
 }
 
-// noSteward skips the steward scan (S5 ports it; it writes reports).
+// noSteward skips the steward scan, which writes reports.
 var noSteward = []string{"SKIP_STEWARD=1"}
 
 // partialInstall returns a copy of the rebar source's scripts/ without the
-// checks that have no native implementation (steward, sync-bootstrap,
-// tests/run.sh), standing in for a binary-only install with a few scripts.
+// checks that have no native implementation (sync-bootstrap, tests/run.sh),
+// standing in for a binary-only install with a few scripts.
 func partialInstall(t *testing.T, _ parityCase) string {
 	t.Helper()
 	src := filepath.Join(testutil.RebarSource(t), "scripts")
@@ -89,7 +89,7 @@ func partialInstall(t *testing.T, _ parityCase) string {
 	}
 	for _, p := range paths {
 		switch filepath.Base(p) {
-		case "steward.sh", "sync-bootstrap.sh":
+		case "sync-bootstrap.sh":
 			continue
 		}
 		body, err := os.ReadFile(p)
@@ -141,7 +141,18 @@ var ciCheckCases = []parityCase{
 		files: withFiles(suiteProject, map[string]string{".rebarrc": "tier = 1\nchecks_enable = check-nope check-ground-truth.sh\ncontract_namespace = S1-BAD.1.0\n"}),
 		git:   true, setup: committed, env: noSteward,
 	},
-	{name: "partial install: steward and sync-bootstrap missing", files: suiteProject, git: true, setup: committed},
+	{name: "partial install: sync-bootstrap missing", files: suiteProject, git: true, setup: committed},
+	// The first run writes the steward's reports, which the checks of the
+	// next run would see: the tree ignores them (as the contract has it) and
+	// has a STEWARD_REPORT.md from the start, which check-freshness counts.
+	{
+		name: "steward runs last",
+		files: withFiles(suiteContracts, map[string]string{
+			"STEWARD_REPORT.md": "<!-- freshness: {{ago:0}} -->\n",
+			".gitignore":        "STEWARD_REPORT.md\narchitecture/.state/\n",
+		}),
+		git: true, setup: committed,
+	},
 	{name: "REBAR_TIER overrides .rebarrc", files: suiteBroken, git: true, setup: committed, env: []string{"SKIP_STEWARD=1", "REBAR_TIER=1"}},
 }
 
@@ -266,8 +277,8 @@ func TestSuitesWithoutInstall(t *testing.T) {
 	for _, want := range []string{
 		"SKIP  Bootstrap Sync (script not found or not executable)",
 		"SKIP  Script Tests (script not found or not executable)",
-		"SKIP  Steward (script not found or not executable)",
-		"PASS  TODO Tracking", "13 passed, 0 failed, 3 skipped",
+		"PASS  Steward",
+		"PASS  TODO Tracking", "14 passed, 0 failed, 2 skipped",
 	} {
 		if code != 0 || !strings.Contains(out, want) {
 			t.Errorf("go, no install: rebar check (exit %d) lacks %q:\n%s", code, want, out)

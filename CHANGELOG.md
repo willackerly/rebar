@@ -18,6 +18,26 @@ All notable changes to rebar. Versioned with [semver](https://semver.org/).
 
 ## Unreleased
 
+- **steward runs natively.** `rebar run steward` and the Steward step of
+  `rebar check` run a Go port of `scripts/steward.sh`
+  (the S1-STEWARD 2.0 contract) with the same arguments (`--json`,
+  `--summary`, `--check <id>`, anything else a full scan), output, exit codes
+  and files, byte for byte as jq writes them: per-contract
+  `<contracts_dir>/.state/<id>.<version>.json`, `steward-report.json` and
+  `STEWARD_REPORT.md`. It runs the seven enforcement checks in process, or a
+  project's own copy of one (a copy that is not executable counts as
+  `skip`, as before). `REBAR_CHECK_IMPL=shell` runs the script, and the
+  install's `steward.sh` hands off to the binary like the other ported
+  scripts. It needs no jq. Where the script depended on the platform or
+  locale, the port picks one behaviour: files, lines and contracts sort in
+  byte order (the C locale; under a UTF-8 locale the script's `sort -u`
+  ordered `implementing_files` by locale collation of `path:line:text`); a
+  binary file holding a reference is not an implementation (BSD grep's
+  "Binary file … matches" line became an implementing file named that); a
+  directory named like a contract file is not a contract. Steward on rebar
+  takes 0.07 s instead of 6 s; on virtru-analyze (60 contracts) 6.6 s
+  instead of 48 s, most of it the project's own check copies, which still
+  run as bash.
 - **The suites run natively: `rebar check` needs no bash for rebar's
   checks.** `rebar check`, `rebar check --pre-commit` and `rebar check
   --cold-start` (and `rebar commit`, `rebar push`, `rebar run ci-check`) run

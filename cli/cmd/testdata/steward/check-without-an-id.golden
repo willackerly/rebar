@@ -1,0 +1,2 @@
+Usage: steward.sh --check <contract-id>
+--- exit 1 ---

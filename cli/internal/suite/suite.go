@@ -108,13 +108,18 @@ func (s script) run(ctx *checks.Context, args []string, withBash bool) int {
 // the CLI. A file the system cannot execute directly (no #! line) runs
 // with bash, as bash does with such a command.
 func runFile(ctx *checks.Context, path string, args []string, withBash bool) int {
+	return runFileIn(ctx, ctx.Root, path, args, withBash)
+}
+
+// runFileIn is runFile started in dir.
+func runFileIn(ctx *checks.Context, dir, path string, args []string, withBash bool) int {
 	name, argv := path, args
 	if withBash {
 		name, argv = "bash", append([]string{path}, args...)
 	}
-	code, err := start(ctx, name, argv)
+	code, err := start(ctx, dir, name, argv)
 	if err != nil && !withBash && errors.Is(err, syscall.ENOEXEC) {
-		code, err = start(ctx, "bash", append([]string{path}, args...))
+		code, err = start(ctx, dir, "bash", append([]string{path}, args...))
 	}
 	if err != nil {
 		fmt.Fprintf(ctx.Stderr, "%s: %v\n", path, err)
@@ -126,9 +131,9 @@ func runFile(ctx *checks.Context, path string, args []string, withBash bool) int
 	return code
 }
 
-func start(ctx *checks.Context, name string, args []string) (int, error) {
+func start(ctx *checks.Context, dir, name string, args []string) (int, error) {
 	cmd := exec.Command(name, args...)
-	cmd.Dir = ctx.Root
+	cmd.Dir = dir
 	cmd.Env = append(append(os.Environ(), "REBAR_PROJECT_ROOT="+ctx.Root), checks.ScriptEnv(ctx.Install)...)
 	cmd.Stdin = os.Stdin
 	cmd.Stdout, cmd.Stderr = ctx.Stdout, ctx.Stderr
@@ -144,6 +149,24 @@ func start(ctx *checks.Context, name string, args []string) (int, error) {
 		return 0, err
 	}
 	return 0, nil
+}
+
+// RunQuiet runs one of rebar's check scripts (name relative to scripts/,
+// e.g. check-todos.sh) with args as steward.sh's enforcement scan does:
+// resolved like _rebar_script without its notice (a project copy, else the
+// native check, else the install's script), in ctx's working directory
+// (steward does not change directory), output discarded. found is false,
+// and nothing runs, when there is no native check and no executable script.
+func RunQuiet(ctx *checks.Context, name string, args []string) (code int, found bool) {
+	s := resolve(ctx, name, true)
+	if !s.found() {
+		return 0, false
+	}
+	quiet := &checks.Context{Root: ctx.Root, Dir: ctx.WorkDir(), Install: ctx.Install, Stdout: io.Discard, Stderr: io.Discard}
+	if s.native != nil {
+		return s.native.Run(quiet, args), true
+	}
+	return runFileIn(quiet, quiet.Dir, s.path, args, false), true
 }
 
 // output runs s with stdout and stderr captured together and returns them

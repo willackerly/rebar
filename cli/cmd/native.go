@@ -9,6 +9,8 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/willackerly/rebar/cli/internal/checks"
 	"github.com/willackerly/rebar/cli/internal/config"
+	// Registers the native steward with the checks.
+	_ "github.com/willackerly/rebar/cli/internal/steward"
 )
 
 // nativeCmd runs a check's native (Go) implementation whatever
