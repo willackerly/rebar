@@ -42,6 +42,11 @@ var (
 	statusMarker  = regexp.MustCompile(`^\*{0,2}Status:\*{0,2}`)
 )
 
+// ComplianceExampleVersion is the release the script's hints name (the
+// version to write to .rebar-version and the badge); rebar's release bumps
+// it with the script (TestComplianceExampleVersion).
+const ComplianceExampleVersion = "v3.1.0-rc.3"
+
 // tierLabel is the badge level of a tier.
 func tierLabel(tier string) string {
 	switch tier {
@@ -90,7 +95,7 @@ func runCompliance(ctx *Context, args []string) int {
 	say("=== Rebar compliance check ===", "")
 	declaredVersion := ""
 	if !isRegular(root + "/.rebar-version") {
-		say("FAIL: .rebar-version file not found", "  Create it with: echo 'v3.1.0-rc.2' > .rebar-version")
+		say("FAIL: .rebar-version file not found", "  Create it with: echo '"+ComplianceExampleVersion+"' > .rebar-version")
 		errors++
 	} else {
 		data, _ := os.ReadFile(root + "/.rebar-version")
@@ -136,7 +141,7 @@ func runCompliance(ctx *Context, args []string) int {
 		case lineNum == 0:
 			say("FAIL: README.md has no rebar badge",
 				"  Add this as the first line after your # Title:",
-				"  > **rebar v3.1.0-rc.2** | **Tier 2: ADOPTED**")
+				"  > **rebar "+ComplianceExampleVersion+"** | **Tier 2: ADOPTED**")
 			errors++
 		case m == nil:
 			say(fmt.Sprintf("FAIL: README.md badge is malformed on line %d", lineNum),

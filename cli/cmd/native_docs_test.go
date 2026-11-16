@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/willackerly/rebar/cli/internal/checks"
 	"github.com/willackerly/rebar/cli/internal/testutil"
 )
 
@@ -423,3 +424,12 @@ OK: Rebar compliance verified.
 
 func TestComplianceParity(t *testing.T) { runParity(t, complianceCheck, complianceParityCases) }
 func TestComplianceGolden(t *testing.T) { runGolden(t, complianceCheck, complianceParityCases) }
+
+// TestComplianceExampleVersion: check-compliance names the current release
+// in its hints, as the script does; a release bumps both (the parity cases
+// "nothing at all" and "badge: none" compare them with the script).
+func TestComplianceExampleVersion(t *testing.T) {
+	if checks.ComplianceExampleVersion != releaseVersion {
+		t.Errorf("checks.ComplianceExampleVersion = %s, want the release, %s", checks.ComplianceExampleVersion, releaseVersion)
+	}
+}

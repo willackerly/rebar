@@ -1,7 +1,7 @@
 === Rebar compliance check ===
 
 FAIL: .rebar-version file not found
-  Create it with: echo 'v3.1.0-rc.2' > .rebar-version
+  Create it with: echo 'v3.1.0-rc.3' > .rebar-version
 FAIL: .rebarrc file not found
   Create it from .rebarrc.template
 FAIL: README.md not found
