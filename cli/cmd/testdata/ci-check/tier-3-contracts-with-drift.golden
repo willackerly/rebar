@@ -37,7 +37,8 @@ OK: no numbered contract IDs listed in the registry — nothing to check.
 ━━━ Ground Truth ━━━
 === Ground Truth Verification ===
 
-No metrics declared. Add metric.<key>.* lines to .rebarrc (see this script's header).
+No metrics declared.
+  Add metric.<key>.* lines to .rebarrc (see this script's header).
 
 All documented metrics match codebase reality
 
