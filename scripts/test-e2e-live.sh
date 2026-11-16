@@ -54,11 +54,16 @@ while [ $# -gt 0 ]; do
 done
 
 # ─── Output helpers ────────────────────────────────────────────────────────
-GREEN='\033[0;32m'
-RED='\033[0;31m'
-YELLOW='\033[1;33m'
-GRAY='\033[0;90m'
-NC='\033[0m'
+# Colour only on a terminal, and never with NO_COLOR set (no-color.org).
+if [ -t 1 ] && [ -z "${NO_COLOR:-}" ]; then
+  GREEN='\033[0;32m'
+  RED='\033[0;31m'
+  YELLOW='\033[1;33m'
+  GRAY='\033[0;90m'
+  NC='\033[0m'
+else
+  GREEN='' RED='' YELLOW='' GRAY='' NC=''
+fi
 
 passed=0; failed=0; skipped=0
 results_tmp="$(mktemp)"

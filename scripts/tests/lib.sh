@@ -13,6 +13,11 @@
 #   run_in DIR SCRIPT [ARGS...]
 #                         run SCRIPT from REBAR_SCRIPTS against project DIR, the
 #                         way `rebar check` does (REBAR_PROJECT_ROOT); stderr is merged
+#   run_tty CMD [ARGS...] run CMD with stdout on a pseudo-terminal (script(1), BSD or
+#                         util-linux); returns 77 when no script(1) is available
+#   doc_snippet FILE MARKER
+#                         print the first fenced code block after the first line of
+#                         FILE containing MARKER (fixed string), without the fences
 #
 # REBAR_TEST_NATIVE_BIN=<rebar binary> makes run_in hand the checks that binary
 # implements natively (`rebar native` lists them) to it, as
@@ -29,7 +34,7 @@ REBAR_TESTS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # silence the checks_enable warnings under test; `rebar check` exports
 # REBAR_PROJECT_ROOT, which would point fixture runs at the caller's repo).
 unset REBAR_TIER REBAR_CHECKS_ENABLE _REBAR_CHECKS_VALIDATED REBAR_PROJECT_ROOT \
-  REBAR_CONTRACTS_DIR REBAR_CONTRACT_NAMESPACE REBAR_REGISTRY_IMPL_COUNTS \
+  REBAR_CONTRACTS_DIR REBAR_CONTRACT_NAMESPACE REBAR_REGISTRY_IMPL_COUNTS REBAR_METRICS_STRICT \
   REBAR_CHECK_IMPL REBAR_BIN REBAR_NATIVE_CHECKS REBAR_NATIVE_SCRIPTS REBAR_RCFILE
 REBAR_SCRIPTS="${REBAR_SCRIPTS_DIR:-$REBAR_TESTS_DIR/..}"
 if [ -n "${REBAR_TEST_NATIVE_BIN:-}" ]; then
@@ -64,4 +69,24 @@ run_in() {
     return
   fi
   ( cd "$dir" && REBAR_PROJECT_ROOT="$dir" "$REBAR_SCRIPTS/$script" "$@" ) 2>&1
+}
+
+doc_snippet() {
+  awk -v marker="$2" '
+    !found && index($0, marker) { found = 1; next }
+    found && !inblock && /^```/ { inblock = 1; next }
+    inblock && /^```/ { exit }
+    inblock { print }
+  ' "$1"
+}
+
+run_tty() {
+  command -v script >/dev/null 2>&1 || return 77
+  if script -q /dev/null true >/dev/null 2>&1 </dev/null; then
+    script -q /dev/null "$@" </dev/null   # BSD / macOS
+  else
+    local cmd="" a
+    for a in "$@"; do cmd="$cmd $(printf '%q' "$a")"; done
+    script -qec "$cmd" /dev/null </dev/null   # util-linux
+  fi
 }
