@@ -5,6 +5,7 @@
 #
 #   T1  declared metrics: files, dirs, depth, exclude_names, exclude_dirs,
 #       contains, distinct, missing path
+#   T1b metric tracked = true: only git-tracked files / dirs (all outside git)
 #   T2  METRICS exact and >= floor pass; drift and a broken floor fail
 #   T2b metrics_strict (.rebarrc or REBAR_METRICS_STRICT): a missing METRICS
 #       and a computed key missing from it fail; by default both pass
@@ -86,6 +87,49 @@ for m in 'test_files = 2' 'sdks = 2' 'agents = 2' 'contract_files = 3' 'contract
   printf '%s\n' "$out" | grep -q "$m" || { echo "$out"; fail "T1: missing '$m'"; }
 done
 ok "T1: declared metrics compute files, dirs, depth, excludes, contains, distinct"
+
+# T1b — tracked = true counts only what git tracks (dirs: holding a tracked
+# file); outside a git work tree it counts everything, with a note.
+mkdir -p "$P/ops/kept" "$P/ops/local"
+printf 'MARK\n' > "$P/ops/kept/a.sh"
+: > "$P/ops/b.sh"
+printf 'local/\n' > "$P/ops/.gitignore"
+( cd "$P" && g add ops && g commit -q -m ops ) || fail "T1b: setup"
+: > "$P/ops/local/ignored.sh"
+printf 'MARK\n' > "$P/ops/untracked.sh"
+cat > "$TMP/tracked.rc" <<'RC'
+metric.all_sh.paths         = ops
+metric.all_sh.names         = *.sh
+metric.tracked_sh.paths     = ./ops/
+metric.tracked_sh.names     = *.sh
+metric.tracked_sh.tracked   = true
+metric.tracked_dirs.type      = dirs
+metric.tracked_dirs.paths     = ops
+metric.tracked_dirs.min_depth = 1
+metric.tracked_dirs.tracked   = true
+metric.tracked_marked.paths    = ops
+metric.tracked_marked.contains = MARK
+metric.tracked_marked.tracked  = true
+metric.tracked_names.paths    = ops
+metric.tracked_names.names    = *.sh
+metric.tracked_names.distinct = ^(.*)$
+metric.tracked_names.tracked  = true
+RC
+out="$( cd / && REBAR_RCFILE="$TMP/tracked.rc" REBAR_PROJECT_ROOT="$P" "$SRC/check-ground-truth.sh" --print 2>&1 )"
+want='all_sh=4
+tracked_sh=2
+tracked_dirs=1
+tracked_marked=1
+tracked_names=2'
+[ "$out" = "$want" ] || { echo "$out"; fail "T1b: tracked counts"; }
+NG="$TMP/nogit"
+mkdir -p "$NG" && cp -R "$P/ops" "$NG/ops"
+out="$( cd / && REBAR_RCFILE="$TMP/tracked.rc" REBAR_PROJECT_ROOT="$NG" "$SRC/check-ground-truth.sh" --print 2>"$TMP/err" )"
+printf '%s\n' "$out" | grep -qx 'tracked_sh=4' || { echo "$out"; fail "T1b: outside git, tracked should count every file"; }
+grep -q 'not a git work tree' "$TMP/err" || { cat "$TMP/err"; fail "T1b: no note outside git"; }
+( cd "$P" && g rm -rq ops && g commit -q -m "drop ops" ) || fail "T1b: cleanup"
+rm -rf "$P/ops"
+ok "T1b: tracked = true counts git-tracked files and dirs only; outside git, everything"
 
 # T2 — floors pass at or above the value; drift fails either way.
 printf 'test_files >= 1\nsdks = 2\n' > "$P/METRICS"

@@ -75,6 +75,10 @@ exit_code=0
 #   distinct       ERE with one group, matched against each name; count the
 #                  distinct values of the group (a name that does not match
 #                  counts as itself)
+#   tracked        true: count only what git tracks (a dir counts when it
+#                  holds a tracked file), so gitignored or untracked local
+#                  files don't inflate the count. Outside a git work tree it
+#                  has no effect (a note goes to stderr).
 #
 # Example — test files under two roots, and contract IDs across versions:
 #   metric.test_files.paths    = api sdk
@@ -99,7 +103,7 @@ metric_field() {
 
 # count_metric <name>: print the computed value of one declared metric.
 count_metric() {
-  local name="$1" type paths names exclude_names exclude_dirs min max contains distinct
+  local name="$1" type paths names exclude_names exclude_dirs min max contains distinct tracked
   type=$(metric_field "$name" type files)
   paths=$(metric_field "$name" paths .)
   names=$(metric_field "$name" names)
@@ -109,6 +113,18 @@ count_metric() {
   max=$(metric_field "$name" max_depth)
   contains=$(metric_field "$name" contains)
   distinct=$(metric_field "$name" distinct)
+  tracked=$(metric_field "$name" tracked false)
+  case "$tracked" in
+    true|1|yes|on)
+      if git -C "$REPO_ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+        tracked=true
+      else
+        echo "rebar: metric.$name.tracked: $REPO_ROOT is not a git work tree; counting every file" >&2
+        tracked=false
+      fi
+      ;;
+    *) tracked=false ;;
+  esac
 
   # Globs in the values are patterns for find, not for this shell.
   set -f
@@ -150,11 +166,43 @@ count_metric() {
   set +f
 
   if [ -n "$distinct" ]; then
-    { find "${args[@]}" 2>/dev/null || true; } \
+    { find "${args[@]}" 2>/dev/null || true; } | only_tracked "$tracked" \
       | sed 's|.*/||' | sed -E "s#${distinct}#\\1#" | LC_ALL=C sort -u | wc -l | tr -d ' '
   else
-    { find "${args[@]}" 2>/dev/null || true; } | wc -l | tr -d ' '
+    { find "${args[@]}" 2>/dev/null || true; } | only_tracked "$tracked" | wc -l | tr -d ' '
   fi
+}
+
+# only_tracked true|false: filter find's paths (under $REPO_ROOT) to those
+# git tracks, and directories holding a tracked file; false passes all.
+only_tracked() {
+  if [ "$1" != true ]; then
+    cat
+    return
+  fi
+  local list
+  list=$(mktemp "${TMPDIR:-/tmp}/rebar-tracked.XXXXXX")
+  git -C "$REPO_ROOT" -c core.quotepath=off ls-files > "$list" 2>/dev/null || true
+  awk -v root="$REPO_ROOT/" -v list="$list" '
+    FILENAME == list {
+      t[$0] = 1
+      p = $0
+      while (sub(/\/[^\/]*$/, "", p)) t[p] = 1
+      t["."] = 1
+      next
+    }
+    {
+      rel = $0
+      if (index(rel, root) == 1) rel = substr(rel, length(root) + 1)
+      else if (rel == substr(root, 1, length(root) - 1)) rel = "."
+      gsub(/\/\/+/, "/", rel)
+      gsub(/\/\.\//, "/", rel)
+      sub(/^\.\//, "", rel)
+      sub(/\/$/, "", rel)
+      if (rel in t) print
+    }
+  ' "$list" -
+  rm -f "$list"
 }
 
 compute_metrics() {

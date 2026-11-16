@@ -46,6 +46,12 @@ All notable changes to rebar. Versioned with [semver](https://semver.org/).
   cases: it proposes `metrics_strict = true` when the copy failed both (as
   virtru-analyze's did; rc.2 judged them equivalent and dropped the
   failures), and keeps a copy that fails only one of them.
+- **`metric.<key>.tracked = true`** counts only files git tracks (for
+  `type = dirs`, directories holding a tracked file), so gitignored or
+  untracked local files no longer inflate a count such as `shell_scripts`.
+  Outside a git work tree it has no effect (every file counts, with a note on
+  stderr). `rebar migrate` reads and keeps the field on metrics already in
+  `.rebarrc`; it does not derive it from a legacy copy.
 
 ---
 
