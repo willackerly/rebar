@@ -18,6 +18,22 @@ All notable changes to rebar. Versioned with [semver](https://semver.org/).
 
 ## Unreleased
 
+- **The git gates run natively.** check-fix-commit (Gate G),
+  check-bypass-flags (Gate I) and check-version-bump (the post-commit
+  outbox hook) are ported to the `rebar` binary and are its default
+  (`REBAR_CHECK_IMPL=shell` selects the scripts). They run the same git
+  commands as the scripts (new `internal/gitx`), so commit selection
+  (`--range` takes any `git rev-list` arguments), path quoting and rename
+  detection stay git's, merge commits and shallow clones included, and give
+  the same output and exit codes in every mode (HEAD, commit-msg file,
+  `--range`, `--warn`, `--help`). Kept as the scripts have them: the
+  `Reproduced on:` / `Bypass tickets:` evidence must contain a character
+  that is not POSIX whitespace (a vertical tab does not count), the
+  "matched:" list shows the first three matches, and check-version-bump
+  reports "00 pending" when a contract was renamed to another one and the
+  outbox holds nothing pending, and exits with git's status in a repository
+  without commits. One difference: `--range` without a range says so and
+  exits 1 (the scripts died on `set -u` with "$2: unbound variable").
 - **compute-registry and check-ground-truth run natively too.** Both are
   ported to the `rebar` binary and are its default (`REBAR_CHECK_IMPL=shell`
   selects the scripts). compute-registry writes, `--check`s, prints
