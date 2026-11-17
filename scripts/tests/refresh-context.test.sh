@@ -34,3 +34,34 @@ code=$?
 contains "$out" 'commit 05000' || fail "newest commit not listed: $(echo "$out" | tail -5)"
 contains "$out" '\.\.\. and 4980 more' || fail "commit count summary missing: $(echo "$out" | tail -5)"
 ok "refresh-context lists 20 of 5000 commits and exits 0"
+
+# Outside a git repository, and in one with no commits yet, the git sections
+# are skipped with a note. They ran git log / git worktree list under set -e
+# and the script ended with git's exit 128 after "Commits since last sync:".
+for kind in no-git no-commits; do
+  D="$TMP/$kind"
+  mkdir -p "$D"
+  [ "$kind" = no-commits ] && { ( cd "$D" && g init -q -b main ) || fail "git init $kind"; }
+  printf '# QUICKCONTEXT\n\nlast-synced: 2023-01-01\n' > "$D/QUICKCONTEXT.md"
+  printf '# TODO\n\n- [ ] one\n' > "$D/TODO.md"
+  for mode in "" --quick; do
+    # GIT_CEILING_DIRECTORIES keeps git from finding a repo above TMP.
+    out=$(GIT_CEILING_DIRECTORIES="$TMP" run_in "$D" refresh-context.sh $mode)
+    code=$?
+    [ $code -eq 0 ] || { echo "$out" | tail -5; fail "refresh-context.sh ${mode:-(full)} exited $code ($kind)"; }
+    echo "$out" | grep -q 'days stale' || fail "staleness not reported ($kind ${mode:-full}): $out"
+    echo "$out" | grep -q 'skipped' || fail "no skip note for the git sections ($kind ${mode:-full}): $out"
+    if [ -z "$mode" ]; then
+      echo "$out" | grep -q 'Open items: 1' || fail "TODO section not reported ($kind): $out"
+      echo "$out" | grep -q '=== Summary ===' || fail "report stopped early ($kind): $out"
+    fi
+  done
+  ok "refresh-context degrades without git history ($kind) and exits 0"
+done
+
+# QUICKCONTEXT.md missing is still an error.
+D="$TMP/no-qc"
+mkdir -p "$D"
+out=$(GIT_CEILING_DIRECTORIES="$TMP" run_in "$D" refresh-context.sh)
+[ $? -eq 1 ] || fail "missing QUICKCONTEXT.md should exit 1: $out"
+ok "refresh-context exits 1 without QUICKCONTEXT.md"
