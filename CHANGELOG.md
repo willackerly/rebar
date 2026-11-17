@@ -18,6 +18,25 @@ All notable changes to rebar. Versioned with [semver](https://semver.org/).
 
 ## Unreleased
 
+- **`rebar mcp serve` shuts down promptly and takes its children with it.**
+  At the end of stdin (Claude Code exiting or restarting the server) and on
+  SIGINT/SIGTERM — stdio and HTTP — the server stops reading requests (HTTP:
+  stops accepting connections and shuts down gracefully), cancels the tool
+  calls still running (they answer with an `isError` "Agent query
+  cancelled" result) and exits 0 within 2 s. Previously the end of input
+  waited up to 310 s for running calls, and a signal killed the server and
+  orphaned the `rebar ask` / `claude` processes it had started. Each ask now
+  runs in its own process group: cancelling it (client cancellation,
+  timeout, shutdown) sends the group SIGTERM, then SIGKILL after 1 s, and
+  what is left of it is killed when the server exits. 2 s is the window
+  Claude Code's stdio client gives a server between closing stdin and
+  sending SIGTERM. Behaviour change for scripts: a `tools/call` piped in with
+  `printf … |` is cancelled at the end of input — keep stdin open until it
+  answers (`scripts/test-e2e-live.sh` now does, over a FIFO). `rebar ask
+  serve` gets the same signal handling and cancels `/v1/ask` asks when
+  their client disconnects. Tests: `TestMCPStdioShutdown` (end of input,
+  SIGTERM, SIGINT; asks that ignore SIGTERM), `TestMCPHTTPShutdown`,
+  `TestRunAskCancelKillsGroup`, `TestKillChildren`, `TestStdinFilterGrace`.
 - **`rebar mcp serve` runs on the official MCP Go SDK**
   (`github.com/modelcontextprotocol/go-sdk` v1.8.0) instead of the
   hand-written JSON-RPC layer, so the server follows the MCP spec rather than
@@ -32,13 +51,14 @@ All notable changes to rebar. Versioned with [semver](https://semver.org/).
   errors; an unknown tool is -32602 `unknown tool "<name>"` (was
   -32603 "Repository … not found"); an unknown resource is -32602 "Resource
   not found"; a request before `initialize` gets the SDK's "invalid during
-  session initialization" error (was -32002); responses are compact JSON
+  session initialization" error with code -32600 invalid request (was -32002;
+  rebar rewrites the SDK v1.8.0's code 0 to what SDK v1.9.0 sends); responses are compact JSON
   (`{"jsonrpc":"2.0",…}`, not python `json.dumps` spacing) and may arrive out
   of order; `serverInfo.version` is rebar's version (was "1.0.0"); `ping` and
   an empty `prompts/list` are answered; batches are refused after
   2025-06-18. Over stdio a malformed line is still logged and skipped (no
   `id: null` reply), invalid JSON-RPC objects and fractional ids are now
-  skipped too, and end of input waits for running calls. **HTTP:** `/mcp` is
+  skipped too. **HTTP:** `/mcp` is
   MCP's Streamable HTTP transport (`Accept: application/json,
   text/event-stream`, `Mcp-Session-Id`, 202 for notifications, DELETE ends a
   session; loopback requests need a loopback `Host`), so Claude Code's

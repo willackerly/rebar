@@ -152,7 +152,10 @@ Expect one JSON response per request, starting with
 `{"jsonrpc":"2.0","id":1,"result":{"capabilities":…,"protocolVersion":"2025-11-25",…}}`.
 Every status line (`scanning repos...`, `registered: …`) goes to stderr, and
 so does `ask-mcp-server: ignored invalid message (…)` for a line that is not
-JSON-RPC (the server reads on).
+JSON-RPC (the server reads on). The server exits at the end of input
+(within 2 s, cancelling tool calls still running), so to try a `tools/call`
+this way keep stdin open until it answers — `(printf '%s\n' …; sleep 60) |
+rebar mcp serve …` — or use Claude Code.
 
 ### 2. From Claude Code
 

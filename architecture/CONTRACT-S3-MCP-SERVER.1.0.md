@@ -118,7 +118,8 @@ JSON-RPC surface:
 | Invalid tool arguments | Missing/empty `question`, wrong types | Tool result with `isError: true` naming the problem |
 | `ask` subprocess fails | Underlying ASK CLI error, timeout | Forward exit code + stderr + cmd + cwd in tool result with `isError: true` |
 | `resources/read` unknown URI | Not a registered `ask://` resource | JSON-RPC error -32602, "Resource not found" |
-| `initialize` not called | Other method invoked first (pre-2026-07-28 protocol) | JSON-RPC error, `method "<m>" is invalid during session initialization` |
+| `initialize` not called | Other method invoked first (pre-2026-07-28 protocol) | JSON-RPC error -32600, `method "<m>" is invalid during session initialization` |
+| Client goes away / server stopped | End of stdin; SIGINT/SIGTERM (stdio or HTTP) | Stop reading/accepting; cancel running tool calls (their answer: `isError` "Agent query cancelled"); the ask process group gets SIGTERM, SIGKILL 1 s later; exit 0 within 2 s, leaving no ask/LLM/git process behind |
 | Method not implemented | Unknown method (non-notification) | Error -32601, "method not found" |
 
 ## Dependencies

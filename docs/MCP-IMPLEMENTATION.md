@@ -355,7 +355,7 @@ rebar mcp client http://localhost:7232
 | `tools/call` of an unknown tool | JSON-RPC error -32602 `unknown tool "<name>"` |
 | `resources/read` of an unknown URI | JSON-RPC error -32602 `Resource not found` |
 | unknown method | JSON-RPC error -32601 |
-| a request before `initialize` (old protocol) | JSON-RPC error `method "<m>" is invalid during session initialization` (the SDK's; code 0) |
+| a request before `initialize` (old protocol) | JSON-RPC error -32600 `method "<m>" is invalid during session initialization` (the SDK's message; rebar sets the code, which SDK v1.8.0 leaves at 0 and v1.9.0 sets to -32600 itself) |
 | notifications | never answered |
 
 rebar's adapters around the SDK (`cli/internal/mcp`):
@@ -366,9 +366,25 @@ rebar's adapters around the SDK (`cli/internal/mcp`):
 - **Stdio hygiene** (`stdio.go`): the SDK ends a session at the first
   malformed line; rebar logs it on stderr
   (`ask-mcp-server: ignored invalid message (<why>): <line>`) and reads on, and
-  never answers with `"id": null` (Claude Code's validator rejects it). At the
-  end of input it waits for the answers still running, so
-  `printf '…' | rebar mcp serve --stdio` prints them all.
+  never answers with `"id": null` (Claude Code's validator rejects it).
+- **Shutdown** (`shutdown.go`, `stdio.go`, `main.go`): at the end of input
+  (the client exited or restarts the server) or on SIGINT/SIGTERM, the server
+  stops reading requests (HTTP: stops accepting connections), cancels the
+  tool calls still running and waits at most **2 s** (`ShutdownGrace`) for
+  the answers due — quick requests answer, a cancelled call answers with an
+  `isError` "Agent query cancelled" result — then exits 0. Each ask runs in
+  its own process group: cancelling it sends the group SIGTERM, then SIGKILL
+  after 1 s (`KillDelay`), and whatever is left of the groups when the server
+  exits is killed, so no `rebar ask`, `claude` or `git` outlives the server.
+  2 s because Claude Code's stdio client (the TypeScript SDK) closes stdin
+  and sends SIGTERM 2 s later: the server is gone before it has to. (The
+  background memory compaction `rebar ask` may start after answering is
+  detached on purpose and not killed.) `printf '…' | rebar mcp serve --stdio`
+  still prints every quick answer, but a `tools/call` piped that way is
+  cancelled at the end of input — keep stdin open until it answers.
+- **Error code** (`compat.go`): the SDK answers a request before
+  `initialize` with code 0; rebar rewrites it to -32600 (invalid request) on
+  stdout and on `/mcp` — the code the SDK uses itself from v1.9.0.
 - **Guard**: `"arguments": null` counts as absent (it panicked inside the SDK
   v1.8.0), and a panic in a handler is an internal error, not a crash.
 
