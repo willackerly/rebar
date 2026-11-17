@@ -1,6 +1,6 @@
 === QUICKCONTEXT Freshness Check ===
 
-Last synced: 2026-10-17
+Last synced: {{ago:30}}
 WARNING: QUICKCONTEXT is N days stale — treat ALL claims as suspect
 
 Commits since last sync:

@@ -4,13 +4,13 @@ Last synced: 2026-01-01
 WARNING: QUICKCONTEXT is N days stale — treat ALL claims as suspect
 
 Commits since last sync:
-ac71e69 three
-3d2dbc7 two
-bface04 one
+<sha> three
+<sha> two
+<sha> one
   (3 commits — review against QUICKCONTEXT claims)
 
 === TODO Freshness ===
-TODO.md last synced: 2026-11-07
+TODO.md last synced: {{ago:9}}
 Open items: 2 | Completed items: 1
 
 === Untracked TODOs in Code ===
@@ -21,7 +21,7 @@ lib/d.py:1:# TODO: python
 packages/g.rs:1:// TODO: rust
 
 === Worktree State ===
-<worktree> ac71e69 [main]
+<worktree> <sha> [main]
 OK: No extra worktrees
 
 === Summary ===

@@ -1,13 +1,13 @@
 === QUICKCONTEXT Freshness Check ===
 
-Last synced: 2026-11-14
+Last synced: {{ago:2}}
 OK: QUICKCONTEXT is N days old
 
 Commits since last sync:
 OK: No commits since last sync
 
 === TODO Freshness ===
-TODO.md last synced: 2026-11-07
+TODO.md last synced: {{ago:9}}
 Open items: 2 | Completed items: 1
 
 === Untracked TODOs in Code ===
@@ -18,7 +18,7 @@ lib/d.py:1:# TODO: python
 packages/g.rs:1:// TODO: rust
 
 === Worktree State ===
-<worktree> 348e2b9 [main]
+<worktree> <sha> [main]
 OK: No extra worktrees
 
 === Summary ===
