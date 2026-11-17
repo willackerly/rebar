@@ -1,0 +1,12 @@
+NOTE: tier 1 < required tier 2; running check-prefix-uniqueness because .rebarrc checks_enable names it
+FAIL: 2 prefix number(s) claimed by more than one contract ID:
+
+  C12: C12-A, C12-B
+  I3: I3, I3-CRLF.1.0.md, I3-LLM-CLIENT, I3-SCANNER, I3-ZED
+
+Each prefix number (S1, I3, ...) must map to exactly one contract ID.
+Versions of the same ID are fine; two different IDs sharing a number
+overload the prefix. Renumber the newer contract to the next free number,
+update its implementing-file headers (grep -rn "CONTRACT:<old-id>"), and
+regenerate the registry with scripts/compute-registry.sh.
+--- exit 1 ---

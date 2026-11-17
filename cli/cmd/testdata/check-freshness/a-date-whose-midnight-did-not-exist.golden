@@ -1,0 +1,9 @@
+STALE (N days): ./before.md — freshness: 2018-10-21
+STALE (N days): ./gap.md — freshness: 2018-11-04
+
+Checked 2 docs with currency markers (freshness:/last-synced:), 2 stale (>14 days).
+0 .md file(s) carry no currency marker at all — unchecked, not verified.
+
+Stale docs may contain outdated status claims.
+Review and update the freshness date after verifying content.
+--- exit 1 ---

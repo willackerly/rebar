@@ -1,0 +1,18 @@
+=== Contract files vs registry ===
+
+=== Orphaned contracts (no implementing code) ===
+ORPHAN (untracked): architecture/CONTRACT-S1-ARCH.1.0.md — 0 implementing files
+  Either add implementing code with CONTRACT:S1-ARCH.1.0 header,
+  or track in TODO.md if implementation is planned.
+ORPHAN (untracked): architecture/CONTRACT-S4-VEND.1.0.md — 0 implementing files
+  Either add implementing code with CONTRACT:S4-VEND.1.0 header,
+  or track in TODO.md if implementation is planned.
+ORPHAN (untracked): architecture/CONTRACT-S5-MD.1.0.md — 0 implementing files
+  Either add implementing code with CONTRACT:S5-MD.1.0 header,
+  or track in TODO.md if implementation is planned.
+ORPHAN (untracked): architecture/CONTRACT-S8-BINARY.1.0.md — 0 implementing files
+  Either add implementing code with CONTRACT:S8-BINARY.1.0 header,
+  or track in TODO.md if implementation is planned.
+
+FAIL: 4 inconsistencies found.
+--- exit 1 ---

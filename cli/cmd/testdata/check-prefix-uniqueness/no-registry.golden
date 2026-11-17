@@ -1,0 +1,2 @@
+SKIP: no architecture/CONTRACT-REGISTRY.md (run scripts/compute-registry.sh to generate).
+--- exit 0 ---

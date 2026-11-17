@@ -1,0 +1,17 @@
+MISSING: architecture/CONTRACT-B.2.0.md — 'Scenarios'
+MISSING: architecture/CONTRACT-D.1.0.md — 'Why this exists' 'Who needs this' 'Scenarios'
+MISSING: architecture/CONTRACT-F.1.10.md — 'Why this exists' 'Who needs this' 'Scenarios'
+MISSING: architecture/CONTRACT-G.md — 'Why this exists' 'Who needs this' 'Scenarios'
+MISSING: architecture/CONTRACT-J.1.0.md — 'Why this exists'
+MISSING: architecture/CONTRACT-K.1.0.md — 'Who needs this'
+MISSING: architecture/CONTRACT-L.1.0.md — 'Why this exists'
+MISSING: architecture/CONTRACT-M.1.0.md — 'Why this exists' 'Who needs this' 'Scenarios'
+
+Checked 12 latest-version contract(s), 1 superseded skipped, 8 with missing JTBD sections.
+
+Every contract needs non-empty 'Why this exists', 'Who needs this', and
+'Scenarios' sections. An interface description is not a Job To Be Done —
+see architecture/CONTRACT-TEMPLATE.md for the required framing.
+
+WARN: advisory at Tier 2; blocking at Tier 3.
+--- exit 0 ---

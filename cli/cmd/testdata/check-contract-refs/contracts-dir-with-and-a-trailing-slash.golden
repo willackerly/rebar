@@ -1,0 +1,9 @@
+BROKEN: ./src/a.go:2 references CONTRACT:S2-BAR.1.0
+        Expected: specs/CONTRACT-S2-BAR.1.0.md
+
+Checked 2 contract references, 1 broken.
+
+Fix by either:
+  1. Creating the missing contract in specs/
+  2. Updating the code reference to the correct contract version
+--- exit 1 ---

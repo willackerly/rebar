@@ -745,7 +745,8 @@ func rootArgs(args []string, root string) []string {
 // lines put in the native order.
 func TestTodosParity(t *testing.T) {
 	runParity(t, parityCheck{
-		name: "check-todos",
+		name:   "check-todos",
+		golden: "check-todos",
 		order: func(out, root string, args []string) string {
 			operands := args
 			if len(operands) == 0 {

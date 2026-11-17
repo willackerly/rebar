@@ -1,0 +1,10 @@
+=== Contract files vs registry ===
+NOT IN REGISTRY: specs/CONTRACT-S1-FOO.1.0.md
+
+=== Orphaned contracts (no implementing code) ===
+ORPHAN (untracked): specs/CONTRACT-S1-FOO.1.0.md — 0 implementing files
+  Either add implementing code with CONTRACT:S1-FOO.1.0 header,
+  or track in TODO.md if implementation is planned.
+
+FAIL: 2 inconsistencies found.
+--- exit 1 ---

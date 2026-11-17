@@ -1,0 +1,6 @@
+=== Contract files vs registry ===
+
+=== Orphaned contracts (no implementing code) ===
+
+OK: Registry and contracts are consistent.
+--- exit 0 ---

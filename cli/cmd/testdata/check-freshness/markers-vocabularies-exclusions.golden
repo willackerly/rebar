@@ -1,0 +1,16 @@
+STALE (16 days): ./.hidden/h.md — freshness: {{ago:16}}
+STALE (17 days): ./.md — freshness: {{ago:17}}
+STALE (50 days): ./crlf.md — freshness: {{ago:50}}
+STALE (20 days): ./docs/deep/both.md — freshness: {{ago:20}}
+STALE (100 days): ./docs/old.md — last-synced: {{ago:100}}
+STALE (15 days): ./edge15.md — freshness: {{ago:15}}
+STALE (30 days): ./stale.md — freshness: {{ago:30}}
+STALE (300 days): ./sub/.git/w.md — freshness: {{ago:300}}
+STALE (300 days): ./sub/templates/t.md — freshness: {{ago:300}}
+
+Checked 14 docs with currency markers (freshness:/last-synced:), 9 stale (>14 days).
+3 .md file(s) carry no currency marker at all — unchecked, not verified.
+
+Stale docs may contain outdated status claims.
+Review and update the freshness date after verifying content.
+--- exit 1 ---
