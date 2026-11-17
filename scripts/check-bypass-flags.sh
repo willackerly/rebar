@@ -58,12 +58,12 @@ BYPASS_REGEX='(--skip-(stress|tests|all|e2e|smoke|ci|build|fix|preflight)|--no-v
 # `Bypass tickets:` line.
 satisfies() {
   local body="$1"
-  echo "$body" | grep -qE '^Bypass[[:space:]]tickets:[[:space:]]*\S'
+  grep -qE '^Bypass[[:space:]]tickets:[[:space:]]*\S' <<<"$body"
 }
 
 mentions_bypass() {
   local body="$1"
-  echo "$body" | grep -qE "$BYPASS_REGEX"
+  grep -qE "$BYPASS_REGEX" <<<"$body"
 }
 
 check_one() {
@@ -75,7 +75,7 @@ check_one() {
   # (e.g., "the script catches --skip-stress / --no-verify"). Honor an
   # explicit `Bypass-flags-meta: <reason>` opt-out so authors can mark a
   # commit as referring to bypass flags rather than invoking them.
-  if echo "$body" | grep -qE '^Bypass-flags-meta:[[:space:]]*\S'; then
+  if grep -qE '^Bypass-flags-meta:[[:space:]]*\S' <<<"$body"; then
     return 0
   fi
   if satisfies "$body"; then

@@ -105,15 +105,19 @@ scan() {
   shift 3
   for file in "$@"; do
     [ -f "$file" ] || continue
-    # Use grep -nE; allow pattern to fail gracefully on no-match.
-    while IFS=: read -r lineno _; do
+    # Pipe, not `done < <(grep …)`: bash 3.2 keeps each process-substitution
+    # fd open until this whole scan() call returns, and its fd table is 256
+    # bytes with an off-by-one at fd 256 — heap corruption (abort, bus error
+    # or hang) once ~250 files are scanned. The loop body only appends to
+    # $findings_tmp, so running it in the pipeline's subshell is fine.
+    grep -nEi "$regex" "$file" 2>/dev/null | while IFS=: read -r lineno _; do
       [ -z "$lineno" ] && continue
       # Allowlist check by file:line:pattern triple.
       if [ -f "$ALLOWLIST" ] && grep -Fxq -- "${file}:${lineno}:${pattern_id}" "$ALLOWLIST" 2>/dev/null; then
         continue
       fi
       echo "${file}:${lineno}:${pattern_id}:${message}" >> "$findings_tmp"
-    done < <(grep -nEi "$regex" "$file" 2>/dev/null || true)
+    done
   done
 }
 

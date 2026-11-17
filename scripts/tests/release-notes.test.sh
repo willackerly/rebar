@@ -84,7 +84,8 @@ ok "T3: --link-base rewrites relative links only"
 
 # T4
 n=0
-for tag in $(sed -n -E 's/^## (v[0-9][^ ]*).*/\1/p' "$SRC/../CHANGELOG.md" | head -8); do
+# The latest 8 headings; awk stops itself (a `| head -8` can SIGPIPE the writer).
+for tag in $(awk '/^## v[0-9]/ { print $2; if (++n == 8) exit }' "$SRC/../CHANGELOG.md"); do
   bash "$SRC/release-notes.sh" "$tag" >/dev/null || fail "T4: no notes for $tag in rebar's CHANGELOG"
   n=$((n + 1))
 done
