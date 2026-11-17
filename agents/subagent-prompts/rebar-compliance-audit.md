@@ -60,16 +60,11 @@ placeholder text):
 
 | Check | How to Verify |
 |-------|---------------|
-| `scripts/` directory exists | `ls scripts/` |
-| Pre-commit hook installed | `ls -la .git/hooks/pre-commit` — should be symlink to scripts/ |
-| `check-contract-refs.sh` exists | `ls scripts/check-contract-refs.sh` |
-| `check-todos.sh` exists | `ls scripts/check-todos.sh` |
-| `check-freshness.sh` exists (Tier 2+) | `ls scripts/check-freshness.sh` |
-| `check-ground-truth.sh` exists (Tier 2+) | `ls scripts/check-ground-truth.sh` |
-| `check-compliance.sh` exists (Tier 2+) | `ls scripts/check-compliance.sh` |
-| `refresh-context.sh` exists | `ls scripts/refresh-context.sh` |
+| `rebar` on PATH | `rebar version` (the checks are built into the binary) |
+| Pre-commit hook installed | `ls -la .git/hooks/pre-commit` — should run `scripts/pre-commit.sh` (`rebar check --pre-commit`) |
+| CI entry point | `scripts/ci-check.sh` is the thin wrapper (`# rebar-thin-wrapper`), or CI runs `rebar check` |
+| No legacy script copies | `rebar migrate` (dry run) reports nothing to migrate |
 | `METRICS` file exists (Tier 2+) | `ls METRICS*` |
-| Scripts exclude `.claude/worktrees/` | `grep -l "\.claude" scripts/*.sh` |
 
 ### Section 4: Agent Coordination
 

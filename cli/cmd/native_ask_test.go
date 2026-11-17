@@ -33,7 +33,7 @@ import (
 // directory and plays back canned output), and the requests a remote-mode
 // case sends to its test ASK servers. Timestamps, message ids, session
 // UUIDs and the temp paths are normalized. The goldens in testdata/ask were
-// captured from bin/ask's bash implementation (rebar 3.2 required the two
+// captured from bin/ask's bash implementation (the go-native port required the two
 // to agree), except where a case documents a deliberate deviation
 // (diverges) or a platform-specific behaviour of the script (divergesOn);
 // regenerate with go test ./cmd -run AskGolden -update-golden.

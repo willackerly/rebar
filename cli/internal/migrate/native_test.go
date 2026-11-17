@@ -9,7 +9,7 @@ import (
 )
 
 // nativeFilters spell the filters of the scanner scripts the native checks
-// were ported from (as rebar 3.2 shipped them), as exclusionBait reads
+// were ported from (their last versions, before rebar 3.2 deleted them), as exclusionBait reads
 // them.
 func TestNativeFiltersMatchScripts(t *testing.T) {
 	scripts := map[string][]string{

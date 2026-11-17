@@ -20,7 +20,7 @@ func commitAll(t *testing.T, p string) {
 }
 
 // installScript is the last version of one of rebar's scripts before rebar
-// became a single binary (3.2, kept in testdata/legacy): the copy an
+// became a single binary (kept in testdata/legacy): the copy an
 // adopter would have. install is unused (rebar's tree has no scripts now).
 func installScript(t *testing.T, install, name string) string {
 	t.Helper()

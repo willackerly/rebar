@@ -155,7 +155,7 @@ This is the latest version. No predecessor.
 
 - `cli/internal/mcp/` — the server (native Go: `rebar mcp serve`)
 - `cli/cmd/mcp.go` — the `rebar mcp serve` / `rebar mcp client` commands
-- `bin/ask-mcp-server` — hand-off to `rebar mcp serve` (python original: `bin/legacy/ask-mcp-server.py`, run under `REBAR_CHECK_IMPL=shell`)
+- `bin/ask-mcp-server` — sh shim running `rebar mcp serve` (the python original was removed in rebar 3.2)
 - `cli/cmd/init.go` — writes `.mcp.json` running `rebar mcp serve` (`ensureMCPConfig`, `findRebarCommand`)
 - `cli/internal/migrate/mcpjson.go` — `rebar migrate` rewrites `.mcp.json` servers from `ask-mcp-server` to `rebar mcp serve`
 - `cli/cmd/adopt.go` — same, in the adoption flow

@@ -185,7 +185,7 @@ tests to write. No guessing. No assumptions.
 ### 3. Automated scans catch drift
 
 ```bash
-$ scripts/steward.sh --summary
+$ rebar run steward --summary
 Steward: 12 contracts (0d/2a/3t/7ip), 1 discovery, 6/6 enforcement passing
 ```
 
@@ -286,7 +286,7 @@ The swarm gets smarter over time. What one agent discovers, all agents benefit f
 Automated quality scanner that produces per-contract health reports:
 
 ```bash
-scripts/steward.sh --summary # One-line health check
+rebar run steward --summary # One-line health check
 ask steward summary          # Same via ASK CLI
 ```
 
@@ -294,17 +294,17 @@ Routes action items by role: draft contracts → architect, testing gaps → eng
 
 ### Enforcement (Progressive by Tier)
 
-| Tier | What's Enforced | Scripts |
+| Tier | What's Enforced | Checks (`rebar run <name>`) |
 |------|----------------|---------|
-| **1 - Partial** | Contract refs + TODOs | `check-contract-refs.sh`, `check-todos.sh` |
-| **2 - Adopted** | + headers, freshness, ground truth, compliance, doc-refs, soft-hardening decay | + `check-contract-headers.sh`, `check-freshness.sh`, `check-ground-truth.sh`, `check-compliance.sh`, `check-doc-refs.sh`, `check-decay-patterns.sh` |
+| **1 - Partial** | Contract refs + TODOs | `check-contract-refs`, `check-todos` |
+| **2 - Adopted** | + headers, freshness, ground truth, compliance, doc-refs, soft-hardening decay | + `check-contract-headers`, `check-freshness`, `check-ground-truth`, `check-compliance`, `check-doc-refs`, `check-decay-patterns` |
 | **3 - Enforced** | + strict steward, full lifecycle | + full Steward with computed lifecycles |
 
-*Run all: `scripts/ci-check.sh` | Pre-commit: `scripts/pre-commit.sh`*
+*Run all: `rebar check` | Pre-commit: `rebar check --pre-commit` (the checks are built into the `rebar` binary; [docs/CONFIGURATION.md](docs/CONFIGURATION.md#what-rebar-check-runs))*
 
-`check-doc-refs.sh` catches the class of drift where a doc cites a file
+`check-doc-refs` catches the class of drift where a doc cites a file
 that's never `git add`-ed — green on the author's machine, broken on a
-fresh clone. `check-decay-patterns.sh` flags soft-hardening patterns
+fresh clone. `check-decay-patterns` flags soft-hardening patterns
 (silenced failures, inverted assertions, magic-string project gating,
 "keep in sync" comments) that survive code review and decay six months
 later. See `feedback/2026-04-21-...`, `2026-04-22-...`, and

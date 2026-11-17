@@ -6,7 +6,7 @@ description: Use at the start of every session in a REBAR-managed repo, before t
 # rebar-coldstart — the session-start ritual
 
 Canonical practice: `rebar:practice/session-lifecycle` (Session Start section)
-— resolve with `scripts/rebar-doc.sh rebar:practice/session-lifecycle --cat`
+— resolve with `rebar run rebar-doc rebar:practice/session-lifecycle --cat`
 (or `rebar doc` if the CLI is installed).
 This skill is a pointer to the ritual, not a replacement for the practice doc.
 
@@ -26,7 +26,7 @@ This skill is a pointer to the ritual, not a replacement for the practice doc.
    if its last-synced date is >1 week old, treat all claims as suspect and
    verify before acting.
 5. **Coordination seats only:** if this repo holds a peer `inbox/`, sweep it
-   first (`ls -lat inbox/ | head`), then arm `scripts/inbox-watch.sh` as a
+   first (`ls -lat inbox/ | head`), then arm `rebar run inbox-watch` as a
    persistent background monitor — see the `rebar-inbox-watch` skill.
 
 Do not start substantive work until steps 1–4 are done.

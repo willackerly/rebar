@@ -3,8 +3,8 @@
 > Format identifier: `rebar-pending-notifications-v1`
 
 The federation outbox at `architecture/.state/pending-notifications.md`
-is auto-populated by `scripts/check-version-bump.sh` (post-commit hook)
-and consumed by `scripts/flush-notifications.sh` (manual flush).
+is auto-populated by `rebar run check-version-bump` (post-commit hook)
+and consumed by `rebar run flush-notifications` (manual flush).
 
 ## File structure
 

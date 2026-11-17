@@ -19,15 +19,15 @@ A session-scoped background monitor that polls the inbox and emits one line per 
 emitted line lands in the agent's conversation as a notification — the agent gets pinged with the
 filename mid-task and can process the memo immediately.
 
-The canonical implementation is `scripts/inbox-watch.sh`: multi-inbox capable (dirs as args,
+The canonical implementation is `rebar run inbox-watch`: multi-inbox capable (dirs as args,
 default `./inbox`), `-i/--interval` poll cadence (default 30s), `--preview` for a first-line memo
 preview, and a once-only warning for inbox dirs that don't exist yet (it keeps watching and picks
 them up on creation). The coordination-seat cold-start ritual arms this script as a persistent
 monitor (see `session-lifecycle.md`, Session Start step 4).
 
 ```bash
-./scripts/inbox-watch.sh inbox/                 # one repo's inbox
-./scripts/inbox-watch.sh -i 10 --preview a/inbox b/inbox   # several, prefixed
+rebar run inbox-watch inbox/                 # one repo's inbox
+rebar run inbox-watch -i 10 --preview a/inbox b/inbox   # several, prefixed
 ```
 
 The loop it extracts is small enough to read in full — kept here as the illustration:
@@ -110,4 +110,4 @@ watcher is reclaimed silently. Your outbound memos sitting in a peer's inbox are
 - **federation-outbox.md** — the outbox flush dispatches notifications to consumers; this practice
   is the receiving side's ear. Together they close the loop without any shared infrastructure.
 - **session-lifecycle.md** — the coordination-seat cold-start ritual sweeps held inboxes, then
-  arms `scripts/inbox-watch.sh` as a persistent monitor; the watch dies at session end by design.
+  arms `rebar run inbox-watch` as a persistent monitor; the watch dies at session end by design.

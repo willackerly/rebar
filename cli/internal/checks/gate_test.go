@@ -282,7 +282,7 @@ func TestGreps(t *testing.T) {
 }
 
 // MinTier is what the scripts' `_rebar_skip N <check>` lines said (rebar
-// 3.2 held the two together while the scripts existed).
+// the go-native port held the two together while the scripts existed).
 func TestMinTierMatchesScripts(t *testing.T) {
 	scripts := map[string]int{
 		"check-contract-headers": 2, "check-freshness": 2, "check-jtbd-presence": 2,

@@ -57,7 +57,7 @@ Then apply with `source ~/.zshrc` (or open a new terminal).
 `rebar` (`rebar ask …`); `bin/ask`, `bin/ask-agent-loop`, `bin/ask-server`
 and `bin/ask-mcp-server` are small sh shims that run the `rebar` beside them
 (else `REBAR_BIN`, else the one on `PATH`), so the two spellings behave the
-same. No bash implementation, jq, uuidgen or python is needed (rebar 4
+same. No bash implementation, jq, uuidgen or python is needed (rebar 3.2
 removed them; `rebar mcp client` replaces `bin/test-mcp-client`).
 
 ## Commands

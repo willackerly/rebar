@@ -14,10 +14,10 @@ import (
 )
 
 var pushCmd = &cobra.Command{
-	Use:   "push [args...]",
-	Short: "Verified push — checks integrity before pushing",
-	Long:  `Runs rebar verify --strict and rebar check, then pushes if clean.`,
-	RunE:  runPush,
+	Use:                "push [args...]",
+	Short:              "Verified push — checks integrity before pushing",
+	Long:               `Runs rebar verify --strict and rebar check, then pushes if clean.`,
+	RunE:               runPush,
 	DisableFlagParsing: true,
 }
 

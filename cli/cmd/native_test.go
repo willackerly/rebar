@@ -308,7 +308,7 @@ func TestRunWithoutInstall(t *testing.T) {
 }
 
 // TestLegacyCopiesRunThemselves: a project's own copy of one of rebar's
-// scripts (made before rebar 4) is the adopter's code: `rebar run` and the
+// scripts (made before rebar 3.2) is the adopter's code: `rebar run` and the
 // suites run it, with the deprecation notice, instead of the built-in
 // check, and keep its customizations; a thin wrapper is never run, and
 // other project scripts run without the notice.

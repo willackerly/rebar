@@ -103,7 +103,7 @@ func TestCheckTierAndUnknownChecks(t *testing.T) {
 }
 
 // KnownChecks is the scripts' list (_REBAR_KNOWN_CHECKS in
-// scripts/_rebar-config.sh, deleted in rebar 4), so checks_enable names
+// scripts/_rebar-config.sh, deleted in rebar 3.2), so checks_enable names
 // valid in a 3.x project stay valid.
 func TestKnownChecksMatchScripts(t *testing.T) {
 	bash := strings.Fields("check-bypass-flags check-compliance check-contract-headers check-contract-refs check-decay-patterns check-doc-refs check-fix-commit check-freshness check-ground-truth check-jtbd-presence check-prefix-uniqueness check-todos compute-registry steward sync-bootstrap")

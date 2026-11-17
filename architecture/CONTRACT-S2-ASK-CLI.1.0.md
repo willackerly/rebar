@@ -137,9 +137,9 @@ This is the latest version. No predecessor.
 
 - `cli/internal/ask/` — the CLI and agent loop (native Go; `rebar ask`, `rebar ask-agent-loop`)
 - `cli/cmd/ask.go` — the `rebar ask` / `rebar ask-agent-loop` commands
-- `bin/ask` — hand-off to `rebar ask` (bash implementation under `REBAR_CHECK_IMPL=shell`)
-- `bin/ask-server` — hand-off to `rebar ask serve` (the enterprise HTTP server, `cli/internal/mcp`; python original in `bin/legacy/`)
-- `bin/ask-agent-loop` — hand-off to `rebar ask-agent-loop` (agent-loop harness)
+- `bin/ask` — sh shim running `rebar ask` (the bash implementation was removed in rebar 3.2)
+- `bin/ask-server` — sh shim running `rebar ask serve` (the enterprise HTTP server, `cli/internal/mcp`)
+- `bin/ask-agent-loop` — sh shim running `rebar ask-agent-loop` (agent-loop harness)
 - `bin/install` — PATH installer + dependency check
 - `agents/<role>/AGENT.md` — per-role config, read by ASK on every call
 - `agents/<role>/commands/*.sh` — unquoted-command implementations

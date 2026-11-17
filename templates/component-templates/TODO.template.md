@@ -73,7 +73,7 @@ _None currently._
 
 ## Discoveries
 
-<!-- Findings that don't fit neatly into tasks. The Steward (scripts/steward.sh)
+<!-- Findings that don't fit neatly into tasks. The Steward (rebar run steward)
      parses this section to track contract health. Each discovery is tagged with
      a type and linked to a contract (or "none" if no contract covers it).
 

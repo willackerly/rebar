@@ -17,12 +17,19 @@ Design notes: [self-contained install](feedback/2026-11-14-self-contained-instal
 **What changes in 3.2.** The `rebar` binary is self-contained: the checks,
 the suites, ASK, the MCP server and the bootstrap templates are built in. A
 release is one binary per platform (`rebar_<ver>_<os>_<arch>`, verified by
-the installer), not a tarball of the rebar tree, and nothing reads a rebar
-tree any more except `REBAR_CHECK_IMPL=shell`. `rebar migrate` compares your
-copies with the built-in checks, and also turns a `ci-check.sh` /
-`pre-commit.sh` copy that only adds calls to your own scripts into
-`checks_extra` / `checks_extra_pre_commit` lines. The steps below apply
-unchanged; step 10 (CI) gets simpler.
+the installer), not a tarball of the rebar tree, and the checks never read a
+rebar tree. The bash implementations are gone: rebar no longer ships
+`scripts/*.sh`, `scripts/_rebar-config.sh`, the bash `ask` or the python MCP
+and ASK servers (`bin/ask`, `bin/ask-agent-loop`, `bin/ask-mcp-server` and
+`bin/ask-server` remain as shims that run `rebar`, so `.mcp.json` files and
+PATH entries keep working), and `REBAR_CHECK_IMPL` is ignored. Your
+project's own copies of rebar's old scripts still run, with the deprecation
+notice: they are your code, and rebar never runs them except as `rebar run`
+or the suites find them. `rebar migrate` compares your copies with the
+built-in checks, and also turns a `ci-check.sh` / `pre-commit.sh` copy that
+only adds calls to your own scripts into `checks_extra` /
+`checks_extra_pre_commit` lines. The steps below apply unchanged; step 10
+(CI) gets simpler.
 
 In the commands below, `v3.1.0` is the release you are moving to. Use the
 tag you are actually installing.
@@ -66,8 +73,8 @@ re-run the installer without `--no-switch`). The rest of this runbook writes
 plain `rebar` for the 3.1 CLI.
 
 If `REBAR_ROOT` is set in your shell, a 3.1 CLI runs that tree's scripts
-rather than the installed version's; unset it unless you mean it. From 3.2 it
-only matters for `REBAR_CHECK_IMPL=shell`.
+rather than the installed version's; unset it unless you mean it. From 3.2 the
+checks ignore it.
 
 ## 2. Migrate copied scripts: `rebar migrate`
 
@@ -154,7 +161,7 @@ convenient, then delete the wrapper:
 | `scripts/cold-start-checks.sh` | `rebar check --cold-start` |
 | `scripts/ci-check.sh`, `scripts/pre-commit.sh` | unchanged: they are the thin entry points |
 
-`rebar run` with no arguments lists every script the install provides.
+`rebar run` with no arguments lists the built-in checks and the project's own scripts.
 
 A file that *sources* a copy for its functions keeps the copy: the wrapper
 cannot provide them. The one exception is `check-ground-truth.sh` sourced for

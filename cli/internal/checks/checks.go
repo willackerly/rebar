@@ -3,7 +3,7 @@
 // scripts/check-todos.sh) and behaves like the script: same arguments, same
 // .rebarrc settings, same output and exit code.
 //
-// The scripts are gone (rebar 4): these are rebar's only implementation.
+// The scripts are gone (rebar 3.2): these are rebar's only implementation.
 // `rebar check` and `rebar run` run them; a project's own copy of a script
 // still runs instead, as the adopter's code (see cmd/scripts.go).
 package checks
@@ -23,7 +23,7 @@ type Context struct {
 	// paths in the output are relative to it, as the script's grep prints
 	// them. Empty means Root (`rebar check` and `rebar run` run the scripts
 	// in the project root).
-	Dir string
+	Dir    string
 	Stdout io.Writer
 	Stderr io.Writer
 }

@@ -21,7 +21,7 @@ import (
 
 // The golden harness of rebar's checks: every case of a check is a fixture
 // tree whose expected output lives in testdata/<check>/<case>.golden. The
-// goldens were captured from the bash scripts (rebar 3.2 required the
+// goldens were captured from the bash scripts (the go-native port required the
 // script, the native check and the script handing off to the native check
 // to agree on every case), so coverage survived the scripts' deletion.
 // Regenerate a check's goldens, after a deliberate change, with
@@ -66,9 +66,9 @@ func filler(n int) string {
 
 // goldenCase is a fixture tree for one of rebar's checks, with its
 // expected output and exit code in a golden file (runGolden). The goldens
-// were captured from the check scripts while they existed (rebar 3.2 ran
+// were captured from the check scripts while they existed (the go-native port ran
 // both and required the same output), so they hold the scripts' behaviour;
-// rebar 4 deleted the scripts. divergesOn documents a case where the
+// rebar 3.2 deleted the scripts. divergesOn documents a case where the
 // script's behaviour depended on the platform's userland ("bsd" or "gnu"
 // grep, find and date; "all" where the script failed in a way that named
 // itself, like bash's "unbound variable"): the check picks the other

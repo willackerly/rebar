@@ -18,6 +18,47 @@ All notable changes to rebar. Versioned with [semver](https://semver.org/).
 
 ## Unreleased
 
+- **rebar is a single Go binary: the shell implementations are gone.**
+  rebar no longer ships `scripts/*.sh` for its checks, suites, steward and
+  utilities, nor `scripts/_rebar-config.sh`, the bash `ask` /
+  `ask-agent-loop`, the python `ask-mcp-server` / `ask-server` /
+  `test-mcp-client` (`bin/legacy/`). Every check, suite and utility runs from
+  the binary (`rebar check`, `rebar run <name>`, `rebar ask`, `rebar mcp
+  serve`), and `REBAR_CHECK_IMPL` is ignored (no `shell` fallback, no
+  hand-off). **What adopters keep:** `.rebarrc`, `METRICS`, their contracts,
+  and the two thin entry points `scripts/ci-check.sh` / `scripts/pre-commit.sh`
+  (they run `rebar check`). `bin/ask`, `bin/ask-agent-loop`,
+  `bin/ask-mcp-server` and `bin/ask-server` stay as sh shims that run
+  `rebar` (from `rebar install-shims` / the installer), so PATH entries and
+  `.mcp.json` files that name them keep working; `rebar mcp client` replaces
+  `bin/test-mcp-client`. **Legacy copies:** a project's own copy of one of
+  rebar's old scripts (`scripts/check-todos.sh` and the like) is the
+  adopter's code: `rebar run <name>` and the suites still run it instead of
+  the built-in check, with a deprecation notice, and `checks_extra` still
+  runs the project's own scripts. A copy that sources `_rebar-config.sh`
+  still finds it only if the project copied that file too. `rebar migrate`
+  recognizes copies of every released script from the list compiled into
+  the binary (no rebar tree needed) and replaces those it verifies.
+  **Behaviour changes:** outside a rebar checkout the full suite's Bootstrap
+  Sync and Script Tests steps are listed as `SKIP … (rebar source repo
+  only)` instead of running a script that skipped itself (the summary counts
+  them as skipped, not passed); `rebar run` lists the built-in checks and the
+  project's own scripts; check hints name `rebar run compute-registry`,
+  `rebar run flush-notifications`, `rebar run refresh-context` and `rebar run
+  steward` instead of the deleted scripts. **Tests:** the parity tests are
+  golden tests now: goldens captured from the scripts before deletion (the
+  scanner checks got theirs in this change), `runGolden` runs every case in
+  process and in parallel, ASK and MCP sessions compare with goldens (and
+  through the `bin/ask` / `bin/ask-mcp-server` shims); the cmd package runs in
+  about 45 s instead of 3.5 min. `scripts/tests/*.test.sh` run the binary
+  (`run.sh` builds it from `cli/`, or `REBAR_TEST_BIN`); CI's check step runs
+  `rebar check` built from the commit. The rebar tree marker is
+  `templates/project-bootstrap/` plus `cli/internal/assets/` (or, for older
+  trees, `scripts/steward.sh`). `scripts/` now holds maintainer tooling only
+  (`sync-bootstrap.sh`, `tests/`, `package-release.sh`,
+  `gen-released-blobs.sh`, `test-e2e-live.sh`); the checks reference moved to
+  `docs/CONFIGURATION.md`.
+
 - **The `rebar` binary is self-contained, and releases are binaries.**
   `rebar new / init / adopt` write the bootstrap template compiled into the
   binary (`cli/internal/assets`, a `.embed`-suffixed copy that

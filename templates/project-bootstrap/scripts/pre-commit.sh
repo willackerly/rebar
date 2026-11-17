@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # rebar-thin-wrapper
-# pre-commit.sh — git pre-commit hook entry point. The checks live in the
-# rebar install. Install: ln -sf ../../scripts/pre-commit.sh .git/hooks/pre-commit
+# pre-commit.sh — git pre-commit hook entry point. The checks are built into
+# the rebar binary. Install: ln -sf ../../scripts/pre-commit.sh .git/hooks/pre-commit
 # Skip (sparingly): git commit --no-verify
 set -euo pipefail
 command -v rebar >/dev/null 2>&1 || {

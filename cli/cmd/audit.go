@@ -15,8 +15,8 @@ import (
 )
 
 var (
-	auditAll  string // directory to scan for repos
-	auditFix  bool   // auto-fix quick wins
+	auditAll string // directory to scan for repos
+	auditFix bool   // auto-fix quick wins
 )
 
 var auditCmd = &cobra.Command{

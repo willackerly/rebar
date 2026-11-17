@@ -21,7 +21,7 @@ import (
 
 // The MCP server (`rebar mcp serve`) and ask-server (`rebar ask serve`)
 // against transcripts in testdata/mcp: a JSON-RPC session over stdio and
-// HTTP request sequences. rebar 3.2 sent the same sessions to the python
+// HTTP request sequences. The go-native port sent the same sessions to the python
 // originals and required the same responses (byte for byte over stdio:
 // the server writes Python's json.dumps format), so the goldens hold the
 // python servers' behaviour, except where a request documents a deliberate
@@ -438,7 +438,7 @@ func TestMCPNativeAsk(t *testing.T) {
 }
 
 // TestMCPClientGolden: `rebar mcp client` against an HTTP MCP server
-// prints what bin/test-mcp-client (python, removed in rebar 4) printed.
+// prints what bin/test-mcp-client (python, removed in rebar 3.2) printed.
 func TestMCPClientGolden(t *testing.T) {
 	repos, stub := mcpFixture(t)
 	port := freePort(t)

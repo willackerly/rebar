@@ -7,8 +7,8 @@
 > thin hand-off to it, so `ask` and `rebar ask` are the same command.
 > Subcommands, flags, `ASK_*` variables, exit codes and on-disk files are
 > specified by `architecture/CONTRACT-S2-ASK-CLI.1.0.md`; `ask help` lists
-> them. `REBAR_CHECK_IMPL=shell` runs the original bash implementation
-> until it is removed.
+> them. (The original bash implementation was removed in rebar 3.2; its
+> behaviour is kept in the goldens of `cli/cmd/native_ask_test.go`.)
 
 This document defines a Unix-like command surface for interacting with agents.
 

@@ -6,7 +6,7 @@
 `feedback/processed/2026-04-27-e2e-test-bypass-closed-loop-verification-drift.md`
 (filedag),
 `feedback/processed/2026-04-27-user-at-keyboard-story-tier.md` (pdf-signer-web)
-**Enforced by:** `scripts/check-decay-patterns.sh` (P2, P8) + reviewer
+**Enforced by:** `rebar run check-decay-patterns` (P2, P8) + reviewer
 discipline
 
 Three repos — pdf-signer-web, filedag, opendockit — independently
@@ -286,7 +286,7 @@ Corollaries:
 - **Soft-hardening decay patterns** (silenced failures, magic-string
   gating, plausible env names) —
   `feedback/2026-04-24-fidelity-decay-soft-hardening-patterns.md`,
-  enforced by `scripts/check-decay-patterns.sh`.
+  enforced by `rebar run check-decay-patterns`.
 
 ---
 
@@ -296,7 +296,7 @@ Corollaries:
   (prohibited skip patterns, accepted conditional patterns)
 - [`practices/e2e-testing.md`](e2e-testing.md) — journey-driving
   ladder (L1–L4), managed test stacks
-- `scripts/check-decay-patterns.sh` — mechanical enforcement (P2
+- `rebar run check-decay-patterns` — mechanical enforcement (P2
   inverted assertions, P8 demo/UAKS bypass ban)
 - [`feedback/2026-04-22-testing-rigor-six-moments.md`](../feedback/2026-04-22-testing-rigor-six-moments.md)
   — the six claim-vs-test asymmetries

@@ -87,8 +87,8 @@ installer leaves the clone as it is — not moved, not updated — and adds
 `versions/` and `current` inside it (git-excluded). The new PATH entry comes
 later in your RC, so it wins; `.mcp.json` files and `REBAR_ROOT` that point at
 the clone keep working until you re-run `rebar init` or change them.
-`REBAR_ROOT` only matters for `REBAR_CHECK_IMPL=shell` (see "Where a rebar
-tree still matters" below).
+`REBAR_ROOT` is no longer needed (see "Where a rebar tree still matters"
+below).
 
 ## Run rebar in CI
 
@@ -168,12 +168,14 @@ download. (Before 3.2 the binary ran the scripts of the rebar tree beside it,
 so a wrapper had to keep the whole tree of the pinned commit; such a
 wrapper keeps working with 3.2, it just no longer needs the tree.)
 
-**Where a rebar tree still matters.** `REBAR_CHECK_IMPL=shell` (the bash
-scripts, until they are removed) and `rebar run` of a script that has no
-built-in (rebar's own maintainer tools) use a rebar tree: `$REBAR_ROOT`, else
-the directory above the binary, the current directory, then `~/.rebar/current`,
-`~/.rebar`, `~/dev/rebar`, `~/src/rebar`, `~/code/rebar` (`findRebarRoot` in
-`cli/cmd/init.go`). Nothing else reads one.
+**Where a rebar tree still matters.** Almost nowhere: rebar is a single
+binary, and its checks never read a rebar tree. `rebar doc` resolves
+`rebar:<kind>/<name>` references from a checkout when it finds one, and
+`rebar migrate` reads a checkout's release history to recognize old copies
+(the binary carries the list of released scripts, so it does not need one).
+They look in `$REBAR_ROOT`, else the directory above the binary, the current
+directory, then `~/.rebar/current`, `~/.rebar`, `~/dev/rebar`, `~/src/rebar`,
+`~/code/rebar` (`findRebarRoot` in `cli/cmd/init.go`).
 
 ## Step 1: Pick Your Profiles
 
@@ -214,13 +216,14 @@ in a fresh directory and makes the first commit (see
 points, `ci-check.sh` and `pre-commit.sh`, which run `rebar check`. Existing
 files are left alone; the badge is added to an existing README.
 
-**Copying by hand** instead works from the install tree, which holds the same
-templates (`~/.rebar/current`; any rebar checkout works too). The copied
-`scripts/` entry points call `rebar`, so rebar must still be on your PATH:
+**Copying by hand** instead works from a rebar checkout (`git clone
+https://github.com/willackerly/rebar`), which holds the same templates. The
+copied `scripts/` entry points call `rebar`, so rebar must still be on your
+PATH:
 
 ```bash
 PROJECT=/path/to/your/project
-R=~/.rebar/current
+R=~/src/rebar                    # a rebar checkout
 BOOTSTRAP="$R/templates/project-bootstrap"
 
 # The Cold Start Quad (required)

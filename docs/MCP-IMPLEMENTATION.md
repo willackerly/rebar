@@ -2,12 +2,12 @@
 
 > **Implementation status (rebar 3.2):** the MCP server is native Go in the
 > `rebar` binary — `rebar mcp serve` (package `cli/internal/mcp`). The
-> python snippets below are the original design (`bin/legacy/ask-mcp-server.py`,
-> runnable with `REBAR_CHECK_IMPL=shell` until it is removed); the Go server
-> keeps its wire behaviour: the same tool names, input schema, descriptions,
-> resource URIs, error codes/messages/data, notification handling and
-> `json.dumps` formatting, verified by parity tests that replay one JSON-RPC
-> session and HTTP transcripts through both (`cli/cmd/native_mcp_test.go`).
+> python snippets below are the original design (the python server was
+> removed in rebar 3.2); the Go server keeps its wire behaviour: the same tool
+> names, input schema, descriptions, resource URIs, error codes/messages/data,
+> notification handling and `json.dumps` formatting, held by goldens captured
+> from the python server — one JSON-RPC session and HTTP transcripts
+> (`cli/cmd/native_mcp_test.go`).
 >
 > It is a minimal JSON-RPC 2.0 implementation rather than the official MCP
 > Go SDK: the SDK negotiates its own protocol version and answers unknown or
@@ -339,7 +339,7 @@ answer = response.json()["result"]["content"][0]["text"]
 # Start MCP server
 rebar mcp serve --port 7232 --repos-dir ..
 
-# Test with provided client (bin/test-mcp-client runs the same)
+# Test with the provided client
 rebar mcp client http://localhost:7232
 ```
 
@@ -426,7 +426,7 @@ ask://agent/repo:role   → agents/role/AGENT.md
 ## Files Created
 
 1. **`cli/internal/mcp/`** - the MCP server, ask-server and test client (Go; `rebar mcp serve`, `rebar ask serve`, `rebar mcp client`)
-2. **`bin/ask-mcp-server`, `bin/ask-server`, `bin/test-mcp-client`** - hand-offs to those commands (the python originals are in `bin/legacy/`)
+2. **`bin/ask-mcp-server`, `bin/ask-server`** - sh shims that run those commands (for `.mcp.json` files and scripts that name them)
 3. **`docs/MCP-IMPLEMENTATION.md`** - This documentation
 
 ---

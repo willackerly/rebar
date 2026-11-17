@@ -115,7 +115,7 @@ freely. The integrity system protects the *methodology*, not the product.
   "repo_salt": "hex-encoded-random-256-bit",
   "checksums": {
     "enforcement": {
-      "scripts/steward.sh": {
+      "rebar run steward": {
         "sha256": "abcdef...",
         "role": "steward",
         "role_hmac": "123456...",
@@ -205,7 +205,7 @@ Integrity Check — 2026-03-27T14:32:00Z
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 Enforcement scripts:
-  ✓ scripts/steward.sh        hash OK, role: steward
+  ✓ rebar run steward        hash OK, role: steward
   ✓ scripts/ci-check.sh       hash OK, role: ci
   ✓ scripts/pre-commit.sh     hash OK, role: ci
 
@@ -508,7 +508,7 @@ Integrity + Authenticity Check — 2026-03-27T14:32:00Z
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 Enforcement scripts:
-  ✓ scripts/steward.sh        hash OK, role: steward
+  ✓ rebar run steward        hash OK, role: steward
     ✓ sig: ci-github-actions (ci) — 2026-03-26T10:00:00Z
 
 Contracts:
