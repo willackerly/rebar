@@ -41,6 +41,15 @@ All notable changes to rebar. Versioned with [semver](https://semver.org/).
   script ended with `[ "$DRY_RUN" = "1" ] && echo …`. It now exits 0 when
   every dispatch succeeds and 1 when any fails (counted as `failed=` in the
   summary line).
+- **New projects ignore the steward's generated files.** The first `rebar
+  check` in a project from `rebar new` left `STEWARD_REPORT.md` and
+  `architecture/.state/` untracked, though the steward contract says they are
+  gitignored. `rebar new` and `rebar init` now add `STEWARD_REPORT.md` and
+  `<contracts_dir>/.state/*.json` to `.gitignore` (`init` appends only the
+  missing entries; the `.state/` outbox, `pending-notifications.md`, stays
+  tracked). The bootstrap template's `.gitignore` gets `STEWARD_REPORT.md` in
+  place of `architecture/.state/steward-report.md`, which nothing writes.
+  Existing projects: add the two lines, or run `rebar init`.
 
 ---
 
