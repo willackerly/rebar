@@ -23,6 +23,11 @@ All notable changes to rebar. Versioned with [semver](https://semver.org/).
   link to the full CHANGELOG), followed by GitHub's list of merged PRs, and
   refuses to publish a tag with no such section — write the CHANGELOG before
   tagging. `scripts/release-notes.sh <tag>` prints the same section locally.
+- **`check-decay-patterns.sh` no longer crashes or hangs under macOS
+  `/bin/bash` 3.2 once ~250 spec/test files are scanned.** Each file's
+  `done < <(grep …)` left a descriptor open, and bash 3.2 corrupts its heap
+  when that reaches fd 256 (abort, bus error, or a hang). The scan now pipes
+  grep into its loop; output is unchanged.
 
 ---
 
