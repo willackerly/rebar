@@ -53,33 +53,34 @@ func runScanConsumers(ctx *checks.Context, args []string) int {
 		fmt.Fprintln(ctx.Stderr, "Usage: scan-consumers.sh <contract-id>")
 		return 2
 	}
-	text, _, code := scanConsumers(ctx.WorkDir(), id, asJSON)
-	io.WriteString(ctx.Stdout, text)
+	_, code := scanConsumers(ctx.WorkDir(), ctx.Stdout, ctx.Stderr, id, asJSON)
 	return code
 }
 
-// scanConsumers is the script's output for contract id, run in dir, the
-// consumers it found, and its exit code. A consumer section without one of
-// version_pinned, pin_date, notify_on_change and rationale ends the script
-// there with exit 1 (the field's `grep | head | sed` pipeline fails under
-// set -e and pipefail), before that consumer is printed; with --json
-// nothing is printed at all.
-func scanConsumers(dir, id string, asJSON bool) (string, []consumer, int) {
-	var b strings.Builder
+// scanConsumers writes the script's output for contract id, run in dir, to
+// out (as the script prints it, so it interleaves with errw as the
+// script's stdout and stderr do) and returns the consumers it found and its
+// exit code. Only version_pinned is required:
+// a consumer section without it is reported on errw and left out, and the
+// exit code is 1 once every consumer has been listed. pin_date,
+// notify_on_change and rationale default to "".
+func scanConsumers(dir string, out, errw io.Writer, id string, asJSON bool) ([]consumer, int) {
+	b := out
 	owner := shellBasename(toplevel(dir))
 	paths := scanPaths(owner)
 	if len(paths) == 0 {
 		if asJSON {
-			b.WriteString(`{"contract":"` + owner + "/" + id + `","consumers":[]}` + "\n")
+			io.WriteString(b, `{"contract":"` + owner + "/" + id + `","consumers":[]}` + "\n")
 		} else {
-			b.WriteString("scan-consumers: no repos to scan (registry empty + REBAR_REPOS unset)\n")
+			io.WriteString(b, "scan-consumers: no repos to scan (registry empty + REBAR_REPOS unset)\n")
 		}
-		return b.String(), nil, 0
+		return nil, 0
 	}
 	head := regexp.MustCompile(`^## ` + regexp.QuoteMeta(owner+"/"+id) + `\.`)
 	headBRE := checks.BRE("^## " + owner + "/" + id + "\\.")
 	var found []consumer
 	var results []string
+	errors := 0
 	for _, repo := range paths {
 		consumes := repo + "/CONSUMES.md"
 		info, err := os.Stat(resolve(dir, consumes))
@@ -105,25 +106,23 @@ func scanConsumers(dir, id string, asJSON bool) (string, []consumer, int) {
 				section = append(section, l)
 			}
 		}
-		c := consumer{name: shellBasename(repo), path: repo}
-		var vals [4]string
-		for i, name := range []string{"version_pinned", "pin_date", "notify_on_change", "rationale"} {
-			v, ok := sectionField(section, name)
-			if !ok {
-				if asJSON {
-					return "", nil, 1
-				}
-				return b.String(), nil, 1
+		c := consumer{
+			name:      shellBasename(repo),
+			path:      repo,
+			pin:       fieldValue(sectionField(section, "version_pinned")),
+			pinDate:   fieldValue(sectionField(section, "pin_date")),
+			notify:    fieldValue(sectionField(section, "notify_on_change")),
+			rationale: sectionField(section, "rationale"),
+		}
+		if c.pin == "" {
+			hdrLine := ""
+			if len(section) > 0 {
+				hdrLine = section[0]
 			}
-			vals[i] = v
+			fmt.Fprintf(errw, "scan-consumers: %s: section '%s' has no version_pinned (required: the semver this consumer is pinned to, CHARTER §1.6) — skipped\n", consumes, hdrLine)
+			errors++
+			continue
 		}
-		c.pin = strings.ReplaceAll(vals[0], " ", "")
-		c.pinDate = strings.ReplaceAll(vals[1], " ", "")
-		// awk '{print $1}': fields split on blanks and tabs.
-		if f := strings.FieldsFunc(vals[2], func(r rune) bool { return r == ' ' || r == '\t' }); len(f) > 0 {
-			c.notify = f[0]
-		}
-		c.rationale = vals[3]
 		found = append(found, c)
 		if asJSON {
 			results = append(results, fmt.Sprintf(`{"name":"%s","path":"%s","version_pinned":"%s","pin_date":"%s","notify_on_change":"%s","rationale":"%s"}`,
@@ -131,30 +130,37 @@ func scanConsumers(dir, id string, asJSON bool) (string, []consumer, int) {
 			continue
 		}
 		if len(results) == 0 {
-			b.WriteString("Consumers of " + owner + "/" + id + ":\n\n")
+			io.WriteString(b, "Consumers of " + owner + "/" + id + ":\n\n")
 		}
 		notify := c.notify
 		if notify == "" {
 			notify = "(unset; owner default applies)"
 		}
-		fmt.Fprintf(&b, "  %s → %s\n", c.name, c.path)
-		fmt.Fprintf(&b, "    version_pinned:    %s\n", c.pin)
-		fmt.Fprintf(&b, "    pin_date:          %s\n", c.pinDate)
-		fmt.Fprintf(&b, "    notify_on_change:  %s\n", notify)
-		if c.rationale != "" {
-			fmt.Fprintf(&b, "    rationale:         %s\n", c.rationale)
+		pinDate := c.pinDate
+		if pinDate == "" {
+			pinDate = "(unset)"
 		}
-		b.WriteString("\n")
+		fmt.Fprintf(b, "  %s → %s\n", c.name, c.path)
+		fmt.Fprintf(b, "    version_pinned:    %s\n", c.pin)
+		fmt.Fprintf(b, "    pin_date:          %s\n", pinDate)
+		fmt.Fprintf(b, "    notify_on_change:  %s\n", notify)
+		if c.rationale != "" {
+			fmt.Fprintf(b, "    rationale:         %s\n", c.rationale)
+		}
+		io.WriteString(b, "\n")
 		results = append(results, "found")
 	}
 	switch {
 	case asJSON:
-		b.WriteString(`{"contract":"` + owner + "/" + id + `","consumers":[` + strings.Join(results, ",") + "]}\n")
+		io.WriteString(b, `{"contract":"` + owner + "/" + id + `","consumers":[` + strings.Join(results, ",") + "]}\n")
 	case len(results) == 0:
-		b.WriteString("No consumers of " + owner + "/" + id + " found in scanned repos.\n")
-		fmt.Fprintf(&b, "(Searched %d repo(s); cross-machine discovery is out of scope per CHARTER §2.10.)\n", len(paths))
+		io.WriteString(b, "No consumers of " + owner + "/" + id + " found in scanned repos.\n")
+		fmt.Fprintf(b, "(Searched %d repo(s); cross-machine discovery is out of scope per CHARTER §2.10.)\n", len(paths))
 	}
-	return b.String(), found, 0
+	if errors > 0 {
+		return found, 1
+	}
+	return found, 0
 }
 
 // awkRegexp is the section header the script's awk matches: the dynamic
@@ -177,19 +183,24 @@ func anyMatch(re *regexp.Regexp, lines []string) bool {
 	return false
 }
 
-// sectionField is the value of the first "- **<name>:**" line of section,
-// as the script's sed leaves it (after the last "<name>:**" and the spaces
-// after it); false when there is no such line.
-func sectionField(section []string, name string) (string, bool) {
+// sectionField is the script's `field NAME`: the rest of the first line of
+// section that starts "- **<name>:**", without the blanks and tabs around
+// it; "" when there is no such line.
+func sectionField(section []string, name string) string {
 	prefix := "- **" + name + ":**"
-	marker := name + ":**"
 	for _, l := range section {
 		if strings.HasPrefix(l, prefix) {
-			v := l[strings.LastIndex(l, marker)+len(marker):]
-			return strings.TrimLeft(v, " "), true
+			return strings.Trim(l[len(prefix):], " \t")
 		}
 	}
-	return "", false
+	return ""
+}
+
+// fieldValue is the script's `value` filter (sed 's/#.*//;
+// s/[[:space:]]*$//'): v up to its first #, without trailing whitespace.
+func fieldValue(v string) string {
+	v, _, _ = strings.Cut(v, "#")
+	return strings.TrimRight(v, " \t\n\v\f\r")
 }
 
 // scanPaths is the set of repos to scan: REBAR_REPOS split on commas (as

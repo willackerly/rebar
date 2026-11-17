@@ -32,7 +32,7 @@ var isoTimestamp = regexp.MustCompile(`[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]
 var (
 	daysOld       = regexp.MustCompile(`QUICKCONTEXT is [0-9]+ days`)
 	worktreeLine  = regexp.MustCompile(`(?m)^/\S+( +[0-9a-f]{7,} \[[^]]*\])$`)
-	bashArithLine = regexp.MustCompile(`(?m)^.*: line [0-9]+: \[\[: 0\n0: syntax error in expression \(error token is "0"\)\n`)
+	bashArithLine = regexp.MustCompile(`(?m)^.*: line [0-9]+: \[\[: 0\n0: (arithmetic )?syntax error in expression \(error token is "0"\)\n`)
 )
 
 var commitLine = regexp.MustCompile(`(?m)^(<worktree> +)?[0-9a-f]{7,12}( )`)
@@ -289,14 +289,14 @@ var scanConsumersCases = []parityCase{
 	{name: "two IDs", files: map[string]string{"x": "x\n"}, args: []string{"C1", "C2"}},
 	{name: "--help", files: map[string]string{"x": "x\n"}, args: []string{"--json", "-h"}},
 	{name: "nothing to scan", files: map[string]string{"x": "x\n"}, env: []string{"ASK_REGISTRY=$ROOT/none"}, args: []string{"C1-API"}},
-	{name: "nothing to scan, --json", files: map[string]string{"x": "x\n"}, env: []string{"ASK_REGISTRY=$ROOT/none"}, args: []string{"--json", "C1-API"}},
+	{name: "nothing to scan --json", files: map[string]string{"x": "x\n"}, env: []string{"ASK_REGISTRY=$ROOT/none"}, args: []string{"--json", "C1-API"}},
 	{name: "REBAR_REPOS", files: map[string]string{"x": "x\n"}, setup: consumerRepos, env: consumersEnv, args: []string{"C1-API"}},
-	{name: "REBAR_REPOS, --json", files: map[string]string{"x": "x\n"}, setup: consumerRepos, env: consumersEnv, args: []string{"C1-API", "--json"}},
+	{name: "REBAR_REPOS --json", files: map[string]string{"x": "x\n"}, setup: consumerRepos, env: consumersEnv, args: []string{"C1-API", "--json"}},
 	{name: "no consumers of this contract", files: map[string]string{"x": "x\n"}, setup: consumerRepos, env: consumersEnv, args: []string{"C9-NONE"}},
 	{name: "the ASK registry", files: map[string]string{"x": "x\n"}, setup: consumerRepos, env: []string{"ASK_REGISTRY=$ROOT/registry"}, args: []string{"C1-API"}},
 	{name: "complete sections", files: map[string]string{"x": "x\n"}, setup: fullConsumers, env: consumersEnv, args: []string{"C1-API"}},
-	{name: "complete sections, --json", files: map[string]string{"x": "x\n"}, setup: fullConsumers, env: consumersEnv, args: []string{"--json", "C1-API"}},
-	{name: "a quote in a rationale, --json", files: map[string]string{"x": "x\n"}, setup: quotedConsumers, env: consumersEnv, args: []string{"--json", "C1-API"}},
+	{name: "complete sections --json", files: map[string]string{"x": "x\n"}, setup: fullConsumers, env: consumersEnv, args: []string{"--json", "C1-API"}},
+	{name: "a quote in a rationale --json", files: map[string]string{"x": "x\n"}, setup: quotedConsumers, env: consumersEnv, args: []string{"--json", "C1-API"}},
 	{name: "an ID that is a pattern", files: map[string]string{"x": "x\n"}, setup: consumerRepos, env: consumersEnv, args: []string{"C1-A.I"}},
 }
 
@@ -308,9 +308,9 @@ func TestScanConsumersGolden(t *testing.T) {
 	runGolden(t, scanConsumersCheck, scanConsumersCases)
 }
 
-// fullConsumers writes consumer repos whose sections have every field
-// (scan-consumers ends at the first one that lacks one): alpha wants
-// notices, beta does not, gamma leaves it open, broken's ask fails.
+// fullConsumers writes consumer repos whose sections have every field:
+// alpha wants notices, beta does not, gamma leaves it open, broken's ask
+// fails.
 func fullConsumers(t *testing.T, root string) { consumersWith(t, root, "plain use") }
 
 // quotedConsumers is fullConsumers with a quote in each rationale, which
@@ -360,8 +360,8 @@ var flushCases = []parityCase{
 	{name: "nothing pending", files: map[string]string{"architecture/.state/pending-notifications.md": "## C3-OLD: 1.0 → 1.0.1\n- **status:** sent\n"}},
 	{name: "dry run", files: flushFiles, setup: both(fullConsumers, fakeAsk), env: flushEnv, args: []string{"--dry-run"}},
 	{name: "dispatch", files: flushFiles, setup: both(fullConsumers, fakeAsk), env: flushEnv},
-	{name: "dispatch with a severity, unset preferences skipped", files: flushFiles, setup: both(fullConsumers, fakeAsk), env: append([]string{"REBAR_NOTIFY_DEFAULT=skip"}, flushEnv...), args: []string{"--severity", "doc-only"}},
-	{name: "a consumer section without a rationale ends scan-consumers", files: flushFiles, setup: both(consumerRepos, fakeAsk), env: flushEnv},
+	{name: "dispatch with a severity unset preferences skipped", files: flushFiles, setup: both(fullConsumers, fakeAsk), env: append([]string{"REBAR_NOTIFY_DEFAULT=skip"}, flushEnv...), args: []string{"--severity", "doc-only"}},
+	{name: "optional fields default and a section without version_pinned is reported", files: flushFiles, setup: both(consumerRepos, fakeAsk), env: flushEnv},
 	{name: "a quote in a rationale breaks the JSON", files: flushFiles, setup: both(quotedConsumers, fakeAsk), env: flushEnv},
 	{name: "no consumers", files: flushFiles, setup: fakeAsk, env: []string{"REBAR_REPOS=$ROOT/none", "ASK_BIN=$ROOT/bin/ask"}},
 	{

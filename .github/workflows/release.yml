@@ -8,6 +8,11 @@
 # tarballs; the installer still handles those.)
 # Tags with a pre-release suffix (v3.1.0-beta.1) become pre-releases.
 #
+# Built with the latest patch of the newest supported Go release (not
+# cli/go.mod's minimum), so fixed standard-library vulnerabilities don't ship;
+# every binary is scanned with govulncheck before anything is published, and
+# the Go version is recorded in the Release notes.
+#
 # Third-party actions are pinned by commit SHA (the tag in the comment).
 name: release
 
@@ -34,9 +39,13 @@ jobs:
 
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version-file: cli/go.mod
+          go-version: stable
+          check-latest: true
           # No shared module/build cache in the job that publishes assets.
           cache: false
+
+      - name: Go toolchain
+        run: go version
 
       - name: Tag matches the CLI's release version
         # Unstamped builds of this tag (go build, older installers) report
@@ -49,6 +58,20 @@ jobs:
             echo "::error file=cli/cmd/root.go::releaseVersion is '$release' but the tag is '$TAG'; bump it and re-tag"
             exit 1
           fi
+
+      # The Release body is the tag's CHANGELOG section, so it must exist
+      # before tagging (like releaseVersion above); checked before the slow steps.
+      - name: Release notes from CHANGELOG
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          if ! scripts/release-notes.sh --link-base "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/blob/$TAG" "$TAG" > "$RUNNER_TEMP/notes.md"; then
+            echo "::error file=CHANGELOG.md::no '## $TAG' section with content; add it and re-tag"
+            exit 1
+          fi
+          printf '\nFull changelog: [CHANGELOG.md](%s/%s/blob/%s/CHANGELOG.md)\n' \
+            "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$TAG" >> "$RUNNER_TEMP/notes.md"
+          printf '\nBinaries built with %s.\n' "$(go env GOVERSION)" >> "$RUNNER_TEMP/notes.md"
 
       - name: Test
         working-directory: cli
@@ -77,6 +100,25 @@ jobs:
           "$bin" new smoke >/dev/null
           (cd smoke && "$bin" check >/dev/null)
 
+      # Fail before upload if any built binary links code with a known
+      # vulnerability (usually a standard-library fix newer than this Go).
+      - name: govulncheck release binaries
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          go install golang.org/x/vuln/cmd/govulncheck@v1.9.0
+          failed=0
+          for bin in dist/rebar_"${TAG#v}"_*; do
+            case "$bin" in *_checksums.txt) continue ;; esac
+            echo "::group::govulncheck $(basename "$bin")"
+            "$(go env GOPATH)/bin/govulncheck" -mode=binary "$bin" || failed=1
+            echo "::endgroup::"
+          done
+          if [ "$failed" -ne 0 ]; then
+            echo "::error::govulncheck found known vulnerabilities in the release binaries; nothing was published"
+            exit 1
+          fi
+
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -87,6 +129,7 @@ jobs:
           gh release create "$TAG" dist/* \
             --repo "$GITHUB_REPOSITORY" \
             --title "$TAG" \
+            --notes-file "$RUNNER_TEMP/notes.md" \
             --generate-notes \
             --verify-tag \
             $prerelease

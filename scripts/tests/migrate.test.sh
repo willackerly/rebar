@@ -83,36 +83,36 @@ g -C "$P" init -q && g -C "$P" add -A && g -C "$P" commit -qm init
 # ── T1 dry run ──
 out=$(cd "$P" && rebar migrate 2>&1) || fail "T1: dry run exited non-zero: $out"
 [ -z "$(g -C "$P" status --porcelain)" ] || fail "T1: dry run changed the project: $(g -C "$P" status --porcelain)"
-echo "$out" | grep -q 'Dry run: nothing changed' || fail "T1: no dry-run notice: $out"
+contains "$out" 'Dry run: nothing changed' || fail "T1: no dry-run notice: $out"
 ok "T1 dry run changes nothing"
 
 # ── T2 / T3 proposals ──
-echo "$out" | grep -q '+ source_dirs *= lib tools' || fail "T2: source_dirs not proposed: $out"
-echo "$out" | grep -q '+ source_extensions *= go sh' || fail "T2: source_extensions not proposed: $out"
+contains "$out" '+ source_dirs *= lib tools' || fail "T2: source_dirs not proposed: $out"
+contains "$out" '+ source_extensions *= go sh' || fail "T2: source_extensions not proposed: $out"
 # The copy's `grep -v "node_modules\|vendor\|dist"` drops lines by substring;
 # the install excludes directories by name (#19). The copy is otherwise the
 # v2 template plus settings, so it goes, with the change reported.
-echo "$out" | grep -q 'delete   scripts/check-todos.sh — customized only in settings' || fail "T2: check-todos.sh not recognized as settings-only: $out"
-echo "$out" | grep -q 'impact on this project: none' || fail "T2: no impact report: $out"
-echo "$out" | grep -q 'kept      sh_lines = 2 — untranslatable' || fail "T3: untranslatable metric not reported with its value: $out"
-echo "$out" | grep -q 'keep     scripts/check-ground-truth.sh' || fail "T3: ground truth copy not kept: $out"
-echo "$out" | grep -q '+ metric.lib_files.paths *= lib' || fail "T3: expressible metric not proposed: $out"
+contains "$out" 'delete   scripts/check-todos.sh — customized only in settings' || fail "T2: check-todos.sh not recognized as settings-only: $out"
+contains "$out" 'impact on this project: none' || fail "T2: no impact report: $out"
+contains "$out" 'kept      sh_lines = 2 — untranslatable' || fail "T3: untranslatable metric not reported with its value: $out"
+contains "$out" 'keep     scripts/check-ground-truth.sh' || fail "T3: ground truth copy not kept: $out"
+contains "$out" '+ metric.lib_files.paths *= lib' || fail "T3: expressible metric not proposed: $out"
 
 out=$(cd "$P" && rebar migrate --apply 2>&1) || fail "--apply exited non-zero: $out"
 [ ! -e "$P/scripts/check-todos.sh" ] || fail "T2: verified check-todos.sh not deleted"
 [ -f "$P/scripts/check-ground-truth.sh" ] || fail "T3: unverified ground truth copy deleted"
-head -2 "$P/.rebarrc" | grep -q '^# our settings$' || fail "existing .rebarrc lines not kept: $(cat "$P/.rebarrc")"
-echo "$out" | grep -q 'PASS  check-todos via rebar' || fail "T2: no post-apply check result: $out"
+contains "$(head -2 "$P/.rebarrc")" '^# our settings$' || fail "existing .rebarrc lines not kept: $(cat "$P/.rebarrc")"
+contains "$out" 'PASS  check-todos via rebar' || fail "T2: no post-apply check result: $out"
 printf '#!/bin/sh\n# TODO: probe\n' > "$P/tools/y.sh"
 res=$(cd "$P" && rebar run check-todos 2>&1) && fail "T2: install's check-todos missed a TODO in tools/: $res"
-echo "$res" | grep -q 'tools/y.sh' || fail "T2: TODO in tools/y.sh not reported: $res"
+contains "$res" 'tools/y.sh' || fail "T2: TODO in tools/y.sh not reported: $res"
 rm "$P/tools/y.sh"
 ok "T2 check-todos moves to source_dirs/source_extensions and still scans tools/"
 ok "T3 untranslatable metric keeps the copy and is reported"
 
 # ── T4 idempotent ──
 out=$(cd "$P" && rebar migrate 2>&1) || fail "T4: second run failed: $out"
-echo "$out" | grep -q 'Nothing to migrate' || fail "T4: second run proposes changes: $out"
+contains "$out" 'Nothing to migrate' || fail "T4: second run proposes changes: $out"
 ok "T4 second run proposes nothing"
 
 # ── T6 callers keep working ──
@@ -131,23 +131,23 @@ chmod +x "$C/scripts/"*.sh
 g -C "$C" init -q && g -C "$C" add -A && g -C "$C" commit -qm init
 touch "$C/wip.txt"
 out=$(cd "$C" && PATH="$TMP/bin:$PATH" rebar migrate --apply 2>&1) && fail "T6: --apply ran on a dirty tree: $out"
-echo "$out" | grep -q 'uncommitted or untracked' || fail "T6: no dirty-tree refusal: $out"
+contains "$out" 'uncommitted or untracked' || fail "T6: no dirty-tree refusal: $out"
 cmp -s "$REBAR_SCRIPTS/check-todos.sh" "$C/scripts/check-todos.sh" && fail "T6: the refused apply changed the copy"
 rm "$C/wip.txt"
 out=$(cd "$C" && PATH="$TMP/bin:$PATH" rebar migrate --apply 2>&1) || fail "T6: --apply failed: $out"
 grep -q '^# rebar-thin-wrapper' "$C/scripts/check-todos.sh" || fail "T6: called copy not replaced by a wrapper: $out"
-echo "$out" | grep -q 'PASS  check-todos via wrapper scripts/check-todos.sh' || fail "T6: wrapper not exercised after apply: $out"
-echo "$out" | grep -q 'CI: .pre-commit-config.yaml:5 runs scripts/check-todos.sh' || fail "T6: no CI note: $out"
+contains "$out" 'PASS  check-todos via wrapper scripts/check-todos.sh' || fail "T6: wrapper not exercised after apply: $out"
+contains "$out" 'CI: .pre-commit-config.yaml:5 runs scripts/check-todos.sh' || fail "T6: no CI note: $out"
 res=$(cd "$C" && PATH="$TMP/bin:$PATH" bash scripts/ci.sh 2>&1) || fail "T6: scripts/ci.sh broke after apply: $res"
 printf '// TODO: probe\n' >> "$C/src/a.go"
 res=$(cd "$C" && PATH="$TMP/bin:$PATH" scripts/check-todos.sh 2>&1) && fail "T6: the wrapper missed a TODO: $res"
-echo "$res" | grep -q 'src/a.go' || fail "T6: wrapper output lacks the finding: $res"
+contains "$res" 'src/a.go' || fail "T6: wrapper output lacks the finding: $res"
 # A wrapper copied elsewhere (analyze's registry test copies the script into
 # a temp dir) checks the directory it sits in, as the copy did.
 mkdir -p "$TMP/standalone/scripts"
 cp "$C/scripts/check-todos.sh" "$TMP/standalone/scripts/"
 res=$(cd / && PATH="$TMP/bin:$PATH" bash "$TMP/standalone/scripts/check-todos.sh" 2>&1) || fail "T6: copied wrapper failed outside a repo: $res"
-echo "$res" | grep -q 'No source directories found' || fail "T6: copied wrapper checked the wrong project: $res"
+contains "$res" 'No source directories found' || fail "T6: copied wrapper checked the wrong project: $res"
 ok "T6 called copies become wrappers and callers still work (also when copied); dirty tree refused"
 
 # ── T7 symlinked scripts/ ──
@@ -158,15 +158,15 @@ printf 'tier = 3\n' > "$TMP/linked/.rebarrc"
 ln -s "$S" "$TMP/linked/scripts"
 g -C "$TMP/linked" init -q && g -C "$TMP/linked" add -A && g -C "$TMP/linked" commit -qm init
 out=$(cd "$TMP/linked" && rebar migrate --apply 2>&1) && fail "T7: symlinked scripts/ not refused: $out"
-echo "$out" | grep -q 'outside the project' || fail "T7: wrong refusal: $out"
-[ "$(echo "$out" | grep -c 'outside the project')" = 1 ] || fail "T7: the error is printed more than once: $out"
+contains "$out" 'outside the project' || fail "T7: wrong refusal: $out"
+[ "$(count_matches "$out" 'outside the project')" = 1 ] || fail "T7: the error is printed more than once: $out"
 [ -f "$S/check-todos.sh" ] || fail "T7: a file outside the project was deleted"
 ok "T7 symlinked scripts/ is refused"
 
 # ── T8 a rebar clone ──
 if g clone -q --shared "$ROOT" "$TMP/rebar-clone" 2>/dev/null; then
   out=$(cd "$TMP/rebar-clone" && rebar migrate 2>&1) && fail "T8: a rebar clone was not refused: $out"
-  echo "$out" | grep -qE 'rebar source tree|shares history' || fail "T8: wrong refusal: $out"
+  contains "$out" -E 'rebar source tree|shares history' || fail "T8: wrong refusal: $out"
   ok "T8 a rebar clone is refused"
 fi
 
@@ -178,8 +178,14 @@ if [ -z "$last" ] || ! git -C "$ROOT" cat-file -e "$last^:templates/project-boot
 fi
 F="$TMP/fresh"
 mkdir -p "$F"
-git -C "$ROOT" archive "$last^" templates/project-bootstrap | tar -x -C "$TMP" \
-  && cp -R "$TMP/templates/project-bootstrap/." "$F/" || fail "T5: extracting the old template"
+# Through a file, not `git archive | tar -x`: bsdtar (macOS) exits at the
+# end-of-archive marker without reading git's trailing padding, so under
+# pipefail git archive could die of SIGPIPE, silently (the T5 flake).
+mkdir -p "$TMP/old-template"
+err=$( { git -C "$ROOT" archive -o "$TMP/old-template.tar" "$last^" templates/project-bootstrap \
+  && tar -x -C "$TMP/old-template" -f "$TMP/old-template.tar" \
+  && cp -R "$TMP/old-template/templates/project-bootstrap/." "$F/"; } 2>&1 ) \
+  || fail "T5: extracting the old template from ${last}^ (exit $?): $err"
 # The old template's check-freshness.sh can report an age one day short when
 # the clock ticks mid-run (fixed in the install), so its output would differ
 # from the install's at random and migrate would rightly keep it. Date the
@@ -202,5 +208,5 @@ grep -q 'rebar migrate' "$F/.rebarrc" && fail "T5: unmodified copies needed sett
 after=$(cd "$F" && rebar check --pre-commit >/dev/null 2>&1; echo $?)
 [ "$before" = "$after" ] || fail "T5: rebar check --pre-commit exit $before before, $after after"
 out=$(cd "$F" && rebar migrate 2>&1) || fail "T5: second run failed: $out"
-echo "$out" | grep -q 'Nothing to migrate' || fail "T5: second run proposes changes: $out"
+contains "$out" 'Nothing to migrate' || fail "T5: second run proposes changes: $out"
 ok "T5 unmodified template copies all go; pre-commit result unchanged ($after); second run proposes nothing"

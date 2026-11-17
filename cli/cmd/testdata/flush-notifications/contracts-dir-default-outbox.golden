@@ -9,6 +9,6 @@ flush-notifications: 001 has 2 pending notification(s)
     DRY: ask_alpha_featurerequest ← (690 chars)
     DRY: ask_broken_featurerequest ← (690 chars)
 
-flush-notifications: processed=4 sent=0 skipped=1
+flush-notifications: processed=4 sent=0 skipped=1 failed=0
 (dry-run — no FRs filed, no outbox state changed)
 --- exit 0 ---

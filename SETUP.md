@@ -16,10 +16,10 @@ parts to adopt.
 ## Install rebar
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/willackerly/rebar/v3.1.0/setup-rebar.sh | bash -s -- v3.1.0
+curl -fsSL https://raw.githubusercontent.com/willackerly/rebar/v3.1.1/setup-rebar.sh | bash -s -- v3.1.1
 ```
 
-That installs v3.1.0 and puts `~/.rebar/current/bin` (`rebar`, `ask`,
+That installs v3.1.1 and puts `~/.rebar/current/bin` (`rebar`, `ask`,
 `ask-mcp-server`) on your PATH via your shell RC; open a new terminal (or
 source the RC) and check with `rebar version`. Fetch `setup-rebar.sh` from the
 tag you install, as above: the copy on `main` is whatever `main` holds. With no
@@ -29,12 +29,12 @@ exists yet, the highest pre-release). Variants (`…` is the `curl` part):
 
 | Command | Installs |
 |---------|----------|
-| `… \| bash -s -- v3.1.0` | that release |
+| `… \| bash -s -- v3.1.1` | that release |
 | `… \| bash -s -- --pre` | the newest tag, pre-releases included |
 | `… \| bash -s -- main` | a branch, built from source; `rebar version` says `main@<sha>` |
-| `… \| bash -s -- v3.1.0 --no-switch` | side by side, without changing the active version |
-| `… \| bash -s -- v3.1.0 --source` | from source even if a prebuilt download exists |
-| `… \| bash -s -- v3.1.0 --dir /opt/rebar` | under `/opt/rebar` instead of `~/.rebar` (CI) |
+| `… \| bash -s -- v3.1.1 --no-switch` | side by side, without changing the active version |
+| `… \| bash -s -- v3.1.1 --source` | from source even if a prebuilt download exists |
+| `… \| bash -s -- v3.1.1 --dir /opt/rebar` | under `/opt/rebar` instead of `~/.rebar` (CI) |
 
 Each version lives in `~/.rebar/versions/<version>/`; `~/.rebar/current` is
 a symlink to the active one, so switching never edits your RC again
@@ -46,8 +46,10 @@ it at `versions/<version>/bin/rebar` and runs `rebar install-shims`, which
 writes the `ask*` shims, `bin/install` and the shell completions beside it.
 Releases up to v3.1.0 published a tarball of the whole tree instead, which the
 installer still unpacks. Releases without assets, branches and commits (by
-full 40-character SHA) build from source, which needs `git` and Go and keeps
-the whole tree of that ref. Branch
+full 40-character SHA) build from source, which needs `git` and Go 1.25 or
+newer (use a [supported release](https://go.dev/doc/devel/release#policy):
+the binary includes its standard library; see [SECURITY.md](SECURITY.md)) and
+keeps the whole tree of that ref. Branch
 names are made path-safe for the directory (`feat/x` → `versions/feat-x`); if
 two refs map to the same name, the second install is refused rather than
 replacing the first. `./setup-rebar.sh --help` lists every option.
@@ -296,7 +298,7 @@ The universal first-read. Every agent, every session, no exceptions.
 
 1. **Rebar badge** — First line after `# Title` MUST be the rebar badge:
    ```markdown
-   > **rebar v3.1.0** | **Tier 2: ADOPTED**
+   > **rebar v3.1.1** | **Tier 2: ADOPTED**
    ```
    This is validated by `check-compliance` (part of `rebar check`) against
    `.rebar-version`. Update both when you upgrade rebar
