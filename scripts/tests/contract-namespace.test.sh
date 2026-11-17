@@ -60,24 +60,24 @@ check_project() {
 
   # T1 — refs.
   out="$(run check-contract-refs.sh)" || { echo "$out"; fail "$label T1: valid refs reported broken"; }
-  printf '%s\n' "$out" | grep -q 'Checked 2 contract references, 0 broken' || { echo "$out"; fail "$label T1: count"; }
-  printf '%s\n' "$out" | grep -q "Namespace $NS: 2 cross-repo reference(s)" || { echo "$out"; fail "$label T1: cross-repo count"; }
+  contains "$out" 'Checked 2 contract references, 0 broken' || { echo "$out"; fail "$label T1: count"; }
+  contains "$out" "Namespace $NS: 2 cross-repo reference(s)" || { echo "$out"; fail "$label T1: cross-repo count"; }
   printf '// %s:%s:%s\n' "$M" "$NS" NOPE.1.0 > "$P/src/bad.go"
   ( cd "$P" && g add src/bad.go )   # compute-registry searches tracked files
   out="$(run check-contract-refs.sh)" && { echo "$out"; fail "$label T1: broken qualified ref passed"; }
-  printf '%s\n' "$out" | grep -q "Expected: $cdir/CONTRACT-NOPE.1.0.md" || { echo "$out"; fail "$label T1: expected path"; }
+  contains "$out" "Expected: $cdir/CONTRACT-NOPE.1.0.md" || { echo "$out"; fail "$label T1: expected path"; }
   ok "$label T1: check-contract-refs"
 
   # T2 — registry counts and shadows (bad.go still present: NOPE is a shadow).
   out="$(run compute-registry.sh --health)" || { echo "$out"; fail "$label T2: --health"; }
-  printf '%s\n' "$out" | grep -q '| C2-BAR | 1 |' || { echo "$out"; fail "$label T2: qualified impl not counted"; }
-  printf '%s\n' "$out" | grep -q '| S1-FOO | 1 |' || { echo "$out"; fail "$label T2: foreign ref counted as impl"; }
-  printf '%s\n' "$out" | grep -q '\*\*NOPE\*\*' || { echo "$out"; fail "$label T2: qualified shadow not reported by bare ID"; }
-  printf '%s\n' "$out" | grep -qE '\*\*(AUTH|github)' && { echo "$out"; fail "$label T2: foreign ref reported as shadow"; }
+  contains "$out" '| C2-BAR | 1 |' || { echo "$out"; fail "$label T2: qualified impl not counted"; }
+  contains "$out" '| S1-FOO | 1 |' || { echo "$out"; fail "$label T2: foreign ref counted as impl"; }
+  contains "$out" '\*\*NOPE\*\*' || { echo "$out"; fail "$label T2: qualified shadow not reported by bare ID"; }
+  contains "$out" -E '\*\*(AUTH|github)' && { echo "$out"; fail "$label T2: foreign ref reported as shadow"; }
   ( cd "$P" && g rm -q -f src/bad.go )
   run compute-registry.sh >/dev/null || fail "$label T2: compute-registry"
   reg="$(cat "$P/$cdir/CONTRACT-REGISTRY.md")"
-  printf '%s\n' "$reg" | grep -q '| C2-BAR | 1.0 | active | 1 |' || { echo "$reg"; fail "$label T2: registry row"; }
+  contains "$reg" '| C2-BAR | 1.0 | active | 1 |' || { echo "$reg"; fail "$label T2: registry row"; }
   ok "$label T2: compute-registry"
 
   # T3 — C2-BAR is implemented only through its qualified reference.
@@ -87,9 +87,9 @@ check_project() {
   # T4 — steward.
   run steward.sh >/dev/null || fail "$label T4: steward"
   out="$(jq -r '.impl_gate.implementing_files[]' "$P/$cdir/.state/C2-BAR.1.0.json")"
-  printf '%s\n' "$out" | grep -q 'src/bar.go$' || { echo "$out"; fail "$label T4: qualified impl missing"; }
+  contains "$out" 'src/bar.go$' || { echo "$out"; fail "$label T4: qualified impl missing"; }
   out="$(jq -r '.impl_gate.implementing_files[]' "$P/$cdir/.state/S1-FOO.1.0.json")"
-  [ "$(printf '%s\n' "$out" | grep -c .)" = 1 ] && printf '%s\n' "$out" | grep -q 'src/foo.go$' \
+  [ "$(count_matches "$out" .)" = 1 ] && contains "$out" 'src/foo.go$' \
     || { echo "$out"; fail "$label T4: S1-FOO should list only foo.go"; }
   ok "$label T4: steward"
 }
@@ -105,30 +105,30 @@ ok "T5: contract_namespace composes with contracts_dir"
 # T6 — unset: qualified references are not understood, as before.
 make_project plain architecture ""
 out="$(run check-contract-refs.sh)" || { echo "$out"; fail "T6: refs"; }
-printf '%s\n' "$out" | grep -q 'Checked 1 contract references, 0 broken' || { echo "$out"; fail "T6: count"; }
-printf '%s\n' "$out" | grep -q 'Namespace' && { echo "$out"; fail "T6: namespace line printed"; }
+contains "$out" 'Checked 1 contract references, 0 broken' || { echo "$out"; fail "T6: count"; }
+contains "$out" 'Namespace' && { echo "$out"; fail "T6: namespace line printed"; }
 out="$(run compute-registry.sh --health)"
-printf '%s\n' "$out" | grep -q '| C2-BAR | 0 |' || { echo "$out"; fail "T6: C2-BAR should have no implementations"; }
+contains "$out" '| C2-BAR | 0 |' || { echo "$out"; fail "T6: C2-BAR should have no implementations"; }
 out="$(run check-registry.sh)" && { echo "$out"; fail "T6: C2-BAR should be an orphan"; }
-printf '%s\n' "$out" | grep -q 'ORPHAN (untracked): architecture/CONTRACT-C2-BAR.1.0.md' || { echo "$out"; fail "T6: orphan message"; }
+contains "$out" 'ORPHAN (untracked): architecture/CONTRACT-C2-BAR.1.0.md' || { echo "$out"; fail "T6: orphan message"; }
 ok "T6: unset keeps the pre-namespace behavior"
 
 # T7 — invalid namespace.
 printf 'tier = 3\ncontract_namespace = acme widgets\n' > "$P/.rebarrc"
 out="$(run check-contract-refs.sh)" || { echo "$out"; fail "T7: refs"; }
-printf '%s\n' "$out" | grep -q "ignoring contract_namespace 'acme widgets'" || { echo "$out"; fail "T7: no warning"; }
-printf '%s\n' "$out" | grep -q 'Checked 1 contract references' || { echo "$out"; fail "T7: not treated as unset"; }
-count_warnings() { printf '%s\n' "$1" | grep -c "ignoring contract_namespace" || true; }
+contains "$out" "ignoring contract_namespace 'acme widgets'" || { echo "$out"; fail "T7: no warning"; }
+contains "$out" 'Checked 1 contract references' || { echo "$out"; fail "T7: not treated as unset"; }
+count_warnings() { count_matches "$1" "ignoring contract_namespace"; }
 [ "$(count_warnings "$out")" = 1 ] || { echo "$out"; fail "T7: one script should warn once"; }
 out="$(run ci-check.sh)"
-[ "$(count_warnings "$out")" = 1 ] || { echo "$out" | grep -n 'ignoring contract_namespace'; fail "T7: ci-check should warn once per run"; }
+[ "$(count_warnings "$out")" = 1 ] || { grep -n 'ignoring contract_namespace' <<<"$out"; fail "T7: ci-check should warn once per run"; }
 printf 'tier = 3\ncontract_namespace = acme.1.2\n' > "$P/.rebarrc"
 out="$(run check-contract-refs.sh)" || { echo "$out"; fail "T7: ID.version-like refs"; }
-printf '%s\n' "$out" | grep -q "ignoring contract_namespace 'acme.1.2'" || { echo "$out"; fail "T7: ID.version-like namespace accepted"; }
+contains "$out" "ignoring contract_namespace 'acme.1.2'" || { echo "$out"; fail "T7: ID.version-like namespace accepted"; }
 printf 'tier = 3\n' > "$P/.rebarrc"
 out="$(REBAR_CONTRACT_NAMESPACE="  $NS  " run check-contract-refs.sh)" || { echo "$out"; fail "T7: env refs"; }
-printf '%s\n' "$out" | grep -q 'ignoring' && { echo "$out"; fail "T7: padded env value rejected"; }
-printf '%s\n' "$out" | grep -q "Namespace $NS: 2 cross-repo" || { echo "$out"; fail "T7: padded env value not trimmed"; }
+contains "$out" 'ignoring' && { echo "$out"; fail "T7: padded env value rejected"; }
+contains "$out" "Namespace $NS: 2 cross-repo" || { echo "$out"; fail "T7: padded env value not trimmed"; }
 ok "T7: invalid namespace ignored, warned once; env trimmed"
 
 # T8 — look-alikes, in the namespaced project.
@@ -137,17 +137,17 @@ printf '// %s:%s:%s\npackage src\n' "$M" githubXcom/acme/widgets C2-BAR.1.0 > "$
 printf '// %s:%s:%s\npackage src\n' "$M" "$NS-fork" C2-BAR.1.0 > "$P/src/fork.go"
 ( cd "$P" && g add src/dot.go src/fork.go )   # compute-registry searches tracked files
 out="$(run check-contract-refs.sh)" || { echo "$out"; fail "T8: look-alikes reported broken"; }
-printf '%s\n' "$out" | grep -q 'Checked 2 contract references, 0 broken' || { echo "$out"; fail "T8: look-alike counted local"; }
-printf '%s\n' "$out" | grep -q "Namespace $NS: 4 cross-repo" || { echo "$out"; fail "T8: look-alikes not foreign"; }
+contains "$out" 'Checked 2 contract references, 0 broken' || { echo "$out"; fail "T8: look-alike counted local"; }
+contains "$out" "Namespace $NS: 4 cross-repo" || { echo "$out"; fail "T8: look-alikes not foreign"; }
 out="$(run compute-registry.sh --health)"
-printf '%s\n' "$out" | grep -q '| C2-BAR | 1 |' || { echo "$out"; fail "T8: look-alike counted as implementation"; }
+contains "$out" '| C2-BAR | 1 |' || { echo "$out"; fail "T8: look-alike counted as implementation"; }
 run steward.sh >/dev/null || fail "T8: steward"
 out="$(jq -r '.impl_gate.implementing_files[]' "$P/architecture/.state/C2-BAR.1.0.json")"
-[ "$(printf '%s\n' "$out" | grep -c .)" = 1 ] || { echo "$out"; fail "T8: steward counted a look-alike"; }
+[ "$(count_matches "$out" .)" = 1 ] || { echo "$out"; fail "T8: steward counted a look-alike"; }
 ( cd "$P" && g rm -q -f src/dot.go src/fork.go )
 printf '// %s:%s:see.2 section\n' "$M" MISSING.1.0 > "$P/src/missing.go"
 out="$(run check-contract-refs.sh)" && { echo "$out"; fail "T8: missing short ref before a colon passed"; }
-printf '%s\n' "$out" | grep -q 'Expected: architecture/CONTRACT-MISSING.1.0.md' || { echo "$out"; fail "T8: MISSING not reported"; }
+contains "$out" 'Expected: architecture/CONTRACT-MISSING.1.0.md' || { echo "$out"; fail "T8: MISSING not reported"; }
 rm "$P/src/missing.go"
 ok "T8: look-alikes are foreign; ID.version before a colon stays local"
 

@@ -14,7 +14,7 @@ Design notes: [self-contained install](feedback/2026-11-14-self-contained-instal
 [rebar migrate](feedback/2026-11-14-rebar-migrate.md),
 [versioned installer](feedback/2026-11-14-versioned-installer.md).
 
-In the commands below, `v3.1.0` is the release you are moving to. Use the
+In the commands below, `v3.1.1` is the release you are moving to. Use the
 tag you are actually installing.
 
 | You are on | Steps |
@@ -26,15 +26,15 @@ tag you are actually installing.
 ## 1. Install the new version next to the old one
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/willackerly/rebar/v3.1.0/setup-rebar.sh \
-  | bash -s -- v3.1.0 --no-switch
+curl -fsSL https://raw.githubusercontent.com/willackerly/rebar/v3.1.1/setup-rebar.sh \
+  | bash -s -- v3.1.1 --no-switch
 ```
 
 Fetch the installer from the tag you install: until 3.1 is on `main`,
 `main`'s `setup-rebar.sh` is the old installer and has no version argument
 (see [Testing a release candidate](SETUP.md#testing-a-release-candidate)).
 
-The new version lands in `~/.rebar/versions/v3.1.0/`, a complete rebar
+The new version lands in `~/.rebar/versions/v3.1.1/`, a complete rebar
 tree. `--no-switch` leaves `~/.rebar/current` (the version on your PATH)
 alone, so other projects are unaffected while you try this one. The
 exception is a machine with **no versioned install yet**, including a
@@ -48,10 +48,10 @@ To run a version that is not `current`, call it by path; each version runs
 its own scripts:
 
 ```bash
-~/.rebar/versions/v3.1.0/bin/rebar version
+~/.rebar/versions/v3.1.1/bin/rebar version
 ```
 
-Switch for good with `ln -sfn versions/v3.1.0 ~/.rebar/current` (or
+Switch for good with `ln -sfn versions/v3.1.1 ~/.rebar/current` (or
 re-run the installer without `--no-switch`). The rest of this runbook writes
 plain `rebar` for the 3.1 CLI.
 
@@ -155,7 +155,7 @@ the caller read the values from `rebar run check-ground-truth --print`
   it for that reason). The 3.1 hook runs `rebar check --cold-start` instead:
 
   ```bash
-  T=~/.rebar/versions/v3.1.0/templates/project-bootstrap
+  T=~/.rebar/versions/v3.1.1/templates/project-bootstrap
   diff .claude/settings.json $T/.claude/settings.json
   # unmodified: copy it; customized: replace the SessionStart "command" by hand
   cp $T/.claude/settings.json .claude/settings.json
@@ -179,9 +179,9 @@ the caller read the values from `rebar run check-ground-truth --print`
 `check-compliance` fails when the two disagree, so change both together:
 
 ```bash
-echo v3.1.0 > .rebar-version
-sed -i.bak 's/^> \*\*rebar v[^*]*\*\*/> **rebar v3.1.0**/' README.md && rm README.md.bak
-sed -n 3p README.md   # > **rebar v3.1.0** | **Tier 1: PARTIAL**
+echo v3.1.1 > .rebar-version
+sed -i.bak 's/^> \*\*rebar v[^*]*\*\*/> **rebar v3.1.1**/' README.md && rm README.md.bak
+sed -n 3p README.md   # > **rebar v3.1.1** | **Tier 1: PARTIAL**
 ```
 
 The badge is the first line after the title. Keep its tier as it was; it must
@@ -285,7 +285,7 @@ staged deletions (the removed copies).
 
 ```bash
 git add -A
-rebar commit -m "chore(rebar): upgrade to v3.1.0"
+rebar commit -m "chore(rebar): upgrade to v3.1.1"
 rebar verify --strict      # RESULT: Integrity verified ✓
 ```
 
