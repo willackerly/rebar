@@ -35,6 +35,18 @@ err()  { echo -e "${RED}ERROR:${NC} $*"; }
 echo "=== QUICKCONTEXT Freshness Check ==="
 echo ""
 
+# The git sections need a work tree with at least one commit; without one
+# (not a repo, or a repo before its first commit) they are skipped with a
+# note instead of failing on git's exit 128.
+HAS_GIT=false
+HAS_COMMITS=false
+if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  HAS_GIT=true
+  if git rev-parse --verify -q HEAD >/dev/null 2>&1; then
+    HAS_COMMITS=true
+  fi
+fi
+
 # Check if QUICKCONTEXT exists
 if [[ ! -f "QUICKCONTEXT.md" ]]; then
   err "QUICKCONTEXT.md not found in repo root"
@@ -75,21 +87,27 @@ else
   # Show recent commits since last sync
   echo ""
   echo "Commits since last sync:"
-  COMMIT_COUNT=$(git log --since="$LAST_SYNCED" --oneline 2>/dev/null | wc -l | tr -d ' ')
-  # -n 20, not `| head -20`: with more commits than head reads, git log gets
-  # SIGPIPE and, under pipefail, set -e ended the script with exit 141.
-  git log -n 20 --since="$LAST_SYNCED" --oneline 2>/dev/null || true
-
-  if [[ "$COMMIT_COUNT" -gt 20 ]]; then
-    echo "  ... and $((COMMIT_COUNT - 20)) more"
-  fi
-
-  if [[ "$COMMIT_COUNT" -gt 10 ]]; then
-    warn "$COMMIT_COUNT commits since last sync — QUICKCONTEXT is likely stale"
-  elif [[ "$COMMIT_COUNT" -gt 0 ]]; then
-    echo "  ($COMMIT_COUNT commits — review against QUICKCONTEXT claims)"
+  if ! $HAS_GIT; then
+    echo "  (skipped: not a git repository)"
+  elif ! $HAS_COMMITS; then
+    echo "  (skipped: no commits yet)"
   else
-    ok "No commits since last sync"
+    COMMIT_COUNT=$(git log --since="$LAST_SYNCED" --oneline 2>/dev/null | wc -l | tr -d ' ')
+    # -n 20, not `| head -20`: with more commits than head reads, git log gets
+    # SIGPIPE and, under pipefail, set -e ended the script with exit 141.
+    git log -n 20 --since="$LAST_SYNCED" --oneline 2>/dev/null || true
+
+    if [[ "$COMMIT_COUNT" -gt 20 ]]; then
+      echo "  ... and $((COMMIT_COUNT - 20)) more"
+    fi
+
+    if [[ "$COMMIT_COUNT" -gt 10 ]]; then
+      warn "$COMMIT_COUNT commits since last sync — QUICKCONTEXT is likely stale"
+    elif [[ "$COMMIT_COUNT" -gt 0 ]]; then
+      echo "  ($COMMIT_COUNT commits — review against QUICKCONTEXT claims)"
+    else
+      ok "No commits since last sync"
+    fi
   fi
 fi
 
@@ -138,16 +156,20 @@ fi
 echo ""
 echo "=== Worktree State ==="
 
-WORKTREES=$(git worktree list 2>/dev/null)
-WORKTREE_COUNT=$(echo "$WORKTREES" | wc -l | tr -d ' ')
-
-echo "$WORKTREES"
-
-if [[ "$WORKTREE_COUNT" -gt 1 ]]; then
-  warn "$((WORKTREE_COUNT - 1)) worktree(s) exist — verify they're active or clean them up"
-  echo "  To clean: git worktree prune"
+if ! $HAS_GIT; then
+  echo "(skipped: not a git repository)"
 else
-  ok "No extra worktrees"
+  WORKTREES=$(git worktree list 2>/dev/null || true)
+  WORKTREE_COUNT=$(echo "$WORKTREES" | wc -l | tr -d ' ')
+
+  echo "$WORKTREES"
+
+  if [[ "$WORKTREE_COUNT" -gt 1 ]]; then
+    warn "$((WORKTREE_COUNT - 1)) worktree(s) exist — verify they're active or clean them up"
+    echo "  To clean: git worktree prune"
+  else
+    ok "No extra worktrees"
+  fi
 fi
 
 # Test baseline (opt-in — can be slow)

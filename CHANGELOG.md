@@ -23,6 +23,33 @@ All notable changes to rebar. Versioned with [semver](https://semver.org/).
   link to the full CHANGELOG), followed by GitHub's list of merged PRs, and
   refuses to publish a tag with no such section — write the CHANGELOG before
   tagging. `scripts/release-notes.sh <tag>` prints the same section locally.
+- **`refresh-context.sh` works outside git history.** Outside a git repository,
+  or in one before its first commit, it exited 128 partway through the report.
+  It now skips the commit and worktree sections with a note, reports the rest,
+  and exits 0; a missing `QUICKCONTEXT.md` is still exit 1.
+- **`scan-consumers.sh` accepts sections without the optional fields.** A
+  consumer's `CONSUMES.md` section without `notify_on_change` (or `pin_date`,
+  `rationale`) made the scan exit 1, so `flush-notifications.sh` notified no
+  one for that contract. Absent optional fields now default to empty (unset
+  `notify_on_change` gets the owner default, `REBAR_NOTIFY_DEFAULT`); only a
+  missing `version_pinned` is an error, naming the file, and the scan still
+  reports the other consumers before exiting 1. `flush-notifications.sh` shows
+  that error and notifies the valid consumers, and its no-`jq` parser now
+  reads the consumer list correctly.
+- **`flush-notifications.sh` exits 0 after a successful flush.** Every real
+  (non-dry-run) flush exited 1, even when all dispatches succeeded, because the
+  script ended with `[ "$DRY_RUN" = "1" ] && echo …`. It now exits 0 when
+  every dispatch succeeds and 1 when any fails (counted as `failed=` in the
+  summary line).
+- **New projects ignore the steward's generated files.** The first `rebar
+  check` in a project from `rebar new` left `STEWARD_REPORT.md` and
+  `architecture/.state/` untracked, though the steward contract says they are
+  gitignored. `rebar new` and `rebar init` now add `STEWARD_REPORT.md` and
+  `<contracts_dir>/.state/*.json` to `.gitignore` (`init` appends only the
+  missing entries; the `.state/` outbox, `pending-notifications.md`, stays
+  tracked). The bootstrap template's `.gitignore` gets `STEWARD_REPORT.md` in
+  place of `architecture/.state/steward-report.md`, which nothing writes.
+  Existing projects: add the two lines, or run `rebar init`.
 - **`check-decay-patterns.sh` no longer crashes or hangs under macOS
   `/bin/bash` 3.2 once ~250 spec/test files are scanned.** Each file's
   `done < <(grep …)` left a descriptor open, and bash 3.2 corrupts its heap
