@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"os/exec"
+	"path/filepath"
 	"sort"
 	"strings"
 	"sync"
@@ -99,8 +100,41 @@ func Environ() []string {
 func Overridden() bool { return envOver.Load() != nil }
 
 // Command is exec.Command with the WithEnv override's environment, if any.
+// Under an override a name without a slash is looked up in the override's
+// PATH (LookPath), not the process's.
 func Command(name string, args ...string) *exec.Cmd {
-	cmd := exec.Command(name, args...)
+	if !Overridden() || strings.Contains(name, "/") {
+		cmd := exec.Command(name, args...)
+		cmd.Env = Environ()
+		return cmd
+	}
+	path, err := LookPath(name)
+	if err != nil {
+		cmd := exec.Command(name, args...)
+		cmd.Path, cmd.Err = name, err
+		cmd.Env = Environ()
+		return cmd
+	}
+	cmd := exec.Command(path, args...)
+	cmd.Args[0] = name
 	cmd.Env = Environ()
 	return cmd
+}
+
+// LookPath is exec.LookPath against Getenv("PATH"): the WithEnv override's
+// PATH when one is in effect.
+func LookPath(file string) (string, error) {
+	if !Overridden() || strings.Contains(file, "/") {
+		return exec.LookPath(file)
+	}
+	for _, dir := range filepath.SplitList(Getenv("PATH")) {
+		if dir == "" {
+			dir = "."
+		}
+		path := filepath.Join(dir, file)
+		if info, err := os.Stat(path); err == nil && info.Mode().IsRegular() && info.Mode()&0o111 != 0 {
+			return path, nil
+		}
+	}
+	return "", &exec.Error{Name: file, Err: exec.ErrNotFound}
 }

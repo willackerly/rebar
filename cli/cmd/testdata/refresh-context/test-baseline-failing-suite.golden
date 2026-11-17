@@ -4,4 +4,48 @@ Last synced: {{ago:2}}
 OK: QUICKCONTEXT is N days old
 
 Commits since last sync:
---- exit 128 ---
+  (skipped: not a git repository)
+
+=== TODO Freshness ===
+TODO.md last synced: {{ago:9}}
+Open items: 2 | Completed items: 1
+
+=== Untracked TODOs in Code ===
+WARNING: Untracked TODO comments found:
+src/a.go:1:// TODO: first
+src/b/c.ts:1:// TODO: nested
+lib/d.py:1:# TODO: python
+packages/g.rs:1:// TODO: rust
+
+=== Worktree State ===
+(skipped: not a git repository)
+
+=== Test Health Baseline ===
+Running: pnpm test
+line 7
+line 8
+line 9
+line 10
+line 11
+line 12
+line 13
+line 14
+line 15
+line 16
+line 17
+line 18
+line 19
+line 20
+line 21
+line 22
+line 23
+line 24
+line 25
+no newlineERROR: Test suite has failures — fix before starting work
+  This saves hours of discovering pre-existing failures mid-session
+
+=== Summary ===
+Run 'rebar context session-start' for full context loading
+Run 'rebar context' for the Cold Start Quad
+Run 'rebar run refresh-context --test-baseline' to verify tests pass
+--- exit 0 ---

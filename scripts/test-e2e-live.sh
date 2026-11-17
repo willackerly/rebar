@@ -203,7 +203,7 @@ section "ASK HTTP server"
 
 if curl -s -o /dev/null -m 2 "http://${ASK_SERVER_URL}/v1/health" 2>/dev/null; then
   health=$(curl -s -m 5 "http://${ASK_SERVER_URL}/v1/health")
-  if echo "$health" | grep -q '"status".*"ok"'; then
+  if grep -q '"status".*"ok"' <<<"$health"; then
     repos_in_server=$(echo "$health" | grep -oE '"repos":[0-9]+' | sed 's/.*://')
     record PASS "ASK server /v1/health" "$repos_in_server repos"
   else
@@ -212,7 +212,7 @@ if curl -s -o /dev/null -m 2 "http://${ASK_SERVER_URL}/v1/health" 2>/dev/null; t
 
   # /v1/agents: should list expected entries
   agents_json=$(curl -s -m 5 "http://${ASK_SERVER_URL}/v1/agents")
-  if echo "$agents_json" | grep -q "rebar:architect"; then
+  if grep -q "rebar:architect" <<<"$agents_json"; then
     agent_count=$(echo "$agents_json" | grep -oE '"[^"]+:[a-z]+"' | wc -l | tr -d ' ')
     record PASS "ASK server /v1/agents lists rebar:architect" "$agent_count total agents"
   else
@@ -253,7 +253,7 @@ else
       return
     fi
     # Case-insensitive grep for any of the accept keywords (pipe-separated).
-    if echo "$response" | grep -qiE "$accept_pattern"; then
+    if grep -qiE "$accept_pattern" <<<"$response"; then
       local snippet
       snippet="$(echo "$response" | tr '\n' ' ' | head -c 80)"
       record PASS "$label" "matched keyword (response: ${snippet}…)"
@@ -352,7 +352,7 @@ PYEOF
       record FAIL "$label" "no id=2 response within ${LLM_TIMEOUT}s timeout"
       return
     fi
-    if echo "$text" | grep -qiE "$accept_pattern"; then
+    if grep -qiE "$accept_pattern" <<<"$text"; then
       local snippet
       snippet="$(echo "$text" | tr '\n' ' ' | head -c 80)"
       record PASS "$label" "matched (response: ${snippet}…)"

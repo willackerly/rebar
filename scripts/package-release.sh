@@ -82,7 +82,12 @@ OUT="$(cd "$OUT" && pwd)"
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/rebar-package.XXXXXX")"
 trap 'rm -rf "$WORK"' EXIT
 
-git -C "$REPO" archive --format=tar "$REF" cli | tar -x -C "$WORK"
+# Through a file, not `git archive | tar -x`: bsdtar (macOS) exits at the
+# end-of-archive marker without reading git's trailing padding, so under
+# pipefail git archive can die of SIGPIPE and fail the build at random.
+git -C "$REPO" archive --format=tar -o "$WORK/cli.src.tar" "$REF" cli
+tar -x -C "$WORK" -f "$WORK/cli.src.tar"
+rm -f "$WORK/cli.src.tar"
 [ -f "$WORK/cli/go.mod" ] || { echo "package-release: $REF has no cli/go.mod" >&2; exit 1; }
 
 assets=""

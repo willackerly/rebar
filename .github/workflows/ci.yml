@@ -1,4 +1,5 @@
-# CI for rebar itself: the same checks contributors run locally.
+# CI for rebar itself: the same checks contributors run locally, plus a
+# govulncheck scan and a build with the oldest Go that cli/go.mod allows.
 # Runs on PRs into and pushes to main and release/* branches, and on PRs
 # into the go-native stack branches (each stacked PR's base is the previous
 # one's branch).
@@ -22,25 +23,37 @@ jobs:
   checks:
     name: checks (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
+    # A run takes ~3 min on ubuntu and ~5-8 on macOS; a hung test should not
+    # hold a runner for the 6 h default. This does not bound the wait for a
+    # runner: when macOS arm64 capacity runs out, GitHub cancels the queued
+    # job after ~15 min ("The job was not acquired by Runner ..."), without
+    # running a step. ci-retry.yml re-runs such jobs; by hand:
+    #   gh run rerun <run-id> --failed
+    timeout-minutes: ${{ matrix.timeout }}
     strategy:
       fail-fast: false
       matrix:
         include:
           - os: ubuntu-latest
             path_prefix: ""
+            timeout: 15
           # Stock macOS /bin/bash is 3.2; put it first so `#!/usr/bin/env bash`
           # scripts run under it, as they do on a developer's Mac.
           - os: macos-latest
             path_prefix: "/bin:/usr/bin:"
+            timeout: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           persist-credentials: false
 
+      # Latest supported Go release, as release.yml builds with; go.mod's
+      # `go` line is only the minimum, proven by the go-min job below.
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version-file: cli/go.mod
+          go-version: stable
+          check-latest: true
           cache-dependency-path: cli/go.sum
 
       - name: Tool versions
@@ -90,3 +103,51 @@ jobs:
             echo "::endgroup::"
           done
           exit "$failed"
+
+  # cli/go.mod's `go` line is the oldest Go a source install (setup-rebar.sh,
+  # `go build`) may use; build and test with exactly that version.
+  go-min:
+    name: go-min (go.mod minimum)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      GOTOOLCHAIN: local   # no automatic switch to a newer toolchain
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: cli/go.mod
+          cache-dependency-path: cli/go.sum
+
+      - name: Build and test
+        working-directory: cli
+        run: |
+          go version
+          go build ./...
+          go test -timeout 20m ./...
+
+  # Known vulnerabilities (Go vulnerability database) reachable from rebar's
+  # code, in its dependencies or in the standard library of the latest Go.
+  # Exits non-zero on any reachable finding. vulncheck.yml rescans weekly.
+  govulncheck:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: stable
+          check-latest: true
+          cache-dependency-path: cli/go.sum
+
+      - name: govulncheck
+        working-directory: cli
+        run: |
+          go version
+          go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...

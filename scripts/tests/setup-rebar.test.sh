@@ -136,7 +136,9 @@ grep -q "  $ASSET\$" "$TMP/releases/v9.1.0/rebar_9.1.0_checksums.txt" \
 TARNAME="rebar_9.2.0-beta.2_${GOOS_HOST}_${GOARCH_HOST}"
 TARASSET="$TARNAME.tar.gz"
 mkdir -p "$TMP/tarwork/$TARNAME" "$TMP/releases/v9.2.0-beta.2"
-g -C "$O" archive v9.2.0-beta.2 | tar -x -C "$TMP/tarwork/$TARNAME"
+# Through a file: bsdtar stops reading at the end-of-archive marker (SIGPIPE).
+g -C "$O" archive -o "$TMP/tarwork/src.tar" v9.2.0-beta.2
+tar -x -C "$TMP/tarwork/$TARNAME" -f "$TMP/tarwork/src.tar"
 ( cd "$TMP/tarwork/$TARNAME/cli" && CGO_ENABLED=0 go build -trimpath \
     -ldflags "-X github.com/willackerly/rebar/cli/cmd.Version=v9.2.0-beta.2" -o ../bin/rebar . ) \
   || fail "could not build the tarball release"
@@ -165,7 +167,7 @@ inst() {
     REBAR_REPO="${IREPO:-$O}" REBAR_RELEASE_URL="$RELURL" \
     "$sh" "$INSTALLER" "$@" 2>&1
 }
-has() { printf '%s\n' "$1" | grep -qF -- "$2" || { printf '%s\n' "$1" | tail -20 >&2; fail "$3: missing '$2'"; }; }
+has() { contains "$1" -F -- "$2" || { printf '%s\n' "$1" | tail -20 >&2; fail "$3: missing '$2'"; }; }
 current_of() { readlink "$1/.rebar/current"; }
 leftovers() { ls -A "$1/.rebar/versions" | grep '^\.' || true; }
 
