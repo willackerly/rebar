@@ -79,12 +79,9 @@ func runNew(cmd *cobra.Command, args []string) error {
 	os.WriteFile(filepath.Join(root, ".rebar-version"), []byte(badgeVersion()+"\n"), 0644)
 	fmt.Println("  ✓ .rebar-version")
 
-	// .gitignore
-	os.WriteFile(filepath.Join(root, ".gitignore"), []byte(`# REBAR
-.rebar/salt
-.rebar/keys/
-
-# Dependencies
+	// .gitignore — the stack basics, then rebar's own entries (secrets, the
+	// steward's generated report and state; after .rebarrc, for contracts_dir).
+	os.WriteFile(filepath.Join(root, ".gitignore"), []byte(`# Dependencies
 node_modules/
 vendor/
 
@@ -99,6 +96,7 @@ build/
 # OS
 .DS_Store
 `), 0644)
+	ensureGitignore(root)
 	fmt.Println("  ✓ .gitignore")
 
 	// Bootstrap v2 files
