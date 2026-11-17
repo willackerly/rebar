@@ -70,6 +70,15 @@ calls the Go and Python binaries optional, and says "zero binaries built";
 the substrate itself is unchanged, and a project's own checks stay plain
 scripts (`checks_extra`).
 
+### §1.8 Dogfooding Gate Is `rebar check`
+The gate §1.5 names as `scripts/ci-check.sh` is `rebar check`: the full
+suite, built from the change under review and run against the rebar repo
+itself in CI on every pull request, alongside rebar's own tests (`go test`,
+`scripts/tests/`). Amends §1.5 only in naming the gate — with the checks in
+the binary (§1.7), `scripts/ci-check.sh` no longer exists in rebar; the rule
+that every addition passes rebar's own enforcement, not just template
+projects, is unchanged.
+
 ---
 
 ## §2 — What rebar IS NOT
@@ -202,6 +211,10 @@ Document History for the trigger events that motivated past amendments.
 
 ## Document History
 
+- **2026-11-17** — §1.8 (Dogfooding Gate Is `rebar check`) amends §1.5's
+  naming of the gate: S8 of the go-native stack deleted `scripts/ci-check.sh`
+  with the other ported scripts, and rebar's CI runs `rebar check`, built
+  from the pull request, against rebar itself.
 - **2026-11-17** — §1.7 (Enforcement Ships as One Binary) amends §1.3's
   tooling sentences: the go-native stack moved every check, ASK and the
   templates into one self-contained, prebuilt `rebar` binary (releases
