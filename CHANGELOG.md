@@ -18,6 +18,20 @@ All notable changes to rebar. Versioned with [semver](https://semver.org/).
 
 ## Unreleased
 
+_Nothing yet._
+
+---
+
+## v3.1.1 — 2026-11-17
+
+A maintenance release. **Upgrade from v3.1.0:** its prebuilt binaries were
+built with go1.25.0 and carry 59 known Go standard-library vulnerabilities
+(net/http, crypto/tls, crypto/x509, …); v3.1.1 is built with the current Go
+release and every release binary is now scanned with `govulncheck` before it
+is published. Also: script fixes found while porting rebar's checks to Go,
+a bash 3.2 crash in `check-decay-patterns.sh` on larger repos, flaky tests,
+and CI hardening.
+
 - **GitHub Release notes come from the CHANGELOG.** The release workflow puts
   the tag's `## vX.Y.Z` section first (relative links made absolute, then a
   link to the full CHANGELOG), followed by GitHub's list of merged PRs, and
