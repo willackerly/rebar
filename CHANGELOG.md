@@ -35,15 +35,14 @@ All notable changes to rebar. Versioned with [semver](https://semver.org/).
   `flush-notifications` calls ask through `ASK_BIN` as before and reads
   scan-consumers' JSON as the script did with jq. `rebar doc` and
   `rebar-doc` now share one kind table, so `rebar doc` also rejects a name
-  with whitespace or `..` (exit 2), as the script did. Kept for parity, to
-  fix later in both implementations: refresh-context ends with exit 128
-  outside a git repository (and before any commit), right after "Commits
-  since last sync:", because of `set -e` with pipefail; scan-consumers ends
-  with exit 1 at the first consumer section missing `version_pinned`,
-  `pin_date`, `notify_on_change` or `rationale`, though the template marks
-  `notify_on_change` optional (so flush-notifications sees no consumers for
-  that contract); flush-notifications exits 1 after every run that is not
-  `--dry-run`; the TODO counts print `0<newline>0` when there are none.
+  with whitespace or `..` (exit 2), as the script did. The ports include
+  v3.1.1's script fixes: refresh-context skips its git sections outside a
+  repository or before the first commit (exit 0); scan-consumers requires
+  only `version_pinned` (other fields default, a trailing `# comment` is
+  dropped; a section without it is reported and left out, the rest still
+  listed, exit 1); flush-notifications exits 0 after a successful flush and
+  1 when a dispatch failed, and its summary counts `failed=`. Kept for
+  parity: the TODO counts print `0<newline>0` when there are none.
   Platform choices: dates are read as GNU date reads them (a date that does
   not exist gives no staleness line; BSD rolled it over), binary source
   files are not untracked TODOs, the `--dry-run` message length counts
