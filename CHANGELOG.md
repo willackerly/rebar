@@ -68,6 +68,11 @@ All notable changes to rebar. Versioned with [semver](https://semver.org/).
   and the new `ci-retry` workflow re-runs, at most twice, jobs that GitHub
   cancelled after waiting ~15 min for a macOS runner without running a step.
   By hand: `gh run rerun <run-id> --failed`.
+- **`check-decay-patterns.sh` no longer crashes or hangs under macOS
+  `/bin/bash` 3.2 once ~250 spec/test files are scanned.** Each file's
+  `done < <(grep …)` left a descriptor open, and bash 3.2 corrupts its heap
+  when that reaches fd 256 (abort, bus error, or a hang). The scan now pipes
+  grep into its loop; output is unchanged.
 - **Release binaries are built with a current Go; v3.1.0's were not.** The
   v3.1.0 binaries were built with go1.25.0 (the workflows read `cli/go.mod`'s
   `go` line literally) and include standard-library vulnerabilities fixed in
