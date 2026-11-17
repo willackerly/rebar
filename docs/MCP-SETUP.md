@@ -141,14 +141,18 @@ To register a non-standard location, use `--repos` instead of (or with)
 
 ```bash
 # stdio handshake — expect clean JSON-RPC on stdout, the banner on stderr
-printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}' \
+printf '%s\n' \
+  '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"me","version":"1"}}}' \
+  '{"jsonrpc":"2.0","method":"notifications/initialized"}' \
   '{"jsonrpc":"2.0","id":2,"method":"tools/list"}' |
   rebar mcp serve --stdio --repos-dir /path/to/parent 2>/dev/null
 ```
 
 Expect one JSON response per request, starting with
-`{"jsonrpc": "2.0", "id": 1, "result": {...}}`. Every status line
-(`scanning repos...`, `registered: …`) goes to stderr.
+`{"jsonrpc":"2.0","id":1,"result":{"capabilities":…,"protocolVersion":"2025-11-25",…}}`.
+Every status line (`scanning repos...`, `registered: …`) goes to stderr, and
+so does `ask-mcp-server: ignored invalid message (…)` for a line that is not
+JSON-RPC (the server reads on).
 
 ### 2. From Claude Code
 
@@ -174,7 +178,45 @@ Ask Claude:
 > "Use the rebar architect agent to summarize the contract system."
 
 If the MCP server is wired correctly, the tool call resolves and returns
-the architect agent's response.
+the architect agent's response. When the agent fails (e.g. `claude` is not
+on the server's `PATH`), Claude Code shows the tool result as an error with
+the ask's stderr, exit code, command and working directory — read it rather
+than guessing.
+
+### 4. Over HTTP (shared server)
+
+`rebar mcp serve --port 7232 …` serves MCP's Streamable HTTP transport at
+`/mcp`. Point Claude Code at it with an `http` server:
+
+```json
+{
+  "mcpServers": {
+    "rebar-ask": {
+      "type": "http",
+      "url": "http://ask-host:7232/mcp",
+      "headers": {"Authorization": "Bearer <key>"}
+    }
+  }
+}
+```
+
+`rebar mcp client http://ask-host:7232` walks the server through a session
+(initialize, tools, resources, one call) to check it. Requests that reach
+the server through a loopback address must name a loopback `Host` (DNS
+rebinding protection); behind a proxy on the same machine, forward the
+original host name as `localhost`.
+
+---
+
+## Protocol (rebar 3.2)
+
+The server is built on the official MCP Go SDK. It negotiates the protocol
+version with the client (2024-11-05 through 2025-11-25 over `initialize`,
+2026-07-28 over `server/discover`, which Claude Code 2.1.3xx tries first),
+reports a failed ask as a tool error (`isError: true` result) rather than a
+JSON-RPC error, and answers an unknown tool with JSON-RPC error -32602. Tool
+names and input schemas did not change; tool names and `ask://` resource
+URIs still match case-insensitively. Details: [MCP-IMPLEMENTATION.md](MCP-IMPLEMENTATION.md#wire-behaviour-rebar-32).
 
 ---
 
@@ -238,8 +280,8 @@ rebar adopt                             # existing project
 # Start MCP server manually for debugging
 rebar mcp serve --stdio --repos-dir ~/dev     # bin/ask-mcp-server runs this
 
-# HTTP mode (enterprise server) — for multi-user orgs
-rebar mcp serve --port 7232 --repos-dir /srv/repos --mcp-only
+# HTTP mode (enterprise server) — for multi-user orgs: Streamable HTTP at /mcp
+rebar mcp serve --port 7232 --repos-dir /srv/repos --mcp-only --api-key "$KEY"
 
 # Point an old .mcp.json at the native server
 rebar migrate            # report

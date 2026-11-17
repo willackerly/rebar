@@ -1,23 +1,22 @@
 # MCP Implementation for ASK - Complete Technical Guide
 
 > **Implementation status (rebar 3.2):** the MCP server is native Go in the
-> `rebar` binary — `rebar mcp serve` (package `cli/internal/mcp`). The
-> python snippets below are the original design (the python server was
-> removed in rebar 3.2); the Go server keeps its wire behaviour: the same tool
-> names, input schema, descriptions, resource URIs, error codes/messages/data,
-> notification handling and `json.dumps` formatting, held by goldens captured
-> from the python server — one JSON-RPC session and HTTP transcripts
-> (`cli/cmd/native_mcp_test.go`).
+> `rebar` binary — `rebar mcp serve` (package `cli/internal/mcp`) — built on
+> the official MCP Go SDK, `github.com/modelcontextprotocol/go-sdk` (v1.8.0).
+> The SDK owns the protocol: version negotiation (2024-11-05 through
+> 2026-07-28, including the sessionless `server/discover` handshake Claude
+> Code 2.1.3xx uses), message framing and validation, input-schema
+> validation, and the Streamable HTTP transport. rebar adds the ASK tools
+> and resources and three small adapters (see
+> [Wire behaviour](#wire-behaviour-rebar-32) below). Tool names, descriptions
+> and input schemas are the python server's, unchanged.
 >
-> It is a minimal JSON-RPC 2.0 implementation rather than the official MCP
-> Go SDK: the SDK negotiates its own protocol version and answers unknown or
-> failing tools with its own error codes and `isError` results, which would
-> change what deployed Claude Code sessions see. Deliberate differences from
-> the python server: over HTTP the session (initialize) is kept across
-> requests (python started a fresh, uninitialized session per request, so
-> every `tools/list` after `initialize` failed with -32002), and a tool of a
-> repo whose name contains `_` (`ask_dsp_2_8_steward`) resolves to that
-> repo's agent (python split the name at the first `_`).
+> The python snippets below are the original design (the python server was
+> removed in rebar 3.2). The python server's wire format survives only in
+> git history (`cli/cmd/testdata/mcp` before S9 of the go-native stack); the
+> goldens there now record the SDK server, and
+> `cli/cmd/native_mcp_compat_test.go` replays sessions recorded from Claude
+> Code 2.1.224 and 2.1.311.
 
 ## What I Built: Full MCP Enablement
 
@@ -275,24 +274,34 @@ def _handle_resources_read(self, params, req_id):
 
 ### Implemented MCP Methods
 
-1. **`initialize`** - Start MCP session, exchange capabilities
+1. **`initialize`** / **`server/discover`** - Start a session (or, on
+   2026-07-28, discover the server without one) and negotiate the protocol
+   version
 2. **`tools/list`** - Discover available agent tools
 3. **`tools/call`** - Execute an agent query
 4. **`resources/list`** - Discover agent resources
 5. **`resources/read`** - Read agent memory/logs/config
+6. **`ping`**, **`prompts/list`** (empty) and the other SDK built-ins
 
 ### Transport Options
 
-**HTTP Transport** (default):
-```bash
-rebar mcp serve --port 7232 --repos-dir /path/to/repos   # or bin/ask-mcp-server …
-# MCP endpoint: POST http://localhost:7232/mcp
-```
-
-**Stdio Transport** (for MCP clients):
+**Stdio Transport** (what `.mcp.json` runs):
 ```bash
 rebar mcp serve --stdio --repos-dir /path/to/repos
-# JSON-RPC over stdin/stdout
+# newline-delimited JSON-RPC over stdin/stdout; banners on stderr
+```
+
+**Streamable HTTP Transport** (MCP spec 2025-03-26 and later):
+```bash
+rebar mcp serve --port 7232 --repos-dir /path/to/repos   # or bin/ask-mcp-server …
+# MCP endpoint: http://localhost:7232/mcp  (POST/GET/DELETE, Mcp-Session-Id)
+# plus GET /mcp/schema and, unless --mcp-only, the classic /v1/* API
+```
+
+Claude Code connects to it with `"type": "http"`:
+```json
+{"mcpServers": {"rebar-ask": {"type": "http", "url": "http://localhost:7232/mcp",
+  "headers": {"Authorization": "Bearer <key>"}}}}
 ```
 
 ---
@@ -301,36 +310,25 @@ rebar mcp serve --stdio --repos-dir /path/to/repos
 
 ### From Any MCP Client
 
-```python
-import requests
+Use an MCP client library (it does the handshake, session id and protocol
+headers for you), e.g. with the Go SDK:
 
-# 1. Initialize
-response = requests.post("http://localhost:7232/mcp", json={
-    "jsonrpc": "2.0",
-    "method": "initialize",
-    "params": {"protocolVersion": "2024-11-05"},
-    "id": 1
-})
+```go
+client := mcp.NewClient(&mcp.Implementation{Name: "my-client", Version: "1"}, nil)
+session, _ := client.Connect(ctx, &mcp.StreamableClientTransport{Endpoint: "http://localhost:7232/mcp"}, nil)
+res, _ := session.CallTool(ctx, &mcp.CallToolParams{
+    Name: "ask_rebar_architect", Arguments: map[string]any{"question": "What contracts exist?"}})
+// res.IsError reports a failed ask; res.Content[0] holds the answer text
+```
 
-# 2. List tools
-response = requests.post("http://localhost:7232/mcp", json={
-    "jsonrpc": "2.0",
-    "method": "tools/list",
-    "id": 2
-})
-tools = response.json()["result"]["tools"]
+By hand, a Streamable HTTP request must accept both JSON and event streams
+and, after `initialize`, carry the session id it returned:
 
-# 3. Call agent
-response = requests.post("http://localhost:7232/mcp", json={
-    "jsonrpc": "2.0",
-    "method": "tools/call",
-    "params": {
-        "name": "ask_rebar_architect",
-        "arguments": {"question": "What contracts exist?"}
-    },
-    "id": 3
-})
-answer = response.json()["result"]["content"][0]["text"]
+```bash
+curl -si http://localhost:7232/mcp -H 'Content-Type: application/json' \
+  -H 'Accept: application/json, text/event-stream' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"curl","version":"1"}}}'
+# → Mcp-Session-Id: <id>; send it (and Mcp-Protocol-Version) on every later request
 ```
 
 ### Testing the Implementation
@@ -339,18 +337,46 @@ answer = response.json()["result"]["content"][0]["text"]
 # Start MCP server
 rebar mcp serve --port 7232 --repos-dir ..
 
-# Test with the provided client
+# Test with the provided client (the SDK's Streamable HTTP client)
 rebar mcp client http://localhost:7232
 ```
 
 ---
 
+## Wire behaviour (rebar 3.2)
+
+| Situation | Answer |
+|-----------|--------|
+| `initialize` with a version the server speaks | that version (2024-11-05, 2025-03-26, 2025-06-18, 2025-11-25) |
+| `initialize` with another version | 2025-11-25 (the client decides whether to disconnect) |
+| `server/discover` (2026-07-28) | `supportedVersions`, capabilities, serverInfo; later requests carry the version in `_meta` |
+| `tools/call` succeeds | `{"content": [{"type": "text", "text": <answer>}]}` |
+| `tools/call` fails (ask exits non-zero, times out, empty question, arguments that break the schema) | an `isError: true` result whose text says why (exit code, stderr, cmd, cwd) — the model can read it |
+| `tools/call` of an unknown tool | JSON-RPC error -32602 `unknown tool "<name>"` |
+| `resources/read` of an unknown URI | JSON-RPC error -32602 `Resource not found` |
+| unknown method | JSON-RPC error -32601 |
+| a request before `initialize` (old protocol) | JSON-RPC error `method "<m>" is invalid during session initialization` (the SDK's; code 0) |
+| notifications | never answered |
+
+rebar's adapters around the SDK (`cli/internal/mcp`):
+
+- **Aliases** (`compat.go`): tool names and resource URIs match
+  case-insensitively — `ask_tdflite_architect` reaches `ask_TDFLite_architect`
+  (a real user hit this; red-team finding C2, 2026-04-28).
+- **Stdio hygiene** (`stdio.go`): the SDK ends a session at the first
+  malformed line; rebar logs it on stderr
+  (`ask-mcp-server: ignored invalid message (<why>): <line>`) and reads on, and
+  never answers with `"id": null` (Claude Code's validator rejects it). At the
+  end of input it waits for the answers still running, so
+  `printf '…' | rebar mcp serve --stdio` prints them all.
+- **Guard**: `"arguments": null` counts as absent (it panicked inside the SDK
+  v1.8.0), and a panic in a handler is an internal error, not a crash.
+
 ## What This Achieves
 
 ### 1. **Standards Compliance** ✅
-- Full JSON-RPC 2.0 implementation
-- MCP protocol version 2024-11-05
-- Proper error handling with standard codes
+- The official MCP Go SDK: JSON-RPC 2.0, protocol versions 2024-11-05 → 2026-07-28
+- Tool failures as `isError` results, protocol errors as JSON-RPC errors
 - Schema validation for all inputs
 
 ### 2. **Tool Discovery** ✅
@@ -364,7 +390,7 @@ rebar mcp client http://localhost:7232
 - Agent configs exposed for introspection
 
 ### 4. **Multi-Transport** ✅
-- HTTP for web/API clients
+- Streamable HTTP for web/API clients
 - Stdio for command-line MCP clients
 - Same protocol over both transports
 
@@ -410,16 +436,14 @@ ask://agent/repo:role   → agents/role/AGENT.md
 
 ### Error Handling
 
-**Challenge:** Map ASK errors to MCP error codes
+**Challenge:** Map ASK errors to MCP
 
-**Solution:** Systematic error code mapping
-```python
-# ASK errors → MCP errors
--32602: Invalid params (missing question, bad agent ID)
--32603: Internal error (ASK command failed, timeout)
--32002: Not initialized (MCP session not started)
--32601: Method not found (unknown MCP method)
-```
+**Solution (rebar 3.2):** a failing ask is a *tool execution error* — an
+`isError: true` result carrying the ask's stderr, exit code, command and
+working directory — so the model sees why and can retry or rephrase. Only
+protocol problems are JSON-RPC errors (-32602 unknown tool or resource /
+invalid params, -32601 unknown method). The python server answered failing
+asks with -32603 "Tool execution failed".
 
 ---
 

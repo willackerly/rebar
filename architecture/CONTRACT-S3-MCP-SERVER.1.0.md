@@ -87,11 +87,12 @@ JSON-RPC surface:
 
 | Method | Behavior |
 |--------|----------|
-| `initialize` | Standard MCP handshake; advertises capabilities |
+| `initialize` | Standard MCP handshake; negotiates the protocol version (2024-11-05 … 2025-11-25); advertises capabilities |
+| `server/discover` | 2026-07-28 sessionless discovery (Claude Code 2.1.3xx probes it first); later requests carry the version in `_meta` |
 | `tools/list` | Returns one tool per (repo, role) pair, named `ask_<repo>_<role>`, with caller-facing description |
-| `tools/call` | Routes `{ name, arguments: { question } }` to `ask <repo>:<role> "<question>"` and returns the answer |
+| `tools/call` | Routes `{ name, arguments: { question } }` to `ask <repo>:<role> "<question>"` and returns the answer; names match case-insensitively |
 | `resources/list` | Per-role memory + log files exposed as MCP resources |
-| `resources/read` | Returns file contents (memory.md, memory.log.md) |
+| `resources/read` | Returns file contents (memory.md, memory.log.md, AGENT.md); URIs match case-insensitively |
 | Notifications (any method without `id`) | **Silently ignored** — never reply with `id: null` |
 
 ## Behavioral Contracts
@@ -102,7 +103,8 @@ JSON-RPC surface:
 | Tool descriptions | Caller-facing first-paragraph extraction from `agents/<role>/AGENT.md`, prefixed with the centralized `ROLE_DESCRIPTIONS` preamble for each role (architect/product/englead/steward/tester/merger/engineer) |
 | Discovery | `--repos-dir` recurses **depth-2** (top level + one nesting level) to find subdirs with `agents/`; skips hidden dirs and `node_modules`/`vendor`/`dist`/`build`/`target`/`out`/`.next`/`.nuxt`/`coverage`/`__pycache__` |
 | Notification handling | JSON-RPC requests without `id` are notifications and MUST NOT receive a response; replying with `id: null` triggers Claude Code's Zod validator and silently breaks the session |
-| Stdio hygiene | All status/banner output goes to stderr; stdout carries only JSON-RPC (otherwise the client can't parse the handshake) |
+| Stdio hygiene | All status/banner output goes to stderr; stdout carries only JSON-RPC (otherwise the client can't parse the handshake). A malformed line is reported on stderr and skipped, never answered with `id: null` |
+| HTTP transport | MCP Streamable HTTP at `/mcp` (session per client via `Mcp-Session-Id`, JSON responses); `GET /mcp/schema` and the classic `/v1/*` API alongside |
 | Cross-repo invocation | `tools/call` with `name=ask_<repo>_<role>` runs `cd <repo-path> && ask <role> "<question>"` |
 | Tool count discipline | At most one tool per (repo, role); duplicates are deduplicated by name |
 | Authentication | If `--api-key` set, requires `Authorization: Bearer <key>` for HTTP transport; stdio is trusted (subprocess-of-Claude) |
@@ -112,15 +114,17 @@ JSON-RPC surface:
 | Error | When | Behavior |
 |-------|------|----------|
 | `--repos-dir` missing | Path doesn't exist | Warn on stderr, continue (allows running with `--repos` only) |
-| `tools/call` for unknown tool | Name not in registry | JSON-RPC error code -32602, "Tool not found" |
-| `ask` subprocess fails | Underlying ASK CLI error | Forward exit code + stderr in tool result with `isError: true` |
-| `initialize` not called | Other method invoked first | Error -32002, "Not initialized — Call initialize first" |
-| Method not implemented | Unknown method (non-notification) | Error -32601, "Method not found" |
+| `tools/call` for unknown tool | Name not in registry (ignoring case) | JSON-RPC error code -32602, `unknown tool "<name>"` |
+| Invalid tool arguments | Missing/empty `question`, wrong types | Tool result with `isError: true` naming the problem |
+| `ask` subprocess fails | Underlying ASK CLI error, timeout | Forward exit code + stderr + cmd + cwd in tool result with `isError: true` |
+| `resources/read` unknown URI | Not a registered `ask://` resource | JSON-RPC error -32602, "Resource not found" |
+| `initialize` not called | Other method invoked first (pre-2026-07-28 protocol) | JSON-RPC error, `method "<m>" is invalid during session initialization` |
+| Method not implemented | Unknown method (non-notification) | Error -32601, "method not found" |
 
 ## Dependencies
 
 - Depends on: `CONTRACT:S2-ASK-CLI.1.0` (subprocess executor for every tools/call)
-- Depends on: the `rebar` binary (native Go, no third-party MCP SDK — a minimal JSON-RPC 2.0 implementation keeps the wire behaviour above exactly)
+- Depends on: the `rebar` binary (native Go) and the official MCP Go SDK `github.com/modelcontextprotocol/go-sdk` (protocol, transports, schema validation)
 - Configuration: `.mcp.json` in adopted repos (auto-written by `rebar init`)
   and `~/.claude.json` (user-level, manual)
 
@@ -153,7 +157,7 @@ This is the latest version. No predecessor.
 
 ## Implementing Files
 
-- `cli/internal/mcp/` — the server (native Go: `rebar mcp serve`)
+- `cli/internal/mcp/` — the server (native Go on the MCP Go SDK: `rebar mcp serve`; `compat.go` aliases, `stdio.go` stdio hygiene)
 - `cli/cmd/mcp.go` — the `rebar mcp serve` / `rebar mcp client` commands
 - `bin/ask-mcp-server` — sh shim running `rebar mcp serve` (the python original was removed in rebar 3.2)
 - `cli/cmd/init.go` — writes `.mcp.json` running `rebar mcp serve` (`ensureMCPConfig`, `findRebarCommand`)
@@ -175,3 +179,4 @@ This is the latest version. No predecessor.
 | Version | Date | Change | Migration |
 |---------|------|--------|-----------|
 | 1.0 | 2026-04-25 | Initial contract — formalizing Wave 2.5 + 2026-04-22→25 fixes | — |
+| 1.0 (amended) | 2026-11-17 | Server moved onto the official MCP Go SDK (rebar 3.2): protocol negotiation incl. 2026-07-28, Streamable HTTP, SDK error shapes; tool names, schemas and result envelope unchanged | None for Claude Code; HTTP clients must speak Streamable HTTP |

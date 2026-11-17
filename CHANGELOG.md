@@ -18,6 +18,36 @@ All notable changes to rebar. Versioned with [semver](https://semver.org/).
 
 ## Unreleased
 
+- **`rebar mcp serve` runs on the official MCP Go SDK**
+  (`github.com/modelcontextprotocol/go-sdk` v1.8.0) instead of the
+  hand-written JSON-RPC layer, so the server follows the MCP spec rather than
+  the python server's quirks. Tool names, descriptions and input schemas are
+  unchanged, and tool names and `ask://` resource URIs still match
+  case-insensitively. **Client-visible changes:** the protocol version is
+  negotiated (2024-11-05 … 2025-11-25 over `initialize`; 2026-07-28 over
+  `server/discover`, which Claude Code 2.1.3xx tries first; the server used
+  to answer 2024-11-05 to everyone); a failing ask, a timeout, an empty
+  `question` or arguments that break the schema are tool errors
+  (`isError: true` results with the reason) instead of JSON-RPC -32603/-32602
+  errors; an unknown tool is -32602 `unknown tool "<name>"` (was
+  -32603 "Repository … not found"); an unknown resource is -32602 "Resource
+  not found"; a request before `initialize` gets the SDK's "invalid during
+  session initialization" error (was -32002); responses are compact JSON
+  (`{"jsonrpc":"2.0",…}`, not python `json.dumps` spacing) and may arrive out
+  of order; `serverInfo.version` is rebar's version (was "1.0.0"); `ping` and
+  an empty `prompts/list` are answered; batches are refused after
+  2025-06-18. Over stdio a malformed line is still logged and skipped (no
+  `id: null` reply), invalid JSON-RPC objects and fractional ids are now
+  skipped too, and end of input waits for running calls. **HTTP:** `/mcp` is
+  MCP's Streamable HTTP transport (`Accept: application/json,
+  text/event-stream`, `Mcp-Session-Id`, 202 for notifications, DELETE ends a
+  session; loopback requests need a loopback `Host`), so Claude Code's
+  `"type": "http"` servers work; plain one-shot JSON-RPC POSTs no longer do.
+  `rebar mcp client` uses the SDK client. The classic `/v1/*` API and
+  `rebar ask serve` are unchanged. The binary grows by ~1.9 MB (stripped).
+  Tests: goldens in `cli/cmd/testdata/mcp` regenerated, and a Claude Code
+  compatibility test replays sessions recorded from Claude Code 2.1.224 and
+  2.1.311.
 - **rebar is a single Go binary: the shell implementations are gone.**
   rebar no longer ships `scripts/*.sh` for its checks, suites, steward and
   utilities, nor `scripts/_rebar-config.sh`, the bash `ask` /
