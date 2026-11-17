@@ -35,6 +35,8 @@ var (
 	bashArithLine = regexp.MustCompile(`(?m)^.*: line [0-9]+: \[\[: 0\n0: syntax error in expression \(error token is "0"\)\n`)
 )
 
+var commitLine = regexp.MustCompile(`(?m)^(<worktree> +)?[0-9a-f]{7,12}( )`)
+
 var refreshContextCheck = parityCheck{
 	name:   "refresh-context",
 	golden: "refresh-context",
@@ -48,6 +50,9 @@ var refreshContextCheck = parityCheck{
 		// the native port compares silently.
 		out = daysOld.ReplaceAllString(out, "QUICKCONTEXT is N days")
 		out = worktreeLine.ReplaceAllString(out, "<worktree>$1")
+		// The fixtures hold dates relative to today, so commit ids change
+		// daily.
+		out = commitLine.ReplaceAllString(out, "$1<sha>$2")
 		return bashArithLine.ReplaceAllString(out, "")
 	},
 }
