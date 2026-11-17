@@ -53,8 +53,7 @@ jobs:
 
       - name: Go tests
         working-directory: cli
-        # Explicit: go test's default is 10 minutes per package, and the
-        # cmd package's parity suites run every bash script under test.
+        # Explicit: go test's default is 10 minutes per package.
         run: go test -timeout 20m ./...
 
       # The release workflow's go test fails on a tag whose scripts are missing
@@ -69,16 +68,19 @@ jobs:
           git tag v0.0.0-ci-head HEAD
           go test ./internal/migrate -run '^TestReleasedManifestCoversLocalTags$' -count=1
 
-      - name: ci-check
+      # rebar's own checks, with the binary built from this commit (the
+      # script tests, part of the suite, run the same binary).
+      - name: rebar check
         run: |
           export PATH="${{ matrix.path_prefix }}$PATH"
-          scripts/ci-check.sh
+          (cd cli && go build -o "$RUNNER_TEMP/rebar" .)
+          REBAR_TEST_BIN="$RUNNER_TEMP/rebar" "$RUNNER_TEMP/rebar" check
 
       - name: Script tests
         run: |
           export PATH="${{ matrix.path_prefix }}$PATH"
           if [ -x scripts/tests/run.sh ]; then
-            echo "scripts/tests/run.sh is part of ci-check; nothing extra to run."
+            echo "scripts/tests/run.sh is part of rebar check; nothing extra to run."
             exit 0
           fi
           failed=0

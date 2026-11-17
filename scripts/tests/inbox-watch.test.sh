@@ -26,8 +26,8 @@
 set -uo pipefail
 
 . "$(dirname "$0")/lib.sh"
-WATCH="${INBOX_WATCH_BIN:-$REBAR_SCRIPTS/inbox-watch.sh}"
-[ -f "$WATCH" ] || fail "watcher not found at $WATCH"
+# The watcher under test: rebar's, or a script copy (INBOX_WATCH_BIN).
+if [ -n "${INBOX_WATCH_BIN:-}" ]; then WATCH=(bash "$INBOX_WATCH_BIN"); else WATCH=("$REBAR" native inbox-watch); fi
 
 # --- pick a UTF-8 locale whose collation diverges from C -------------------
 # Snapshot `locale -a` into a variable and match with a herestring rather than
@@ -64,9 +64,8 @@ OUT="$TMP/out.log"
 # Arm the watcher UNDER THE DIVERGENT LOCALE. A correct watcher pins LC_ALL=C
 # internally for every sort/merge and is immune; a broken one inherits this
 # locale in its union and phantom-emits.
-# native_env: under REBAR_TEST_NATIVE_BIN the script hands off to the binary
 # (exec keeps the PID, so $! is still the watcher).
-( native_env && LC_ALL="$DIVERGENT" exec bash "$WATCH" -i 1 "$TMP/inbox" ) > "$OUT" 2> "$TMP/err.log" &
+( LC_ALL="$DIVERGENT" exec "${WATCH[@]}" -i 1 "$TMP/inbox" ) > "$OUT" 2> "$TMP/err.log" &
 W=$!
 
 poll() { sleep 2; }   # >= one 1s poll, with margin

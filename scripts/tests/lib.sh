@@ -4,50 +4,43 @@
 # Source it first:  . "$(dirname "$0")/lib.sh"
 #
 #   REBAR_TESTS_DIR       this directory
-#   REBAR_SCRIPTS         the scripts under test (override with REBAR_SCRIPTS_DIR)
+#   REBAR_SCRIPTS         rebar's scripts/ (maintainer tooling)
 #   fail MSG...           print "FAIL: MSG" to stderr and exit 1
 #   ok MSG...             print "ok MSG"
 #   g ARGS...             git with a throwaway identity, no signing, no hooks
 #   rebar_tmpdir [NAME]   create a temp dir in TMP; it is removed on exit
 #   rebar_on_exit CMD     eval CMD on exit, before TMP is removed (e.g. kill a watcher)
-#   run_in DIR SCRIPT [ARGS...]
-#                         run SCRIPT from REBAR_SCRIPTS against project DIR, the
-#                         way `rebar check` does (REBAR_PROJECT_ROOT); stderr is merged
-#   run_from CWD DIR SCRIPT [ARGS...]
+#   run_in DIR CHECK [ARGS...]
+#                         run one of rebar's checks (CHECK is its old script name,
+#                         check-todos.sh or check-todos) against project DIR the way
+#                         its script ran (REBAR_PROJECT_ROOT, `rebar native`); stderr
+#                         is merged
+#   run_from CWD DIR CHECK [ARGS...]
 #                         run_in, started in CWD instead of DIR
-#   native_env            under REBAR_TEST_NATIVE_BIN, export the hand-off variables
-#                         run_in sets (call it in a subshell before running a script
-#                         directly, e.g. under run_tty)
+#   REBAR                 the rebar binary under test
 #   run_tty CMD [ARGS...] run CMD with stdout on a pseudo-terminal (script(1), BSD or
 #                         util-linux); returns 77 when no script(1) is available
 #   doc_snippet FILE MARKER
 #                         print the first fenced code block after the first line of
 #                         FILE containing MARKER (fixed string), without the fences
 #
-# The tests exercise the scripts: tests that drive the CLI get
-# REBAR_CHECK_IMPL=shell (the CLI's default is go). REBAR_TEST_NATIVE_BIN=<rebar
-# binary> instead makes run_in hand the checks that binary implements natively
-# (`rebar native` lists them) to it, as `rebar check` does, and sets
-# REBAR_CHECK_IMPL=go for tests that drive the CLI, so a test's assertions also
-# hold the Go ports to the scripts' behaviour:
-#   REBAR_TEST_NATIVE_BIN=/path/to/rebar scripts/tests/run.sh source-scan
+# The tests exercise the rebar binary: REBAR_TEST_BIN, else the one run.sh
+# built from cli/ (run.sh exports REBAR_TEST_BIN), else bin/rebar:
+#   REBAR_TEST_BIN=/path/to/rebar scripts/tests/run.sh source-scan
 #
 # Bash 3.2 compatible.
 
 REBAR_TESTS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # Tests set tiers and checks in their fixtures' .rebarrc; don't let a caller's
-# settings leak in (ci-check.sh exports _REBAR_CHECKS_VALIDATED, which would
+# settings leak in (the suites export _REBAR_CHECKS_VALIDATED, which would
 # silence the checks_enable warnings under test; `rebar check` exports
 # REBAR_PROJECT_ROOT, which would point fixture runs at the caller's repo).
 unset REBAR_TIER REBAR_CHECKS_ENABLE _REBAR_CHECKS_VALIDATED REBAR_PROJECT_ROOT \
   REBAR_CONTRACTS_DIR REBAR_CONTRACT_NAMESPACE REBAR_REGISTRY_IMPL_COUNTS REBAR_METRICS_STRICT \
-  REBAR_CHECK_IMPL REBAR_BIN REBAR_NATIVE_CHECKS REBAR_NATIVE_SCRIPTS REBAR_RCFILE
-REBAR_SCRIPTS="${REBAR_SCRIPTS_DIR:-$REBAR_TESTS_DIR/..}"
-if [ -n "${REBAR_TEST_NATIVE_BIN:-}" ]; then
-  export REBAR_CHECK_IMPL=go
-else
-  export REBAR_CHECK_IMPL=shell
-fi
+  REBAR_BIN REBAR_RCFILE
+REBAR_SCRIPTS="$(cd "$REBAR_TESTS_DIR/.." && pwd)"
+REBAR="${REBAR_TEST_BIN:-$REBAR_SCRIPTS/../bin/rebar}"
+[ -x "$REBAR" ] || { echo "FAIL: no rebar binary at $REBAR (build it: cd cli && go build -o ../bin/rebar .)" >&2; exit 1; }
 
 fail() { echo "FAIL: $*" >&2; exit 1; }
 ok() { echo "ok $*"; }
@@ -71,16 +64,9 @@ run_in() {
   run_from "$dir" "$@"
 }
 run_from() {
-  local cwd="$1" dir="$2" script="$3"
+  local cwd="$1" dir="$2" check="${3%.sh}"
   shift 3
-  ( native_env && cd "$cwd" && REBAR_PROJECT_ROOT="$dir" "$REBAR_SCRIPTS/$script" "$@" ) 2>&1
-}
-native_env() {
-  [ -n "${REBAR_TEST_NATIVE_BIN:-}" ] || return 0
-  REBAR_BIN="$REBAR_TEST_NATIVE_BIN"
-  REBAR_NATIVE_CHECKS="$("$REBAR_TEST_NATIVE_BIN" native | tr '\n' ' ')"
-  REBAR_NATIVE_SCRIPTS="$(cd "$REBAR_SCRIPTS" && pwd -P)"
-  export REBAR_BIN REBAR_NATIVE_CHECKS REBAR_NATIVE_SCRIPTS
+  ( cd "$cwd" && REBAR_PROJECT_ROOT="$dir" "$REBAR" native "$check" "$@" ) 2>&1
 }
 
 doc_snippet() {

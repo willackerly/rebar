@@ -8,7 +8,7 @@
 #   T2  an orphan tracked in TODO.md passes; an implemented contract is no orphan
 #
 # Usage: bash scripts/tests/check-registry-orphans.test.sh
-# Override the scripts under test with REBAR_SCRIPTS_DIR.
+# Runs the rebar binary under test (lib.sh: REBAR_TEST_BIN).
 # Bash 3.2 compatible (macOS default).
 
 set -uo pipefail

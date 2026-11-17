@@ -22,7 +22,7 @@
 #       short ref, so a missing one is still BROKEN
 #
 # Usage: bash scripts/tests/contract-namespace.test.sh
-# Override the scripts under test with REBAR_SCRIPTS_DIR.
+# Runs the rebar binary under test (lib.sh: REBAR_TEST_BIN).
 # Bash 3.2 compatible (macOS default).
 
 set -uo pipefail
