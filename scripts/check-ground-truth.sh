@@ -258,7 +258,7 @@ verify() {
   while IFS='=' read -r key value; do
     # Skip empty lines and comments
     [ -z "$key" ] && continue
-    echo "$key" | grep -q '^[[:space:]]*#' && continue
+    grep -q '^[[:space:]]*#' <<<"$key" && continue
 
     key=$(echo "$key" | xargs)
     value=$(echo "$value" | xargs)
@@ -274,7 +274,7 @@ verify() {
       drift=true
     elif [ -z "$documented" ]; then
       echo -e "${YELLOW}NEW${NC}:   $key = $value  (not in METRICS file)"
-    elif echo "$line" | grep -Eq "^[[:space:]]*${key}[[:space:]]*>="; then
+    elif grep -Eq "^[[:space:]]*${key}[[:space:]]*>=" <<<"$line"; then
       if [[ "$value" =~ ^[0-9]+$ && "$documented" =~ ^[0-9]+$ ]] && [ "$value" -ge "$documented" ]; then
         echo -e "${GREEN}OK${NC}:    $key = $value  (floor $documented)"
       else

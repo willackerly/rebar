@@ -87,7 +87,7 @@ printf 'test_files = 2\nsdks = 2\nagents = 2\ncontract_files = 3\ncontract_ids =
 out="$(gt)" || { echo "$out"; fail "T1: declared metrics did not match"; }
 for m in 'test_files = 2' 'sdks = 2' 'agents = 2' 'contract_files = 3' 'contract_ids = 2' \
   'headed_sources = 1' 'nothing = 0'; do
-  printf '%s\n' "$out" | grep -q "$m" || { echo "$out"; fail "T1: missing '$m'"; }
+  contains "$out" "$m" || { echo "$out"; fail "T1: missing '$m'"; }
 done
 ok "T1: declared metrics compute files, dirs, depth, excludes, contains, distinct"
 
@@ -128,7 +128,7 @@ tracked_names=2'
 NG="$TMP/nogit"
 mkdir -p "$NG" && cp -R "$P/ops" "$NG/ops"
 out="$( native_env; cd / && REBAR_RCFILE="$TMP/tracked.rc" REBAR_PROJECT_ROOT="$NG" "$SRC/check-ground-truth.sh" --print 2>"$TMP/err" )"
-printf '%s\n' "$out" | grep -qx 'tracked_sh=4' || { echo "$out"; fail "T1b: outside git, tracked should count every file"; }
+contains "$out" -x 'tracked_sh=4' || { echo "$out"; fail "T1b: outside git, tracked should count every file"; }
 grep -q 'not a git work tree' "$TMP/err" || { cat "$TMP/err"; fail "T1b: no note outside git"; }
 ( cd "$P" && g rm -rq ops && g commit -q -m "drop ops" ) || fail "T1b: cleanup"
 rm -rf "$P/ops"
@@ -137,7 +137,7 @@ ok "T1b: tracked = true counts git-tracked files and dirs only; outside git, eve
 # T2 — floors pass at or above the value; drift fails either way.
 printf 'test_files >= 1\nsdks = 2\n' > "$P/METRICS"
 out="$(gt)" || { echo "$out"; fail "T2: floor below the count should pass"; }
-printf '%s\n' "$out" | grep -q 'test_files = 2  (floor 1)' || { echo "$out"; fail "T2: floor not reported"; }
+contains "$out" 'test_files = 2  (floor 1)' || { echo "$out"; fail "T2: floor not reported"; }
 printf 'test_files >= 3\n' > "$P/METRICS"
 gt >/dev/null && fail "T2: floor above the count should fail"
 printf 'test_files = 5\n' > "$P/METRICS"
@@ -149,9 +149,9 @@ ok "T2: METRICS exact and floor semantics hold for declared metrics"
 FULL='test_files = 2\nsdks = 2\nagents = 2\ncontract_files = 3\ncontract_ids = 2\nheaded_sources = 1\nnothing = 0\n'
 printf 'test_files = 2\n' > "$P/METRICS"
 out="$(gt)" || { echo "$out"; fail "T2b: a key missing from METRICS should pass by default"; }
-printf '%s\n' "$out" | grep -q 'NEW.*sdks = 2' || { echo "$out"; fail "T2b: NEW not reported"; }
+contains "$out" 'NEW.*sdks = 2' || { echo "$out"; fail "T2b: NEW not reported"; }
 out="$(REBAR_METRICS_STRICT=true gt)" && { echo "$out"; fail "T2b: strict, a key missing from METRICS should fail"; }
-printf '%s\n' "$out" | grep -q 'MISSING.*sdks = 2' || { echo "$out"; fail "T2b: MISSING not reported"; }
+contains "$out" 'MISSING.*sdks = 2' || { echo "$out"; fail "T2b: MISSING not reported"; }
 cp "$P/.rebarrc" "$TMP/rc.bak"
 printf 'metrics_strict = true\n' >> "$P/.rebarrc"
 gt >/dev/null && fail "T2b: .rebarrc metrics_strict = true not honored"
@@ -159,45 +159,45 @@ printf "$FULL" > "$P/METRICS"
 out="$(gt)" || { echo "$out"; fail "T2b: strict with every key in METRICS should pass"; }
 rm "$P/METRICS"
 out="$(gt)" && { echo "$out"; fail "T2b: strict, a missing METRICS should fail"; }
-printf '%s\n' "$out" | grep -q 'FAIL.*No METRICS file' || { echo "$out"; fail "T2b: missing METRICS not reported"; }
-printf '%s\n' "$out" | grep -q 'drift' && { echo "$out"; fail "T2b: a missing METRICS is not drift"; }
-printf '%s\n' "$out" | grep -q 'Ground truth not verified' || { echo "$out"; fail "T2b: missing METRICS summary"; }
+contains "$out" 'FAIL.*No METRICS file' || { echo "$out"; fail "T2b: missing METRICS not reported"; }
+contains "$out" 'drift' && { echo "$out"; fail "T2b: a missing METRICS is not drift"; }
+contains "$out" 'Ground truth not verified' || { echo "$out"; fail "T2b: missing METRICS summary"; }
 cp "$TMP/rc.bak" "$P/.rebarrc"
 out="$(gt)" || { echo "$out"; fail "T2b: a missing METRICS should pass by default"; }
-printf '%s\n' "$out" | grep -q 'SKIP.*No METRICS file' || { echo "$out"; fail "T2b: SKIP not reported"; }
+contains "$out" 'SKIP.*No METRICS file' || { echo "$out"; fail "T2b: SKIP not reported"; }
 out="$(REBAR_METRICS_STRICT=false gt)" || fail "T2b: REBAR_METRICS_STRICT=false should not be strict"
 printf "$FULL" > "$P/METRICS"
 # No metric.* lines at all: passes by default, fails strict (not as drift).
 printf 'tier = 3\n' > "$TMP/nometrics.rc"
 gtrc() { ( native_env; cd / && REBAR_RCFILE="$TMP/nometrics.rc" REBAR_PROJECT_ROOT="$P" "$SRC/check-ground-truth.sh" ) 2>&1; }
 out="$(gtrc)" || { echo "$out"; fail "T2b: no metric declarations should pass by default"; }
-printf '%s\n' "$out" | grep -q 'No metrics declared' || { echo "$out"; fail "T2b: no-declarations note missing"; }
+contains "$out" 'No metrics declared' || { echo "$out"; fail "T2b: no-declarations note missing"; }
 printf 'metrics_strict = true\n' >> "$TMP/nometrics.rc"
 out="$(gtrc)" && { echo "$out"; fail "T2b: strict, no metric declarations should fail"; }
-printf '%s\n' "$out" | grep -q 'FAIL.*No metrics declared' || { echo "$out"; fail "T2b: strict no-declarations FAIL not reported"; }
-printf '%s\n' "$out" | grep -q 'drift' && { echo "$out"; fail "T2b: no declarations is not drift"; }
+contains "$out" 'FAIL.*No metrics declared' || { echo "$out"; fail "T2b: strict no-declarations FAIL not reported"; }
+contains "$out" 'drift' && { echo "$out"; fail "T2b: no declarations is not drift"; }
 ok "T2b: metrics_strict fails a missing METRICS, keys missing from it, and no declarations"
 
 # T3 — registry classification and purpose rendering come from .rebarrc.
 reg() { run_from / "$P" compute-registry.sh --stdout; }
 out="$(reg)"
 # Unscoped, SDK-C2-BAR starts with S and lands in Services.
-printf '%s\n' "$out" | grep -A6 '^## Services' | grep -q 'SDK-C2-BAR' \
+contains "$(grep -A6 '^## Services' <<<"$out")" 'SDK-C2-BAR' \
   || { echo "$out"; fail "T3: SDK-C2-BAR should be a Service without prefixes"; }
-printf '%s\n' "$out" | grep -q '| S1-FOO | 1.0 | active | — |' \
+contains "$out" '| S1-FOO | 1.0 | active | — |' \
   || { echo "$out"; fail "T3: default heading should not read 'Why this exists'"; }
 cat >> "$P/.rebarrc" <<'EOF'
 registry_scope_prefixes  = SDK-
 registry_purpose_heading = Purpose|Why this exists
 EOF
 out="$(reg)"
-printf '%s\n' "$out" | grep -A4 '^## Components' | grep -q 'SDK-C2-BAR' \
+contains "$(grep -A4 '^## Components' <<<"$out")" 'SDK-C2-BAR' \
   || { echo "$out"; fail "T3: SDK-C2-BAR should be a Component"; }
-printf '%s\n' "$out" | grep -qF '| S1-FOO | 1.0 | active | Short \| purpose. |' \
+contains "$out" -F '| S1-FOO | 1.0 | active | Short \| purpose. |' \
   || { echo "$out"; fail "T3: purpose heading not applied, or ellipsis (the default) did not escape |"; }
 printf 'registry_purpose_style   = bytes\n' >> "$P/.rebarrc"
 out="$(reg)"
-printf '%s\n' "$out" | grep -qF '| S1-FOO | 1.0 | active | Short | purpose. |' \
+contains "$out" -F '| S1-FOO | 1.0 | active | Short | purpose. |' \
   || { echo "$out"; fail "T3: registry_purpose_style = bytes should keep the raw purpose"; }
 ok "T3: registry scope prefixes and purpose settings apply (ellipsis default, bytes opt-out)"
 
@@ -215,8 +215,8 @@ mkdir -p "$P/scripts"
 printf '#!/usr/bin/env bash\necho LOCAL-COPY\n' > "$P/scripts/check-ground-truth.sh"
 chmod +x "$P/scripts/check-ground-truth.sh"
 out="$( cd / && REBAR_PROJECT_ROOT="$P" bash -c "source '$SRC/_rebar-config.sh'; \"\$(_rebar_script check-ground-truth.sh)\"" 2>&1 )"
-printf '%s\n' "$out" | grep -q LOCAL-COPY || { echo "$out"; fail "T5: project copy not used"; }
-printf '%s\n' "$out" | grep -q deprecated || { echo "$out"; fail "T5: no deprecation notice"; }
+contains "$out" LOCAL-COPY || { echo "$out"; fail "T5: project copy not used"; }
+contains "$out" deprecated || { echo "$out"; fail "T5: no deprecation notice"; }
 printf '#!/usr/bin/env bash\n# rebar-thin-wrapper\nexec rebar check\n' > "$P/scripts/ci-check.sh"
 path="$( cd / && REBAR_PROJECT_ROOT="$P" bash -c "source '$SRC/_rebar-config.sh'; _rebar_script ci-check.sh" 2>/dev/null )"
 [ "$path" = "$(cd "$SRC" && pwd -P)/ci-check.sh" ] || fail "T5: thin wrapper picked ($path)"
@@ -227,8 +227,8 @@ rm -f "$P/scripts/check-ground-truth.sh" "$P/scripts/ci-check.sh"
 mv "$P/METRICS" "$P/METRICS.off"
 out="$(REBAR_TIER=1 run_from / "$P" check-ground-truth.sh --print)" \
   || { echo "$out"; fail "T6: --print exited non-zero"; }
-printf '%s\n' "$out" | grep -qx 'test_files=2' || { echo "$out"; fail "T6: --print lacks test_files=2"; }
-printf '%s\n' "$out" | grep -qx 'sdks=2' || { echo "$out"; fail "T6: --print lacks sdks=2"; }
+contains "$out" -x 'test_files=2' || { echo "$out"; fail "T6: --print lacks test_files=2"; }
+contains "$out" -x 'sdks=2' || { echo "$out"; fail "T6: --print lacks sdks=2"; }
 printf 'metric.only_this.paths = api\nmetric.only_this.names = main.go\n' > "$TMP/alt.rc"
 out="$(REBAR_RCFILE="$TMP/alt.rc" run_from / "$P" check-ground-truth.sh --print)"
 [ "$out" = "only_this=1" ] || { echo "$out"; fail "T6: REBAR_RCFILE not used instead of .rebarrc"; }
