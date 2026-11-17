@@ -79,11 +79,11 @@ while [ $i -le 150 ]; do some_files="$some_files f${i}_test.go"; i=$((i + 1)); d
 first=""
 check_report() {
   [ $rc -eq 1 ] || { echo "$out" | tail -20; fail "$1: exit $rc, want 1 (134 = abort, 124/142 = timeout)"; }
-  printf '%s\n' "$out" | grep -qE 'process substitution|open files|ambiguous redirect' && { echo "$out" | head -20; fail "$1: ran out of file descriptors"; }
-  printf '%s\n' "$out" | grep -q '^check-decay-patterns: 3 finding(s) in scan set$' || { echo "$out" | head -20; fail "$1: finding count"; }
-  printf '%s\n' "$out" | grep -q '^e2e/a.spec.ts:1:P1-silenced-failure:' || { echo "$out"; fail "$1: P1"; }
-  printf '%s\n' "$out" | grep -q '^e2e/a.spec.ts:2:P4-keep-in-sync:' || { echo "$out"; fail "$1: P4"; }
-  printf '%s\n' "$out" | grep -q '^.github/workflows/ci.yml:2:P7-plausible-env-name:' || { echo "$out"; fail "$1: P7"; }
+  contains "$out" -E 'process substitution|open files|ambiguous redirect' && { head -20 <<<"$out"; fail "$1: ran out of file descriptors"; }
+  contains "$out" '^check-decay-patterns: 3 finding(s) in scan set$' || { head -20 <<<"$out"; fail "$1: finding count"; }
+  contains "$out" '^e2e/a.spec.ts:1:P1-silenced-failure:' || { echo "$out"; fail "$1: P1"; }
+  contains "$out" '^e2e/a.spec.ts:2:P4-keep-in-sync:' || { echo "$out"; fail "$1: P4"; }
+  contains "$out" '^.github/workflows/ci.yml:2:P7-plausible-env-name:' || { echo "$out"; fail "$1: P7"; }
   if [ -z "$first" ]; then
     first="$out"
   elif [ "$out" != "$first" ]; then
