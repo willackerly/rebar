@@ -8,6 +8,11 @@
 #   fail MSG...           print "FAIL: MSG" to stderr and exit 1
 #   ok MSG...             print "ok MSG"
 #   g ARGS...             git with a throwaway identity, no signing, no hooks
+#   contains TEXT GREP-ARGS...
+#                         true if grep GREP-ARGS matches a line of TEXT, e.g.
+#                         `contains "$out" -E 'a|b' || fail ...`
+#   count_matches TEXT GREP-ARGS...
+#                         print how many lines of TEXT match (0 when none)
 #   rebar_tmpdir [NAME]   create a temp dir in TMP; it is removed on exit
 #   rebar_on_exit CMD     eval CMD on exit, before TMP is removed (e.g. kill a watcher)
 #   run_in DIR SCRIPT [ARGS...]
@@ -32,6 +37,12 @@ REBAR_SCRIPTS="${REBAR_SCRIPTS_DIR:-$REBAR_TESTS_DIR/..}"
 
 fail() { echo "FAIL: $*" >&2; exit 1; }
 ok() { echo "ok $*"; }
+# Not `echo "$out" | grep -q PATTERN`: grep -q exits at the first match, and
+# echo, if still writing (output over a few KB), dies of SIGPIPE (exit 141),
+# which pipefail turns into a failed check, at random. A here-string has no
+# writer process. Bash 3.2 has here-strings.
+contains() { local text="$1"; shift; grep -q "$@" <<<"$text"; }
+count_matches() { local text="$1"; shift; grep -c "$@" <<<"$text" || true; }
 g() { git -c user.name=t -c user.email=t@example.com -c commit.gpgsign=false -c core.hooksPath=/dev/null "$@"; }
 
 _REBAR_EXIT_CMDS=""

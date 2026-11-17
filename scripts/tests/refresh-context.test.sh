@@ -31,6 +31,6 @@ printf '# QUICKCONTEXT\n\nlast-synced: 2023-01-01\n' > "$P/QUICKCONTEXT.md"
 out=$(run_in "$P" refresh-context.sh)
 code=$?
 [ $code -eq 0 ] || { echo "$out" | tail -5; fail "refresh-context.sh exited $code with 5000 commits since the last sync"; }
-echo "$out" | grep -q 'commit 05000' || fail "newest commit not listed: $(echo "$out" | tail -5)"
-echo "$out" | grep -q '\.\.\. and 4980 more' || fail "commit count summary missing: $(echo "$out" | tail -5)"
+contains "$out" 'commit 05000' || fail "newest commit not listed: $(echo "$out" | tail -5)"
+contains "$out" '\.\.\. and 4980 more' || fail "commit count summary missing: $(echo "$out" | tail -5)"
 ok "refresh-context lists 20 of 5000 commits and exits 0"
