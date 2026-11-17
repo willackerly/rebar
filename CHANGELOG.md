@@ -50,6 +50,24 @@ All notable changes to rebar. Versioned with [semver](https://semver.org/).
   tracked). The bootstrap template's `.gitignore` gets `STEWARD_REPORT.md` in
   place of `architecture/.state/steward-report.md`, which nothing writes.
   Existing projects: add the two lines, or run `rebar init`.
+- **Script tests no longer fail at random on SIGPIPE.** Under `set -o
+  pipefail`, `echo "$out" | grep -q …` fails when grep exits at an early match
+  while echo is still writing (exit 141; checks-enable T4 on ubuntu CI). The
+  tests use `contains` / `count_matches` from `scripts/tests/lib.sh`, which
+  feed grep a here-string; `sigpipe.test.sh` proves the old form fails on
+  large output and keeps it out of `scripts/` and `scripts/tests/`.
+  `check-fix-commit.sh` and `check-bypass-flags.sh` could misjudge a long
+  commit message the same way, and `test-e2e-live.sh` a long LLM answer;
+  they use here-strings now.
+- **`git archive | tar -x` no longer fails at random on macOS.** bsdtar stops
+  reading at the end-of-archive marker, so git archive could die of SIGPIPE
+  writing its padding: migrate T5's "extracting the old template" flake, and
+  a latent `package-release.sh` failure. Both extract from a file now; T5
+  prints the failing command's stderr.
+- **CI jobs time out** (15 min ubuntu, 30 min macOS) instead of after 6 h,
+  and the new `ci-retry` workflow re-runs, at most twice, jobs that GitHub
+  cancelled after waiting ~15 min for a macOS runner without running a step.
+  By hand: `gh run rerun <run-id> --failed`.
 - **`check-decay-patterns.sh` no longer crashes or hangs under macOS
   `/bin/bash` 3.2 once ~250 spec/test files are scanned.** Each file's
   `done < <(grep …)` left a descriptor open, and bash 3.2 corrupts its heap

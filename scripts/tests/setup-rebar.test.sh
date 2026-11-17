@@ -130,7 +130,7 @@ inst() {
     REBAR_REPO="${IREPO:-$O}" REBAR_RELEASE_URL="$RELURL" \
     "$sh" "$INSTALLER" "$@" 2>&1
 }
-has() { printf '%s\n' "$1" | grep -qF -- "$2" || { printf '%s\n' "$1" | tail -20 >&2; fail "$3: missing '$2'"; }; }
+has() { contains "$1" -F -- "$2" || { printf '%s\n' "$1" | tail -20 >&2; fail "$3: missing '$2'"; }; }
 current_of() { readlink "$1/.rebar/current"; }
 leftovers() { ls -A "$1/.rebar/versions" | grep '^\.' || true; }
 

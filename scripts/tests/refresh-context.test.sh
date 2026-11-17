@@ -31,8 +31,8 @@ printf '# QUICKCONTEXT\n\nlast-synced: 2023-01-01\n' > "$P/QUICKCONTEXT.md"
 out=$(run_in "$P" refresh-context.sh)
 code=$?
 [ $code -eq 0 ] || { echo "$out" | tail -5; fail "refresh-context.sh exited $code with 5000 commits since the last sync"; }
-echo "$out" | grep -q 'commit 05000' || fail "newest commit not listed: $(echo "$out" | tail -5)"
-echo "$out" | grep -q '\.\.\. and 4980 more' || fail "commit count summary missing: $(echo "$out" | tail -5)"
+contains "$out" 'commit 05000' || fail "newest commit not listed: $(echo "$out" | tail -5)"
+contains "$out" '\.\.\. and 4980 more' || fail "commit count summary missing: $(echo "$out" | tail -5)"
 ok "refresh-context lists 20 of 5000 commits and exits 0"
 
 # Outside a git repository, and in one with no commits yet, the git sections
@@ -49,11 +49,11 @@ for kind in no-git no-commits; do
     out=$(GIT_CEILING_DIRECTORIES="$TMP" run_in "$D" refresh-context.sh $mode)
     code=$?
     [ $code -eq 0 ] || { echo "$out" | tail -5; fail "refresh-context.sh ${mode:-(full)} exited $code ($kind)"; }
-    echo "$out" | grep -q 'days stale' || fail "staleness not reported ($kind ${mode:-full}): $out"
-    echo "$out" | grep -q 'skipped' || fail "no skip note for the git sections ($kind ${mode:-full}): $out"
+    contains "$out" 'days stale' || fail "staleness not reported ($kind ${mode:-full}): $out"
+    contains "$out" 'skipped' || fail "no skip note for the git sections ($kind ${mode:-full}): $out"
     if [ -z "$mode" ]; then
-      echo "$out" | grep -q 'Open items: 1' || fail "TODO section not reported ($kind): $out"
-      echo "$out" | grep -q '=== Summary ===' || fail "report stopped early ($kind): $out"
+      contains "$out" 'Open items: 1' || fail "TODO section not reported ($kind): $out"
+      contains "$out" '=== Summary ===' || fail "report stopped early ($kind): $out"
     fi
   done
   ok "refresh-context degrades without git history ($kind) and exits 0"
