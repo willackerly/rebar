@@ -538,8 +538,8 @@ func (m *migrator) runInstall(root, name string, extra []Setting, args ...string
 	if ok {
 		return r
 	}
-	rcPath := filepath.Join(m.tmp, "rebarrc-"+gitBlobHash(rc))
-	if err := os.WriteFile(rcPath, rc, 0o644); err != nil {
+	rcPath, err := m.writeRC(rc)
+	if err != nil {
 		return runResult{Err: err, Code: -1}
 	}
 	r = runNative(root, rcPath, scrubbedEnv("REBAR_PROJECT_ROOT="+root, "REBAR_TIER=3"), name, args...)
@@ -2149,12 +2149,38 @@ func (m *migrator) registryAfterDeletions() {
 	_ = m.ws.restore()
 }
 
+// writeRC stores a candidate .rebarrc under its content hash and returns
+// the path. A file already there is the same content and is left alone,
+// and a new one appears by rename: concurrent runs (registry --stdout and
+// --health) read one while another goroutine asks for the same settings.
+func (m *migrator) writeRC(rc []byte) (string, error) {
+	p := filepath.Join(m.tmp, "rebarrc-"+gitBlobHash(rc))
+	if _, err := os.Stat(p); err == nil {
+		return p, nil
+	}
+	f, err := os.CreateTemp(m.tmp, "rebarrc-*.tmp")
+	if err != nil {
+		return "", err
+	}
+	_, werr := f.Write(rc)
+	if cerr := f.Close(); werr == nil {
+		werr = cerr
+	}
+	if werr == nil {
+		werr = os.Rename(f.Name(), p)
+	}
+	if werr != nil {
+		os.Remove(f.Name())
+		return "", werr
+	}
+	return p, nil
+}
+
 // rcFile writes the candidate .rebarrc (the project's plus accepted and
 // extra settings) and returns its path.
 func (m *migrator) rcFile(extra []Setting) string {
 	rc, _ := MergeRC(m.rc, append(append([]Setting{}, m.accepted...), extra...))
-	p := filepath.Join(m.tmp, "rebarrc-"+gitBlobHash(rc))
-	_ = os.WriteFile(p, rc, 0o644)
+	p, _ := m.writeRC(rc)
 	return p
 }
 
