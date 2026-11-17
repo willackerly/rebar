@@ -130,6 +130,17 @@ func nativeFor(name string, s resolvedScript, found bool) (*checks.Check, bool) 
 	return c, ok && !(found && s.Legacy)
 }
 
+// scriptAvailable reports whether rebar can run name for the project at
+// root: natively, or from the project's own copy or the install at
+// rebarRoot.
+func scriptAvailable(root, rebarRoot, name string) bool {
+	s, ok := resolveScript(root, rebarRoot, name)
+	if _, native := nativeFor(name, s, ok); native {
+		return true
+	}
+	return ok
+}
+
 func warnLegacy(s resolvedScript) {
 	if s.Legacy {
 		fmt.Fprintf(os.Stderr, "rebar: running the project's own %s (deprecated: rebar runs its checks from the install; move customizations to .rebarrc and delete the copy)\n",

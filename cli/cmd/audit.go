@@ -246,14 +246,14 @@ func auditContracts(root string) auditResult {
 func auditEnforcement(root string) auditResult {
 	checks := []checkResult{hookInstalled(root)}
 
-	// The checks run from the rebar install; a project's own copy also counts.
+	// The checks are built into rebar; a project's own copy, or the
+	// install's script (REBAR_CHECK_IMPL=shell), also counts.
 	rebarRoot := findRebarRoot()
 	for _, script := range []string{"ci-check.sh", "check-contract-refs.sh", "check-todos.sh", "refresh-context.sh"} {
-		_, ok := resolveScript(root, rebarRoot, script)
 		checks = append(checks, checkResult{
 			Name:   script + " available",
-			Pass:   ok,
-			Detail: "project scripts/ or the rebar install",
+			Pass:   scriptAvailable(root, rebarRoot, script),
+			Detail: "built into rebar, project scripts/ or the rebar install",
 		})
 	}
 
@@ -548,13 +548,7 @@ func applyFixes(root string) int {
 	archDir := filepath.Join(root, contractsDir)
 	if _, err := os.Stat(archDir); os.IsNotExist(err) {
 		os.MkdirAll(archDir, 0755)
-		rebarRoot := findRebarRoot()
-		if rebarRoot != "" {
-			src := filepath.Join(rebarRoot, "architecture", "CONTRACT-TEMPLATE.md")
-			if data, err := os.ReadFile(src); err == nil {
-				os.WriteFile(filepath.Join(archDir, "CONTRACT-TEMPLATE.md"), data, 0644)
-			}
-		}
+		writeContractTemplate(archDir)
 		fmt.Printf("  ✓ Created %s/ with contract template\n", contractsDir)
 		fixed++
 	}

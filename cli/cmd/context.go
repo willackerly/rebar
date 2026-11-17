@@ -244,7 +244,7 @@ func findBranchContracts() []string {
 
 func runSessionStart() error {
 	// First, try to run refresh-context.sh
-	if _, ok := resolveScript(cfg.RepoRoot, findRebarRoot(), "refresh-context.sh"); ok {
+	if scriptAvailable(cfg.RepoRoot, findRebarRoot(), "refresh-context.sh") {
 		fmt.Println("═══ Freshness Check ═══")
 		fmt.Println()
 		out := gitOutput("log", "--since=7 days", "--oneline")

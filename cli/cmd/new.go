@@ -129,28 +129,12 @@ architecture/.state/*.json
 	contractsDir := config.ContractsDirFor(root)
 	archDir := filepath.Join(root, contractsDir)
 	os.MkdirAll(archDir, 0755)
-	rebarRoot := findRebarRoot()
-	if rebarRoot != "" {
-		src := filepath.Join(rebarRoot, "architecture", "CONTRACT-TEMPLATE.md")
-		if data, err := os.ReadFile(src); err == nil {
-			os.WriteFile(filepath.Join(archDir, "CONTRACT-TEMPLATE.md"), data, 0644)
-		}
-	}
+	writeContractTemplate(archDir)
 	fmt.Printf("  ✓ %s/\n", contractsDir)
 
-	// scripts/ — the thin entry points; every check runs from the rebar install.
-	scriptsDir := filepath.Join(root, "scripts")
-	os.MkdirAll(scriptsDir, 0755)
-	if rebarRoot != "" {
-		srcDir := filepath.Join(rebarRoot, "templates", "project-bootstrap", "scripts")
-		if entries, err := os.ReadDir(srcDir); err == nil {
-			for _, e := range entries {
-				if data, err := os.ReadFile(filepath.Join(srcDir, e.Name())); err == nil && !e.IsDir() {
-					os.WriteFile(filepath.Join(scriptsDir, e.Name()), data, 0755)
-				}
-			}
-		}
-	}
+	// scripts/ — the thin entry points (compiled into rebar); every check
+	// runs in the rebar binary.
+	copyBootstrap("scripts", root)
 	fmt.Println("  ✓ scripts/")
 
 	// Phase 3: LLM-generated content (if description provided)
@@ -221,7 +205,7 @@ Be practical and specific. Don't over-engineer — this is a fresh project.`, na
 	// The registry check runs at every tier, so the first `rebar check` fails
 	// without a registry. It lists tracked files, so stage first.
 	exec.Command("git", "-C", root, "add", "-A").Run()
-	if out, code, found, err := outputRebarScript(root, rebarRoot, "compute-registry"); found {
+	if out, code, found, err := outputRebarScript(root, findRebarRoot(), "compute-registry"); found {
 		if err != nil || code != 0 {
 			fmt.Fprintf(os.Stderr, "  ⚠ compute-registry failed (exit %d): %s\n", code, strings.TrimSpace(string(out)))
 		} else {

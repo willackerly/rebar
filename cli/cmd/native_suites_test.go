@@ -263,8 +263,8 @@ func TestColdStartParity(t *testing.T) {
 }
 
 // TestSuitesWithoutInstall runs the CLI (this binary) with no rebar install
-// to find: the native suites still run every native check, list the
-// scripts-only checks as not found, and the shell implementation has
+// to find: the native suites still run every native check, skip the
+// rebar-source-only checks as such, and the shell implementation has
 // nothing to run (rebar check fails, the hooks skip).
 func TestSuitesWithoutInstall(t *testing.T) {
 	requireBash(t)
@@ -275,8 +275,8 @@ func TestSuitesWithoutInstall(t *testing.T) {
 
 	out, code := testutil.RunEnv(t, root, cliEnv(home, "", ""), bin, "check")
 	for _, want := range []string{
-		"SKIP  Bootstrap Sync (script not found or not executable)",
-		"SKIP  Script Tests (script not found or not executable)",
+		"SKIP  Bootstrap Sync (rebar source repo only)",
+		"SKIP  Script Tests (rebar source repo only)",
 		"PASS  Steward",
 		"PASS  TODO Tracking", "14 passed, 0 failed, 2 skipped",
 	} {

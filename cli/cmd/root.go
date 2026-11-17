@@ -75,7 +75,7 @@ var rootCmd = &cobra.Command{
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 		// Skip repo detection for commands that handle their own root
 		name := cmd.Name()
-		if name == "help" || name == "version" || name == "native" {
+		if name == "help" || name == "version" || name == "native" || name == "install-shims" {
 			return nil // native finds its own root (nativeRoot)
 		}
 		// ASK works in any directory, as bin/ask always did.
@@ -237,6 +237,8 @@ func init() {
 	rootCmd.AddCommand(newCmd)
 	rootCmd.AddCommand(adoptCmd)
 	rootCmd.AddCommand(initCmd)
+	installShimsCmd.GroupID = "start"
+	rootCmd.AddCommand(installShimsCmd)
 
 	// Daily Workflow
 	contextCmd.GroupID = "daily"

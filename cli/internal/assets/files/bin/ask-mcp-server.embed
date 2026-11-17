@@ -1,0 +1,30 @@
+#!/bin/sh
+# ask-mcp-server — ASK's MCP server (stdio or HTTP), built into the rebar binary.
+# CONTRACT:S3-MCP-SERVER.1.0
+#
+# Hand-off: runs `rebar mcp serve` with the same arguments — the rebar beside
+# this script (through symlinks), else REBAR_BIN, else the one on PATH — so
+# .mcp.json files and scripts naming bin/ask-mcp-server keep working.
+# REBAR_CHECK_IMPL=shell runs the python original, bin/legacy/ask-mcp-server.py,
+# until it is removed.
+self=$0
+while [ -L "$self" ]; do
+  link=$(readlink "$self")
+  case $link in
+    /*) self=$link ;;
+    *) self=$(dirname "$self")/$link ;;
+  esac
+done
+dir=$(dirname "$self")
+if [ "${REBAR_CHECK_IMPL:-}" = shell ]; then
+  exec python3 "$dir/legacy/ask-mcp-server.py" "$@"
+fi
+rebar=$dir/rebar
+[ -x "$rebar" ] || rebar=${REBAR_BIN:-}
+if [ -z "$rebar" ] || [ ! -x "$rebar" ]; then
+  rebar=$(command -v rebar 2>/dev/null) || {
+    echo "ask-mcp-server: the rebar binary was not found (beside this script, REBAR_BIN or PATH)" >&2
+    exit 127
+  }
+fi
+exec "$rebar" mcp serve "$@"

@@ -244,39 +244,14 @@ _None currently._
 		}
 	}
 
-	// scripts/ — the thin entry points from rebar's
-	// templates/project-bootstrap/scripts/ (identical to what the
-	// `cp -r templates/project-bootstrap/. <target>/` adoption path
-	// delivers); the checks themselves run from the rebar install.
+	// scripts/ — the thin entry points of rebar's bootstrap template
+	// (templates/project-bootstrap/scripts/, compiled into the binary; the
+	// same files the `cp -r templates/project-bootstrap/. <target>/`
+	// adoption path delivers); the checks themselves run in the binary.
 	// Never overwrites existing files.
-	scriptsDir := filepath.Join(root, "scripts")
-	if rebarRoot := findRebarRoot(); rebarRoot == "" {
-		fmt.Println("  ⚠ Skipped scripts/ and .claude/ — rebar checkout not found (set REBAR_ROOT to your rebar clone)")
-	} else {
-		srcScripts := filepath.Join(rebarRoot, "templates", "project-bootstrap", "scripts")
-		copiedScripts := 0
-		if entries, err := os.ReadDir(srcScripts); err == nil {
-			for _, e := range entries {
-				if e.IsDir() {
-					continue
-				}
-				dst := filepath.Join(scriptsDir, e.Name())
-				if _, err := os.Stat(dst); err == nil {
-					continue
-				}
-				data, readErr := os.ReadFile(filepath.Join(srcScripts, e.Name()))
-				if readErr != nil {
-					continue
-				}
-				os.MkdirAll(scriptsDir, 0755)
-				os.WriteFile(dst, data, 0755)
-				copiedScripts++
-			}
-		}
-		if copiedScripts > 0 {
-			fmt.Printf("  Created scripts/ (%d files: ci-check.sh + pre-commit.sh entry points; checks run from the rebar install)\n", copiedScripts)
-			created++
-		}
+	if n := len(copyBootstrap("scripts", root)); n > 0 {
+		fmt.Printf("  Created scripts/ (%d files: ci-check.sh + pre-commit.sh entry points; checks run in the rebar binary)\n", n)
+		created++
 	}
 
 	// contracts directory (architecture/ unless .rebarrc contracts_dir says otherwise)
@@ -284,21 +259,9 @@ _None currently._
 	archDir := filepath.Join(root, contractsDir)
 	if _, err := os.Stat(archDir); os.IsNotExist(err) {
 		os.MkdirAll(archDir, 0755)
-		// Copy contract template
-		rebarRoot := findRebarRoot()
-		if rebarRoot != "" {
-			src := filepath.Join(rebarRoot, "architecture", "CONTRACT-TEMPLATE.md")
-			dst := filepath.Join(archDir, "CONTRACT-TEMPLATE.md")
-			if data, err := os.ReadFile(src); err == nil {
-				os.WriteFile(dst, data, 0644)
-				fmt.Printf("  Created %s/ with contract template\n", contractsDir)
-				created++
-			}
-		} else {
-			os.WriteFile(filepath.Join(archDir, ".gitkeep"), []byte(""), 0644)
-			fmt.Printf("  Created %s/\n", contractsDir)
-			created++
-		}
+		writeContractTemplate(archDir)
+		fmt.Printf("  Created %s/ with contract template\n", contractsDir)
+		created++
 	}
 
 	// .mcp.json — Claude Code MCP config for ASK
@@ -314,10 +277,9 @@ _None currently._
 		created++
 	}
 
-	// .claude/ — SessionStart cold-start hook + rebar skills (v3).
-	// Copied from rebar's templates/project-bootstrap/.claude/ so the
-	// canonical content lives in one place; skipped silently when the
-	// rebar checkout can't be located (same contract as refresh-context).
+	// .claude/ — SessionStart cold-start hook + rebar skills (v3), from
+	// rebar's templates/project-bootstrap/.claude/ (compiled into the
+	// binary), so the canonical content lives in one place.
 	if ensureClaudeAssets(root) {
 		created++
 	}
@@ -329,51 +291,22 @@ _None currently._
 // with the SessionStart hook, skills/*/SKILL.md) into the project. Existing
 // files are never overwritten.
 func ensureClaudeAssets(root string) bool {
-	rebarRoot := findRebarRoot()
-	if rebarRoot == "" {
+	copied := copyBootstrap(".claude", root)
+	if len(copied) == 0 {
 		return false
 	}
-	srcDir := filepath.Join(rebarRoot, "templates", "project-bootstrap", ".claude")
-	if _, err := os.Stat(srcDir); err != nil {
-		return false
-	}
-	dstDir := filepath.Join(root, ".claude")
-	copied := 0
 	hookInstalled := false
-	filepath.Walk(srcDir, func(path string, info os.FileInfo, err error) error {
-		if err != nil || info.IsDir() {
-			return nil
+	for _, p := range copied {
+		if p == ".claude/settings.json" {
+			hookInstalled = true
 		}
-		rel, relErr := filepath.Rel(srcDir, path)
-		if relErr != nil {
-			return nil
-		}
-		dst := filepath.Join(dstDir, rel)
-		if _, statErr := os.Stat(dst); statErr == nil {
-			return nil // never overwrite
-		}
-		data, readErr := os.ReadFile(path)
-		if readErr != nil {
-			return nil
-		}
-		os.MkdirAll(filepath.Dir(dst), 0755)
-		if os.WriteFile(dst, data, 0644) == nil {
-			copied++
-			if rel == "settings.json" {
-				hookInstalled = true
-			}
-		}
-		return nil
-	})
-	if copied > 0 {
-		if hookInstalled {
-			fmt.Printf("  Created .claude/ (%d files: SessionStart hook + rebar skills)\n", copied)
-		} else {
-			fmt.Printf("  Created .claude/skills (%d files; existing settings.json preserved — merge the SessionStart hook manually from templates/project-bootstrap/.claude/settings.json)\n", copied)
-		}
-		return true
 	}
-	return false
+	if hookInstalled {
+		fmt.Printf("  Created .claude/ (%d files: SessionStart hook + rebar skills)\n", len(copied))
+	} else {
+		fmt.Printf("  Created .claude/skills (%d files; existing settings.json preserved — merge the SessionStart hook manually from templates/project-bootstrap/.claude/settings.json)\n", len(copied))
+	}
+	return true
 }
 
 // ensureMCPConfig writes a project-local .mcp.json that registers rebar's
