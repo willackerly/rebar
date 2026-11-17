@@ -23,6 +23,10 @@ All notable changes to rebar. Versioned with [semver](https://semver.org/).
   link to the full CHANGELOG), followed by GitHub's list of merged PRs, and
   refuses to publish a tag with no such section — write the CHANGELOG before
   tagging. `scripts/release-notes.sh <tag>` prints the same section locally.
+- **`refresh-context.sh` works outside git history.** Outside a git repository,
+  or in one before its first commit, it exited 128 partway through the report.
+  It now skips the commit and worktree sections with a note, reports the rest,
+  and exits 0; a missing `QUICKCONTEXT.md` is still exit 1.
 
 ---
 
