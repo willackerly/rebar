@@ -54,14 +54,14 @@ done
 # with the nested group; using grep -E for portability.
 qualifies() {
   local subject="$1"
-  echo "$subject" | grep -qE '^(fix|regression)(\([^)]*\))?:[[:space:]]'
+  grep -qE '^(fix|regression)(\([^)]*\))?:[[:space:]]' <<<"$subject"
 }
 
 # A commit message satisfies Gate G if its body contains a non-empty
 # `Reproduced on:` line. The text after the colon is the evidence reference.
 satisfies() {
   local body="$1"
-  echo "$body" | grep -qE '^Reproduced[[:space:]]on:[[:space:]]*\S'
+  grep -qE '^Reproduced[[:space:]]on:[[:space:]]*\S' <<<"$body"
 }
 
 check_one() {

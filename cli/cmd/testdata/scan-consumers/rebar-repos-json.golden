@@ -1,2 +1,3 @@
-{"contract":"001/C1-API","consumers":[]}
---- exit 0 ---
+scan-consumers: $ROOT/consumers/gamma/CONSUMES.md: section '## 001/C1-API.1.0' has no version_pinned (required: the semver this consumer is pinned to, CHARTER §1.6) — skipped
+{"contract":"001/C1-API","consumers":[{"name":"alpha","path":"$ROOT/consumers/alpha","version_pinned":"1.0","pin_date":"2026-01-01","notify_on_change":"true","rationale":"we call it"},{"name":"beta","path":"$ROOT/consumers/beta","version_pinned":"1 . 0","pin_date":"","notify_on_change":"false","rationale":""}]}
+--- exit 1 ---

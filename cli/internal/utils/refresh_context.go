@@ -58,11 +58,9 @@ var untrackedTODOExts = []string{"*.ts", "*.tsx", "*.js", "*.jsx", "*.go", "*.py
 // over, or read the first and ignored the rest); a binary source file is
 // not an untracked TODO (BSD grep listed "Binary file … matches").
 //
-// Like the script, it ends with git's exit status (128) right after
-// "Commits since last sync:" or "=== Worktree State ===" when git log or
-// git worktree list fails (not a repository; git log also in a repository
-// without commits): set -e and pipefail end the script there. It does not
-// print bash's complaint when a count is "0<newline>0" (grep -c … || echo
+// Outside a git work tree, or in one without commits, the git sections
+// print a "(skipped: …)" note instead, as the script does since v3.1.1. It
+// does not print bash's complaint when a count is "0<newline>0" (grep -c … || echo
 // 0 with no match), and compares such a count as false, as bash does.
 func runRefreshContext(ctx *checks.Context, args []string) int {
 	r := &refreshContext{out: ctx.Stdout, repo: toplevel(ctx.WorkDir())}
@@ -79,6 +77,11 @@ func runRefreshContext(ctx *checks.Context, args []string) int {
 
 	r.say("=== QUICKCONTEXT Freshness Check ===")
 	r.say("")
+	// The script's HAS_GIT / HAS_COMMITS: the git sections need a work tree
+	// with at least one commit.
+	_, inTree := gitx.Run(r.repo, nil, "rev-parse", "--is-inside-work-tree")
+	_, hasHead := gitx.Run(r.repo, nil, "rev-parse", "--verify", "-q", "HEAD")
+	hasGit, hasCommits := inTree == 0, inTree == 0 && hasHead == 0
 	if info, err := os.Stat(resolve(r.repo, "QUICKCONTEXT.md")); err != nil || !info.Mode().IsRegular() {
 		r.err("QUICKCONTEXT.md not found in repo root")
 		return 1
@@ -106,28 +109,29 @@ func runRefreshContext(ctx *checks.Context, args []string) int {
 
 		r.say("")
 		r.say("Commits since last sync:")
-		log, code := gitx.Run(r.repo, nil, "log", "--since="+synced, "--oneline")
-		if code != 0 {
-			// COMMIT_COUNT=$(git log … | wc -l | tr -d ' ') under set -e and
-			// pipefail: outside a repository, or in one without commits, the
-			// script ends here with git's status.
-			return code
-		}
-		count := strings.Count(log, "\n")
-		if log != "" && !strings.HasSuffix(log, "\n") {
-			count++
-		}
-		run(r.repo, ctx.Stdout, nil, "git", "log", "-n", "20", "--since="+synced, "--oneline")
-		if count > 20 {
-			r.say(fmt.Sprintf("  ... and %d more", count-20))
-		}
 		switch {
-		case count > 10:
-			r.warn(fmt.Sprintf("%d commits since last sync — QUICKCONTEXT is likely stale", count))
-		case count > 0:
-			r.say(fmt.Sprintf("  (%d commits — review against QUICKCONTEXT claims)", count))
+		case !hasGit:
+			r.say("  (skipped: not a git repository)")
+		case !hasCommits:
+			r.say("  (skipped: no commits yet)")
 		default:
-			r.ok("No commits since last sync")
+			log, _ := gitx.Run(r.repo, nil, "log", "--since="+synced, "--oneline")
+			count := strings.Count(log, "\n")
+			if log != "" && !strings.HasSuffix(log, "\n") {
+				count++
+			}
+			run(r.repo, ctx.Stdout, nil, "git", "log", "-n", "20", "--since="+synced, "--oneline")
+			if count > 20 {
+				r.say(fmt.Sprintf("  ... and %d more", count-20))
+			}
+			switch {
+			case count > 10:
+				r.warn(fmt.Sprintf("%d commits since last sync — QUICKCONTEXT is likely stale", count))
+			case count > 0:
+				r.say(fmt.Sprintf("  (%d commits — review against QUICKCONTEXT claims)", count))
+			default:
+				r.ok("No commits since last sync")
+			}
 		}
 	}
 	if quick {
@@ -165,17 +169,18 @@ func runRefreshContext(ctx *checks.Context, args []string) int {
 
 	r.say("")
 	r.say("=== Worktree State ===")
-	worktrees, code := gitx.Run(r.repo, nil, "worktree", "list")
-	if code != 0 {
-		return code // WORKTREES=$(git worktree list 2>/dev/null) under set -e
-	}
-	worktrees = strings.TrimRight(worktrees, "\n")
-	r.say(worktrees)
-	if n := strings.Count(worktrees, "\n") + 1; n > 1 {
-		r.warn(fmt.Sprintf("%d worktree(s) exist — verify they're active or clean them up", n-1))
-		r.say("  To clean: git worktree prune")
+	if !hasGit {
+		r.say("(skipped: not a git repository)")
 	} else {
-		r.ok("No extra worktrees")
+		worktrees, _ := gitx.Run(r.repo, nil, "worktree", "list")
+		worktrees = strings.TrimRight(worktrees, "\n")
+		r.say(worktrees)
+		if n := strings.Count(worktrees, "\n") + 1; n > 1 {
+			r.warn(fmt.Sprintf("%d worktree(s) exist — verify they're active or clean them up", n-1))
+			r.say("  To clean: git worktree prune")
+		} else {
+			r.ok("No extra worktrees")
+		}
 	}
 
 	if arg(0) == "--test-baseline" || arg(1) == "--test-baseline" {

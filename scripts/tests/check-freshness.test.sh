@@ -37,6 +37,6 @@ SHIM
 chmod +x "$TMP/shim/date"
 
 out=$(cd "$P" && PATH="$TMP/shim:$PATH" REBAR_PROJECT_ROOT="$P" "$REBAR_SCRIPTS/check-freshness.sh" 2>&1)
-echo "$out" | grep -q "STALE ($days_ago days): ./NOTES.md" \
+contains "$out" "STALE ($days_ago days): ./NOTES.md" \
   || fail "age is not exactly $days_ago days when the clock ticks during parsing: $out"
 ok "age is $days_ago days even when a second ticks between reading now and parsing the date"
