@@ -44,6 +44,10 @@ section with required and optional fields:
 | `pin_date` | `YYYY-MM-DD` | when you pinned this version (helps owner age out stale pins) |
 | `rationale` | one-line prose | why your project depends on this contract — surfaces value to drift-check output |
 
+The owner's `scan-consumers` needs only `version_pinned`: a section without
+it is reported as an error and left out of notifications. It shows a
+missing `pin_date` or `rationale` as unset rather than failing.
+
 ### Optional fields
 
 | Field | Default | Purpose |

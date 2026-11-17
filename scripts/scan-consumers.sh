@@ -8,6 +8,18 @@
 # Cross-machine discovery is out of scope (CHARTER §2.10). For consumers
 # on other machines, run with REBAR_REPOS=path1,path2,... explicit list.
 #
+# Fields read from each consumer's `## <owner>/<contract-id>.<version>` section:
+#   version_pinned    required — a section without it is reported on stderr,
+#                     left out, and the scan exits 1 (after the other consumers)
+#   pin_date          optional, default "" (shown as "(unset)")
+#   notify_on_change  optional, default "" (flush-notifications applies the
+#                     owner default, REBAR_NOTIFY_DEFAULT: notify)
+#   rationale         optional, default "" (not shown)
+# A trailing `# comment` is dropped from version_pinned, pin_date and
+# notify_on_change, as `rebar contract drift-check` does.
+#
+# Exit: 0 = scanned, 1 = a consumer section lacks a required field, 2 = usage.
+#
 # Source: CHARTER §1.6, feedback/2026-04-28-cross-repo-contract-federation.md
 
 set -euo pipefail
@@ -71,8 +83,18 @@ if [ "${#SCAN_PATHS[@]}" -eq 0 ]; then
   exit 0
 fi
 
+# field NAME — the value of "- **NAME:** value" in $section ("" if absent).
+field() {
+  awk -v k="- **$1:**" 'index($0, k) == 1 {
+    v = substr($0, length(k) + 1); sub(/^[ \t]+/, "", v); sub(/[ \t]+$/, "", v); print v; exit
+  }' <<< "$section"
+}
+# value — drop a trailing "# comment" and the whitespace around the value.
+value() { sed -e 's/#.*//' -e 's/[[:space:]]*$//'; }
+
 # Build results in JSON-shaped lines for easy consumption
 results=""
+errors=0
 for repo_path in "${SCAN_PATHS[@]}"; do
   consumes="$repo_path/CONSUMES.md"
   [ -f "$consumes" ] || continue
@@ -88,10 +110,16 @@ for repo_path in "${SCAN_PATHS[@]}"; do
     in_section { print }
   ' "$consumes")
 
-  pin=$(echo "$section" | grep '^- \*\*version_pinned:\*\*' | head -1 | sed 's/.*version_pinned:\*\* *//' | tr -d ' ')
-  pin_date=$(echo "$section" | grep '^- \*\*pin_date:\*\*' | head -1 | sed 's/.*pin_date:\*\* *//' | tr -d ' ')
-  notify=$(echo "$section" | grep '^- \*\*notify_on_change:\*\*' | head -1 | sed 's/.*notify_on_change:\*\* *//' | awk '{print $1}')
-  rationale=$(echo "$section" | grep '^- \*\*rationale:\*\*' | head -1 | sed 's/.*rationale:\*\* *//')
+  pin=$(field version_pinned | value)
+  pin_date=$(field pin_date | value)
+  notify=$(field notify_on_change | value)
+  rationale=$(field rationale)
+
+  if [ -z "$pin" ]; then
+    echo "scan-consumers: $consumes: section '${section%%$'\n'*}' has no version_pinned (required: the semver this consumer is pinned to, CHARTER §1.6) — skipped" >&2
+    errors=$((errors + 1))
+    continue
+  fi
 
   if [ "$JSON" -eq 1 ]; then
     results+="{\"name\":\"$consumer_name\",\"path\":\"$repo_path\",\"version_pinned\":\"$pin\",\"pin_date\":\"$pin_date\",\"notify_on_change\":\"${notify:-}\",\"rationale\":\"$rationale\"},"
@@ -102,7 +130,7 @@ for repo_path in "${SCAN_PATHS[@]}"; do
     fi
     echo "  $consumer_name → $repo_path"
     echo "    version_pinned:    $pin"
-    echo "    pin_date:          $pin_date"
+    echo "    pin_date:          ${pin_date:-(unset)}"
     echo "    notify_on_change:  ${notify:-(unset; owner default applies)}"
     [ -n "$rationale" ] && echo "    rationale:         $rationale"
     echo ""
@@ -117,3 +145,4 @@ elif [ -z "$results" ]; then
   echo "No consumers of $OWNER/$CONTRACT_ID found in scanned repos."
   echo "(Searched ${#SCAN_PATHS[@]} repo(s); cross-machine discovery is out of scope per CHARTER §2.10.)"
 fi
+[ "$errors" -eq 0 ] || exit 1

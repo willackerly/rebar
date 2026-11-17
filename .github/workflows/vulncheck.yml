@@ -1,0 +1,84 @@
+# Weekly vulnerability scan — new entries in the Go vulnerability database
+# can affect code that hasn't changed. Scans main's source (as ci.yml does on
+# every PR) and the binaries of the latest published release. A finding fails
+# the run (GitHub notifies on scheduled-run failures); for a release-binary
+# finding the fix is usually a patch release, which release.yml builds with
+# the latest Go. See SECURITY.md.
+name: vulncheck
+
+on:
+  schedule:
+    - cron: '17 6 * * 1'   # Mondays 06:17 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  source:
+    name: source (main)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          persist-credentials: false
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: stable
+          check-latest: true
+          cache: false
+
+      - name: govulncheck
+        working-directory: cli
+        run: |
+          go version
+          go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
+
+  release:
+    name: binaries (latest release)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: stable
+          check-latest: true
+          cache: false
+
+      - name: Download latest release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="$(gh release view --repo "$GITHUB_REPOSITORY" --json tagName --jq .tagName)"
+          echo "Latest release: $tag"
+          echo "### govulncheck: $tag binaries" >> "$GITHUB_STEP_SUMMARY"
+          mkdir dist
+          gh release download "$tag" --repo "$GITHUB_REPOSITORY" --dir dist \
+            --pattern '*.tar.gz' --pattern '*_checksums.txt'
+          (cd dist && sha256sum -c ./*_checksums.txt)
+
+      - name: govulncheck
+        run: |
+          go install golang.org/x/vuln/cmd/govulncheck@v1.9.0
+          scan="$RUNNER_TEMP/vulncheck"
+          failed=0
+          for tarball in dist/*.tar.gz; do
+            name="$(basename "$tarball" .tar.gz)"
+            mkdir -p "$scan"
+            tar -xzf "$tarball" -C "$scan" "$name/bin/rebar"
+            echo "::group::govulncheck $name"
+            if "$(go env GOPATH)/bin/govulncheck" -mode=binary "$scan/$name/bin/rebar"; then
+              echo "- $name: no known vulnerabilities" >> "$GITHUB_STEP_SUMMARY"
+            else
+              echo "- $name: **vulnerabilities found** (see log)" >> "$GITHUB_STEP_SUMMARY"
+              failed=1
+            fi
+            echo "::endgroup::"
+          done
+          if [ "$failed" -ne 0 ]; then
+            echo "::error::the latest release's binaries have known vulnerabilities; cut a patch release (release.yml builds with the latest Go)"
+            exit 1
+          fi
