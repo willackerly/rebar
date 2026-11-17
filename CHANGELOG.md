@@ -37,6 +37,10 @@ All notable changes to rebar. Versioned with [semver](https://semver.org/).
   writing its padding: migrate T5's "extracting the old template" flake, and
   a latent `package-release.sh` failure. Both extract from a file now; T5
   prints the failing command's stderr.
+- **CI jobs time out** (15 min ubuntu, 30 min macOS) instead of after 6 h,
+  and the new `ci-retry` workflow re-runs, at most twice, jobs that GitHub
+  cancelled after waiting ~15 min for a macOS runner without running a step.
+  By hand: `gh run rerun <run-id> --failed`.
 
 ---
 

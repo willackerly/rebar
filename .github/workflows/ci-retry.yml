@@ -1,0 +1,59 @@
+# Re-run ci jobs that never started.
+#
+# macOS arm64 hosted runners sometimes run out of capacity: the job waits for
+# a runner, GitHub cancels it after ~15 min ("The job was not acquired by
+# Runner ..."), and the run fails without having run a step. This re-runs the
+# failed jobs of such a run, at most twice. Runs where every job started (real
+# failures), runs a newer push superseded, and jobs cancelled within 10 min
+# (by hand or by ci's concurrency group) are left alone. By hand:
+#   gh run rerun <run-id> --failed
+#
+# A second macOS runner label as a fallback matrix entry would not help: the
+# cancelled job still fails the run. workflow_run workflows run from the
+# default branch, so changes here take effect once they reach main.
+name: ci-retry
+
+on:
+  workflow_run:
+    workflows: [ci]
+    types: [completed]
+
+permissions:
+  actions: write
+
+jobs:
+  rerun-unstarted:
+    if: >-
+      (github.event.workflow_run.conclusion == 'cancelled' ||
+       github.event.workflow_run.conclusion == 'failure') &&
+      github.event.workflow_run.run_attempt < 3
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Re-run jobs that never got a runner
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+          WORKFLOW_ID: ${{ github.event.workflow_run.workflow_id }}
+          BRANCH: ${{ github.event.workflow_run.head_branch }}
+          EVENT: ${{ github.event.workflow_run.event }}
+        run: |
+          newest=$(gh api -X GET "repos/$REPO/actions/workflows/$WORKFLOW_ID/runs" \
+            -f branch="$BRANCH" -f event="$EVENT" -F per_page=1 --jq '.workflow_runs[0].id')
+          if [ "$newest" != "$RUN_ID" ]; then
+            echo "Run $RUN_ID was superseded by run $newest; not retrying."
+            exit 0
+          fi
+          unstarted=$(gh api "repos/$REPO/actions/runs/$RUN_ID/jobs?filter=latest&per_page=100" --jq '
+            [.jobs[]
+             | select(.conclusion == "cancelled" or .conclusion == "failure")
+             | select((.steps | length) == 0)
+             | select((.completed_at | fromdate) - (.created_at | fromdate) >= 600)
+             | .name] | join(", ")')
+          if [ -z "$unstarted" ]; then
+            echo "No job of run $RUN_ID waited for a runner and was cancelled; not retrying."
+            exit 0
+          fi
+          echo "Never started: $unstarted. Re-running the failed jobs of run $RUN_ID."
+          gh run rerun "$RUN_ID" --failed -R "$REPO"
