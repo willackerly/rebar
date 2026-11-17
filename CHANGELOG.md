@@ -36,6 +36,11 @@ All notable changes to rebar. Versioned with [semver](https://semver.org/).
   reports the other consumers before exiting 1. `flush-notifications.sh` shows
   that error and notifies the valid consumers, and its no-`jq` parser now
   reads the consumer list correctly.
+- **`flush-notifications.sh` exits 0 after a successful flush.** Every real
+  (non-dry-run) flush exited 1, even when all dispatches succeeded, because the
+  script ended with `[ "$DRY_RUN" = "1" ] && echo …`. It now exits 0 when
+  every dispatch succeeds and 1 when any fails (counted as `failed=` in the
+  summary line).
 
 ---
 

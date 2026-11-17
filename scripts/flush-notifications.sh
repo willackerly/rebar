@@ -13,6 +13,9 @@
 #   notify_on_change: false  → skip
 #   (absent)                 → notify (owner default; tweak with REBAR_NOTIFY_DEFAULT=skip)
 #
+# Exit: 0 = every dispatch succeeded (or nothing to send, or --dry-run),
+#       1 = at least one dispatch failed, 2 = usage.
+#
 # Source: CHARTER §1.6, feedback/2026-04-28-cross-repo-contract-federation.md
 
 set -euo pipefail
@@ -125,6 +128,7 @@ MSG
 processed=0
 sent=0
 skipped=0
+failed=0
 
 # Bash 3.2 portable: read full file, split into per-entry blocks
 mapfile -t lines < "$OUTBOX" 2>/dev/null || {
@@ -229,6 +233,7 @@ for entry in "${entries[@]}"; do
       processed=$((processed+1))
     else
       echo "    FAIL: $consumer (ask invocation failed; entry stays pending)" >&2
+      failed=$((failed+1))
     fi
   done <<< "$consumer_lines"
 
@@ -248,5 +253,10 @@ if [ "$DRY_RUN" = "0" ] && [ "$sent" -gt 0 ]; then
   mv "$tmpfile" "$OUTBOX"
 fi
 
-echo "flush-notifications: processed=$processed sent=$sent skipped=$skipped"
-[ "$DRY_RUN" = "1" ] && echo "(dry-run — no FRs filed, no outbox state changed)"
+echo "flush-notifications: processed=$processed sent=$sent skipped=$skipped failed=$failed"
+# An if, not `[ dry-run ] && echo`: as the last command, that list's status
+# (1 on a real flush) was the script's exit status.
+if [ "$DRY_RUN" = "1" ]; then
+  echo "(dry-run — no FRs filed, no outbox state changed)"
+fi
+[ "$failed" -eq 0 ] || exit 1

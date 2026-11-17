@@ -9,6 +9,9 @@
 #       field; the other consumers are still reported
 #   T3  flush-notifications --dry-run dispatches to that consumer, with and
 #       without jq, and passes on scan-consumers' error for an invalid one
+#   T4  a real flush exits 0 when every dispatch succeeds and marks the entry
+#       sent (it always exited 1: the closing `[ dry-run ] && echo` was the
+#       last command), and exits 1 with the entry pending when one fails
 #
 # Bash 3.2 compatible.
 set -uo pipefail
@@ -82,3 +85,24 @@ echo "$out" | grep -q 'DRY: ask_minimal_featurerequest' || fail "T3: valid consu
 echo "$out" | grep -q 'nopin/CONSUMES.md.*version_pinned' || fail "T3: scan-consumers error not shown: $out"
 echo "$out" | grep -q 'ask_nopin' && fail "T3: invalid consumer dispatched: $out"
 ok "T3 flush-notifications reports an invalid consumer and notifies the rest"
+
+# T4 — ASK_BIN stands in for the ask CLI and logs each dispatch.
+ASK="$TMP/fake-ask"
+printf '#!/bin/sh\necho "$1" >> "%s/asked"\nexit "${FAKE_ASK_EXIT:-0}"\n' "$TMP" > "$ASK"
+chmod +x "$ASK"
+outbox="$OWNER/architecture/.state/pending-notifications.md"
+out=$(ASK_BIN="$ASK" REBAR_REPOS="$TMP/full,$TMP/minimal" run_in "$OWNER" flush-notifications.sh)
+code=$?
+[ $code -eq 0 ] || fail "T4: successful flush exited $code: $out"
+echo "$out" | grep -q 'processed=2 sent=2' || fail "T4: dispatch summary: $out"
+grep -q 'full:featurerequest' "$TMP/asked" && grep -q 'minimal:featurerequest' "$TMP/asked" \
+  || fail "T4: ask not invoked for both consumers: $(cat "$TMP/asked")"
+grep -q '^- \*\*status:\*\* sent' "$outbox" || fail "T4: entry not marked sent: $(cat "$outbox")"
+
+sed 's/status:\*\* sent/status:** pending/' "$outbox" > "$outbox.tmp" && mv "$outbox.tmp" "$outbox"
+out=$(FAKE_ASK_EXIT=1 ASK_BIN="$ASK" REBAR_REPOS="$TMP/full,$TMP/minimal" run_in "$OWNER" flush-notifications.sh)
+code=$?
+[ $code -eq 1 ] || fail "T4: flush with failed dispatches should exit 1, got $code: $out"
+echo "$out" | grep -q 'FAIL: full' || fail "T4: failed dispatch not reported: $out"
+grep -q '^- \*\*status:\*\* pending' "$outbox" || fail "T4: entry not left pending: $(cat "$outbox")"
+ok "T4 flush-notifications exits 0 on success, 1 on a failed dispatch"
