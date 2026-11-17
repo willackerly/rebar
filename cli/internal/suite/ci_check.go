@@ -38,8 +38,8 @@ var ciSteps = []ciStep{
 	{"Steward", "SKIP_STEWARD", "steward.sh", nil},
 }
 
-// maintainerSteps check the rebar source repo itself; elsewhere their
-// scripts skip.
+// maintainerSteps check the rebar source repo itself: they run its own
+// scripts there and skip elsewhere.
 var maintainerSteps = map[string]bool{"sync-bootstrap.sh": true, "tests/run.sh": true}
 
 // SkipVars are the variables that skip a check of the full suite, in
@@ -96,9 +96,8 @@ func runCICheck(ctx *checks.Context, args []string) int {
 			continue
 		}
 		if !s.found() {
-			if ctx.Install == "" && maintainerSteps[step.script] {
-				// No rebar tree at all (a binary-only install): these
-				// check rebar's own source and would skip anyway.
+			if maintainerSteps[step.script] && !config.IsRebarTree(ctx.Root) {
+				// These check rebar's own source.
 				r.skip(step.label + " (rebar source repo only)")
 			} else {
 				r.skip(step.label + " (script not found or not executable)")

@@ -104,8 +104,8 @@ func InitRepo(t testing.TB) string {
 }
 
 // IsolatedEnv is the test process's environment without rebar's settings
-// (REBAR_*, _REBAR_*), plus extra, so a developer's REBAR_TIER,
-// REBAR_CHECK_IMPL or REBAR_RCFILE cannot leak into a fixture run.
+// (REBAR_*, _REBAR_*), plus extra, so a developer's REBAR_TIER or
+// REBAR_RCFILE cannot leak into a fixture run.
 func IsolatedEnv(extra ...string) []string {
 	var env []string
 	for _, kv := range os.Environ() {
@@ -144,8 +144,8 @@ func RunEnv(t testing.TB, dir string, env []string, name string, args ...string)
 var Tags = strings.NewReplacer("@todo", "TO"+"DO:", "@tracked", "TRACKED"+"-TASK:", "@contract:", "CONTRACT"+":")
 
 // RebarSource returns the root of the rebar checkout the test runs in (the
-// directory holding scripts/_rebar-config.sh above the working directory),
-// and skips the test when there is none.
+// directory above the working directory holding cli/go.mod and
+// templates/project-bootstrap/), and skips the test when there is none.
 func RebarSource(t testing.TB) string {
 	t.Helper()
 	dir, err := os.Getwd()
@@ -153,12 +153,14 @@ func RebarSource(t testing.TB) string {
 		t.Fatal(err)
 	}
 	for {
-		if _, err := os.Stat(filepath.Join(dir, "scripts", "_rebar-config.sh")); err == nil {
-			return dir
+		if _, err := os.Stat(filepath.Join(dir, "cli", "go.mod")); err == nil {
+			if info, err := os.Stat(filepath.Join(dir, "templates", "project-bootstrap")); err == nil && info.IsDir() {
+				return dir
+			}
 		}
 		parent := filepath.Dir(dir)
 		if parent == dir {
-			t.Skip("rebar scripts not found above the test directory")
+			t.Skip("rebar checkout not found above the test directory")
 		}
 		dir = parent
 	}

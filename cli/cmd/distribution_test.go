@@ -59,7 +59,7 @@ func TestBinaryOnly(t *testing.T) {
 	requireBash(t)
 	testutil.IsolateGitConfig(t)
 	bin, home, work := testBinary(t), t.TempDir(), t.TempDir()
-	env := append(cliEnv(home, "", ""), "GIT_CONFIG_GLOBAL="+os.Getenv("GIT_CONFIG_GLOBAL"))
+	env := append(cliEnv(home), "GIT_CONFIG_GLOBAL="+os.Getenv("GIT_CONFIG_GLOBAL"))
 
 	if out, code := testutil.RunEnv(t, work, env, bin, "new", "demo"); code != 0 {
 		t.Fatalf("rebar new (exit %d):\n%s", code, out)

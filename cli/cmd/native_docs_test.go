@@ -10,11 +10,11 @@ import (
 	"github.com/willackerly/rebar/cli/internal/testutil"
 )
 
-// Parity of check-doc-refs, check-decay-patterns and check-compliance
-// (runParity), with their goldens in testdata/<check> (regenerate with
+// check-doc-refs, check-decay-patterns and check-compliance (runGolden),
+// with their goldens in testdata/<check> (regenerate with
 // go test ./cmd -run 'DocRefs|DecayPatterns|Compliance' -update-golden).
 
-var docRefsCheck = parityCheck{name: "check-doc-refs", golden: "check-doc-refs"}
+var docRefsCheck = goldenCheck{name: "check-doc-refs", golden: "check-doc-refs"}
 
 // docTree is a project whose README links to files of every kind.
 var docTree = map[string]string{
@@ -58,7 +58,7 @@ func withFiles(base map[string]string, extra map[string]string) map[string]strin
 	return out
 }
 
-var docRefsParityCases = []parityCase{
+var docRefsCases = []goldenCase{
 	{name: "every kind of link", files: docTree, git: true, untracked: map[string]string{"docs/draft.md": "draft\n"}},
 	{name: "quiet", files: docTree, git: true, args: []string{"--quiet"}},
 	{name: "json", files: docTree, git: true, args: []string{"--json"}},
@@ -103,10 +103,9 @@ var docRefsParityCases = []parityCase{
 	},
 }
 
-func TestDocRefsParity(t *testing.T) { runParity(t, docRefsCheck, docRefsParityCases) }
-func TestDocRefsGolden(t *testing.T) { runGolden(t, docRefsCheck, docRefsParityCases) }
+func TestDocRefsGolden(t *testing.T) { runGolden(t, docRefsCheck, docRefsCases) }
 
-var decayCheck = parityCheck{name: "check-decay-patterns", golden: "check-decay-patterns"}
+var decayCheck = goldenCheck{name: "check-decay-patterns", golden: "check-decay-patterns"}
 
 // decayTree holds a file per pattern, files that are not scanned, and
 // files that opt in or out of P8.
@@ -146,7 +145,7 @@ var decayPaths = []string{
 	"src/app.spec.ts.bak", "crlf.spec.js", "tail.test.mjs", "missing.spec.ts",
 }
 
-var decayParityCases = []parityCase{
+var decayCases = []goldenCase{
 	{name: "paths: every pattern", files: decayTree, args: append([]string{"--paths"}, decayPaths...)},
 	{name: "all: tracked files", files: decayTree, git: true, args: []string{"--all"}},
 	{
@@ -210,10 +209,9 @@ References: feedback/2026-04-24-fidelity-decay-soft-hardening-patterns.md
 	},
 }
 
-func TestDecayPatternsParity(t *testing.T) { runParity(t, decayCheck, decayParityCases) }
-func TestDecayPatternsGolden(t *testing.T) { runGolden(t, decayCheck, decayParityCases) }
+func TestDecayPatternsGolden(t *testing.T) { runGolden(t, decayCheck, decayCases) }
 
-var complianceCheck = parityCheck{name: "check-compliance", golden: "check-compliance"}
+var complianceCheck = goldenCheck{name: "check-compliance", golden: "check-compliance"}
 
 // agentsMD has every required AGENTS.md section and mentions ask.
 const agentsMD = "# Agents\n\n## Cold Start\n\n## Contract-Driven Development\n\n## Testing Cascade\n\n## TODO Tracking\n\nUse `ask architect \"q\"`.\n"
@@ -233,7 +231,7 @@ func maturityContract(status string) string {
 	return "# Contract\n\n" + status + "\n\n## Purpose\n\nx\n"
 }
 
-var complianceParityCases = []parityCase{
+var complianceCases = []goldenCase{
 	{name: "compliant", files: compliant},
 	{name: "nothing at all"},
 	{name: "version: not semver", files: withFiles(compliant, map[string]string{".rebar-version": "3.1.0\n"})},
@@ -422,12 +420,11 @@ OK: Rebar compliance verified.
 	},
 }
 
-func TestComplianceParity(t *testing.T) { runParity(t, complianceCheck, complianceParityCases) }
-func TestComplianceGolden(t *testing.T) { runGolden(t, complianceCheck, complianceParityCases) }
+func TestComplianceGolden(t *testing.T) { runGolden(t, complianceCheck, complianceCases) }
 
 // TestComplianceExampleVersion: check-compliance names the current release
-// in its hints, as the script does; a release bumps both (the parity cases
-// "nothing at all" and "badge: none" compare them with the script).
+// in its hints, as the script did; a release bumps both (the cases
+// "nothing at all" and "badge: none" hold them in their goldens).
 func TestComplianceExampleVersion(t *testing.T) {
 	if checks.ComplianceExampleVersion != releaseVersion {
 		t.Errorf("checks.ComplianceExampleVersion = %s, want the release, %s", checks.ComplianceExampleVersion, releaseVersion)

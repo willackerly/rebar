@@ -19,9 +19,12 @@ func commitAll(t *testing.T, p string) {
 	testutil.Git(t, p, "commit", "-q", "-m", "update")
 }
 
+// installScript is the last version of one of rebar's scripts before rebar
+// became a single binary (3.2, kept in testdata/legacy): the copy an
+// adopter would have. install is unused (rebar's tree has no scripts now).
 func installScript(t *testing.T, install, name string) string {
 	t.Helper()
-	data, err := os.ReadFile(filepath.Join(install, "scripts", name))
+	data, err := os.ReadFile(filepath.Join("testdata", "legacy", name+".fixture"))
 	if err != nil {
 		t.Fatal(err)
 	}

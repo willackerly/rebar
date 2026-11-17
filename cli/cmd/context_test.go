@@ -208,10 +208,10 @@ func TestContextDefaultPrintsColdStartQuad(t *testing.T) {
 
 func TestContextArchitectIncludesContractsAndDesign(t *testing.T) {
 	repoDir := setupTestRepo(t, map[string]string{
-		"DESIGN.md": "# Methodology\n\nThe full philosophy.\n",
-		"architecture/CONTRACT-C1-AUTH.1.0.md":     "# Auth Contract\n",
-		"architecture/CONTRACT-S2-STORAGE.1.0.md":  "# Storage Contract\n",
-		"architecture/.state/report.json":          `{"should": "be skipped"}`,
+		"DESIGN.md":                                  "# Methodology\n\nThe full philosophy.\n",
+		"architecture/CONTRACT-C1-AUTH.1.0.md":       "# Auth Contract\n",
+		"architecture/CONTRACT-S2-STORAGE.1.0.md":    "# Storage Contract\n",
+		"architecture/.state/report.json":            `{"should": "be skipped"}`,
 		"architecture/CONTRACT-REGISTRY.template.md": "# Template — should be skipped\n",
 	})
 	setupCfg(repoDir)
@@ -242,10 +242,10 @@ func TestContextArchitectIncludesContractsAndDesign(t *testing.T) {
 
 func TestContextSecurityIncludesAuthAndCryptoContracts(t *testing.T) {
 	repoDir := setupTestRepo(t, map[string]string{
-		"CLAUDE.md": "# Claude Config\n\n## Hard Rules\nNO server-side signing.\n",
-		"architecture/CONTRACT-S1-AUTH.1.0.md":        "# Auth Contract\n",
+		"CLAUDE.md":                                     "# Claude Config\n\n## Hard Rules\nNO server-side signing.\n",
+		"architecture/CONTRACT-S1-AUTH.1.0.md":          "# Auth Contract\n",
 		"architecture/CONTRACT-C3-CRYPTO-BRIDGE.1.0.md": "# Crypto Contract\n",
-		"architecture/CONTRACT-S2-STORAGE.1.0.md":     "# Storage — should NOT appear\n",
+		"architecture/CONTRACT-S2-STORAGE.1.0.md":       "# Storage — should NOT appear\n",
 	})
 	setupCfg(repoDir)
 
@@ -270,10 +270,10 @@ func TestContextSecurityIncludesAuthAndCryptoContracts(t *testing.T) {
 
 func TestContextProductIncludesPersonasAndFeatures(t *testing.T) {
 	repoDir := setupTestRepo(t, map[string]string{
-		"product/personas/sarah.md":           "# Sarah\nSecurity analyst.\n",
-		"product/features/auth.feature":       "Feature: Authentication\n",
-		"product/features/encryption.md":      "# Encryption Feature\n",
-		"product/user-stories/upload-doc.md":  "# Upload Document\n",
+		"product/personas/sarah.md":          "# Sarah\nSecurity analyst.\n",
+		"product/features/auth.feature":      "Feature: Authentication\n",
+		"product/features/encryption.md":     "# Encryption Feature\n",
+		"product/user-stories/upload-doc.md": "# Upload Document\n",
 	})
 	setupCfg(repoDir)
 
@@ -320,10 +320,10 @@ func TestContextMissingFilesSkippedGracefully(t *testing.T) {
 
 func TestContextFiltersTemplateAndStateFiles(t *testing.T) {
 	repoDir := setupTestRepo(t, map[string]string{
-		"DESIGN.md": "# Real Design\n",
-		"architecture/CONTRACT-C1-FOO.1.0.md":            "# Real Contract\n",
-		"architecture/CONTRACT-REGISTRY.template.md":      "# Template Skip\n",
-		"architecture/.state/steward-report.json":         `{"skip": true}`,
+		"DESIGN.md":                                  "# Real Design\n",
+		"architecture/CONTRACT-C1-FOO.1.0.md":        "# Real Contract\n",
+		"architecture/CONTRACT-REGISTRY.template.md": "# Template Skip\n",
+		"architecture/.state/steward-report.json":    `{"skip": true}`,
 	})
 	setupCfg(repoDir)
 

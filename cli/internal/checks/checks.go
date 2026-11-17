@@ -3,19 +3,15 @@
 // scripts/check-todos.sh) and behaves like the script: same arguments, same
 // .rebarrc settings, same output and exit code.
 //
-// A check registered here is the default for `rebar check` and `rebar run`;
-// REBAR_CHECK_IMPL=shell selects the scripts instead until they are deleted
-// (see feedback/2026-11-14-go-native-checks.md).
+// The scripts are gone (rebar 4): these are rebar's only implementation.
+// `rebar check` and `rebar run` run them; a project's own copy of a script
+// still runs instead, as the adopter's code (see cmd/scripts.go).
 package checks
 
 import (
-	"fmt"
 	"io"
-	"os"
-	"path/filepath"
 	"sort"
 	"strings"
-	"sync"
 )
 
 // Context is what a check runs against.
@@ -28,13 +24,8 @@ type Context struct {
 	// them. Empty means Root (`rebar check` and `rebar run` run the scripts
 	// in the project root).
 	Dir string
-	// Install is the scripts directory of the rebar install the CLI found
-	// ("" when there is none). The suites (ci-check, pre-commit,
-	// cold-start-checks) run the checks that have no native implementation
-	// from it, as the suite scripts run their sibling scripts.
-	Install string
-	Stdout  io.Writer
-	Stderr  io.Writer
+	Stdout io.Writer
+	Stderr io.Writer
 }
 
 // WorkDir is the directory relative paths resolve against: Dir, else Root.
@@ -75,70 +66,4 @@ func Names() []string {
 	}
 	sort.Strings(names)
 	return names
-}
-
-// Implementation selectors for REBAR_CHECK_IMPL.
-const (
-	ImplShell = "shell"
-	ImplGo    = "go"
-)
-
-var warnImplOnce sync.Once
-
-// Impl is the implementation REBAR_CHECK_IMPL selects: ImplShell for
-// "shell", otherwise ImplGo (the default). An unknown value is warned about
-// once and treated as go.
-func Impl() string {
-	switch v := strings.TrimSpace(os.Getenv("REBAR_CHECK_IMPL")); v {
-	case ImplShell:
-		return ImplShell
-	case "", ImplGo:
-		return ImplGo
-	default:
-		warnImplOnce.Do(func() {
-			fmt.Fprintf(os.Stderr, "rebar: ignoring REBAR_CHECK_IMPL=%q (use shell or go); running the native checks\n", v)
-		})
-		return ImplGo
-	}
-}
-
-// Native returns the native check to run for a script name, if the
-// selected implementation is go and one is registered.
-func Native(name string) (*Check, bool) {
-	if Impl() != ImplGo {
-		return nil, false
-	}
-	return Lookup(name)
-}
-
-// ScriptEnv is the environment the CLI adds to a script it runs so that the
-// scripts of the install at installScripts that have a native counterpart
-// hand off to it (_rebar_native in scripts/_rebar-config.sh):
-// REBAR_NATIVE_CHECKS lists the checks to run natively, REBAR_BIN names this
-// binary, and REBAR_NATIVE_SCRIPTS is the install's scripts directory
-// (symlinks resolved). Only a script in that directory hands off, so a
-// project's own copy of a check, which may be customized, always runs
-// itself, even one made from a script that has the hand-off line.
-//
-// Pass "" for installScripts when the script being run is a project's copy
-// (its siblings are copies too), and under the shell implementation: the
-// hand-off variables are then cleared, so values inherited from the
-// caller's environment cannot route anything to a binary.
-func ScriptEnv(installScripts string) []string {
-	off := []string{"REBAR_NATIVE_CHECKS=", "REBAR_NATIVE_SCRIPTS="}
-	if Impl() != ImplGo || installScripts == "" {
-		return off
-	}
-	exe, err := os.Executable()
-	if err != nil {
-		return off
-	}
-	dir, err := filepath.Abs(installScripts)
-	if err != nil {
-		return off
-	}
-	if real, err := filepath.EvalSymlinks(dir); err == nil {
-		dir = real
-	}
-	return []string{"REBAR_BIN=" + exe, "REBAR_NATIVE_CHECKS=" + strings.Join(Names(), " "), "REBAR_NATIVE_SCRIPTS=" + dir}
 }

@@ -10,11 +10,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/willackerly/rebar/cli/internal/integrity"
-	"github.com/willackerly/rebar/cli/internal/scripts"
 )
-
-// Ensure scripts is used (pre-commit check)
-var _ = scripts.Run
 
 var commitMessage string
 var commitRole string

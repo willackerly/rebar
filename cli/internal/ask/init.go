@@ -2,11 +2,9 @@ package ask
 
 import (
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
-	"syscall"
 )
 
 // initRoles are the agents `ask init` creates.
@@ -277,38 +275,14 @@ func (a *App) ensureGitignore() {
 	}
 }
 
-// serve runs the enterprise server, ask-server. Serve, when set (the
-// native server), runs it; otherwise the python script beside the rebar
-// binary does, as the script exec'd it.
+// serve runs the enterprise server, ask-server: Serve (the native server,
+// set by the CLI).
 func (a *App) serve(args []string) {
-	if Serve != nil {
-		a.exit(Serve(args))
+	if Serve == nil {
+		a.die("ask serve: no server in this build (run 'rebar ask serve')")
 	}
-	server := ""
-	for _, dir := range BinDirs {
-		if p := filepath.Join(dir, "ask-server"); isFile(p) {
-			server = p
-			break
-		}
-	}
-	if server == "" {
-		first := "."
-		if len(BinDirs) > 0 {
-			first = BinDirs[0]
-		}
-		a.die("ask-server not found at %s/ask-server", first)
-	}
-	python, err := exec.LookPath("python3")
-	if err != nil {
-		a.die("python3 is required for 'ask serve'. Install Python 3.7+.")
-	}
-	err = syscall.Exec(python, append([]string{"python3", server}, args...), os.Environ())
-	a.die("cannot run %s: %v", server, err)
+	a.exit(Serve(args))
 }
 
-// Serve, when set, is the native `ask serve`.
+// Serve is the native `ask serve`.
 var Serve func(args []string) int
-
-// BinDirs are the directories `ask serve` looks in for ask-server: the
-// rebar binary's and the install's bin/ (set by the CLI).
-var BinDirs []string

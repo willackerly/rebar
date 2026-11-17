@@ -3,9 +3,6 @@ package checks
 import (
 	"bytes"
 	"os"
-	"path/filepath"
-	"regexp"
-	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -284,30 +281,21 @@ func TestGreps(t *testing.T) {
 	}
 }
 
-// MinTier agrees with the scripts' `_rebar_skip N <check>` lines while the
-// scripts exist.
+// MinTier is what the scripts' `_rebar_skip N <check>` lines said (rebar
+// 3.2 held the two together while the scripts existed).
 func TestMinTierMatchesScripts(t *testing.T) {
-	scripts, _ := filepath.Glob(filepath.Join("..", "..", "..", "scripts", "*.sh"))
-	if len(scripts) == 0 {
-		t.Skip("no rebar scripts here")
+	scripts := map[string]int{
+		"check-contract-headers": 2, "check-freshness": 2, "check-jtbd-presence": 2,
+		"check-prefix-uniqueness": 2, "check-ground-truth": 3,
 	}
-	re := regexp.MustCompile(`_rebar_skip ([123]) ([a-z-]+)`)
-	seen := map[string]bool{}
-	for _, p := range scripts {
-		if filepath.Base(p) == "_rebar-config.sh" {
-			continue
-		}
-		data, _ := os.ReadFile(p)
-		for _, m := range re.FindAllStringSubmatch(string(data), -1) {
-			seen[m[2]] = true
-			if got := strconv.Itoa(MinTier(m[2])); got != m[1] {
-				t.Errorf("%s: _rebar_skip %s, MinTier = %s", filepath.Base(p), m[1], got)
-			}
+	for name, tier := range scripts {
+		if got := MinTier(name); got != tier {
+			t.Errorf("MinTier(%s) = %d, the script said %d", name, got, tier)
 		}
 	}
 	for name := range minTiers {
-		if !seen[name] {
-			t.Errorf("MinTier(%s) has no _rebar_skip line in the scripts", name)
+		if _, ok := scripts[name]; !ok {
+			t.Errorf("MinTier(%s) had no _rebar_skip line in the scripts", name)
 		}
 	}
 }

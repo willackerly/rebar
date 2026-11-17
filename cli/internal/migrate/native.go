@@ -39,17 +39,18 @@ func runNative(root, rcFile string, env []string, name string, args ...string) (
 }
 
 // isRebarScript reports whether a project's scripts/<name> is a copy of a
-// script rebar ships: one with a built-in implementation, the shared
-// _rebar-config.sh, or (while installs still carry scripts) a script of
-// the install at rebarRoot.
-func isRebarScript(rebarRoot, name string) bool {
+// script rebar shipped: one with a built-in implementation, the shared
+// _rebar-config.sh, or any other script a release carried
+// (released-blobs.txt; rebar ships no scripts since it became a single
+// binary).
+func isRebarScript(name string) bool {
 	if _, ok := checks.Lookup(name); ok && strings.HasSuffix(name, ".sh") {
 		return true
 	}
 	if name == "_rebar-config.sh" {
 		return true
 	}
-	return rebarRoot != "" && isFile(rebarRoot+"/scripts/"+name)
+	return strings.HasSuffix(name, ".sh") && manifestBlobs()[name] != nil
 }
 
 // templateScript is templates/project-bootstrap/scripts/<name> as compiled

@@ -80,16 +80,15 @@ func TestExtras(t *testing.T) {
 }
 
 // TestResolve: a project copy wins (with the notice unless quiet), a thin
-// wrapper and the install's own directory never count as copies, then the
-// native check, then the install's script.
+// wrapper never counts as a copy, then the built-in check; the maintainer
+// steps run the project's own scripts in a rebar source checkout only.
 func TestResolve(t *testing.T) {
-	install := t.TempDir()
 	root := t.TempDir()
 	testutil.WriteExecutable(t, root, "scripts/check-todos.sh", "#!/bin/sh\necho custom\n")
-	testutil.WriteExecutable(t, root, "scripts/steward.sh", "#!/bin/sh\n# rebar-thin-wrapper\n")
-	testutil.WriteExecutable(t, install, "steward.sh", "#!/bin/sh\n")
+	testutil.WriteExecutable(t, root, "scripts/check-registry.sh", "#!/bin/sh\n# rebar-thin-wrapper\n")
+	testutil.WriteExecutable(t, root, "scripts/sync-bootstrap.sh", "#!/bin/sh\n")
 	var errs strings.Builder
-	ctx := &checks.Context{Root: root, Install: install, Stdout: &errs, Stderr: &errs}
+	ctx := &checks.Context{Root: root, Stdout: &errs, Stderr: &errs}
 
 	if s := resolve(ctx, "check-todos.sh", false); s.native != nil || s.path != filepath.Join(root, "scripts", "check-todos.sh") {
 		t.Errorf("project copy: %+v", s)
@@ -102,19 +101,20 @@ func TestResolve(t *testing.T) {
 	if errs.Len() != 0 {
 		t.Errorf("quiet resolve printed %q", errs.String())
 	}
-	if s := resolve(ctx, "steward.sh", false); s.path != filepath.Join(install, "steward.sh") {
+	if s := resolve(ctx, "check-registry.sh", false); s.native == nil {
 		t.Errorf("thin wrapper picked: %+v", s)
 	}
 	if s := resolve(ctx, "check-freshness.sh", false); s.native == nil {
-		t.Errorf("native not picked: %+v", s)
+		t.Errorf("built-in check not picked: %+v", s)
 	}
-	if s := resolve(&checks.Context{Root: root, Stderr: &errs}, "sync-bootstrap.sh", false); s.found() {
-		t.Errorf("no install, no copy: %+v found", s)
+	if s := resolve(ctx, "sync-bootstrap.sh", false); s.found() {
+		t.Errorf("maintainer step outside a rebar checkout: %+v found", s)
 	}
-	// The rebar source repo: its scripts/ is the install.
-	ctx.Install = filepath.Join(root, "scripts")
-	if s := resolve(ctx, "check-todos.sh", false); s.native == nil {
-		t.Errorf("the install's own scripts/ counted as a project copy: %+v", s)
+	// A rebar source checkout runs its own maintainer scripts.
+	testutil.WriteFile(t, root, "templates/project-bootstrap/README.md", "x\n")
+	testutil.WriteFile(t, root, "cli/internal/assets/assets.go", "package assets\n")
+	if s := resolve(ctx, "sync-bootstrap.sh", false); !s.found() || s.path != filepath.Join(root, "scripts", "sync-bootstrap.sh") {
+		t.Errorf("maintainer step in a rebar checkout: %+v", s)
 	}
 }
 

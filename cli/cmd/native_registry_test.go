@@ -1,190 +1,13 @@
 package cmd
 
 import (
-	"flag"
-	"io/fs"
-	"os"
-	"path/filepath"
-	"regexp"
-	"sort"
-	"strconv"
 	"strings"
 	"testing"
-	"time"
-
-	"github.com/willackerly/rebar/cli/internal/checks"
-	"github.com/willackerly/rebar/cli/internal/testutil"
 )
 
-// Parity of compute-registry (runParity), and its golden files: every
-// case's expected output is kept in testdata/compute-registry, checked
-// against the script by the parity test and against the native check by
-// TestComputeRegistryGolden, which needs no bash (it outlives the script).
-// Regenerate the goldens from the script with
-//
-//	go test ./cmd -run 'TestComputeRegistry' -update-golden
+// compute-registry's cases (goldens in testdata/compute-registry).
 //
 // Contract references in fixture bodies are spelled @contract:.
-
-var updateGolden = flag.Bool("update-golden", false, "rewrite the golden files from the scripts' output")
-
-// gitTree makes root a git work tree with its files staged, then writes
-// the untracked files.
-func gitTree(t *testing.T, root string, untracked map[string]string, loc *time.Location) {
-	t.Helper()
-	testutil.Git(t, root, "init", "-q", "-b", "main")
-	testutil.Git(t, root, "add", "-A")
-	for rel, body := range untracked {
-		testutil.WriteFile(t, root, rel, fixtureText(body, loc))
-	}
-}
-
-// treeState maps every file below root, outside .git, to its contents.
-func treeState(t *testing.T, root string) map[string]string {
-	t.Helper()
-	state := map[string]string{}
-	err := filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		if d.IsDir() && d.Name() == ".git" {
-			return fs.SkipDir
-		}
-		if !d.Type().IsRegular() {
-			return nil
-		}
-		data, err := os.ReadFile(p)
-		if err != nil {
-			return err
-		}
-		rel, _ := filepath.Rel(root, p)
-		state[filepath.ToSlash(rel)] = string(data)
-		return nil
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	return state
-}
-
-// takeChanges describes the files a run wrote or removed below root since
-// before, and puts root back as it was.
-func takeChanges(t *testing.T, root string, before map[string]string) string {
-	t.Helper()
-	after := treeState(t, root)
-	var paths []string
-	for p := range after {
-		if body, ok := before[p]; !ok || body != after[p] {
-			paths = append(paths, p)
-		}
-	}
-	for p := range before {
-		if _, ok := after[p]; !ok {
-			paths = append(paths, p)
-		}
-	}
-	sort.Strings(paths)
-	var b strings.Builder
-	for _, p := range paths {
-		full := filepath.Join(root, p)
-		body, existed := before[p]
-		if now, ok := after[p]; ok {
-			b.WriteString("--- wrote " + p + " ---\n" + now)
-		} else {
-			b.WriteString("--- removed " + p + " ---\n")
-		}
-		if existed {
-			if err := os.WriteFile(full, []byte(body), 0o644); err != nil {
-				t.Fatal(err)
-			}
-		} else if err := os.Remove(full); err != nil {
-			t.Fatal(err)
-		}
-	}
-	return b.String()
-}
-
-// goldenName is the golden file of a case.
-func goldenName(dir, name string) string {
-	return filepath.Join("testdata", dir, strings.Trim(nonWord.ReplaceAllString(strings.ToLower(name), "-"), "-")+".golden")
-}
-
-var nonWord = regexp.MustCompile(`[^a-z0-9]+`)
-
-// goldenText is output as a golden file keeps it: the tree's root spelled
-// $ROOT, the exit code on the last line.
-func goldenText(out, root string, code int) string {
-	return strings.ReplaceAll(out, root, "$ROOT") + "--- exit " + strconv.Itoa(code) + " ---\n"
-}
-
-// checkGolden compares out (exit code) with a case's golden file, or
-// rewrites it under -update-golden.
-func checkGolden(t *testing.T, dir, name, out, root string, code int) {
-	t.Helper()
-	path := goldenName(dir, name)
-	got := goldenText(out, root, code)
-	if *updateGolden {
-		testutil.WriteFile(t, ".", path, got)
-		return
-	}
-	want, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatalf("no golden file (run with -update-golden): %v", err)
-	}
-	if got != string(want) {
-		t.Errorf("differs from %s:\ngot:\n%s\nwant:\n%s", path, got, want)
-	}
-}
-
-// runGolden runs the native check in process on every case's tree and
-// compares its output, and the files it wrote, with the golden files.
-func runGolden(t *testing.T, check parityCheck, cases []parityCase) {
-	t.Helper()
-	c, ok := checks.Lookup(check.name)
-	if !ok {
-		t.Fatalf("%s is not registered", check.name)
-	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			if *updateGolden && !check.nativeOnly {
-				t.Skip("goldens are written by the parity test")
-			}
-			if _, err := os.Stat(goldenName(check.golden, tc.name)); err != nil && tc.pending != "" {
-				t.Skipf("pending %q: no golden file yet", tc.pending)
-			}
-			files := map[string]string{}
-			for rel, body := range tc.files {
-				files[rel] = fixtureText(body, time.Local)
-			}
-			root := writeTree(t, files, tc.links)
-			if tc.git {
-				gitTree(t, root, tc.untracked, time.Local)
-			}
-			if tc.setup != nil {
-				tc.setup(t, root)
-			}
-			before := treeState(t, root)
-			for _, k := range scriptSettings {
-				t.Setenv(k, "")
-			}
-			for _, kv := range tc.env {
-				k, v, _ := strings.Cut(strings.ReplaceAll(kv, "$ROOT", root), "=")
-				t.Setenv(k, v)
-			}
-			var out strings.Builder
-			install := filepath.Join(testutil.RebarSource(t), "scripts")
-			if check.install != nil {
-				install = check.install(t, tc)
-			}
-			code := c.Run(&checks.Context{Root: root, Install: install, Stdout: &out, Stderr: &out}, rootArgs(tc.args, root))
-			got := out.String() + takeChanges(t, root, before)
-			if check.normalize != nil {
-				got = check.normalize(got)
-			}
-			checkGolden(t, check.golden, tc.name, undoAgo(got, tc, time.Local), root, code)
-		})
-	}
-}
 
 // registryContract is a contract body with a status, a purpose and a
 // reference to itself (which is not source).
@@ -192,9 +15,9 @@ func registryContract(status, purpose string) string {
 	return "# Contract\n\n**Status:** " + status + "\n\n## Purpose\n\n" + purpose + "\n\n## Interface\n\nSee @contract:SELF.1.0.\n"
 }
 
-var registryCheck = parityCheck{name: "compute-registry", writes: true, golden: "compute-registry"}
+var registryCheck = goldenCheck{name: "compute-registry", writes: true, golden: "compute-registry"}
 
-var registryParityCases = []parityCase{
+var registryCases = []goldenCase{
 	{
 		name: "default run writes the registry",
 		files: map[string]string{
@@ -572,10 +395,6 @@ func registryWant(row, file string) string {
 		row + "\n\n## Contract Files\n\n<!-- Plain list of filenames for grep-based tooling -->\n- " + file + "\n\n"
 }
 
-func TestComputeRegistryParity(t *testing.T) {
-	runParity(t, registryCheck, registryParityCases)
-}
-
 func TestComputeRegistryGolden(t *testing.T) {
-	runGolden(t, registryCheck, registryParityCases)
+	runGolden(t, registryCheck, registryCases)
 }

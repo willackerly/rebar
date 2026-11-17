@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"os/exec"
@@ -9,6 +10,7 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+	"github.com/willackerly/rebar/cli/internal/checks"
 	"github.com/willackerly/rebar/cli/internal/config"
 	"github.com/willackerly/rebar/cli/internal/llm"
 )
@@ -205,9 +207,10 @@ Be practical and specific. Don't over-engineer — this is a fresh project.`, na
 	// The registry check runs at every tier, so the first `rebar check` fails
 	// without a registry. It lists tracked files, so stage first.
 	exec.Command("git", "-C", root, "add", "-A").Run()
-	if out, code, found, err := outputRebarScript(root, findRebarRoot(), "compute-registry"); found {
-		if err != nil || code != 0 {
-			fmt.Fprintf(os.Stderr, "  ⚠ compute-registry failed (exit %d): %s\n", code, strings.TrimSpace(string(out)))
+	if c, ok := checks.Lookup("compute-registry"); ok {
+		var out bytes.Buffer
+		if code := c.Run(&checks.Context{Root: root, Dir: root, Stdout: &out, Stderr: &out}, nil); code != 0 {
+			fmt.Fprintf(os.Stderr, "  ⚠ compute-registry failed (exit %d): %s\n", code, strings.TrimSpace(out.String()))
 		} else {
 			fmt.Printf("  ✓ %s/CONTRACT-REGISTRY.md\n", contractsDir)
 		}

@@ -43,7 +43,7 @@ func (m *migrator) suiteExtras(src string, blobs map[string]bool) (extras []stri
 		hit := false
 		for _, mm := range scriptRefRe.FindAllStringSubmatch(l, -1) {
 			name := mm[1]
-			if isRebarScript(m.opts.RebarRoot, name) || !isExecutable(filepath.Join(m.opts.ProjectRoot, "scripts", name)) {
+			if isRebarScript(name) || !isExecutable(filepath.Join(m.opts.ProjectRoot, "scripts", name)) {
 				continue
 			}
 			hit = true

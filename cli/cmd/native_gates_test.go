@@ -9,7 +9,7 @@ import (
 	"github.com/willackerly/rebar/cli/internal/testutil"
 )
 
-// Parity of the git gates (runParity), check-fix-commit, check-bypass-flags
+// The git gates (runGolden), check-fix-commit, check-bypass-flags
 // and check-version-bump, with their goldens in testdata/<check>
 // (regenerate with go test ./cmd -run 'Gate|VersionBump' -update-golden).
 // Commits are made at a fixed date with a fixed identity under a
@@ -19,7 +19,7 @@ import (
 // fixedGit isolates git from the developer's configuration and pins the
 // commit dates, for the setup and for every run of the check. Once a test
 // has called it, calls from its (parallel) subtests change nothing:
-// runParity calls it before the cases when any has a setup.
+// runGolden calls it before the cases when any has a setup.
 func fixedGit(t *testing.T) {
 	t.Helper()
 	if os.Getenv("GIT_COMMITTER_DATE") == fixedDate && os.Getenv("GIT_CONFIG_NOSYSTEM") == "1" {
@@ -85,9 +85,9 @@ func shallowClone(msgs ...string) func(t *testing.T, root string) {
 	}
 }
 
-var fixCommitCheck = parityCheck{name: "check-fix-commit", golden: "check-fix-commit"}
+var fixCommitCheck = goldenCheck{name: "check-fix-commit", golden: "check-fix-commit"}
 
-var fixCommitParityCases = []parityCase{
+var fixCommitCases = []goldenCase{
 	{name: "head: not a fix", setup: commits("feat: add the thing\n\nbody\n")},
 	{name: "head: fix without reproduced on", setup: commits("fix: crash on start\n\nThe app crashed.\n")},
 	{name: "head: fix(scope) with reproduced on", setup: commits("fix(cli): crash on start\n\nReproduced on: abc1234 (local)\n")},
@@ -180,12 +180,11 @@ var fixCommitParityCases = []parityCase{
 	},
 }
 
-func TestFixCommitParity(t *testing.T) { runParity(t, fixCommitCheck, fixCommitParityCases) }
-func TestFixCommitGolden(t *testing.T) { runGolden(t, fixCommitCheck, fixCommitParityCases) }
+func TestFixCommitGolden(t *testing.T) { runGolden(t, fixCommitCheck, fixCommitCases) }
 
-var bypassFlagsCheck = parityCheck{name: "check-bypass-flags", golden: "check-bypass-flags"}
+var bypassFlagsCheck = goldenCheck{name: "check-bypass-flags", golden: "check-bypass-flags"}
 
-var bypassFlagsParityCases = []parityCase{
+var bypassFlagsCases = []goldenCase{
 	{name: "head: no bypass", setup: commits("feat: x\n\nbody\n")},
 	{name: "head: no-verify without tickets", setup: commits("chore: ship\n\nPushed with git push --no-verify because CI was down.\n")},
 	{name: "head: tickets", setup: commits("chore: ship\n\nUsed --skip-tests.\nBypass tickets: T-1, T-2\n")},
@@ -229,13 +228,12 @@ var bypassFlagsParityCases = []parityCase{
 	},
 }
 
-func TestBypassFlagsParity(t *testing.T) { runParity(t, bypassFlagsCheck, bypassFlagsParityCases) }
-func TestBypassFlagsGolden(t *testing.T) { runGolden(t, bypassFlagsCheck, bypassFlagsParityCases) }
+func TestBypassFlagsGolden(t *testing.T) { runGolden(t, bypassFlagsCheck, bypassFlagsCases) }
 
 // detectedAt is the timestamp check-version-bump writes.
 var detectedAt = regexp.MustCompile(`(- \*\*detected:\*\* )[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z`)
 
-var versionBumpCheck = parityCheck{
+var versionBumpCheck = goldenCheck{
 	name:      "check-version-bump",
 	golden:    "check-version-bump",
 	writes:    true,
@@ -259,7 +257,7 @@ func renameCommit(renames ...string) func(t *testing.T, root string) {
 
 const bumpContract = "# Contract\n\n**Status:** active\n\n## Purpose\n\nA contract body long enough for git to see a rename.\nline\nline\nline\n"
 
-var versionBumpParityCases = []parityCase{
+var versionBumpCases = []goldenCase{
 	{name: "not a repository"},
 	{name: "empty repository", git: true},
 	{name: "root commit", files: map[string]string{"architecture/CONTRACT-S1-FOO.1.0.md": bumpContract}, setup: commits("init\n")},
@@ -348,5 +346,4 @@ var versionBumpParityCases = []parityCase{
 	},
 }
 
-func TestVersionBumpParity(t *testing.T) { runParity(t, versionBumpCheck, versionBumpParityCases) }
-func TestVersionBumpGolden(t *testing.T) { runGolden(t, versionBumpCheck, versionBumpParityCases) }
+func TestVersionBumpGolden(t *testing.T) { runGolden(t, versionBumpCheck, versionBumpCases) }

@@ -10,43 +10,39 @@ import (
 
 func TestResolveScript(t *testing.T) {
 	project := t.TempDir()
-	install := t.TempDir()
-	testutil.WriteExecutable(t, install, "scripts/ci-check.sh", "#!/usr/bin/env bash\n")
-	testutil.WriteExecutable(t, install, "scripts/steward.sh", "#!/usr/bin/env bash\n")
 
-	// No project copy: the install's script runs.
-	got, ok := resolveScript(project, install, "ci-check.sh")
-	if !ok || got.Path != filepath.Join(install, "scripts", "ci-check.sh") || got.Legacy {
-		t.Fatalf("no project copy: got %+v ok=%v", got, ok)
+	// Nothing in the project: nothing to run but the built-in checks.
+	if _, ok := resolveScript(project, "ci-check.sh"); ok {
+		t.Fatal("resolved a script the project does not have")
 	}
 
 	// A thin wrapper is skipped, or `rebar check` would call itself.
 	testutil.WriteExecutable(t, project, "scripts/ci-check.sh",
 		"#!/usr/bin/env bash\n# rebar-thin-wrapper\nexec rebar check \"$@\"\n")
-	got, _ = resolveScript(project, install, "ci-check")
-	if got.Path != filepath.Join(install, "scripts", "ci-check.sh") {
+	if got, ok := resolveScript(project, "ci-check"); ok {
 		t.Fatalf("thin wrapper: got %+v", got)
 	}
 
-	// A full legacy copy wins and is flagged.
+	// A full copy of one of rebar's scripts wins and is flagged legacy.
 	testutil.WriteExecutable(t, project, "scripts/steward.sh", "#!/usr/bin/env bash\necho custom\n")
-	got, _ = resolveScript(project, install, "steward")
-	if got.Path != filepath.Join(project, "scripts", "steward.sh") || !got.Legacy {
-		t.Fatalf("legacy copy: got %+v", got)
+	got, ok := resolveScript(project, "steward")
+	if !ok || got.Path != filepath.Join(project, "scripts", "steward.sh") || !got.Legacy {
+		t.Fatalf("legacy copy: got %+v ok=%v", got, ok)
 	}
 
-	// Inside the rebar repo itself the project copy is the install.
-	got, _ = resolveScript(install, install, "steward.sh")
-	if got.Legacy {
-		t.Fatalf("rebar repo: got %+v", got)
+	// The project's own other scripts resolve, not legacy.
+	testutil.WriteExecutable(t, project, "scripts/deploy.sh", "#!/usr/bin/env bash\n")
+	if got, ok := resolveScript(project, "deploy.sh"); !ok || got.Legacy {
+		t.Fatalf("own script: got %+v ok=%v", got, ok)
 	}
 
-	// Neither has it.
-	if _, ok := resolveScript(project, install, "nope"); ok {
-		t.Fatal("missing script resolved")
-	}
-	if _, ok := resolveScript(project, "", "ci-check"); ok {
-		t.Fatal("thin wrapper resolved with no install")
+	// Inside a rebar source checkout nothing is legacy.
+	src := t.TempDir()
+	testutil.WriteFile(t, src, "templates/project-bootstrap/README.md", "x\n")
+	testutil.WriteFile(t, src, "cli/internal/assets/assets.go", "package assets\n")
+	testutil.WriteExecutable(t, src, "scripts/steward.sh", "#!/usr/bin/env bash\n")
+	if got, _ := resolveScript(src, "steward.sh"); got.Legacy {
+		t.Fatalf("rebar source: got %+v", got)
 	}
 }
 

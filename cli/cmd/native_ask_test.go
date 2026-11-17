@@ -24,19 +24,19 @@ import (
 	"github.com/willackerly/rebar/cli/internal/testutil"
 )
 
-// Parity of the native ASK (`rebar ask`, internal/ask) with bin/ask, the
-// bash original: every case runs three ways on a fresh copy of its tree —
-// bin/ask under REBAR_CHECK_IMPL=shell, `rebar ask` (this test binary),
-// and bin/ask handing off to rebar (the shim path adopters' scripts take)
-// — and the three records must agree: exit code, stdout, stderr, the
-// files written under the project and HOME, every claude invocation (a
-// stub claude on PATH logs its arguments, stdin and working directory and
-// plays back canned output), and the requests a remote-mode case sends to
-// its test ASK servers. Timestamps, message ids, session UUIDs and the
-// temp paths are normalized. The records are golden files in
-// testdata/ask (regenerate with go test ./cmd -run AskParity
-// -update-golden); a case that documents a deliberate deviation
-// (diverges) takes its golden from the native side.
+// ASK (`rebar ask`, internal/ask) against its goldens: every case runs two
+// ways on a fresh copy of its tree — `rebar ask` (this test binary) and
+// bin/ask, the shim adopters' PATH and scripts use, handing off to rebar —
+// and both records must match the case's golden file: exit code, stdout,
+// stderr, the files written under the project and HOME, every claude
+// invocation (a stub claude on PATH logs its arguments, stdin and working
+// directory and plays back canned output), and the requests a remote-mode
+// case sends to its test ASK servers. Timestamps, message ids, session
+// UUIDs and the temp paths are normalized. The goldens in testdata/ask were
+// captured from bin/ask's bash implementation (rebar 3.2 required the two
+// to agree), except where a case documents a deliberate deviation
+// (diverges) or a platform-specific behaviour of the script (divergesOn);
+// regenerate with go test ./cmd -run AskGolden -update-golden.
 
 // askCase is one ASK invocation and the tree it runs in.
 type askCase struct {
@@ -58,15 +58,11 @@ type askCase struct {
 	servers int
 	// noClaude runs with a PATH that has no claude.
 	noClaude bool
-	// diverges documents a deliberate deviation: the native record is the
-	// golden one; the script's is only logged.
+	// diverges documents a deliberate deviation from the bash ASK.
 	diverges string
-	// divergesOn is "linux" or "darwin" for a platform-specific script
-	// behaviour: the native side follows the other platform, whose script
-	// output is the golden one.
+	// divergesOn is "linux" or "darwin" for a platform-specific behaviour
+	// of the bash ASK: rebar follows the other platform.
 	divergesOn string
-	// needs lists tools the script side needs beyond bash and jq.
-	needs []string
 }
 
 // defaultClaude answers like `claude --print --output-format json`.
@@ -379,9 +375,6 @@ func askRun(t *testing.T, tc askCase, how string, srv *askServers, dead string) 
 	var stdout, stderr string
 	var code int
 	switch how {
-	case "script":
-		script := filepath.Join(testutil.RebarSource(t), "bin", "ask")
-		stdout, stderr, code = runSplit(t, proj, append(env, "REBAR_CHECK_IMPL=shell"), tc.stdin, "bash", append([]string{script}, args...)...)
 	case "native":
 		stdout, stderr, code = runSplit(t, proj, append(env, "REBAR_TEST_RUN_CLI=1"), tc.stdin, testBinary(t), append([]string{"ask"}, args...)...)
 	case "shim":
@@ -431,57 +424,25 @@ func srvURLs(s *askServers) []string {
 // normalized ($BASE).
 const noRoot = "\x00no-root\x00"
 
-// runAskParity runs the cases.
-func runAskParity(t *testing.T, cases []askCase) {
+// runAskGolden runs the cases.
+func runAskGolden(t *testing.T, cases []askCase) {
 	t.Helper()
-	requireBash(t)
-	for _, tool := range []string{"jq", "uuidgen"} {
-		if _, err := exec.LookPath(tool); err != nil {
-			t.Skipf("bin/ask needs %s", tool)
-		}
-	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel() // each run has its own trees, servers and stub claude
-			for _, tool := range tc.needs {
-				if _, err := exec.LookPath(tool); err != nil {
-					t.Skipf("needs %s", tool)
-				}
-			}
 			var srv *askServers
 			if tc.servers > 0 {
 				srv = startAskServers(t, tc.servers)
 			}
 			dead := deadAddr(t)
-			script, scriptCode := askRun(t, tc, "script", srv, dead)
 			native, nativeCode := askRun(t, tc, "native", srv, dead)
-			shim, shimCode := askRun(t, tc, "shim", srv, dead)
-
-			want, wantCode, from := script, scriptCode, "the script"
-			platformDiverges := tc.divergesOn != "" && tc.divergesOn == hostOS()
-			if tc.diverges != "" || platformDiverges {
-				want, wantCode, from = native, nativeCode, "native"
-				if script == native && scriptCode == nativeCode {
-					t.Logf("documented divergence did not show here (%s%s)", tc.diverges, tc.divergesOn)
-				} else {
-					t.Logf("the script diverges, as documented (%s%s); it gave (exit %d):\n%s", tc.diverges, tc.divergesOn, scriptCode, script)
-				}
+			checkGolden(t, "ask", tc.name, native, noRoot, nativeCode)
+			if *updateGolden {
+				return
 			}
-			checkGolden(t, "ask", tc.name, want, noRoot, wantCode)
-			for _, got := range []struct {
-				how  string
-				rec  string
-				code int
-			}{{"native", native, nativeCode}, {"shim", shim, shimCode}} {
-				if got.rec != want || got.code != wantCode {
-					t.Errorf("%s differs from %s:\n%s (exit %d):\n%s\n%s (exit %d):\n%s", got.how, from, from, wantCode, want, got.how, got.code, got.rec)
-				}
+			if shim, shimCode := askRun(t, tc, "shim", srv, dead); shim != native || shimCode != nativeCode {
+				t.Errorf("bin/ask differs from rebar ask:\nbin/ask (exit %d):\n%s\nrebar ask (exit %d):\n%s", shimCode, shim, nativeCode, native)
 			}
 		})
 	}
-}
-
-func hostOS() string {
-	out, _ := exec.Command("uname", "-s").Output()
-	return strings.ToLower(strings.TrimSpace(string(out)))
 }

@@ -2,51 +2,11 @@ package checks
 
 import (
 	"bytes"
-	"path/filepath"
-	"slices"
 	"strings"
 	"testing"
 
 	"github.com/willackerly/rebar/cli/internal/testutil"
 )
-
-func TestImpl(t *testing.T) {
-	for v, want := range map[string]string{"": ImplGo, "shell": ImplShell, " shell ": ImplShell, "go": ImplGo, "rust": ImplGo} {
-		t.Setenv("REBAR_CHECK_IMPL", v)
-		if got := Impl(); got != want {
-			t.Errorf("REBAR_CHECK_IMPL=%q: Impl() = %q, want %q", v, got, want)
-		}
-	}
-}
-
-func TestNativeAndScriptEnv(t *testing.T) {
-	t.Setenv("REBAR_CHECK_IMPL", "shell")
-	if _, ok := Native("check-todos.sh"); ok {
-		t.Error("shell implementation returned a native check")
-	}
-	off := []string{"REBAR_NATIVE_CHECKS=", "REBAR_NATIVE_SCRIPTS="}
-	if env := ScriptEnv("/install/scripts"); !slices.Equal(env, off) {
-		t.Errorf("shell ScriptEnv = %v, want the inherited hand-off cleared", env)
-	}
-
-	t.Setenv("REBAR_CHECK_IMPL", "")
-	if c, ok := Native("check-todos.sh"); !ok || c.Name != "check-todos" {
-		t.Errorf("go: Native(check-todos.sh) = %v, %v", c, ok)
-	}
-	if _, ok := Native("steward"); ok {
-		t.Error("go: an unported check returned a native implementation")
-	}
-	install := t.TempDir()
-	env := strings.Join(ScriptEnv(install), "\n")
-	real, _ := filepath.EvalSymlinks(install)
-	if !strings.Contains(env, "REBAR_BIN=") || !strings.Contains(env, "REBAR_NATIVE_CHECKS="+strings.Join(Names(), " ")) ||
-		!strings.Contains(env, "REBAR_NATIVE_SCRIPTS="+real+"\n") && !strings.HasSuffix(env, "REBAR_NATIVE_SCRIPTS="+real) {
-		t.Errorf("go ScriptEnv = %q, want the binary, the checks and the install's scripts (%s)", env, real)
-	}
-	if env := ScriptEnv(""); !slices.Equal(env, off) {
-		t.Errorf("go ScriptEnv for a project copy = %v, want the hand-off cleared", env)
-	}
-}
 
 func write(t *testing.T, root, rel, body string) {
 	t.Helper()

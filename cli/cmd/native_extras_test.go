@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -34,7 +33,7 @@ var extrasProject = withFiles(suiteProject, map[string]string{
 		"checks_extra_pre_commit = scripts/check-openapi.sh tools/lint.awk\n",
 })
 
-var ciExtrasCases = []parityCase{
+var ciExtrasCases = []goldenCase{
 	{name: "every kind of extra", files: extrasProject, git: true, setup: extraScripts, env: noSteward},
 	{name: "extras that pass", files: withFiles(extrasProject, map[string]string{".rebarrc": "tier = 1\nchecks_extra = scripts/check-openapi.sh tools/lint.awk\n"}), git: true, setup: extraScripts, env: noSteward},
 	{name: "a failing extra with --no-strict", files: extrasProject, git: true, setup: extraScripts, env: noSteward, args: []string{"--no-strict"}},
@@ -49,10 +48,10 @@ var ciExtrasCases = []parityCase{
 func TestCICheckExtras(t *testing.T) {
 	t.Setenv("REBAR_TEST_RUN_CLI", "1")
 	t.Setenv("REBAR_CHECKS_EXTRA", "")
-	runGolden(t, parityCheck{name: "ci-check", golden: "ci-check-extras", nativeOnly: true}, ciExtrasCases)
+	runGolden(t, goldenCheck{name: "ci-check", golden: "ci-check-extras"}, ciExtrasCases)
 }
 
-var preCommitExtrasCases = []parityCase{
+var preCommitExtrasCases = []goldenCase{
 	{name: "extras that pass", files: extrasProject, git: true, setup: extraScripts},
 	{name: "a failing and a missing extra", files: withFiles(extrasProject, map[string]string{".rebarrc": "tier = 1\nchecks_extra_pre_commit = tools/check-licenses tools/missing.sh tools/lint.awk\n"}), git: true, setup: extraScripts},
 	{name: "SKIP_CHECKS_EXTRA", files: withFiles(extrasProject, map[string]string{".rebarrc": "tier = 1\nchecks_extra_pre_commit = tools/check-licenses\n"}), git: true, setup: extraScripts, env: []string{"SKIP_CHECKS_EXTRA=1"}},
@@ -62,60 +61,48 @@ var preCommitExtrasCases = []parityCase{
 func TestPreCommitExtras(t *testing.T) {
 	t.Setenv("REBAR_TEST_RUN_CLI", "1")
 	t.Setenv("REBAR_CHECKS_EXTRA_PRE_COMMIT", "")
-	runGolden(t, parityCheck{name: "pre-commit", golden: "pre-commit-extras", nativeOnly: true}, preCommitExtrasCases)
+	runGolden(t, goldenCheck{name: "pre-commit", golden: "pre-commit-extras"}, preCommitExtrasCases)
 }
 
 // TestExtrasCLI runs the CLI (this binary): rebar check counts the extras
 // in the summary; rebar run finds an extra by name and passes its exit code
-// and arguments through; REBAR_CHECK_IMPL=shell and a project's own
-// ci-check.sh say they do not run them.
+// and arguments through; a project's own ci-check.sh says it does not run
+// them.
 func TestExtrasCLI(t *testing.T) {
 	requireBash(t)
 	root := writeTree(t, extrasProject, nil)
 	testutil.Git(t, root, "init", "-q", "-b", "main")
 	extraScripts(t, root)
-	bin, home, src := testBinary(t), t.TempDir(), testutil.RebarSource(t)
-	env := func(impl string) []string { return append(cliEnv(home, impl, src), "SKIP_STEWARD=1") }
+	bin, home := testBinary(t), t.TempDir()
+	env := func() []string { return append(cliEnv(home), "SKIP_STEWARD=1") }
 
-	out, code := testutil.RunEnv(t, root, env(""), bin, "check")
+	out, code := testutil.RunEnv(t, root, env(), bin, "check")
 	if code != 1 || !strings.Contains(out, "PASS  extra: check-openapi") || !strings.Contains(out, "FAIL  extra: check-licenses") ||
 		!strings.Contains(out, "FAIL  extra: missing (tools/missing.sh not found or not executable)") {
 		t.Errorf("rebar check: exit %d\n%s", code, out)
 	}
-	out, code = testutil.RunEnv(t, root, env(""), bin, "run", "check-openapi", "a", "b")
+	out, code = testutil.RunEnv(t, root, env(), bin, "run", "check-openapi", "a", "b")
 	if code != 0 || !strings.Contains(out, "openapi ok, in the project root: yes, args:2") || strings.Contains(out, "deprecated") {
 		t.Errorf("rebar run check-openapi: exit %d\n%s", code, out)
 	}
-	if out, code = testutil.RunEnv(t, root, env(""), bin, "run", "tools/check-licenses"); code != 3 || !strings.Contains(out, "GPL") {
+	if out, code = testutil.RunEnv(t, root, env(), bin, "run", "tools/check-licenses"); code != 3 || !strings.Contains(out, "GPL") {
 		t.Errorf("rebar run tools/check-licenses: exit %d\n%s", code, out)
 	}
-	if out, code = testutil.RunEnv(t, root, env(""), bin, "run", "not-executable"); code == 0 || !strings.Contains(out, "not an executable file") {
+	if out, code = testutil.RunEnv(t, root, env(), bin, "run", "not-executable"); code == 0 || !strings.Contains(out, "not an executable file") {
 		t.Errorf("rebar run not-executable: exit %d\n%s", code, out)
 	}
 	// rebar's own checks keep their names.
-	if out, _ = testutil.RunEnv(t, root, env(""), bin, "run", "check-todos"); !strings.Contains(out, "untracked TODOs") {
+	if out, _ = testutil.RunEnv(t, root, env(), bin, "run", "check-todos"); !strings.Contains(out, "untracked TODOs") {
 		t.Errorf("rebar run check-todos:\n%s", out)
 	}
 
-	out, _ = testutil.RunEnv(t, root, env("shell"), bin, "check")
-	if !strings.Contains(out, "rebar: .rebarrc checks_extra not run: REBAR_CHECK_IMPL=shell runs the suite script") || strings.Contains(out, "extra: check-openapi") {
-		t.Errorf("shell: rebar check\n%s", out)
-	}
-	out, _ = testutil.RunEnv(t, root, env("shell"), bin, "check", "--pre-commit")
-	if !strings.Contains(out, "checks_extra_pre_commit not run") {
-		t.Errorf("shell: rebar check --pre-commit\n%s", out)
-	}
-	if out, _ = testutil.RunEnv(t, root, env(""), bin, "check", "--cold-start"); strings.Contains(out, "not run") {
+	if out, _ = testutil.RunEnv(t, root, env(), bin, "check", "--cold-start"); strings.Contains(out, "not run") {
 		t.Errorf("cold start warned about extras:\n%s", out)
 	}
 
-	copySrc, err := os.ReadFile(filepath.Join(src, "scripts", "ci-check.sh"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	testutil.WriteExecutable(t, root, "scripts/ci-check.sh", string(copySrc))
-	out, _ = testutil.RunEnv(t, root, env(""), bin, "check")
-	if !strings.Contains(out, "checks_extra not run: the project's own scripts/ci-check.sh runs instead") {
+	testutil.WriteExecutable(t, root, "scripts/ci-check.sh", "#!/usr/bin/env bash\necho 'legacy ci-check copy ran'\n")
+	out, _ = testutil.RunEnv(t, root, env(), bin, "check")
+	if !strings.Contains(out, "checks_extra not run: the project's own scripts/ci-check.sh runs instead") || !strings.Contains(out, "legacy ci-check copy ran") {
 		t.Errorf("project copy: rebar check\n%s", out)
 	}
 }

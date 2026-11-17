@@ -11,7 +11,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"reflect"
 	"strconv"
 	"strings"
 	"testing"
@@ -20,15 +19,14 @@ import (
 	"github.com/willackerly/rebar/cli/internal/testutil"
 )
 
-// Parity of the native MCP server (`rebar mcp serve`) and ask-server
-// (`rebar ask serve`) with the python originals (bin/legacy/*.py): the
-// same JSON-RPC session over stdio, and the same HTTP requests, go to
-// both, and every response must match — compared structurally (decoded
-// JSON) and, for stdio, byte for byte, since the native server writes
-// Python's json.dumps format. tools/call runs a stub ask (--ask-bin) on
-// both sides, so answers and failures are the same; TestMCPNativeAsk runs
-// the native server with its own ask against a stub claude. Transcripts
-// are goldens in testdata/mcp. The python side is skipped without python3.
+// The MCP server (`rebar mcp serve`) and ask-server (`rebar ask serve`)
+// against transcripts in testdata/mcp: a JSON-RPC session over stdio and
+// HTTP request sequences. rebar 3.2 sent the same sessions to the python
+// originals and required the same responses (byte for byte over stdio:
+// the server writes Python's json.dumps format), so the goldens hold the
+// python servers' behaviour, except where a request documents a deliberate
+// deviation. tools/call runs a stub ask (--ask-bin); TestMCPNativeAsk runs
+// the server with its own ask against a stub claude.
 
 // mcpRepos is a --repos-dir: two repos (one nested a level down, one with
 // "_" in its name), a repo opted out, a non-repo, and skipped directories.
@@ -104,16 +102,6 @@ var mcpSession = []string{
 	`{"jsonrpc":"2.0","method":"notifications/cancelled","params":{"requestId":3}}`,
 }
 
-// requirePython skips without python3.
-func requirePython(t *testing.T) string {
-	t.Helper()
-	p, err := exec.LookPath("python3")
-	if err != nil {
-		t.Skip("python3 not installed: no python side to compare with")
-	}
-	return p
-}
-
 // mcpFixture writes the repos dir and the stub ask and returns them.
 func mcpFixture(t *testing.T) (repos, stub string) {
 	t.Helper()
@@ -127,11 +115,6 @@ func mcpFixture(t *testing.T) (repos, stub string) {
 	}
 	stub = testutil.WriteExecutable(t, base, "bin/ask", stubAsk)
 	return repos, stub
-}
-
-// legacy is bin/legacy/<name>.py of the rebar source.
-func legacy(t *testing.T, name string) string {
-	return filepath.Join(testutil.RebarSource(t), "bin", "legacy", name+".py")
 }
 
 // mcpStdio runs one server over stdio with input and returns stdout and
@@ -152,53 +135,47 @@ func mcpEnv(t *testing.T, extra ...string) []string {
 	return append(append(env, "REBAR_TEST_RUN_CLI=1", "LC_ALL=C"), extra...)
 }
 
-// TestMCPStdioParity: one session through both stdio servers.
-func TestMCPStdioParity(t *testing.T) {
-	python := requirePython(t)
+// stdioErrLines hides each json library's own words in parse errors (the
+// python server's differed from Go's).
+func stdioErrLines(s string) string {
+	var out []string
+	for _, l := range strings.Split(s, "\n") {
+		if strings.HasPrefix(l, "ask-mcp-server: parse error:") {
+			l = "ask-mcp-server: parse error: <msg>"
+		}
+		out = append(out, l)
+	}
+	return strings.Join(out, "\n")
+}
+
+// TestMCPStdioGolden: one session through `rebar mcp serve` and through
+// the bin/ask-mcp-server shim (what .mcp.json files name).
+func TestMCPStdioGolden(t *testing.T) {
 	repos, stub := mcpFixture(t)
 	input := strings.Join(mcpSession, "\n") + "\n"
 	args := []string{"--stdio", "--repos-dir", repos, "--ask-bin", stub}
 	env := mcpEnv(t, "ASK_SERVER=elsewhere:1")
-	pyOut, pyErr, pyCode := mcpStdio(t, append([]string{python, legacy(t, "ask-mcp-server")}, args...), env, input)
 	goOut, goErr, goCode := mcpStdio(t, append([]string{testBinary(t), "mcp", "serve"}, args...), env, input)
+	norm := func(s string) string {
+		return strings.ReplaceAll(strings.ReplaceAll(s, repos, "$REPOS"), stub, "$STUB")
+	}
+	checkGolden(t, "mcp", "stdio session", norm(goOut+"--- stderr ---\n"+stdioErrLines(goErr)), "\x00", goCode)
 
-	if pyCode != goCode {
-		t.Errorf("exit: python %d, native %d", pyCode, goCode)
+	shimDir := t.TempDir()
+	data, err := os.ReadFile(filepath.Join(testutil.RebarSource(t), "bin", "ask-mcp-server"))
+	if err != nil {
+		t.Fatal(err)
 	}
-	pyLines, goLines := strings.Split(pyOut, "\n"), strings.Split(goOut, "\n")
-	for i := 0; i < len(pyLines) || i < len(goLines); i++ {
-		var p, g string
-		if i < len(pyLines) {
-			p = pyLines[i]
-		}
-		if i < len(goLines) {
-			g = goLines[i]
-		}
-		if p != g {
-			t.Errorf("response %d differs:\npython: %s\nnative: %s", i+1, p, g)
-		}
+	shim := testutil.WriteExecutable(t, shimDir, "ask-mcp-server", string(data))
+	testutil.WriteExecutable(t, shimDir, "rebar", "#!/bin/sh\nREBAR_TEST_RUN_CLI=1 exec '"+testBinary(t)+"' \"$@\"\n")
+	shOut, shErr, shCode := mcpStdio(t, append([]string{shim}, args...), env, input)
+	if shOut != goOut || shErr != goErr || shCode != goCode {
+		t.Errorf("bin/ask-mcp-server differs from rebar mcp serve:\n%s%s\n(exit %d)", shOut, shErr, shCode)
 	}
-	// stderr: the banner and registrations match; parse errors are each
-	// json library's own words.
-	parse := func(s string) string {
-		var out []string
-		for _, l := range strings.Split(s, "\n") {
-			if strings.HasPrefix(l, "ask-mcp-server: parse error:") {
-				l = "ask-mcp-server: parse error: <msg>"
-			}
-			out = append(out, l)
-		}
-		return strings.Join(out, "\n")
-	}
-	if parse(pyErr) != parse(goErr) {
-		t.Errorf("stderr differs:\npython:\n%s\nnative:\n%s", pyErr, goErr)
-	}
-	checkGolden(t, "mcp", "stdio session", strings.ReplaceAll(strings.ReplaceAll(goOut+"--- stderr ---\n"+parse(goErr), repos, "$REPOS"), stub, "$STUB"), "\x00", goCode)
 }
 
-// TestMCPStdioErrors: the servers' start-up failures.
+// TestMCPStdioErrors: the server's start-up failures.
 func TestMCPStdioErrors(t *testing.T) {
-	python := requirePython(t)
 	repos, _ := mcpFixture(t)
 	for _, tc := range []struct {
 		name string
@@ -209,19 +186,14 @@ func TestMCPStdioErrors(t *testing.T) {
 		{"explicit repos", []string{"--stdio", "--repos", filepath.Join(repos, "web") + "," + filepath.Join(repos, "plain")}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			env := mcpEnv(t)
-			pyOut, pyErr, pyCode := mcpStdio(t, append([]string{python, legacy(t, "ask-mcp-server")}, tc.args...), env, "")
-			goOut, goErr, goCode := mcpStdio(t, append([]string{testBinary(t), "mcp", "serve"}, tc.args...), env, "")
-			if pyOut != goOut || pyErr != goErr || pyCode != goCode {
-				t.Errorf("differs:\npython (exit %d):\n%s%s\nnative (exit %d):\n%s%s", pyCode, pyOut, pyErr, goCode, goOut, goErr)
-			}
+			out, errOut, code := mcpStdio(t, append([]string{testBinary(t), "mcp", "serve"}, tc.args...), mcpEnv(t), "")
+			checkGolden(t, "mcp", "stdio error "+tc.name, strings.ReplaceAll(out+"--- stderr ---\n"+errOut, repos, "$REPOS"), "\x00", code)
 		})
 	}
-	// Usage errors exit 2 on both sides (argparse's wording is its own).
-	_, _, pyCode := mcpStdio(t, []string{python, legacy(t, "ask-mcp-server"), "--stdio"}, mcpEnv(t), "")
+	// A usage error exits 2 (as argparse did; the wording is rebar's).
 	_, goErr, goCode := mcpStdio(t, []string{testBinary(t), "mcp", "serve", "--stdio"}, mcpEnv(t), "")
-	if pyCode != 2 || goCode != 2 || !strings.Contains(goErr, "Provide --repos-dir or --repos") {
-		t.Errorf("no repos flag: python exit %d, native exit %d:\n%s", pyCode, goCode, goErr)
+	if goCode != 2 || !strings.Contains(goErr, "Provide --repos-dir or --repos") {
+		t.Errorf("no repos flag: exit %d:\n%s", goCode, goErr)
 	}
 }
 
@@ -263,8 +235,7 @@ func startHTTP(t *testing.T, argv, env []string, port int) {
 // httpReq is one request of an HTTP transcript.
 type httpReq struct {
 	method, path, body, auth string
-	// diverges documents a deliberate difference: the python answer is
-	// only logged.
+	// diverges documents a deliberate difference from the python server.
 	diverges string
 }
 
@@ -296,38 +267,21 @@ func exchange(t *testing.T, port int, r httpReq) (int, any, string) {
 	return resp.StatusCode, v, string(data)
 }
 
-// invalidJSON hides each json library's own error words.
-func invalidJSON(v any) any {
-	if m, ok := v.(map[string]any); ok {
-		if s, ok := m["error"].(string); ok && strings.HasPrefix(s, "Invalid JSON:") {
-			m["error"] = "Invalid JSON: <msg>"
-		}
-	}
-	return v
-}
-
-// compareHTTP sends reqs to both servers and compares status and JSON.
-func compareHTTP(t *testing.T, golden string, pyPort, goPort int, reqs []httpReq, normalize func(string) string) {
+// compareHTTP sends reqs to the server and compares status and body with
+// the golden transcript.
+func compareHTTP(t *testing.T, golden string, port int, reqs []httpReq, normalize func(string) string) {
 	t.Helper()
 	var rec strings.Builder
 	for _, r := range reqs {
-		pyStatus, pyBody, _ := exchange(t, pyPort, r)
-		goStatus, goBody, goRaw := exchange(t, goPort, r)
-		pyBody, goBody = invalidJSON(pyBody), invalidJSON(goBody)
-		if r.diverges != "" {
-			t.Logf("%s %s: deliberate deviation (%s); python gave %d %v", r.method, r.path, r.diverges, pyStatus, pyBody)
-		} else if pyStatus != goStatus || !reflect.DeepEqual(pyBody, goBody) {
-			t.Errorf("%s %s %s: python %d %v, native %d %v", r.method, r.path, r.body, pyStatus, pyBody, goStatus, goBody)
-		}
-		fmt.Fprintf(&rec, "%s %s %s\n%d %s\n", r.method, r.path, r.body, goStatus, normalize(goRaw))
+		status, _, raw := exchange(t, port, r)
+		fmt.Fprintf(&rec, "%s %s %s\n%d %s\n", r.method, r.path, r.body, status, normalize(raw))
 	}
 	checkGolden(t, "mcp", golden, rec.String(), "\x00", 0)
 }
 
-// TestMCPHTTPParity: the MCP server's HTTP mode (with and without
+// TestMCPHTTPGolden: the MCP server's HTTP mode (with and without
 // --mcp-only and an API key).
-func TestMCPHTTPParity(t *testing.T) {
-	python := requirePython(t)
+func TestMCPHTTPGolden(t *testing.T) {
 	repos, stub := mcpFixture(t)
 	norm := func(s string) string {
 		return strings.ReplaceAll(strings.ReplaceAll(s, repos, "$REPOS"), stub, "$STUB")
@@ -367,12 +321,10 @@ func TestMCPHTTPParity(t *testing.T) {
 		}},
 	} {
 		t.Run(mode.name, func(t *testing.T) {
-			pyPort, goPort := freePort(t), freePort(t)
+			goPort := freePort(t)
 			flags := append([]string{"--repos-dir", repos, "--ask-bin", stub, "--host", "127.0.0.1"}, mode.flags...)
-			env := mcpEnv(t)
-			startHTTP(t, append([]string{python, legacy(t, "ask-mcp-server"), "--port", strconv.Itoa(pyPort)}, flags...), env, pyPort)
-			startHTTP(t, append([]string{testBinary(t), "mcp", "serve", "--port", strconv.Itoa(goPort)}, flags...), env, goPort)
-			compareHTTP(t, mode.name, pyPort, goPort, mode.reqs, norm)
+			startHTTP(t, append([]string{testBinary(t), "mcp", "serve", "--port", strconv.Itoa(goPort)}, flags...), mcpEnv(t), goPort)
+			compareHTTP(t, mode.name, goPort, mode.reqs, norm)
 		})
 	}
 }
@@ -391,9 +343,8 @@ func TestMCPHTTPSession(t *testing.T) {
 	}
 }
 
-// TestAskServerParity: ask-server's HTTP API.
-func TestAskServerParity(t *testing.T) {
-	python := requirePython(t)
+// TestAskServerGolden: ask-server's HTTP API.
+func TestAskServerGolden(t *testing.T) {
 	repos, stub := mcpFixture(t)
 	norm := func(s string) string {
 		return strings.ReplaceAll(strings.ReplaceAll(s, repos, "$REPOS"), stub, "$STUB")
@@ -440,12 +391,10 @@ esac
 		}},
 	} {
 		t.Run(mode.name, func(t *testing.T) {
-			pyPort, goPort := freePort(t), freePort(t)
+			goPort := freePort(t)
 			flags := append([]string{"--repos-dir", repos, "--ask-bin", statusStub, "--host", "127.0.0.1"}, mode.flags...)
-			env := mcpEnv(t)
-			startHTTP(t, append([]string{python, legacy(t, "ask-server"), "--port", strconv.Itoa(pyPort)}, flags...), env, pyPort)
-			startHTTP(t, append([]string{testBinary(t), "ask", "serve", "--port", strconv.Itoa(goPort)}, flags...), env, goPort)
-			compareHTTP(t, mode.name, pyPort, goPort, mode.reqs, func(s string) string { return norm(strings.ReplaceAll(s, statusStub, "$STUB")) })
+			startHTTP(t, append([]string{testBinary(t), "ask", "serve", "--port", strconv.Itoa(goPort)}, flags...), mcpEnv(t), goPort)
+			compareHTTP(t, mode.name, goPort, mode.reqs, func(s string) string { return norm(strings.ReplaceAll(s, statusStub, "$STUB")) })
 		})
 	}
 }
@@ -488,10 +437,9 @@ func TestMCPNativeAsk(t *testing.T) {
 	}
 }
 
-// TestMCPClientParity: `rebar mcp client` against a native HTTP MCP server
-// prints what bin/legacy/test-mcp-client.py prints (that one needs the
-// requests module; without it only the golden is checked).
-func TestMCPClientParity(t *testing.T) {
+// TestMCPClientGolden: `rebar mcp client` against an HTTP MCP server
+// prints what bin/test-mcp-client (python, removed in rebar 4) printed.
+func TestMCPClientGolden(t *testing.T) {
 	repos, stub := mcpFixture(t)
 	port := freePort(t)
 	startHTTP(t, []string{testBinary(t), "mcp", "serve", "--port", strconv.Itoa(port), "--host", "127.0.0.1", "--repos-dir", repos, "--ask-bin", stub}, mcpEnv(t), port)
@@ -499,14 +447,6 @@ func TestMCPClientParity(t *testing.T) {
 	goOut, goErr, goCode := runSplit(t, t.TempDir(), mcpEnv(t), "", testBinary(t), "mcp", "client", url)
 	if goCode != 0 {
 		t.Fatalf("exit %d:\n%s%s", goCode, goOut, goErr)
-	}
-	if python, err := exec.LookPath("python3"); err == nil && exec.Command(python, "-c", "import requests").Run() == nil {
-		pyOut, pyErr, pyCode := runSplit(t, t.TempDir(), mcpEnv(t), "", python, legacy(t, "test-mcp-client"), url)
-		if pyOut != goOut || pyCode != goCode {
-			t.Errorf("differs:\npython (exit %d):\n%s%s\nnative (exit %d):\n%s", pyCode, pyOut, pyErr, goCode, goOut)
-		}
-	} else {
-		t.Log("python3 with requests not available: comparing with the golden only")
 	}
 	checkGolden(t, "mcp", "client", strings.ReplaceAll(goOut, repos, "$REPOS"), "\x00none\x00", goCode)
 	usageOut, _, usageCode := runSplit(t, t.TempDir(), mcpEnv(t), "", testBinary(t), "mcp", "client")

@@ -32,8 +32,7 @@ so does a project's own copy of a check the suite runs.
 Skip a check with its SKIP_* variable (SKIP_FRESHNESS=1; see
 scripts/README.md). The project's own checks in .rebarrc checks_extra
 (checks_extra_pre_commit for --pre-commit) run after rebar's and count in
-the summary. REBAR_CHECK_IMPL=shell runs the install's suite scripts
-instead (until they are removed); they do not run checks_extra.`,
+the summary (a project's own copy of the suite script does not run them).`,
 	Args: cobra.NoArgs,
 	RunE: runCheck,
 }
@@ -64,12 +63,7 @@ func runCheck(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("running %s: %w", name, err)
 	}
 	if !found {
-		if checkPreCommit || checkColdStart {
-			// Never block a commit or a session on a missing install.
-			fmt.Fprintf(os.Stderr, "rebar: %s not found in the project or a rebar install — skipping (set REBAR_ROOT)\n", name)
-			return nil
-		}
-		return fmt.Errorf("%s not found in the project or a rebar install (set REBAR_ROOT to your rebar checkout)", name)
+		return fmt.Errorf("%s is not built into this rebar", name) // cannot happen: the suites are built in
 	}
 	if exitCode != 0 {
 		os.Exit(exitCode)
@@ -78,21 +72,14 @@ func runCheck(cmd *cobra.Command, args []string) error {
 }
 
 // warnExtrasIgnored tells the user when the suite for name will not run the
-// project's checks_extra / checks_extra_pre_commit: only the native suite
-// does, so REBAR_CHECK_IMPL=shell and a project's own copy of the suite
-// script skip them.
+// project's checks_extra / checks_extra_pre_commit: only the built-in suite
+// does, so a project's own copy of the suite script skips them.
 func warnExtrasIgnored(name string) {
 	key := map[string]string{"ci-check.sh": suite.ExtraKey, "pre-commit.sh": suite.ExtraPreCommitKey}[name]
 	if key == "" || len(suite.Extras(cfg.RepoRoot, key)) == 0 {
 		return
 	}
-	s, ok := resolveScript(cfg.RepoRoot, findRebarRoot(), name)
-	if _, native := nativeFor(name, s, ok); native {
-		return
+	if s, ok := resolveScript(cfg.RepoRoot, name); ok && s.Legacy {
+		fmt.Fprintf(os.Stderr, "rebar: .rebarrc %s not run: the project's own scripts/%s runs instead (only the built-in suite runs it)\n", key, name)
 	}
-	why := "REBAR_CHECK_IMPL=shell runs the suite script"
-	if ok && s.Legacy {
-		why = "the project's own scripts/" + name + " runs instead"
-	}
-	fmt.Fprintf(os.Stderr, "rebar: .rebarrc %s not run: %s (only the built-in suite runs it)\n", key, why)
 }

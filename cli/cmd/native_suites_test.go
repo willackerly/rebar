@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -11,10 +10,8 @@ import (
 	"github.com/willackerly/rebar/cli/internal/testutil"
 )
 
-// Parity of the suites: ci-check, pre-commit and cold-start-checks
-// (runParity: the suite script running every check as a script, the native
-// suite in process, and the script handing off to this binary), with
-// goldens in testdata/<suite> (regenerate with
+// The suites: ci-check, pre-commit and cold-start-checks, with goldens in
+// testdata/<suite> (captured from the suite scripts; regenerate with
 // go test ./cmd -run 'CICheck|PreCommit|ColdStart' -update-golden).
 
 // suiteProject is a small adopter project at tier 1 whose checks pass.
@@ -76,39 +73,6 @@ var suiteSkipAll = []string{
 // noSteward skips the steward scan, which writes reports.
 var noSteward = []string{"SKIP_STEWARD=1"}
 
-// partialInstall returns a copy of the rebar source's scripts/ without the
-// checks that have no native implementation (sync-bootstrap, tests/run.sh),
-// standing in for a binary-only install with a few scripts.
-func partialInstall(t *testing.T, _ parityCase) string {
-	t.Helper()
-	src := filepath.Join(testutil.RebarSource(t), "scripts")
-	dir := t.TempDir()
-	paths, err := filepath.Glob(filepath.Join(src, "*.sh"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, p := range paths {
-		switch filepath.Base(p) {
-		case "sync-bootstrap.sh":
-			continue
-		}
-		body, err := os.ReadFile(p)
-		if err != nil {
-			t.Fatal(err)
-		}
-		testutil.WriteExecutable(t, dir, filepath.Base(p), string(body))
-	}
-	return dir
-}
-
-// suiteInstall runs a case from partialInstall when its name says so.
-func suiteInstall(t *testing.T, tc parityCase) string {
-	if strings.Contains(tc.name, "partial install") {
-		return partialInstall(t, tc)
-	}
-	return filepath.Join(testutil.RebarSource(t), "scripts")
-}
-
 // projectCopies adds the project's own scripts: a customized executable
 // check-todos.sh, a thin-wrapper check-freshness.sh (never picked) and a
 // copy of check-doc-refs.sh that is not executable.
@@ -119,7 +83,7 @@ func projectCopies(t *testing.T, root string) {
 	committed(t, root)
 }
 
-var ciCheckCases = []parityCase{
+var ciCheckCases = []goldenCase{
 	{name: "clean tier 1 project", files: suiteProject, git: true, setup: withRegistry, env: noSteward},
 	{name: "failures fail by default", files: suiteBroken, git: true, setup: committed, env: noSteward},
 	{name: "failures with --no-strict pass", files: suiteBroken, git: true, setup: committed, env: noSteward, args: []string{"--no-strict"}},
@@ -141,7 +105,6 @@ var ciCheckCases = []parityCase{
 		files: withFiles(suiteProject, map[string]string{".rebarrc": "tier = 1\nchecks_enable = check-nope check-ground-truth.sh\ncontract_namespace = S1-BAD.1.0\n"}),
 		git:   true, setup: committed, env: noSteward,
 	},
-	{name: "partial install: sync-bootstrap missing", files: suiteProject, git: true, setup: committed},
 	// The first run writes the steward's reports, which the checks of the
 	// next run would see: the tree ignores them (as the contract has it) and
 	// has a STEWARD_REPORT.md from the start, which check-freshness counts.
@@ -156,12 +119,12 @@ var ciCheckCases = []parityCase{
 	{name: "REBAR_TIER overrides .rebarrc", files: suiteBroken, git: true, setup: committed, env: []string{"SKIP_STEWARD=1", "REBAR_TIER=1"}},
 }
 
-func TestCICheckParity(t *testing.T) {
+func TestCICheckGolden(t *testing.T) {
 	t.Setenv("REBAR_TEST_RUN_CLI", "1") // scripts the native suite starts may hand off to this binary
-	runParity(t, parityCheck{name: "ci-check", golden: "ci-check", install: suiteInstall}, ciCheckCases)
+	runGolden(t, goldenCheck{name: "ci-check", golden: "ci-check"}, ciCheckCases)
 }
 
-var preCommitCases = []parityCase{
+var preCommitCases = []goldenCase{
 	{name: "clean", files: suiteProject, git: true, setup: withRegistry},
 	{name: "failures", files: suiteBroken, git: true, setup: committed},
 	{name: "ground truth drift at tier 3", files: suiteContracts, git: true, setup: committed},
@@ -176,9 +139,9 @@ var preCommitCases = []parityCase{
 	{name: "arguments are ignored", files: suiteBroken, git: true, setup: committed, args: []string{"--no-strict"}},
 }
 
-func TestPreCommitParity(t *testing.T) {
+func TestPreCommitGolden(t *testing.T) {
 	t.Setenv("REBAR_TEST_RUN_CLI", "1")
-	runParity(t, parityCheck{name: "pre-commit", golden: "pre-commit"}, preCommitCases)
+	runGolden(t, goldenCheck{name: "pre-commit", golden: "pre-commit"}, preCommitCases)
 }
 
 // maturityContracts declare every kind of Status: line.
@@ -220,7 +183,7 @@ func upstream(n int) func(t *testing.T, root string) {
 	}
 }
 
-var coldStartCases = []parityCase{
+var coldStartCases = []goldenCase{
 	{name: "clean, no contracts", files: suiteProject, git: true, setup: withRegistry},
 	{name: "failures", files: suiteBroken, git: true, setup: committed},
 	{name: "tier 3 contracts with drift", files: suiteContracts, git: true, setup: committed},
@@ -253,27 +216,25 @@ var coldStartCases = []parityCase{
 // elapsed is the cold-start hook's run time, which differs between runs.
 var elapsed = regexp.MustCompile(`(passing|failing) \([0-9]+s\)`)
 
-func TestColdStartParity(t *testing.T) {
+func TestColdStartGolden(t *testing.T) {
 	t.Setenv("REBAR_TEST_RUN_CLI", "1")
-	runParity(t, parityCheck{
+	runGolden(t, goldenCheck{
 		name:      "cold-start-checks",
 		golden:    "cold-start-checks",
 		normalize: func(out string) string { return elapsed.ReplaceAllString(out, "$1 (Ns)") },
 	}, coldStartCases)
 }
 
-// TestSuitesWithoutInstall runs the CLI (this binary) with no rebar install
-// to find: the native suites still run every native check, skip the
-// rebar-source-only checks as such, and the shell implementation has
-// nothing to run (rebar check fails, the hooks skip).
+// TestSuitesWithoutInstall runs the CLI (this binary) with no rebar tree to
+// find: the suites run every check and skip the rebar-source-only ones as
+// such.
 func TestSuitesWithoutInstall(t *testing.T) {
-	requireBash(t)
 	root := writeTree(t, suiteProject, nil)
 	testutil.Git(t, root, "init", "-q", "-b", "main")
 	withRegistry(t, root)
 	bin, home := testBinary(t), t.TempDir()
 
-	out, code := testutil.RunEnv(t, root, cliEnv(home, "", ""), bin, "check")
+	out, code := testutil.RunEnv(t, root, cliEnv(home), bin, "check")
 	for _, want := range []string{
 		"SKIP  Bootstrap Sync (rebar source repo only)",
 		"SKIP  Script Tests (rebar source repo only)",
@@ -281,16 +242,10 @@ func TestSuitesWithoutInstall(t *testing.T) {
 		"PASS  TODO Tracking", "14 passed, 0 failed, 2 skipped",
 	} {
 		if code != 0 || !strings.Contains(out, want) {
-			t.Errorf("go, no install: rebar check (exit %d) lacks %q:\n%s", code, want, out)
+			t.Errorf("rebar check (exit %d) lacks %q:\n%s", code, want, out)
 		}
 	}
-	if out, code := testutil.RunEnv(t, root, cliEnv(home, "", ""), bin, "check", "--cold-start"); code != 0 || !strings.Contains(out, "all 4 checks passing") {
-		t.Errorf("go, no install: rebar check --cold-start (exit %d):\n%s", code, out)
-	}
-	if out, code := testutil.RunEnv(t, root, cliEnv(home, "shell", ""), bin, "check"); code == 0 || !strings.Contains(out, "ci-check.sh not found") {
-		t.Errorf("shell, no install: rebar check (exit %d):\n%s", code, out)
-	}
-	if out, code := testutil.RunEnv(t, root, cliEnv(home, "shell", ""), bin, "check", "--pre-commit"); code != 0 || !strings.Contains(out, "skipping") {
-		t.Errorf("shell, no install: rebar check --pre-commit (exit %d):\n%s", code, out)
+	if out, code := testutil.RunEnv(t, root, cliEnv(home), bin, "check", "--cold-start"); code != 0 || !strings.Contains(out, "all 4 checks passing") {
+		t.Errorf("rebar check --cold-start (exit %d):\n%s", code, out)
 	}
 }

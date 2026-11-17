@@ -15,9 +15,9 @@ import (
 	"github.com/willackerly/rebar/cli/internal/testutil"
 )
 
-// Parity of the utilities (internal/utils): refresh-context,
-// agent-health, scan-consumers, rebar-doc, flush-notifications and the
-// non-blocking paths of inbox-watch (runParity), with goldens in
+// The utilities (internal/utils): refresh-context, agent-health,
+// scan-consumers, rebar-doc, flush-notifications and the non-blocking
+// paths of inbox-watch (runGolden), with goldens in
 // testdata/<name> (regenerate with
 // go test ./cmd -run 'RefreshContext|AgentHealth|ScanConsumers|RebarDoc|FlushNotifications|InboxWatch' -update-golden).
 // The watcher itself is tested by TestInboxWatchSession and, in
@@ -30,30 +30,24 @@ var isoTimestamp = regexp.MustCompile(`[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]
 // --- refresh-context ---------------------------------------------------
 
 var (
-	daysOld       = regexp.MustCompile(`QUICKCONTEXT is [0-9]+ days`)
-	worktreeLine  = regexp.MustCompile(`(?m)^/\S+( +[0-9a-f]{7,} \[[^]]*\])$`)
-	bashArithLine = regexp.MustCompile(`(?m)^.*: line [0-9]+: \[\[: 0\n0: syntax error in expression \(error token is "0"\)\n`)
+	daysOld      = regexp.MustCompile(`QUICKCONTEXT is [0-9]+ days`)
+	worktreeLine = regexp.MustCompile(`(?m)^/\S+( +[0-9a-f]{7,} \[[^]]*\])$`)
 )
 
 var commitLine = regexp.MustCompile(`(?m)^(<worktree> +)?[0-9a-f]{7,12}( )`)
 
-var refreshContextCheck = parityCheck{
+var refreshContextCheck = goldenCheck{
 	name:   "refresh-context",
 	golden: "refresh-context",
-	// grep -r lists files in directory order.
-	order: func(out, _ string, _ []string) string {
-		return inWalkOrder(out, []string{"src", "lib", "internal", "packages", "cmd"})
-	},
 	normalize: func(out string) string {
 		// Days since a fixed date grow daily; git prints the work tree's
-		// physical path; bash complains about a "0<newline>0" count, which
-		// the native port compares silently.
+		// physical path.
 		out = daysOld.ReplaceAllString(out, "QUICKCONTEXT is N days")
 		out = worktreeLine.ReplaceAllString(out, "<worktree>$1")
 		// The fixtures hold dates relative to today, so commit ids change
 		// daily.
 		out = commitLine.ReplaceAllString(out, "$1<sha>$2")
-		return bashArithLine.ReplaceAllString(out, "")
+		return out
 	},
 }
 
@@ -90,7 +84,7 @@ var refreshTree = map[string]string{
 	"other/h.go":                 "// @todo not scanned\n",
 }
 
-var refreshContextCases = []parityCase{
+var refreshContextCases = []goldenCase{
 	{name: "no QUICKCONTEXT", files: map[string]string{"README.md": "x\n"}},
 	{name: "fresh, not a repository", files: refreshTree},
 	{name: "--quick", files: refreshTree, args: []string{"--quick"}},
@@ -152,10 +146,6 @@ var refreshContextCases = []parityCase{
 	{name: "test baseline: no runner", files: refreshTree, args: []string{"--test-baseline"}},
 }
 
-func TestRefreshContextParity(t *testing.T) {
-	runParity(t, refreshContextCheck, refreshContextCases)
-}
-
 func TestRefreshContextGolden(t *testing.T) {
 	runGolden(t, refreshContextCheck, refreshContextCases)
 }
@@ -173,7 +163,7 @@ func cleanAgentFiles(t *testing.T) {
 	})
 }
 
-var agentHealthCheck = parityCheck{
+var agentHealthCheck = goldenCheck{
 	name:      "agent-health",
 	golden:    "agent-health",
 	writes:    true,
@@ -182,7 +172,7 @@ var agentHealthCheck = parityCheck{
 
 var agentEnv = []string{"AGENT_ID=" + agentID, "AGENT_PROGRESS_FILE=progress.jsonl"}
 
-var agentHealthCases = []parityCase{
+var agentHealthCases = []goldenCase{
 	{name: "loaded", files: map[string]string{"x": "x\n"}, env: agentEnv},
 	{name: "agent ID from the work tree", files: map[string]string{"x": "x\n"}, git: true, args: []string{"what"}},
 	{name: "metric", files: map[string]string{"x": "x\n"}, env: agentEnv, args: []string{"metric", "rmse_delta", "-0.045"}},
@@ -204,25 +194,17 @@ var agentHealthCases = []parityCase{
 	},
 }
 
-func TestAgentHealthParity(t *testing.T) {
-	cleanAgentFiles(t)
-	runParity(t, agentHealthCheck, agentHealthCases)
-}
-
 func TestAgentHealthGolden(t *testing.T) {
 	cleanAgentFiles(t)
 	runGolden(t, agentHealthCheck, agentHealthCases)
 }
 
-// TestAgentHealthCheckpoint commits a change with the script, the native
-// port and the script handing off, each in a fresh repository (a commit
-// cannot be taken back between runs), and compares output and progress
-// files; and appends metrics to /tmp as the script does.
+// TestAgentHealthCheckpoint commits a change through the CLI in a fresh
+// repository and compares output, progress file and status with the golden
+// (captured from the script); and appends metrics to /tmp as the script
+// did.
 func TestAgentHealthCheckpoint(t *testing.T) {
-	requireBash(t)
 	cleanAgentFiles(t)
-	script := filepath.Join(testutil.RebarSource(t), "scripts", "agent-health.sh")
-	scripts := filepath.Dir(script)
 	repo := func() string {
 		root := writeTree(t, map[string]string{"a.txt": "one\n", "new.txt": "untracked\n"}, nil)
 		os.Remove(filepath.Join(root, "new.txt"))
@@ -231,31 +213,16 @@ func TestAgentHealthCheckpoint(t *testing.T) {
 		testutil.WriteFile(t, root, "untracked.txt", "never committed\n")
 		return root
 	}
-	run := func(how string) string {
-		root := repo()
-		env := append(testutil.IsolatedEnv(agentEnv...), "REBAR_PROJECT_ROOT="+root)
-		var out string
-		switch how {
-		case "script":
-			out, _ = testutil.RunEnv(t, root, env, "bash", script, "checkpoint", "fix: the \"thing\"")
-		case "native":
-			out, _ = testutil.RunEnv(t, root, append(env, "REBAR_TEST_RUN_CLI=1"), testBinary(t), "native", "agent-health", "checkpoint", "fix: the \"thing\"")
-		case "hand-off":
-			out, _ = testutil.RunEnv(t, root, append(env, handOffEnv(t, scripts)...), "bash", script, "checkpoint", "fix: the \"thing\"")
-		}
-		progress, _ := os.ReadFile(filepath.Join(root, "progress.jsonl"))
-		status := testutil.Git(t, root, "status", "--short")
-		return isoTimestamp.ReplaceAllString(out+"--- progress\n"+string(progress)+"--- status\n"+status, "<ts>")
+	root := repo()
+	env := append(testutil.IsolatedEnv(agentEnv...), "REBAR_PROJECT_ROOT="+root, "REBAR_TEST_RUN_CLI=1")
+	out, _ := testutil.RunEnv(t, root, env, testBinary(t), "native", "agent-health", "checkpoint", "fix: the \"thing\"")
+	progress, _ := os.ReadFile(filepath.Join(root, "progress.jsonl"))
+	status := testutil.Git(t, root, "status", "--short")
+	got := isoTimestamp.ReplaceAllString(out+"--- progress\n"+string(progress)+"--- status\n"+status, "<ts>")
+	if !strings.Contains(got, "[agent-health] checkpoint: ") || !strings.Contains(got, "?? untracked.txt") {
+		t.Errorf("no checkpoint:\n%s", got)
 	}
-	want := run("script")
-	if !strings.Contains(want, "[agent-health] checkpoint: ") || !strings.Contains(want, "?? untracked.txt") {
-		t.Fatalf("the script did not checkpoint:\n%s", want)
-	}
-	for _, how := range []string{"native", "hand-off"} {
-		if got := run(how); got != want {
-			t.Errorf("%s differs from the script:\n%s\nscript:\n%s", how, got, want)
-		}
-	}
+	checkGoldenText(t, "agent-health", "checkpoint session", got)
 	metrics, err := os.ReadFile("/tmp/agent-" + agentID + ".metrics.jsonl")
 	if err == nil && strings.Count(string(metrics), "\n") > 0 && !strings.Contains(string(metrics), `"agent":"`+agentID+`"`) {
 		t.Errorf("metrics file: %s", metrics)
@@ -280,11 +247,11 @@ func consumerRepos(t *testing.T, root string) {
 	testutil.WriteFile(t, root, "registry", "me = /nowhere\n"+owner+" = /self\nalpha = "+root+"/consumers/alpha\n beta\t=\t"+root+"/consumers/beta\n\n")
 }
 
-var scanConsumersCheck = parityCheck{name: "scan-consumers", golden: "scan-consumers"}
+var scanConsumersCheck = goldenCheck{name: "scan-consumers", golden: "scan-consumers"}
 
 var consumersEnv = []string{"REBAR_REPOS=$ROOT/consumers/alpha,$ROOT/consumers/beta,$ROOT/consumers/gamma,$ROOT/consumers/delta,$ROOT/missing"}
 
-var scanConsumersCases = []parityCase{
+var scanConsumersCases = []goldenCase{
 	{name: "no arguments", files: map[string]string{"x": "x\n"}},
 	{name: "two IDs", files: map[string]string{"x": "x\n"}, args: []string{"C1", "C2"}},
 	{name: "--help", files: map[string]string{"x": "x\n"}, args: []string{"--json", "-h"}},
@@ -298,10 +265,6 @@ var scanConsumersCases = []parityCase{
 	{name: "complete sections, --json", files: map[string]string{"x": "x\n"}, setup: fullConsumers, env: consumersEnv, args: []string{"--json", "C1-API"}},
 	{name: "a quote in a rationale, --json", files: map[string]string{"x": "x\n"}, setup: quotedConsumers, env: consumersEnv, args: []string{"--json", "C1-API"}},
 	{name: "an ID that is a pattern", files: map[string]string{"x": "x\n"}, setup: consumerRepos, env: consumersEnv, args: []string{"C1-A.I"}},
-}
-
-func TestScanConsumersParity(t *testing.T) {
-	runParity(t, scanConsumersCheck, scanConsumersCases)
 }
 
 func TestScanConsumersGolden(t *testing.T) {
@@ -334,7 +297,7 @@ func fakeAsk(t *testing.T, root string) {
 	testutil.WriteExecutable(t, root, "bin/ask", "#!/bin/sh\nprintf '%s\\n---\\n' \"$*\" >> \""+root+"/ask.log\"\ncase \"$1\" in broken:*) exit 1;; esac\n")
 }
 
-var flushCheck = parityCheck{name: "flush-notifications", golden: "flush-notifications", writes: true}
+var flushCheck = goldenCheck{name: "flush-notifications", golden: "flush-notifications", writes: true}
 
 var outbox = "# Pending notifications\n\n" +
 	"## C1-API: 1.0 → 2.0\n- **detected:** 2026-01-02T03:04:05Z\n- **status:** pending\n- **commit:** abc1234\n\n" +
@@ -348,7 +311,7 @@ var flushEnv = []string{
 
 var flushFiles = map[string]string{"architecture/.state/pending-notifications.md": outbox}
 
-var flushCases = []parityCase{
+var flushCases = []goldenCase{
 	{name: "no outbox", files: map[string]string{"x": "x\n"}},
 	{name: "--help", files: map[string]string{"x": "x\n"}, args: []string{"--help"}},
 	{name: "unexpected argument", files: map[string]string{"x": "x\n"}, args: []string{"--now"}},
@@ -376,13 +339,6 @@ var flushCases = []parityCase{
 	},
 }
 
-func TestFlushNotificationsParity(t *testing.T) {
-	// --dry-run prints ${#msg}, which bash counts in characters only under
-	// a UTF-8 locale; the native port always counts characters.
-	utf8Locale(t)
-	runParity(t, flushCheck, flushCases)
-}
-
 // utf8Locale sets LC_ALL to an installed UTF-8 locale, or skips the test.
 func utf8Locale(t *testing.T) {
 	t.Helper()
@@ -404,7 +360,7 @@ func TestFlushNotificationsGolden(t *testing.T) {
 
 // --- rebar-doc ---------------------------------------------------------
 
-var rebarDocCheck = parityCheck{name: "rebar-doc", golden: "rebar-doc"}
+var rebarDocCheck = goldenCheck{name: "rebar-doc", golden: "rebar-doc"}
 
 // docEnv points HOME into the tree and keeps the script's $PWD logical.
 var docEnv = []string{"HOME=$ROOT/home", "PWD=$ROOT", "REBAR_ROOT="}
@@ -426,7 +382,7 @@ var rebarDocTree = map[string]string{
 	"home/.rebar/practices/co.md":                     "# not a source checkout\n",
 }
 
-var rebarDocCases = []parityCase{
+var rebarDocCases = []goldenCase{
 	{name: "missing ref", files: rebarDocTree, env: docEnv},
 	{name: "--help", files: rebarDocTree, env: docEnv, args: []string{"x", "--help"}},
 	{name: "unknown option", files: rebarDocTree, env: docEnv, args: []string{"--json"}},
@@ -450,19 +406,15 @@ var rebarDocCases = []parityCase{
 	{name: "unknown kind", files: rebarDocTree, env: docEnv, args: []string{"rebar:guide/x"}},
 }
 
-func TestRebarDocParity(t *testing.T) {
-	runParity(t, rebarDocCheck, rebarDocCases)
-}
-
 func TestRebarDocGolden(t *testing.T) {
 	runGolden(t, rebarDocCheck, rebarDocCases)
 }
 
 // --- inbox-watch -------------------------------------------------------
 
-var inboxWatchCheck = parityCheck{name: "inbox-watch", golden: "inbox-watch"}
+var inboxWatchCheck = goldenCheck{name: "inbox-watch", golden: "inbox-watch"}
 
-var inboxWatchCases = []parityCase{
+var inboxWatchCases = []goldenCase{
 	{name: "--help", files: map[string]string{"x": "x\n"}, args: []string{"-i", "5", "--help"}},
 	{name: "interval without a value", files: map[string]string{"x": "x\n"}, args: []string{"--interval"}},
 	{name: "interval zero", files: map[string]string{"x": "x\n"}, args: []string{"--interval=00"}},
@@ -471,31 +423,22 @@ var inboxWatchCases = []parityCase{
 	{name: "unknown option", files: map[string]string{"x": "x\n"}, args: []string{"-"}},
 }
 
-func TestInboxWatchParity(t *testing.T) {
-	runParity(t, inboxWatchCheck, inboxWatchCases)
-}
-
 func TestInboxWatchGolden(t *testing.T) {
 	runGolden(t, inboxWatchCheck, inboxWatchCases)
 }
 
-// TestInboxWatchSession runs the watcher for real, as the script and as the
-// script handing off to this binary: it waits for the armed line, adds
-// deposits, waits for them to be reported, stops the watcher with SIGTERM
-// and compares what each printed (exit 0, lock released). It waits on the
-// watcher's output, polling every second, not on fixed sleeps.
+// TestInboxWatchSession runs the watcher for real, through the CLI: it
+// waits for the armed line, adds deposits, waits for them to be reported,
+// stops the watcher with SIGTERM and compares what it printed with the
+// golden (captured from the script; exit 0, lock released). It waits on
+// the watcher's output, polling every second, not on fixed sleeps.
 func TestInboxWatchSession(t *testing.T) {
-	requireBash(t)
-	script := filepath.Join(testutil.RebarSource(t), "scripts", "inbox-watch.sh")
 	session := func(how string) string {
 		root := physical(t, writeTree(t, map[string]string{
 			"inbox/2026-07-11-peer-old.md": "old\n",
 		}, nil))
-		env := testutil.IsolatedEnv("REBAR_PROJECT_ROOT="+root, "PWD="+root)
-		if how == "hand-off" {
-			env = append(env, handOffEnv(t, filepath.Dir(script))...)
-		}
-		cmd := exec.Command("bash", script, "-i", "1", "--preview", "inbox", "missing")
+		env := testutil.IsolatedEnv("REBAR_PROJECT_ROOT="+root, "PWD="+root, "REBAR_TEST_RUN_CLI=1")
+		cmd := exec.Command(testBinary(t), "native", "inbox-watch", "-i", "1", "--preview", "inbox", "missing")
 		cmd.Dir, cmd.Env = root, env
 		stdout, _ := cmd.StdoutPipe()
 		stderr, _ := cmd.StderrPipe()
@@ -566,11 +509,9 @@ func TestInboxWatchSession(t *testing.T) {
 		out = strings.ReplaceAll(out, "suppressed: "+filepath.Base(root), "suppressed: <root's name>")
 		return strings.ReplaceAll(out, root, "$ROOT")
 	}
-	want := session("script")
-	if !strings.Contains(want, "NEW INBOX DEPOSIT: inbox/2026-07-12-peer-ASK-new.md — Subject: hello") || !strings.Contains(want, "NEW INBOX DEPOSIT: missing/late.md") {
-		t.Fatalf("script session:\n%s", want)
+	got := session("native")
+	if !strings.Contains(got, "NEW INBOX DEPOSIT: inbox/2026-07-12-peer-ASK-new.md — Subject: hello") || !strings.Contains(got, "NEW INBOX DEPOSIT: missing/late.md") {
+		t.Fatalf("session:\n%s", got)
 	}
-	if got := session("hand-off"); got != want {
-		t.Errorf("hand-off differs from the script:\n%s\nscript:\n%s", got, want)
-	}
+	checkGoldenText(t, "inbox-watch", "session", got)
 }

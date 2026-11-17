@@ -274,30 +274,30 @@ var askCases = []askCase{
 	{name: "up without claude", files: askAgents, args: []string{"up", "architect"}, noClaude: true},
 
 	// remote mode
-	{name: "remote ask", files: askAgents, servers: 1, args: []string{"web:architect", "Remote?"}, env: []string{"ASK_SERVER=$SERVER1", "ASK_API_KEY=k3y"}, needs: []string{"curl"}},
-	{name: "remote ask verbose", servers: 2, args: []string{"-v", "web:architect", "Remote?"}, env: []string{"ASK_SERVER=$SERVER1,$SERVER2"}, needs: []string{"curl"}},
-	{name: "remote ask round robin", servers: 2, home: map[string]string{".config/ask/.rr-index": "1\n"}, args: []string{"web:architect", "Remote?"}, env: []string{"ASK_SERVER=http://$SERVER1,$SERVER2,"}, needs: []string{"curl"}},
-	{name: "remote ask not found moves on", servers: 2, args: []string{"web:elsewhere", "q"}, env: []string{"ASK_SERVER=$SERVER1,$SERVER2"}, needs: []string{"curl"}},
-	{name: "remote ask agent error", servers: 1, args: []string{"web:broken", "q"}, env: []string{"ASK_SERVER=$SERVER1"}, needs: []string{"curl"}},
-	{name: "remote ask all fail", servers: 1, args: []string{"-v", "missing:architect", "q"}, env: []string{"ASK_SERVER=$DEAD,$SERVER1"}, needs: []string{"curl"}},
-	{name: "remote ask needs a question", servers: 1, args: []string{"web:architect"}, env: []string{"ASK_SERVER=$SERVER1"}, needs: []string{"curl"}},
-	{name: "remote local first", files: otherProject, home: askRegistry, servers: 1, args: []string{"OTHER:architect", "Local?"}, env: []string{"ASK_SERVER=$SERVER1"}, needs: []string{"curl"}},
-	{name: "remote status", servers: 1, args: []string{"status", "web:architect"}, env: []string{"ASK_SERVER=$SERVER1"}, needs: []string{"curl"}},
-	{name: "remote log", servers: 1, args: []string{"log", "web:architect"}, env: []string{"ASK_SERVER=$SERVER1"}, needs: []string{"curl"}},
-	{name: "remote reset", servers: 1, args: []string{"reset", "web:architect"}, env: []string{"ASK_SERVER=$SERVER1"}, needs: []string{"curl"}},
-	{name: "remote reset unreachable", args: []string{"reset", "web:architect"}, env: []string{"ASK_SERVER=$DEAD"}, needs: []string{"curl"}},
-	{name: "remote agents", servers: 1, args: []string{"agents"}, env: []string{"ASK_SERVER=$SERVER1"}, needs: []string{"curl"}},
-	{name: "remote agents merged", servers: 2, args: []string{"agents"}, env: []string{"ASK_SERVER=$SERVER2,$DEAD,$SERVER1"}, needs: []string{"curl"}},
+	{name: "remote ask", files: askAgents, servers: 1, args: []string{"web:architect", "Remote?"}, env: []string{"ASK_SERVER=$SERVER1", "ASK_API_KEY=k3y"}},
+	{name: "remote ask verbose", servers: 2, args: []string{"-v", "web:architect", "Remote?"}, env: []string{"ASK_SERVER=$SERVER1,$SERVER2"}},
+	{name: "remote ask round robin", servers: 2, home: map[string]string{".config/ask/.rr-index": "1\n"}, args: []string{"web:architect", "Remote?"}, env: []string{"ASK_SERVER=http://$SERVER1,$SERVER2,"}},
+	{name: "remote ask not found moves on", servers: 2, args: []string{"web:elsewhere", "q"}, env: []string{"ASK_SERVER=$SERVER1,$SERVER2"}},
+	{name: "remote ask agent error", servers: 1, args: []string{"web:broken", "q"}, env: []string{"ASK_SERVER=$SERVER1"}},
+	{name: "remote ask all fail", servers: 1, args: []string{"-v", "missing:architect", "q"}, env: []string{"ASK_SERVER=$DEAD,$SERVER1"}},
+	{name: "remote ask needs a question", servers: 1, args: []string{"web:architect"}, env: []string{"ASK_SERVER=$SERVER1"}},
+	{name: "remote local first", files: otherProject, home: askRegistry, servers: 1, args: []string{"OTHER:architect", "Local?"}, env: []string{"ASK_SERVER=$SERVER1"}},
+	{name: "remote status", servers: 1, args: []string{"status", "web:architect"}, env: []string{"ASK_SERVER=$SERVER1"}},
+	{name: "remote log", servers: 1, args: []string{"log", "web:architect"}, env: []string{"ASK_SERVER=$SERVER1"}},
+	{name: "remote reset", servers: 1, args: []string{"reset", "web:architect"}, env: []string{"ASK_SERVER=$SERVER1"}},
+	{name: "remote reset unreachable", args: []string{"reset", "web:architect"}, env: []string{"ASK_SERVER=$DEAD"}},
+	{name: "remote agents", servers: 1, args: []string{"agents"}, env: []string{"ASK_SERVER=$SERVER1"}},
+	{name: "remote agents merged", servers: 2, args: []string{"agents"}, env: []string{"ASK_SERVER=$SERVER2,$DEAD,$SERVER1"}},
 	{name: "remote agents without server", args: []string{"agents"}},
 
 	// ask serve (ask-server, python)
-	{name: "serve needs repos", args: []string{"serve", "--port", "0"}, needs: []string{"python3"}, diverges: "the usage line is rebar's, not argparse's (the error line and exit 2 match)"},
+	{name: "serve needs repos", args: []string{"serve", "--port", "0"}, diverges: "the usage line is rebar's, not argparse's (the error line and exit 2 match)"},
 }
 
-// TestAskParity: bin/ask (bash) and the native `rebar ask` agree on every
-// case (see runAskParity).
-func TestAskParity(t *testing.T) {
-	runAskParity(t, askCases)
+// TestAskGolden: `rebar ask` and the bin/ask shim match every case's
+// golden (see runAskGolden).
+func TestAskGolden(t *testing.T) {
+	runAskGolden(t, askCases)
 }
 
 // loopQuestions are two questions waiting in the architect's inbox; the
@@ -312,16 +312,11 @@ var loopClaude = map[string]string{
 	"claude-out.2": "", "claude-exit.2": "1",
 }
 
-// TestAskLoopParity: the agent loop — `ask up` without a run.sh, and
-// bin/ask-agent-loop — answers its inbox the same way in bash and natively:
+// TestAskLoopGolden: the agent loop — `ask up` without a run.sh, and
+// bin/ask-agent-loop — answers its inbox as the bash loop did (goldens):
 // outbox files, event log, memory log, claude calls, output, and a clean
 // exit (pid file removed) on SIGTERM.
-func TestAskLoopParity(t *testing.T) {
-	requireBash(t)
-	if _, err := exec.LookPath("jq"); err != nil {
-		t.Skip("the bash loop needs jq")
-	}
-	src := testutil.RebarSource(t)
+func TestAskLoopGolden(t *testing.T) {
 	for _, tool := range []struct {
 		name, script string
 		args         []string
@@ -330,20 +325,14 @@ func TestAskLoopParity(t *testing.T) {
 		{"ask-agent-loop", "ask-agent-loop", []string{"agents/architect"}},
 	} {
 		t.Run(tool.name, func(t *testing.T) {
-			var recs [2]string
-			for i, how := range []string{"script", "native"} {
+			var recs [1]string
+			for i, how := range []string{"native"} {
 				tc := askCase{files: loopQuestions, claude: loopClaude}
 				base := askTree(t, tc)
 				proj := filepath.Join(base, "proj")
 				env := askEnv(t, base, filepath.Join(base, "bin")+string(os.PathListSeparator)+os.Getenv("PATH"))
-				var cmd *exec.Cmd
-				if how == "script" {
-					cmd = exec.Command("bash", append([]string{filepath.Join(src, "bin", tool.script)}, tool.args...)...)
-					env = append(env, "REBAR_CHECK_IMPL=shell")
-				} else {
-					cmd = exec.Command(testBinary(t), append([]string{tool.script}, tool.args...)...)
-					env = append(env, "REBAR_TEST_RUN_CLI=1")
-				}
+				cmd := exec.Command(testBinary(t), append([]string{tool.script}, tool.args...)...)
+				env = append(env, "REBAR_TEST_RUN_CLI=1")
 				before := snapshot(t, base)
 				var stdout, stderr bytes.Buffer
 				cmd.Dir, cmd.Env, cmd.Stdout, cmd.Stderr = proj, env, &stdout, &stderr
@@ -374,9 +363,6 @@ func TestAskLoopParity(t *testing.T) {
 					code, stdout.String(), stderr.String(), claudeLog, changes(before, snapshot(t, base)))
 				rec = strings.NewReplacer(base, "$BASE", "pid "+pid, "pid $PID").Replace(rec)
 				recs[i] = askTS.ReplaceAllString(rec, "<TS>")
-			}
-			if recs[0] != recs[1] {
-				t.Errorf("native loop differs from the script:\nscript:\n%s\nnative:\n%s", recs[0], recs[1])
 			}
 			checkGolden(t, "ask", "loop "+tool.name, recs[0], noRoot, 0)
 		})

@@ -4,7 +4,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/willackerly/rebar/cli/internal/scripts"
 	"github.com/willackerly/rebar/cli/internal/testutil"
 )
 
@@ -21,25 +20,17 @@ func checksEnableProject(t *testing.T, extraRC string) string {
 	return project
 }
 
-// The CLI runs the install's scripts in the project (`rebar run`, `rebar
-// check --pre-commit`), and the project's checks_enable reaches them.
-func TestChecksEnableReachesInstallScripts(t *testing.T) {
-	install := testutil.RebarSource(t)
-	t.Setenv("REBAR_TIER", "")
-	t.Setenv("REBAR_CHECKS_ENABLE", "")
-	t.Setenv("_REBAR_CHECKS_VALIDATED", "")
-
+// The project's checks_enable reaches the checks `rebar run` and `rebar
+// check --pre-commit` run.
+func TestChecksEnableReachesChecks(t *testing.T) {
+	bin, home := testBinary(t), t.TempDir()
 	run := func(project, name string) (string, int) {
 		t.Helper()
-		s, ok := resolveScript(project, install, name)
-		if !ok || s.Legacy {
-			t.Fatalf("resolveScript(%s) = %+v, %v", name, s, ok)
+		args := []string{"run", name}
+		if name == "pre-commit" {
+			args = []string{"check", "--pre-commit"}
 		}
-		out, code, err := scripts.OutputInProject(s.Path, project, nil)
-		if err != nil {
-			t.Fatalf("%s: %v", name, err)
-		}
-		return string(out), code
+		return testutil.RunEnv(t, project, cliEnv(home), bin, args...)
 	}
 
 	unset := checksEnableProject(t, "")

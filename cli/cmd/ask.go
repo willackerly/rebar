@@ -1,10 +1,7 @@
 package cmd
 
 import (
-	"fmt"
 	"os"
-	"path/filepath"
-	"syscall"
 
 	"github.com/spf13/cobra"
 	"github.com/willackerly/rebar/cli/internal/ask"
@@ -21,8 +18,7 @@ var askCmd = &cobra.Command{
 
 'rebar ask' and the 'ask' command (bin/ask, which runs 'rebar ask') are
 the same: flags, agent names, environment variables (ASK_*), files and exit
-codes. It works in any directory, not only in a rebar project.
-REBAR_CHECK_IMPL=shell runs the bash implementation, bin/ask, instead.`,
+codes. It works in any directory, not only in a rebar project.`,
 	DisableFlagParsing: true,
 	RunE:               runAsk,
 }
@@ -45,44 +41,11 @@ func init() {
 }
 
 func runAsk(cmd *cobra.Command, args []string) error {
-	if os.Getenv("REBAR_CHECK_IMPL") == "shell" {
-		return execShellTool("ask", args)
-	}
-	ask.BinDirs = askBinDirs()
 	os.Exit(ask.Main(args))
 	return nil
 }
 
 func runAskAgentLoop(cmd *cobra.Command, args []string) error {
-	if os.Getenv("REBAR_CHECK_IMPL") == "shell" {
-		return execShellTool("ask-agent-loop", args)
-	}
 	os.Exit(ask.RunAgentLoop(args, os.Stdout, os.Stderr))
 	return nil
-}
-
-// askBinDirs are where the ASK tools of this install live: beside the rebar
-// binary, then in the rebar install's bin/.
-func askBinDirs() []string {
-	var dirs []string
-	if exe, err := os.Executable(); err == nil {
-		dirs = append(dirs, stableBinDir(filepath.Dir(exe)))
-	}
-	if root := findRebarRoot(); root != "" {
-		dirs = append(dirs, filepath.Join(root, "bin"))
-	}
-	return dirs
-}
-
-// execShellTool replaces rebar with the bash/python original of an ASK
-// tool (bin/<name>), for REBAR_CHECK_IMPL=shell; the tool sees that
-// setting and does not hand back to rebar.
-func execShellTool(name string, args []string) error {
-	for _, dir := range askBinDirs() {
-		path := filepath.Join(dir, name)
-		if _, err := os.Stat(path); err == nil {
-			return syscall.Exec(path, append([]string{name}, args...), os.Environ())
-		}
-	}
-	return fmt.Errorf("REBAR_CHECK_IMPL=shell: %s not found beside rebar or in the rebar install's bin/", name)
 }

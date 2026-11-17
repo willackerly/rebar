@@ -22,9 +22,10 @@ the scripts they replace) against the current project, for example:
   rebar run check-ground-truth   verify METRICS
   rebar run inbox-watch inbox    watch the peer inbox
 
-It runs in the project root and reads the project's .rebarrc; a script
-(the project's own copy, a checks_extra entry, or the install's under
-REBAR_CHECK_IMPL=shell) runs there with REBAR_PROJECT_ROOT set. Without
+It runs in the project root and reads the project's .rebarrc. A script of
+the project's own (a checks_extra entry, another scripts/*.sh, or a legacy
+copy of one of rebar's scripts, which runs instead of the built-in check
+with a deprecation notice) runs there with REBAR_PROJECT_ROOT set. Without
 arguments, lists what is available.`,
 	DisableFlagParsing: true,
 	Annotations:        map[string]string{rootFlagsAfterName: "true"},
@@ -43,7 +44,7 @@ func runScript(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	if !found {
-		return fmt.Errorf("no script %q in the project or a rebar install — `rebar run` lists them", args[0])
+		return fmt.Errorf("no check or script %q (built in or in the project's scripts/) — `rebar run` lists them", args[0])
 	}
 	if exitCode != 0 {
 		os.Exit(exitCode)
@@ -52,45 +53,36 @@ func runScript(cmd *cobra.Command, args []string) error {
 }
 
 // listScripts prints the checks and utilities built into rebar, then the
-// scripts of the rebar install (if one is found) that have no native
-// implementation, or all of them under REBAR_CHECK_IMPL=shell.
+// project's own scripts (scripts/*.sh, thin wrappers aside), marking legacy
+// copies of rebar's scripts.
 func listScripts() error {
-	shell := checks.Impl() == checks.ImplShell
-	if !shell {
-		fmt.Println("Built into rebar:")
-		for _, n := range checks.Names() {
-			fmt.Printf("  %s\n", n)
-		}
+	fmt.Println("Built into rebar:")
+	for _, n := range checks.Names() {
+		fmt.Printf("  %s\n", n)
 	}
-	rebarRoot := findRebarRoot()
-	if rebarRoot == "" {
-		if shell {
-			return fmt.Errorf("REBAR_CHECK_IMPL=shell needs a rebar install's scripts/ (set REBAR_ROOT to your rebar checkout)")
-		}
-		return nil
-	}
-	paths, _ := filepath.Glob(filepath.Join(rebarRoot, "scripts", "*.sh"))
-	names := []string{}
+	paths, _ := filepath.Glob(filepath.Join(cfg.RepoRoot, "scripts", "*.sh"))
+	var lines []string
 	for _, p := range paths {
 		name := strings.TrimSuffix(filepath.Base(p), ".sh")
 		if strings.HasPrefix(name, "_") {
 			continue // sourced helpers, not commands
 		}
-		if _, native := checks.Lookup(name); native && !shell {
+		s, ok := resolveScript(cfg.RepoRoot, name)
+		if !ok {
 			continue
 		}
-		names = append(names, name)
+		if s.Legacy {
+			name += "  (legacy copy: runs instead of the built-in check)"
+		}
+		lines = append(lines, name)
 	}
-	if len(names) == 0 {
+	if len(lines) == 0 {
 		return nil
 	}
-	sort.Strings(names)
-	if !shell {
-		fmt.Println()
-	}
-	fmt.Printf("Scripts in %s:\n", filepath.Join(rebarRoot, "scripts"))
-	for _, n := range names {
-		fmt.Printf("  %s\n", n)
+	sort.Strings(lines)
+	fmt.Printf("\nProject scripts in %s:\n", filepath.Join(cfg.RepoRoot, "scripts"))
+	for _, l := range lines {
+		fmt.Printf("  %s\n", l)
 	}
 	return nil
 }

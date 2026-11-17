@@ -4,27 +4,22 @@ import (
 	"regexp"
 	"strings"
 	"testing"
-
-	"github.com/willackerly/rebar/cli/internal/config"
-	"github.com/willackerly/rebar/cli/internal/sourcescan"
 )
 
-// Parity of the scanner checks ported in S1 (runParity). Contract
+// The scanner checks (runGolden; goldens in testdata/<check>). Contract
 // references in fixture bodies are spelled @contract: (testutil.Tags).
 
 // contract is a contract file body with every JTBD section filled in.
 const contract = "# C\n\n## Why this exists\n\nReason.\n\n## Who needs this\n\nUs.\n\n## Scenarios\n\nOne.\n"
 
-func TestFreshnessParity(t *testing.T) {
-	staleLine := regexp.MustCompile(`^STALE \((?:-?[0-9]+|N) days\): (.*) — `)
+func TestFreshnessGolden(t *testing.T) {
 	// Fixed dates (not {{ago:N}}) are a growing number of days old.
 	fixedAge := regexp.MustCompile(`(?m)^STALE \(-?[0-9]+ days\)(: .* — [a-z-]+: (19[0-9]{2}|20[01][0-9])-)`)
-	runParity(t, parityCheck{
+	runGolden(t, goldenCheck{
 		name:      "check-freshness",
 		golden:    "check-freshness",
 		normalize: func(out string) string { return fixedAge.ReplaceAllString(out, "STALE (N days)$1") },
-		order: func(out, _ string, _ []string) string { return inWalkOrderBy(out, []string{"."}, staleLine, 1) },
-	}, []parityCase{
+	}, []goldenCase{
 		{
 			name: "markers, vocabularies, exclusions",
 			files: map[string]string{
@@ -176,16 +171,14 @@ Checked 1 docs with currency markers (freshness:/last-synced:), 0 stale (>14 day
 	})
 }
 
-func TestContractRefsParity(t *testing.T) {
-	broken := regexp.MustCompile(`^BROKEN: ([^:]*):`)
-	runParity(t, parityCheck{
+func TestContractRefsGolden(t *testing.T) {
+	runGolden(t, goldenCheck{
 		name:   "check-contract-refs",
 		golden: "check-contract-refs",
-		order: func(out, _ string, _ []string) string { return inWalkOrderBy(out, []string{"."}, broken, 2) },
 		exercised: func(out string) bool {
 			return strings.Contains(out, "Checked") || strings.Contains(out, "not found")
 		},
-	}, []parityCase{
+	}, []goldenCase{
 		{
 			name: "valid, broken and malformed references",
 			files: map[string]string{
@@ -267,12 +260,12 @@ func TestContractRefsParity(t *testing.T) {
 	})
 }
 
-func TestRegistryParity(t *testing.T) {
-	runParity(t, parityCheck{
+func TestRegistryGolden(t *testing.T) {
+	runGolden(t, goldenCheck{
 		name:      "check-registry",
 		golden:    "check-registry",
 		exercised: func(out string) bool { return strings.Contains(out, "===") || strings.Contains(out, "not found") },
-	}, []parityCase{
+	}, []goldenCase{
 		{
 			name: "consistent",
 			files: map[string]string{
@@ -354,21 +347,11 @@ func TestRegistryParity(t *testing.T) {
 	})
 }
 
-func TestContractHeadersParity(t *testing.T) {
-	missing := regexp.MustCompile(`^MISSING: (.*)$`)
-	runParity(t, parityCheck{
+func TestContractHeadersGolden(t *testing.T) {
+	runGolden(t, goldenCheck{
 		name:   "check-contract-headers",
 		golden: "check-contract-headers",
-		order: func(out, root string, args []string) string {
-			operands := args
-			if len(operands) == 0 {
-				for _, d := range strings.Fields(config.RCValueOr(root, "source_dirs", "", sourcescan.DefaultSourceDirs)) {
-					operands = append(operands, d)
-				}
-			}
-			return inWalkOrderBy(out, operands, missing, 1)
-		},
-	}, []parityCase{
+	}, []goldenCase{
 		{
 			name: "default scope and exemptions",
 			files: map[string]string{
@@ -463,12 +446,12 @@ func registry(names ...string) string {
 	return b.String()
 }
 
-func TestPrefixUniquenessParity(t *testing.T) {
+func TestPrefixUniquenessGolden(t *testing.T) {
 	collisions := registry("CONTRACT-S1-STEWARD.1.0.md", "CONTRACT-S1-STEWARD.2.0.md", "CONTRACT-I3-SCANNER.1.0.md",
 		"CONTRACT-I3-LLM-CLIENT.1.0.md", "CONTRACT-I3-ZED.2.md", "CONTRACT-SEAM-X.1.0.md", "CONTRACT-C12-B.1.0.md",
 		"CONTRACT-C12-A.1.0.md", "CONTRACT-NOVERSION.md", "CONTRACT-S1-STEWARD.1.0.md", "CONTRACT-p4-low.1.0.md",
 		"CONTRACT-P4-UP.1.0.md", "CONTRACT-I3.1.0.md") + "  - CONTRACT-I3-INDENTED.1.0.md\n- CONTRACT-I3-CRLF.1.0.md\r\n"
-	runParity(t, parityCheck{name: "check-prefix-uniqueness", golden: "check-prefix-uniqueness"}, []parityCase{
+	runGolden(t, goldenCheck{name: "check-prefix-uniqueness", golden: "check-prefix-uniqueness"}, []goldenCase{
 		{name: "no registry", files: map[string]string{"architecture/README.md": "x\n"}},
 		{name: "collisions block at tier 3", files: map[string]string{"architecture/CONTRACT-REGISTRY.md": collisions}},
 		{name: "advisory at tier 2", files: map[string]string{".rebarrc": "tier = 2\n", "architecture/CONTRACT-REGISTRY.md": collisions}},
@@ -496,7 +479,7 @@ func TestPrefixUniquenessParity(t *testing.T) {
 	})
 }
 
-func TestJTBDPresenceParity(t *testing.T) {
+func TestJTBDPresenceGolden(t *testing.T) {
 	sections := func(why, who, scen string) string {
 		return "# C\n\n## Why this exists\n" + why + "\n## Who needs this\n" + who + "\n## Scenarios\n" + scen
 	}
@@ -535,7 +518,7 @@ func TestJTBDPresenceParity(t *testing.T) {
 		}
 		return out
 	}
-	runParity(t, parityCheck{name: "check-jtbd-presence", golden: "check-jtbd-presence"}, []parityCase{
+	runGolden(t, goldenCheck{name: "check-jtbd-presence", golden: "check-jtbd-presence"}, []goldenCase{
 		{name: "no contracts directory", files: map[string]string{"README.md": "x\n"}},
 		{name: "no contracts", files: map[string]string{"architecture/CONTRACT-TEMPLATE.md": "x\n", "architecture/README.md": "x\n"}},
 		{name: "sections, versions, comments", files: mixed},

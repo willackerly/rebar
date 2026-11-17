@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+	rebarchecks "github.com/willackerly/rebar/cli/internal/checks"
 	"github.com/willackerly/rebar/cli/internal/config"
 )
 
@@ -246,14 +247,14 @@ func auditContracts(root string) auditResult {
 func auditEnforcement(root string) auditResult {
 	checks := []checkResult{hookInstalled(root)}
 
-	// The checks are built into rebar; a project's own copy, or the
-	// install's script (REBAR_CHECK_IMPL=shell), also counts.
-	rebarRoot := findRebarRoot()
+	// The checks are built into rebar (named after the scripts they
+	// replaced), so they are always available.
 	for _, script := range []string{"ci-check.sh", "check-contract-refs.sh", "check-todos.sh", "refresh-context.sh"} {
+		_, builtIn := rebarchecks.Lookup(script)
 		checks = append(checks, checkResult{
 			Name:   script + " available",
-			Pass:   scriptAvailable(root, rebarRoot, script),
-			Detail: "built into rebar, project scripts/ or the rebar install",
+			Pass:   builtIn,
+			Detail: "built into rebar",
 		})
 	}
 

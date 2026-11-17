@@ -4,10 +4,10 @@ import (
 	"testing"
 )
 
-// Parity of check-ground-truth (runParity) and its golden files
-// (testdata/check-ground-truth; see native_registry_test.go).
+// check-ground-truth (runGolden) and its golden files
+// (testdata/check-ground-truth; see golden_test.go).
 
-var groundTruthCheck = parityCheck{name: "check-ground-truth", golden: "check-ground-truth"}
+var groundTruthCheck = goldenCheck{name: "check-ground-truth", golden: "check-ground-truth"}
 
 // gtTree is a small project the metrics below count.
 var gtTree = map[string]string{
@@ -72,7 +72,7 @@ func gtCase(rc, metrics string, extra map[string]string) map[string]string {
 	return files
 }
 
-var groundTruthParityCases = []parityCase{
+var groundTruthCases = []goldenCase{
 	{name: "every metric matches", files: gtCase(gtRC, gtMetrics, nil)},
 	{name: "print", files: gtCase(gtRC, "", nil), args: []string{"--print"}},
 	{name: "print ignores the tier", files: gtCase("tier = 1\n"+gtRC[len("tier = 3\n"):], "", nil), args: []string{"--print"}},
@@ -214,10 +214,6 @@ metric.tracked_none.tracked = true
 	},
 }
 
-func TestGroundTruthParity(t *testing.T) {
-	runParity(t, groundTruthCheck, groundTruthParityCases)
-}
-
 func TestGroundTruthGolden(t *testing.T) {
-	runGolden(t, groundTruthCheck, groundTruthParityCases)
+	runGolden(t, groundTruthCheck, groundTruthCases)
 }

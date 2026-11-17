@@ -338,12 +338,9 @@ func within(base, p string) bool {
 	return err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)) && !filepath.IsAbs(rel)
 }
 
-// IsRebarSourceDir mirrors cli/cmd's check: a rebar source tree has the
-// bootstrap template and the steward.
-func IsRebarSourceDir(dir string) bool {
-	info, err := os.Stat(filepath.Join(dir, "templates", "project-bootstrap"))
-	return err == nil && info.IsDir() && isFile(filepath.Join(dir, "scripts", "steward.sh"))
-}
+// IsRebarSourceDir reports whether dir is a rebar source checkout or
+// install tree (config.IsRebarTree).
+func IsRebarSourceDir(dir string) bool { return config.IsRebarTree(dir) }
 
 // guardProject resolves the project and install paths and refuses the
 // layouts where migrating would delete rebar's own scripts or files outside
@@ -471,7 +468,7 @@ func (m *migrator) legacyCopies() []string {
 			}
 			continue
 		}
-		if isRebarScript(m.opts.RebarRoot, n) {
+		if isRebarScript(n) {
 			out = append(out, n)
 		}
 	}

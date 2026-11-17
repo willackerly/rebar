@@ -3,13 +3,14 @@ package cmd
 import (
 	"crypto/rand"
 	"fmt"
-	"github.com/willackerly/rebar/cli/internal/ask"
 	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/willackerly/rebar/cli/internal/ask"
 
 	"github.com/google/uuid"
 	"github.com/spf13/cobra"
@@ -512,11 +513,6 @@ tier = 1
 	os.WriteFile(rcPath, []byte(content), 0644)
 }
 
-// isRebarSourceDir reports whether dir is a rebar source checkout or install.
-// Shared with scripts/rebar-doc.sh, which tests the same two paths.
-func isRebarSourceDir(dir string) bool {
-	if info, err := os.Stat(filepath.Join(dir, "templates", "project-bootstrap")); err != nil || !info.IsDir() {
-		return false
-	}
-	return isFile(filepath.Join(dir, "scripts", "steward.sh"))
-}
+// isRebarSourceDir reports whether dir is a rebar source checkout or
+// install tree (config.IsRebarTree).
+func isRebarSourceDir(dir string) bool { return config.IsRebarTree(dir) }

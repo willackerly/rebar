@@ -11,7 +11,7 @@ import (
 	"github.com/willackerly/rebar/cli/internal/testutil"
 )
 
-// Parity of steward (CONTRACT:S1-STEWARD.2.0; runParity with the files it
+// steward (CONTRACT:S1-STEWARD.2.0; runGolden with the files it
 // writes as part of the output), with goldens in testdata/steward
 // (regenerate with go test ./cmd -run TestSteward -update-golden).
 // Contract references in fixture bodies are spelled @contract:.
@@ -19,7 +19,7 @@ import (
 // stewardTimestamp is the scan's generated_at, which differs between runs.
 var stewardTimestamp = regexp.MustCompile(`[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z`)
 
-var stewardCheck = parityCheck{
+var stewardCheck = goldenCheck{
 	name:      "steward",
 	writes:    true,
 	golden:    "steward",
@@ -75,7 +75,7 @@ func fileWithColon(t *testing.T, root string) {
 	}
 }
 
-var stewardParityCases = []parityCase{
+var stewardCases = []goldenCase{
 	{name: "empty project", files: map[string]string{"README.md": "# x\n"}},
 	{name: "no contracts", files: map[string]string{".rebarrc": "tier = 1\n", "architecture/README.md": "# Architecture\n"}},
 	{name: "every lifecycle state", files: stewardTree},
@@ -151,95 +151,67 @@ var stewardParityCases = []parityCase{
 	},
 }
 
-// stewardLocale runs the scripts in the C locale: the native steward sorts
-// in byte order, and GNU grep under a UTF-8 locale takes a line that is not
-// valid UTF-8 for binary data (neither is emulated). LC_ALL also beats a
-// runner's own LC_ALL, which LC_COLLATE alone would not.
-func stewardLocale(t *testing.T) { t.Setenv("LC_ALL", "C") }
-
-func TestStewardParity(t *testing.T) {
-	t.Setenv("REBAR_TEST_RUN_CLI", "1")
-	stewardLocale(t)
-	runParity(t, stewardCheck, stewardParityCases)
-}
-
 func TestStewardGolden(t *testing.T) {
-	runGolden(t, stewardCheck, stewardParityCases)
+	runGolden(t, stewardCheck, stewardCases)
 }
 
 // TestStewardBinaryReference: a binary file holding a reference is no
-// implementation. BSD grep prints "Binary file … matches" for it, which the
-// script then takes for a file name; GNU grep 3.5+ prints nothing on
-// stdout, as the native port.
+// implementation. (The script diverged by platform: BSD grep printed
+// "Binary file … matches" for it, which the script then took for a file
+// name; GNU grep 3.5+ printed nothing on stdout, as the native steward.)
 func TestStewardBinaryReference(t *testing.T) {
-	requireBash(t)
-	stewardLocale(t)
 	files := map[string]string{
 		".rebarrc":                            "tier = 1\n",
 		"architecture/CONTRACT-S1-BIN.1.0.md": specContract("S1-BIN"),
 		"data/blob.json":                      "@contract:S1-BIN.1.0\n\x00\n",
 		"src/a.go":                            "// @contract:S1-BIN.1.0\n",
 	}
-	state := func(root string) string {
-		data, err := os.ReadFile(filepath.Join(root, "architecture", ".state", "S1-BIN.1.0.json"))
-		if err != nil {
-			t.Fatal(err)
-		}
-		return strings.ReplaceAll(string(data), root, "$ROOT")
-	}
 	root := writeTree(t, files, nil)
-	script := filepath.Join(testutil.RebarSource(t), "scripts", "steward.sh")
-	if out, code := testutil.RunEnv(t, root, testutil.IsolatedEnv("REBAR_PROJECT_ROOT="+root), "bash", script, "--summary"); code != 0 {
-		t.Fatalf("script: exit %d\n%s", code, out)
-	}
-	shell := state(root)
 	c, _ := checks.Lookup("steward")
 	var out strings.Builder
 	if code := c.Run(&checks.Context{Root: root, Stdout: &out, Stderr: &out}, []string{"--summary"}); code != 0 {
-		t.Fatalf("native: exit %d\n%s", code, out.String())
+		t.Fatalf("exit %d\n%s", code, out.String())
 	}
-	native := state(root)
-	if !strings.Contains(native, `"$ROOT/src/a.go"`) || strings.Contains(native, "blob.json") {
-		t.Errorf("native lists the binary file or misses the text one:\n%s", native)
+	data, err := os.ReadFile(filepath.Join(root, "architecture", ".state", "S1-BIN.1.0.json"))
+	if err != nil {
+		t.Fatal(err)
 	}
-	switch grepFlavour(t) {
-	case "bsd":
-		if !strings.Contains(shell, `"Binary file $ROOT/data/blob.json matches"`) {
-			t.Errorf("BSD grep: the script was expected to list the binary-file message:\n%s", shell)
-		}
-	case "gnu":
-		if shell != native {
-			t.Errorf("GNU grep: script and native differ:\n%s\n%s", shell, native)
-		}
+	if state := strings.ReplaceAll(string(data), root, "$ROOT"); !strings.Contains(state, `"$ROOT/src/a.go"`) || strings.Contains(state, "blob.json") {
+		t.Errorf("the steward lists the binary file or misses the text one:\n%s", state)
 	}
 }
 
-// TestStewardCLI runs `rebar run steward` and `rebar check` end to end:
-// the native steward under the default implementation, the script under
-// REBAR_CHECK_IMPL=shell, with the same output and reports.
+// TestStewardCLI runs `rebar run steward` end to end: the same output and
+// reports as the steward run in process on the same tree.
 func TestStewardCLI(t *testing.T) {
-	requireBash(t)
-	stewardLocale(t)
 	files := map[string]string{}
 	for rel, body := range stewardTree {
 		files[rel] = testutil.Tags.Replace(body)
 	}
-	bin, home, src := testBinary(t), t.TempDir(), testutil.RebarSource(t)
+	bin, home := testBinary(t), t.TempDir()
+	c, _ := checks.Lookup("steward")
 	for _, args := range [][]string{{"run", "steward"}, {"run", "steward", "--summary"}} {
-		var outs [2]string
-		var reports [2]string
-		for i, impl := range []string{"shell", "go"} {
-			root := writeTree(t, files, nil)
-			out, code := testutil.RunEnv(t, root, cliEnv(home, impl, src), bin, args...)
-			if code != 0 {
-				t.Fatalf("%s rebar %v: exit %d\n%s", impl, args, code, out)
+		var outs, reports [2]string
+		for i := range 2 {
+			root := physical(t, writeTree(t, files, nil))
+			var out string
+			if i == 0 {
+				var code int
+				out, code = testutil.RunEnv(t, root, cliEnv(home), bin, args...)
+				if code != 0 {
+					t.Fatalf("rebar %v: exit %d\n%s", args, code, out)
+				}
+			} else {
+				var b strings.Builder
+				c.Run(&checks.Context{Root: root, Stdout: &b, Stderr: &b}, args[2:])
+				out = b.String()
 			}
 			outs[i] = stewardTimestamp.ReplaceAllString(strings.ReplaceAll(out, root, "$ROOT"), "<ts>")
 			report, _ := os.ReadFile(filepath.Join(root, "architecture", ".state", "steward-report.json"))
 			reports[i] = stewardTimestamp.ReplaceAllString(strings.ReplaceAll(string(report), root, "$ROOT"), "<ts>")
 		}
 		if outs[0] != outs[1] || reports[0] != reports[1] {
-			t.Errorf("rebar %v: shell:\n%s\n%s\ngo:\n%s\n%s", args, outs[0], reports[0], outs[1], reports[1])
+			t.Errorf("rebar %v: CLI:\n%s\n%s\nin process:\n%s\n%s", args, outs[0], reports[0], outs[1], reports[1])
 		}
 	}
 }

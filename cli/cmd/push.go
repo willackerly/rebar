@@ -50,32 +50,28 @@ func runPush(cmd *cobra.Command, args []string) error {
 	}
 	fmt.Println("Integrity verified ✓")
 
-	// 2. Run checks (if scripts exist)
-	s, ok := resolveScript(cfg.RepoRoot, findRebarRoot(), "ci-check.sh")
-	c, native := nativeFor("ci-check.sh", s, ok)
-	if ok || native {
-		fmt.Println("Running checks...")
-		var checkOut []byte
-		var code int
-		var err error
-		if native {
-			var buf bytes.Buffer
-			code = c.Run(&checks.Context{Root: cfg.RepoRoot, Dir: cfg.RepoRoot, Install: installScripts(), Stdout: &buf, Stderr: &buf}, nil)
-			checkOut = buf.Bytes()
-		} else {
-			warnLegacy(s)
-			// Run checks but don't block on missing scripts
-			checkOut, code, err = scripts.OutputInProject(s.Path, cfg.RepoRoot, s.nativeEnv())
+	// 2. Run the checks: the built-in suite, or the project's own copy of
+	// scripts/ci-check.sh (deprecated).
+	fmt.Println("Running checks...")
+	var checkOut []byte
+	var code int
+	if s, ok := resolveScript(cfg.RepoRoot, "ci-check.sh"); ok && s.Legacy {
+		warnLegacy(s)
+		checkOut, code, err = scripts.OutputInProject(s.Path, cfg.RepoRoot)
+	} else {
+		c, _ := checks.Lookup("ci-check")
+		var buf bytes.Buffer
+		code = c.Run(&checks.Context{Root: cfg.RepoRoot, Dir: cfg.RepoRoot, Stdout: &buf, Stderr: &buf}, nil)
+		checkOut = buf.Bytes()
+	}
+	if err != nil || code != 0 {
+		fmt.Println(string(checkOut))
+		// Only fail if it's a real check failure, not a missing dependency
+		if code == 1 {
+			return fmt.Errorf("checks failed — fix before pushing")
 		}
-		if err != nil || code != 0 {
-			fmt.Println(string(checkOut))
-			// Only fail if it's a real check failure, not a missing dependency
-			if code == 1 {
-				return fmt.Errorf("checks failed — fix before pushing")
-			}
-		} else {
-			fmt.Println("Checks passed ✓")
-		}
+	} else {
+		fmt.Println("Checks passed ✓")
 	}
 
 	// 3. Push

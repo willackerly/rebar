@@ -44,12 +44,6 @@ OK: Rebar compliance verified.
 ━━━ Decay Patterns ━━━
 check-decay-patterns: no files to scan.
 
-━━━ Bootstrap Sync ━━━
-check-bootstrap-sync: SKIP — not in rebar source repo (no templates/project-bootstrap/)
-
-━━━ Script Tests ━━━
-SKIP: script tests run only in the rebar source repo
-
 ━━━ Fix Commit Gate ━━━
 
 check-fix-commit: VIOLATION (HEAD)
@@ -81,13 +75,13 @@ SUMMARY
   PASS  Ground Truth
   PASS  Rebar Compliance
   PASS  Decay Patterns
-  PASS  Bootstrap Sync
-  PASS  Script Tests
+  SKIP  Bootstrap Sync (rebar source repo only)
+  SKIP  Script Tests (rebar source repo only)
   FAIL  Fix Commit Gate
   PASS  Bypass Flags Gate
   SKIP  Steward
 
-  13 passed, 2 failed, 1 skipped
+  11 passed, 2 failed, 3 skipped
 
 CI check failed. Fix the issues above or skip individual checks
 with environment variables (e.g., SKIP_FRESHNESS=1).

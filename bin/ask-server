@@ -2,11 +2,9 @@
 # ask-server — the enterprise ASK HTTP server, built into the rebar binary.
 # CONTRACT:S2-ASK-CLI.1.0
 #
-# Hand-off: runs `rebar ask serve` with the same arguments — the rebar beside
-# this script (through symlinks), else REBAR_BIN, else the one on PATH — so
-# .mcp.json files and scripts naming bin/ask-server keep working.
-# REBAR_CHECK_IMPL=shell runs the python original, bin/legacy/ask-server.py,
-# until it is removed.
+# Shim: runs `rebar ask serve` with the same arguments — the rebar beside this
+# script (through symlinks), else REBAR_BIN, else the one on PATH — so
+# PATH entries, .mcp.json files and scripts naming bin/ask-server keep working.
 self=$0
 while [ -L "$self" ]; do
   link=$(readlink "$self")
@@ -15,11 +13,7 @@ while [ -L "$self" ]; do
     *) self=$(dirname "$self")/$link ;;
   esac
 done
-dir=$(dirname "$self")
-if [ "${REBAR_CHECK_IMPL:-}" = shell ]; then
-  exec python3 "$dir/legacy/ask-server.py" "$@"
-fi
-rebar=$dir/rebar
+rebar=$(dirname "$self")/rebar
 [ -x "$rebar" ] || rebar=${REBAR_BIN:-}
 if [ -z "$rebar" ] || [ ! -x "$rebar" ]; then
   rebar=$(command -v rebar 2>/dev/null) || {

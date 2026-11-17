@@ -328,3 +328,22 @@ func LocalContractRef(ref, namespace string) (string, bool) {
 	}
 	return m[2], true
 }
+
+// IsRebarTree reports whether dir is a rebar source checkout or a rebar
+// install tree: it has templates/project-bootstrap/ and either rebar's
+// embedded assets (cli/internal/assets, a source checkout since rebar is a
+// single binary) or scripts/steward.sh (a release tree or clone from
+// before that, v3.1.0 and earlier).
+func IsRebarTree(dir string) bool {
+	if dir == "" {
+		return false
+	}
+	if info, err := os.Stat(filepath.Join(dir, "templates", "project-bootstrap")); err != nil || !info.IsDir() {
+		return false
+	}
+	if info, err := os.Stat(filepath.Join(dir, "cli", "internal", "assets")); err == nil && info.IsDir() {
+		return true
+	}
+	info, err := os.Stat(filepath.Join(dir, "scripts", "steward.sh"))
+	return err == nil && !info.IsDir()
+}

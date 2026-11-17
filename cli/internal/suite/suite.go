@@ -1,16 +1,15 @@
-// Package suite holds the native (Go) implementations of rebar's check
-// suites: ci-check (scripts/ci-check.sh), pre-commit (scripts/pre-commit.sh)
-// and cold-start-checks (scripts/cold-start-checks.sh). They are registered
-// with the checks package under their scripts' names, so `rebar check`,
-// `rebar run` and `rebar native` find them like any check, and behave like
-// the scripts: same check order, output, SKIP_* variables and exit codes.
+// Package suite holds rebar's check suites: ci-check, pre-commit and
+// cold-start-checks (named after the scripts they replaced). They are
+// registered with the checks package under those names, so `rebar check`,
+// `rebar run` and `rebar native` find them like any check: same check
+// order, output, SKIP_* variables and exit codes as the scripts had.
 //
-// A suite runs each check's native implementation in process. A check with
-// none (steward, sync-bootstrap, tests/run.sh) runs from the install's
-// scripts directory (checks.Context.Install), and a project's own copy of a
-// check script still wins over both, with the deprecation notice the
-// scripts print (_rebar_script in scripts/_rebar-config.sh): it is the
-// adopter's code. The adopter's own extra checks (.rebarrc checks_extra,
+// A suite runs each check in process. A project's own copy of one of
+// rebar's check scripts still wins, with a deprecation notice: it is the
+// adopter's code. The two maintainer steps of the full suite
+// (sync-bootstrap.sh and tests/run.sh) check rebar's own source: they run
+// the project's scripts only in a rebar source checkout and skip
+// elsewhere. The adopter's own extra checks (.rebarrc checks_extra,
 // checks_extra_pre_commit) run after rebar's.
 package suite
 
@@ -43,13 +42,21 @@ type script struct {
 const thinWrapperMarker = "# rebar-thin-wrapper"
 
 // resolve picks what runs for script name (relative to scripts/, e.g.
-// check-todos.sh or tests/run.sh), as _rebar_script does: the project's own
-// scripts/<name> when it has one that is not the install's and not a thin
+// check-todos.sh or tests/run.sh), as the suite scripts' _rebar_script did:
+// the project's own scripts/<name> when it has one that is not a thin
 // wrapper, with the deprecation notice on ctx.Stderr unless quiet (the
-// cold-start hook sends it to /dev/null); else the native check; else the
-// install's script.
+// cold-start hook sends it to /dev/null); else the built-in check. A
+// maintainer step runs the project's own script in a rebar source checkout
+// (config.IsRebarTree) and nothing elsewhere.
 func resolve(ctx *checks.Context, name string, quiet bool) script {
-	if local := filepath.Join(ctx.Root, "scripts", name); isProjectCopy(ctx, local) {
+	local := filepath.Join(ctx.Root, "scripts", name)
+	if maintainerSteps[name] {
+		if config.IsRebarTree(ctx.Root) {
+			return script{path: local}
+		}
+		return script{}
+	}
+	if isProjectCopy(local) {
 		if !quiet {
 			fmt.Fprintf(ctx.Stderr, "rebar: running project copy scripts/%s (deprecated: move its settings to .rebarrc and delete it)\n", name)
 		}
@@ -58,20 +65,13 @@ func resolve(ctx *checks.Context, name string, quiet bool) script {
 	if c, ok := checks.Lookup(name); ok {
 		return script{native: c}
 	}
-	if ctx.Install == "" {
-		return script{}
-	}
-	return script{path: filepath.Join(ctx.Install, name)}
+	return script{}
 }
 
 // isProjectCopy is _rebar_script's test for a project copy: the file
-// exists, the project's scripts/ is not the install's, and no line starts
-// with the thin-wrapper marker.
-func isProjectCopy(ctx *checks.Context, local string) bool {
+// exists and no line starts with the thin-wrapper marker.
+func isProjectCopy(local string) bool {
 	if !isRegular(local) {
-		return false
-	}
-	if ctx.Install != "" && samePath(filepath.Join(ctx.Root, "scripts"), ctx.Install) {
 		return false
 	}
 	data, err := os.ReadFile(local)
@@ -97,15 +97,14 @@ func (s script) found() bool {
 // own interpreter); the cold-start hook runs them with bash instead.
 func (s script) run(ctx *checks.Context, args []string, withBash bool) int {
 	if s.native != nil {
-		return s.native.Run(&checks.Context{Root: ctx.Root, Dir: ctx.Root, Install: ctx.Install, Stdout: ctx.Stdout, Stderr: ctx.Stderr}, args)
+		return s.native.Run(&checks.Context{Root: ctx.Root, Dir: ctx.Root, Stdout: ctx.Stdout, Stderr: ctx.Stderr}, args)
 	}
 	return runFile(ctx, s.path, args, withBash)
 }
 
 // runFile runs the file at path with args in the project root, with
-// REBAR_PROJECT_ROOT and the native hand-off settings (checks.ScriptEnv)
-// added to the environment, as the suite scripts' children get them from
-// the CLI. A file the system cannot execute directly (no #! line) runs
+// REBAR_PROJECT_ROOT added to the environment, as the suite scripts'
+// children got it from the CLI. A file the system cannot execute directly (no #! line) runs
 // with bash, as bash does with such a command.
 func runFile(ctx *checks.Context, path string, args []string, withBash bool) int {
 	return runFileIn(ctx, ctx.Root, path, args, withBash)
@@ -138,7 +137,7 @@ func start(ctx *checks.Context, dir, name string, args []string) (int, error) {
 	if base == nil {
 		base = os.Environ()
 	}
-	cmd.Env = append(append(base, "REBAR_PROJECT_ROOT="+ctx.Root), checks.ScriptEnv(ctx.Install)...)
+	cmd.Env = append(base, "REBAR_PROJECT_ROOT="+ctx.Root)
 	if !config.Overridden() {
 		cmd.Stdin = os.Stdin // under an override (rebar migrate's probes) stdin stays closed
 	}
@@ -160,15 +159,15 @@ func start(ctx *checks.Context, dir, name string, args []string) (int, error) {
 // RunQuiet runs one of rebar's check scripts (name relative to scripts/,
 // e.g. check-todos.sh) with args as steward.sh's enforcement scan does:
 // resolved like _rebar_script without its notice (a project copy, else the
-// native check, else the install's script), in ctx's working directory
-// (steward does not change directory), output discarded. found is false,
-// and nothing runs, when there is no native check and no executable script.
+// built-in check), in ctx's working directory (steward does not change
+// directory), output discarded. found is false, and nothing runs, when
+// there is neither.
 func RunQuiet(ctx *checks.Context, name string, args []string) (code int, found bool) {
 	s := resolve(ctx, name, true)
 	if !s.found() {
 		return 0, false
 	}
-	quiet := &checks.Context{Root: ctx.Root, Dir: ctx.WorkDir(), Install: ctx.Install, Stdout: io.Discard, Stderr: io.Discard}
+	quiet := &checks.Context{Root: ctx.Root, Dir: ctx.WorkDir(), Stdout: io.Discard, Stderr: io.Discard}
 	if s.native != nil {
 		return s.native.Run(quiet, args), true
 	}
@@ -273,15 +272,6 @@ func isExecutable(p string) bool {
 	}
 	info, err := os.Stat(p)
 	return err == nil && !info.IsDir() && info.Mode().Perm()&0o111 != 0
-}
-
-func samePath(a, b string) bool {
-	ra, errA := filepath.EvalSymlinks(a)
-	rb, errB := filepath.EvalSymlinks(b)
-	if errA != nil || errB != nil {
-		return filepath.Clean(a) == filepath.Clean(b)
-	}
-	return ra == rb
 }
 
 // echo writes s and a newline to w.

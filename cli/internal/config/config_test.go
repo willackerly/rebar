@@ -2,9 +2,7 @@ package config
 
 import (
 	"os"
-	"os/exec"
 	"path/filepath"
-	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -104,25 +102,13 @@ func TestCheckTierAndUnknownChecks(t *testing.T) {
 	}
 }
 
-// KnownChecks must match the bash list and name real scripts, or the CLI and
-// the scripts would disagree about which names are valid.
+// KnownChecks is the scripts' list (_REBAR_KNOWN_CHECKS in
+// scripts/_rebar-config.sh, deleted in rebar 4), so checks_enable names
+// valid in a 3.x project stay valid.
 func TestKnownChecksMatchScripts(t *testing.T) {
-	scriptsDir := filepath.Join(testutil.RebarSource(t), "scripts")
-	data, err := os.ReadFile(filepath.Join(scriptsDir, "_rebar-config.sh"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	m := regexp.MustCompile(`(?m)^_REBAR_KNOWN_CHECKS="([^"]*)"`).FindSubmatch(data)
-	if m == nil {
-		t.Fatal("_REBAR_KNOWN_CHECKS not found in scripts/_rebar-config.sh")
-	}
-	if bash := strings.Fields(string(m[1])); !slices.Equal(bash, KnownChecks) {
+	bash := strings.Fields("check-bypass-flags check-compliance check-contract-headers check-contract-refs check-decay-patterns check-doc-refs check-fix-commit check-freshness check-ground-truth check-jtbd-presence check-prefix-uniqueness check-todos compute-registry steward sync-bootstrap")
+	if !slices.Equal(bash, KnownChecks) {
 		t.Fatalf("KnownChecks = %q\nbash list   = %q", KnownChecks, bash)
-	}
-	for _, name := range KnownChecks {
-		if _, err := os.Stat(filepath.Join(scriptsDir, name+".sh")); err != nil {
-			t.Errorf("known check %s has no script: %v", name, err)
-		}
 	}
 }
 
@@ -204,26 +190,15 @@ func TestRCValueOr(t *testing.T) {
 	}
 }
 
-// TestRCFileParity: REBAR_RCFILE replaces <root>/.rebarrc for every reader,
-// in Go as in scripts/_rebar-config.sh (rebar migrate tries settings that
-// way before writing them).
-func TestRCFileParity(t *testing.T) {
+// TestRCFile: REBAR_RCFILE replaces <root>/.rebarrc for every reader, as
+// in scripts/_rebar-config.sh (rebar migrate tries settings that way
+// before writing them).
+func TestRCFile(t *testing.T) {
 	root := t.TempDir()
 	testutil.WriteFile(t, root, ".rebarrc", "tier = 1\nsource_dirs = project\nchecks_enable = steward\n")
 	alt := testutil.WriteFile(t, t.TempDir(), "alt.rc", "tier = 2\nsource_dirs = alt  # tried\n")
 	keys := []string{"source_dirs", "checks_enable", "source_extensions"}
 
-	bashValues := func(env ...string) []string {
-		t.Helper()
-		script := `. "$1/_rebar-config.sh"; _rebar_tier; for k in source_dirs checks_enable source_extensions; do _rebar_config "$k" _REBAR_NO_ENV "-"; done`
-		cmd := exec.Command("bash", "-c", script, "bash", filepath.Join(testutil.RebarSource(t), "scripts"))
-		cmd.Env = testutil.IsolatedEnv(append([]string{"REBAR_PROJECT_ROOT=" + root}, env...)...)
-		out, err := cmd.CombinedOutput()
-		if err != nil {
-			t.Fatalf("bash: %v\n%s", err, out)
-		}
-		return strings.Split(strings.TrimSpace(string(out)), "\n")
-	}
 	goValues := func() []string {
 		t.Helper()
 		c, err := Load(root)
@@ -237,9 +212,6 @@ func TestRCFileParity(t *testing.T) {
 		return vals
 	}
 
-	if _, err := exec.LookPath("bash"); err != nil {
-		t.Skip("bash not installed")
-	}
 	for _, tc := range []struct {
 		name, rcfile string
 		want         []string
@@ -254,14 +226,11 @@ func TestRCFileParity(t *testing.T) {
 					t.Setenv(k, "")
 				}
 			}
-			var env []string
 			if tc.rcfile != "" {
 				t.Setenv("REBAR_RCFILE", tc.rcfile)
-				env = append(env, "REBAR_RCFILE="+tc.rcfile)
 			}
-			gotGo, gotBash := goValues(), bashValues(env...)
-			if !slices.Equal(gotGo, tc.want) || !slices.Equal(gotBash, tc.want) {
-				t.Fatalf("tier and %v:\n go   = %q\n bash = %q\n want = %q", keys, gotGo, gotBash, tc.want)
+			if got := goValues(); !slices.Equal(got, tc.want) {
+				t.Fatalf("tier and %v:\n got  = %q\n want = %q", keys, got, tc.want)
 			}
 			if got := ChecksEnableFor(root); strings.Join(got, " ") != map[bool]string{true: "steward", false: ""}[tc.rcfile == ""] {
 				t.Fatalf("ChecksEnableFor = %q", got)

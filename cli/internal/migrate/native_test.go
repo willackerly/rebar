@@ -1,7 +1,6 @@
 package migrate
 
 import (
-	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -10,17 +9,22 @@ import (
 )
 
 // nativeFilters spell the filters of the scanner scripts the native checks
-// were ported from, as exclusionBait reads them.
+// were ported from (as rebar 3.2 shipped them), as exclusionBait reads
+// them.
 func TestNativeFiltersMatchScripts(t *testing.T) {
-	src := testutil.RebarSource(t)
+	scripts := map[string][]string{
+		"check-todos.sh":            {"grep -v TRACKED-TASK:", "--exclude TODO.md", "--exclude check-todos.sh)", "--exclude $dir"},
+		"check-contract-refs.sh":    {"--exclude $dir"},
+		"check-contract-headers.sh": nil,
+		"check-freshness.sh":        nil,
+	}
 	for name, filters := range nativeFilters {
-		data, err := os.ReadFile(filepath.Join(src, "scripts", name))
-		if err != nil {
-			t.Fatal(err)
+		if got, want := strings.Join(filterSet(filters), "\n"), strings.Join(scripts[name], "\n"); got != want {
+			t.Errorf("%s: nativeFilters give\n%s\nthe script had\n%s", name, got, want)
 		}
-		if got, want := strings.Join(filterSet(filters), "\n"), strings.Join(filterSet(string(data)), "\n"); got != want {
-			t.Errorf("%s: nativeFilters give\n%s\nthe script has\n%s", name, got, want)
-		}
+	}
+	if len(nativeFilters) != len(scripts) {
+		t.Errorf("nativeFilters has %d scanners, the scripts %d", len(nativeFilters), len(scripts))
 	}
 }
 

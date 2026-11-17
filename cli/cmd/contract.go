@@ -38,7 +38,7 @@ var contractVerifyCmd = &cobra.Command{
 				return err
 			}
 			if !found {
-				return fmt.Errorf("%s not found in the project or a rebar install (set REBAR_ROOT)", step.script)
+				return fmt.Errorf("%s is not built into this rebar", step.script)
 			}
 			if exitCode != 0 {
 				os.Exit(exitCode)

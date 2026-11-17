@@ -3,7 +3,6 @@ package cmd
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -14,21 +13,18 @@ import (
 	_ "github.com/willackerly/rebar/cli/internal/utils"
 )
 
-// nativeCmd runs a check's native (Go) implementation whatever
-// REBAR_CHECK_IMPL says. It is the target of _rebar_native in
-// scripts/_rebar-config.sh, which a script with a native counterpart calls
-// when `rebar check` / `rebar run` use the go implementation (the default), and a
-// way to compare the two by hand. It never runs a script, so the hand-off
-// cannot loop.
+// nativeCmd runs one of rebar's built-in checks as its script ran: against
+// REBAR_PROJECT_ROOT, from the working directory, never a project's own
+// copy. The script regression tests (scripts/tests/lib.sh run_in) drive the
+// checks through it.
 var nativeCmd = &cobra.Command{
 	Use:   "native <check> [args...]",
-	Short: "Run the native (Go) implementation of a check (experimental)",
-	Long: `Run the native (Go) implementation of one of rebar's checks against the
-current project (REBAR_PROJECT_ROOT, else the enclosing repository), with
-the same arguments, output and exit code as its script. Without arguments,
-lists the checks that have one.
-
-rebar check and rebar run use them unless REBAR_CHECK_IMPL=shell.`,
+	Short: "Run one of rebar's built-in checks, as its script ran",
+	Long: `Run one of rebar's built-in checks against the current project
+(--repo-root, else REBAR_PROJECT_ROOT, else the enclosing repository) from
+the working directory, with the arguments, output and exit code its script
+had. Unlike rebar run, it never runs the project's own copy of a script.
+Without arguments, lists the checks.`,
 	Hidden:             true,
 	DisableFlagParsing: true,
 	RunE:               runNative,
@@ -52,23 +48,16 @@ func runNative(cmd *cobra.Command, args []string) error {
 	}
 	// Like the script, which runs where it was started: relative arguments
 	// resolve against the working directory, settings come from the root.
-	// A suite that a script handed off runs the checks with no native
-	// implementation from that script's install.
-	install := os.Getenv("REBAR_NATIVE_SCRIPTS")
-	if install == "" {
-		install = installScripts()
-	}
-	if code := runNativeCheckIn(c, nativeRoot(), cwd, install, args[1:]); code != 0 {
+	if code := runNativeCheck(c, nativeRoot(), cwd, args[1:]); code != 0 {
 		os.Exit(code)
 	}
 	return nil
 }
 
 // nativeRoot is the project a native check runs against: --repo-root when
-// given (`rebar --repo-root X native …`), else REBAR_PROJECT_ROOT (set by the
-// CLI for the scripts it runs, so a hand-off checks the same repo the script
-// would), else the repository around the working directory, else the
-// working directory.
+// given (`rebar --repo-root X native …`), else REBAR_PROJECT_ROOT (as the
+// scripts read it), else the repository around the working directory, else
+// the working directory.
 func nativeRoot() string {
 	if repoRoot != "" {
 		return repoRoot
@@ -84,29 +73,7 @@ func nativeRoot() string {
 }
 
 // runNativeCheck runs c against the project at root from the working
-// directory dir, on the terminal, and returns its exit code. A suite runs
-// the checks that have no native implementation from the install the CLI
-// finds (installScripts).
+// directory dir, on the terminal, and returns its exit code.
 func runNativeCheck(c *checks.Check, root, dir string, args []string) int {
-	return runNativeCheckIn(c, root, dir, installScripts(), args)
-}
-
-// runNativeCheckIn is runNativeCheck with the install's scripts directory
-// given ("" for none).
-func runNativeCheckIn(c *checks.Check, root, dir, install string, args []string) int {
-	return c.Run(&checks.Context{Root: root, Dir: dir, Install: install, Stdout: os.Stdout, Stderr: os.Stderr}, args)
-}
-
-// installScripts is the scripts directory of the rebar install the CLI
-// finds (findRebarRoot), "" when there is none.
-func installScripts() string {
-	root := findRebarRoot()
-	if root == "" {
-		return ""
-	}
-	dir := filepath.Join(root, "scripts")
-	if info, err := os.Stat(dir); err != nil || !info.IsDir() {
-		return ""
-	}
-	return dir
+	return c.Run(&checks.Context{Root: root, Dir: dir, Stdout: os.Stdout, Stderr: os.Stderr}, args)
 }
