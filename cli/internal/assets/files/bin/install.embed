@@ -47,7 +47,7 @@ if grep -qF "$BIN_DIR" "$RC_FILE" 2>/dev/null; then
   echo "[ok] PATH already includes $BIN_DIR"
 else
   echo "" >> "$RC_FILE"
-  echo "# rebar CLI tools (ask, ask-server)" >> "$RC_FILE"
+  echo "# rebar CLI tools (rebar, ask, ask-server)" >> "$RC_FILE"
   echo "$PATH_LINE" >> "$RC_FILE"
   echo "[added] PATH → $RC_FILE"
 fi
@@ -104,32 +104,20 @@ echo ""
 echo "  source $RC_FILE"
 echo ""
 
-# Verify dependencies
+# Verify dependencies. The checks and ASK are built into the rebar binary;
+# `ask <agent>` sessions run Claude Code's CLI.
 echo "Checking dependencies..."
 ok=true
-for dep in jq claude; do
-  if command -v "$dep" &>/dev/null; then
-    echo "  [ok] $dep"
-  else
-    echo "  [missing] $dep"
-    ok=false
-  fi
-done
-
-if command -v bash &>/dev/null; then
-  bash_version=$(bash -c 'echo ${BASH_VERSINFO[0]}')
-  if [ "$bash_version" -ge 3 ] 2>/dev/null; then
-    echo "  [ok] bash $bash_version.x"
-  else
-    echo "  [warn] bash $bash_version.x (need 3.2+ — macOS default is fine)"
-    ok=false
-  fi
-fi
-
-if command -v python3 &>/dev/null; then
-  echo "  [ok] python3 (for ask-server)"
+if [ -x "$BIN_DIR/rebar" ] || command -v rebar &>/dev/null; then
+  echo "  [ok] rebar"
 else
-  echo "  [missing] python3 (needed for ask-server)"
+  echo "  [missing] rebar (expected at $BIN_DIR/rebar)"
+  ok=false
+fi
+if command -v claude &>/dev/null; then
+  echo "  [ok] claude"
+else
+  echo "  [missing] claude (Claude Code CLI, for ask)"
   ok=false
 fi
 

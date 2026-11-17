@@ -10,8 +10,11 @@
 # on PATH):
 #   T1  no version → highest stable tag (v9.1.0 beats v9.0.10, and is chosen
 #       over the higher pre-release v9.2.0-beta.10 and a non-semver tag);
-#       prebuilt tarball, checksum OK; current → it; ~/.bashrc gets
+#       prebuilt binary, checksum OK, companions written by the binary
+#       (install-shims), no tree; current → it; ~/.bashrc gets
 #       $REBAR_DIR/current/bin
+#   T20 a release with only a whole-tree tarball (up to v3.1.0) still
+#       installs as a tree
 #   T1b --pre → highest tag including pre-releases (v9.2.0-beta.10 beats beta.2)
 #   T1c an upstream with only pre-releases → latest falls back to the highest
 #   T2  explicit version with no release assets → source fallback, stamped
@@ -19,7 +22,8 @@
 #   T3  "9.0.10" resolves to v9.0.10; --no-switch leaves current alone
 #   T4  branch feat/x → versions/feat-x, version "feat/x@<sha7>"
 #   T5  re-install with --source replaces the version in place, no leftovers
-#   T6  checksum mismatch → refused, nothing installed, nothing left behind
+#   T6  checksum mismatch (binary, and tarball) → refused, nothing installed,
+#       nothing left behind
 #   T7  pre-versioned ~/.rebar git clone → untouched (clean, same HEAD),
 #       versions/ + current added and git-excluded, new PATH line wins
 #   T8  a non-rebar, non-empty ~/.rebar → refused
@@ -65,18 +69,32 @@ chmod +x "$O/scripts/steward.sh"
 echo "template" > "$O/templates/project-bootstrap/README.md"
 printf 'module github.com/willackerly/rebar/cli\n\ngo 1.21\n' > "$O/cli/go.mod"
 printf 'package cmd\n\nvar Version = "v0.0.0-unstamped"\n' > "$O/cli/cmd/version.go"
+# Like the real binary, it carries bin/install and writes it (and an ask
+# shim) with `install-shims --dir DIR`.
+cp "$ROOT/bin/install" "$O/cli/install.txt"
 cat > "$O/cli/main.go" <<'EOF'
 package main
 
 import (
+	_ "embed"
 	"os"
+	"path/filepath"
 
 	"github.com/willackerly/rebar/cli/cmd"
 )
 
+//go:embed install.txt
+var install []byte
+
 func main() {
 	if len(os.Args) > 1 && os.Args[1] == "version" {
 		os.Stdout.WriteString("rebar " + cmd.Version + "\n")
+		return
+	}
+	if len(os.Args) == 4 && os.Args[1] == "install-shims" && os.Args[2] == "--dir" {
+		os.MkdirAll(os.Args[3], 0o755)
+		os.WriteFile(filepath.Join(os.Args[3], "ask"), []byte("#!/bin/sh\nexec rebar ask \"$@\"\n"), 0o755)
+		os.WriteFile(filepath.Join(os.Args[3], "install"), install, 0o755)
 		return
 	}
 	os.Exit(2)
@@ -100,20 +118,37 @@ PREONLY="$TMP/preonly.git"
 g init -q --bare "$PREONLY" && g -C "$O" push -q "$PREONLY" main:main \
   && g -C "$PREONLY" tag v9.5.0-rc.1 main || fail "could not build the pre-release-only upstream"
 
-# ── Fake GitHub Releases: only v9.1.0 has assets ─────────────────────
+# ── Fake GitHub Releases: v9.1.0 has binaries, v9.2.0-beta.2 a tarball ──
 GOOS_HOST="$(go env GOOS)"; GOARCH_HOST="$(go env GOARCH)"
 export GOCACHE="$TMP/gocache" GOPATH="$TMP/gopath" GOTOOLCHAIN=local GOPROXY=off GOFLAGS=""
 "$PACKAGE" v9.1.0 --repo "$O" --ref v9.1.0 \
   --out "$TMP/releases/v9.1.0" --targets "$GOOS_HOST/$GOARCH_HOST" >/dev/null \
   || fail "package-release.sh failed against the fake upstream"
-ASSET="rebar_9.1.0_${GOOS_HOST}_${GOARCH_HOST}.tar.gz"
-[ -f "$TMP/releases/v9.1.0/$ASSET" ] || fail "package-release.sh wrote no $ASSET"
+ASSET="rebar_9.1.0_${GOOS_HOST}_${GOARCH_HOST}"
+[ -x "$TMP/releases/v9.1.0/$ASSET" ] || fail "package-release.sh wrote no executable $ASSET"
+[ "$(ls "$TMP/releases/v9.1.0" | tr '\n' ' ')" = "rebar_9.1.0_checksums.txt $ASSET " ] \
+  || fail "package-release.sh wrote $(ls "$TMP/releases/v9.1.0" | tr '\n' ' ')"
 grep -q "  $ASSET\$" "$TMP/releases/v9.1.0/rebar_9.1.0_checksums.txt" \
   || fail "checksums file does not list $ASSET"
+[ "$("$TMP/releases/v9.1.0/$ASSET" version)" = "rebar v9.1.0" ] || fail "$ASSET is not stamped v9.1.0"
+
+# A release as v3.1.0 and earlier published it: the whole tree plus bin/rebar.
+TARNAME="rebar_9.2.0-beta.2_${GOOS_HOST}_${GOARCH_HOST}"
+TARASSET="$TARNAME.tar.gz"
+mkdir -p "$TMP/tarwork/$TARNAME" "$TMP/releases/v9.2.0-beta.2"
+g -C "$O" archive v9.2.0-beta.2 | tar -x -C "$TMP/tarwork/$TARNAME"
+( cd "$TMP/tarwork/$TARNAME/cli" && CGO_ENABLED=0 go build -trimpath \
+    -ldflags "-X github.com/willackerly/rebar/cli/cmd.Version=v9.2.0-beta.2" -o ../bin/rebar . ) \
+  || fail "could not build the tarball release"
+tar -C "$TMP/tarwork" -czf "$TMP/releases/v9.2.0-beta.2/$TARASSET" "$TARNAME"
+( cd "$TMP/releases/v9.2.0-beta.2" && if command -v sha256sum >/dev/null 2>&1; then sha256sum "$TARASSET"; else shasum -a 256 "$TARASSET"; fi ) \
+  > "$TMP/releases/v9.2.0-beta.2/rebar_9.2.0-beta.2_checksums.txt"
+
 mkdir -p "$TMP/badrel"
-cp -R "$TMP/releases/v9.1.0" "$TMP/badrel/"
+cp -R "$TMP/releases/v9.1.0" "$TMP/releases/v9.2.0-beta.2" "$TMP/badrel/"
 printf 'tampered' >> "$TMP/badrel/v9.1.0/$ASSET"
-ok "package-release.sh: $ASSET + checksums from the fake upstream"
+printf 'tampered' >> "$TMP/badrel/v9.2.0-beta.2/$TARASSET"
+ok "package-release.sh: $ASSET + checksums from the fake upstream (and a tarball release by hand)"
 
 # ── Runner ───────────────────────────────────────────────────────────────────
 dir_of() { dirname "$(command -v "$1")"; }
@@ -168,10 +203,24 @@ for sh in $BASHES; do
   has "$out" "Checksum OK" "T1 [$bv]"
   [ "$(current_of "$H")" = "versions/v9.1.0" ] || fail "T1 [$bv] current is $(current_of "$H")"
   [ "$("$H/.rebar/current/bin/rebar" version)" = "rebar v9.1.0" ] || fail "T1 [$bv] wrong version"
-  [ -f "$H/.rebar/current/scripts/steward.sh" ] || fail "T1 [$bv] tarball tree is incomplete"
-  grep -q '^method=prebuilt' "$H/.rebar/current/.rebar-install" || fail "T1 [$bv] not a prebuilt install"
+  [ -x "$H/.rebar/current/bin/ask" ] && [ -x "$H/.rebar/current/bin/install" ] \
+    || fail "T1 [$bv] install-shims did not lay out the companions: $(ls "$H/.rebar/current/bin" | tr '\n' ' ')"
+  [ "$(ls -A "$H/.rebar/current" | tr '\n' ' ')" = ".rebar-install bin " ] \
+    || fail "T1 [$bv] a binary install holds $(ls -A "$H/.rebar/current" | tr '\n' ' ')"
+  grep -q '^method=prebuilt (rebar_9.1.0_' "$H/.rebar/current/.rebar-install" || fail "T1 [$bv] not a prebuilt install"
+  grep -q '^layout=binary$' "$H/.rebar/current/.rebar-install" || fail "T1 [$bv] layout not recorded"
   grep -qF "$H/.rebar/current/bin" "$H/.bashrc" || fail "T1 [$bv] PATH not wired to current/bin"
-  ok "T1 [$bv] latest = v9.1.0 (stable over v9.2.0-beta.10), prebuilt + checksum, current, PATH"
+  ok "T1 [$bv] latest = v9.1.0 (stable over v9.2.0-beta.10), prebuilt binary + checksum + companions, current, PATH"
+
+  # T20
+  H20="$TMP/h$n-tarball"
+  out="$(inst "$H20" "$sh" v9.2.0-beta.2)" || { echo "$out" | tail -20 >&2; fail "T20 [$bv] tarball install failed"; }
+  has "$out" "Checksum OK" "T20 [$bv]"
+  [ -f "$H20/.rebar/current/scripts/steward.sh" ] || fail "T20 [$bv] tarball tree is incomplete"
+  [ "$("$H20/.rebar/current/bin/rebar" version)" = "rebar v9.2.0-beta.2" ] || fail "T20 [$bv] wrong version"
+  grep -q '^layout=tree$' "$H20/.rebar/current/.rebar-install" || fail "T20 [$bv] layout not recorded"
+  case "$out" in *"may not find its scripts"*) fail "T20 [$bv] warned about a complete tree" ;; esac
+  ok "T20 [$bv] a whole-tree tarball release installs as before"
 
   # T1b
   out="$(inst "$TMP/h$n-pre" "$sh" --pre)" || { echo "$out" | tail -20 >&2; fail "T1b [$bv] --pre failed"; }
@@ -239,7 +288,11 @@ for sh in $BASHES; do
   fi
   has "$out" "checksum mismatch for $ASSET" "T6 [$bv]"
   case "$out" in *"source build"*) fail "T6 [$bv] fell back to source after a mismatch" ;; esac
-  [ ! -e "$H6/.rebar/versions/v9.1.0" ] && [ ! -e "$H6/.rebar/current" ] \
+  if out="$(RELURL="file://$TMP/badrel" inst "$H6" "$sh" v9.2.0-beta.2)"; then
+    fail "T6 [$bv] a tampered tarball was installed"
+  fi
+  has "$out" "checksum mismatch for $TARASSET" "T6 [$bv]"
+  [ ! -e "$H6/.rebar/versions/v9.1.0" ] && [ ! -e "$H6/.rebar/versions/v9.2.0-beta.2" ] && [ ! -e "$H6/.rebar/current" ] \
     || fail "T6 [$bv] something was installed"
   [ -z "$(leftovers "$H6")" ] || fail "T6 [$bv] left $(leftovers "$H6")"
   ok "T6 [$bv] checksum mismatch refused, nothing installed or left behind"

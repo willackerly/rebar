@@ -1,8 +1,11 @@
 # Release — build rebar for darwin/linux × amd64/arm64 on a v* tag push and
-# publish a GitHub Release with the tarballs and their SHA-256 checksums.
+# publish a GitHub Release with the binaries and their SHA-256 checksums.
 #
-# Each tarball is the full tree at the tag plus bin/rebar for one platform
-# (scripts/package-release.sh); setup-rebar.sh downloads and verifies it.
+# Each asset is one self-contained binary, rebar_<ver>_<os>_<arch>
+# (scripts/package-release.sh): templates, ask shims and completions are
+# compiled in. setup-rebar.sh downloads and verifies it, then runs
+# `rebar install-shims` beside it. (Releases up to v3.1.0 shipped whole-tree
+# tarballs; the installer still handles those.)
 # Tags with a pre-release suffix (v3.1.0-beta.1) become pre-releases.
 #
 # Third-party actions are pinned by commit SHA (the tag in the comment).
@@ -55,6 +58,22 @@ jobs:
         env:
           TAG: ${{ github.ref_name }}
         run: scripts/package-release.sh "$TAG" --out dist
+
+      # The linux/amd64 binary runs on this runner: it must work with no
+      # rebar tree at all (outside the checkout, empty HOME).
+      - name: Smoke-test the binary
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          bin="$PWD/dist/rebar_${TAG#v}_linux_amd64"
+          work="$(mktemp -d)"
+          cd "$work"
+          export HOME="$work/home" && mkdir -p "$HOME"
+          git config --global user.email ci@example.invalid && git config --global user.name ci
+          "$bin" version | grep -qxF "rebar $TAG"
+          "$bin" install-shims --dir "$work/kit" >/dev/null && test -x "$work/kit/ask"
+          "$bin" new smoke >/dev/null
+          (cd smoke && "$bin" check >/dev/null)
 
       - name: Create GitHub Release
         env:
