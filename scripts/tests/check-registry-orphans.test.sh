@@ -26,17 +26,17 @@ printf '// %s:%s\npackage src\n' CONTRACT USED.1.0 > "$P/src/used.go"
 
 # T1 — both orphans reported.
 out="$(run_in "$P" check-registry.sh)" && { echo "$out"; fail "T1: orphans passed"; }
-printf '%s\n' "$out" | grep -q 'ORPHAN (untracked): architecture/CONTRACT-LONELY.1.0.md' || { echo "$out"; fail "T1: LONELY not reported"; }
-printf '%s\n' "$out" | grep -q 'ORPHAN (untracked): architecture/CONTRACT-PLANNED.1.0.md' || { echo "$out"; fail "T1: PLANNED not reported"; }
-printf '%s\n' "$out" | grep -q 'FAIL: 2 inconsistencies found' || { echo "$out"; fail "T1: summary"; }
-printf '%s\n' "$out" | grep -q 'CONTRACT-USED' && { echo "$out"; fail "T1: implemented contract reported"; }
+contains "$out" 'ORPHAN (untracked): architecture/CONTRACT-LONELY.1.0.md' || { echo "$out"; fail "T1: LONELY not reported"; }
+contains "$out" 'ORPHAN (untracked): architecture/CONTRACT-PLANNED.1.0.md' || { echo "$out"; fail "T1: PLANNED not reported"; }
+contains "$out" 'FAIL: 2 inconsistencies found' || { echo "$out"; fail "T1: summary"; }
+contains "$out" 'CONTRACT-USED' && { echo "$out"; fail "T1: implemented contract reported"; }
 ok "T1: every orphan reported"
 
 # T2 — TODO.md exemption reached; only LONELY fails.
 printf -- '- [ ] implement PLANNED.1.0\n' > "$P/TODO.md"
 out="$(run_in "$P" check-registry.sh)" && { echo "$out"; fail "T2: LONELY should still fail"; }
-printf '%s\n' "$out" | grep -q 'ORPHAN (tracked in TODO.md): architecture/CONTRACT-PLANNED.1.0.md' || { echo "$out"; fail "T2: TODO exemption"; }
-printf '%s\n' "$out" | grep -q 'FAIL: 1 inconsistencies found' || { echo "$out"; fail "T2: summary"; }
+contains "$out" 'ORPHAN (tracked in TODO.md): architecture/CONTRACT-PLANNED.1.0.md' || { echo "$out"; fail "T2: TODO exemption"; }
+contains "$out" 'FAIL: 1 inconsistencies found' || { echo "$out"; fail "T2: summary"; }
 rm "$P/architecture/CONTRACT-LONELY.1.0.md"
 out="$(run_in "$P" check-registry.sh)" || { echo "$out"; fail "T2: should pass with only a tracked orphan"; }
 ok "T2: TODO.md exemption and implemented contracts"

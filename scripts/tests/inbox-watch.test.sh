@@ -91,5 +91,5 @@ fi
 
 echo "FAIL (locale=$DIVERGENT): emitted set != the 2 genuine deposits." >&2
 echo "--- expected ---" >&2; printf '%s\n' "$EXPECTED" >&2
-echo "--- got ($(printf '%s' "$EMITTED" | grep -c . || true)) ---" >&2; printf '%s\n' "$EMITTED" >&2
+echo "--- got ($(count_matches "$EMITTED" .)) ---" >&2; printf '%s\n' "$EMITTED" >&2
 exit 1
