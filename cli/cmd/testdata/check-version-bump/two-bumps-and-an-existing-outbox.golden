@@ -1,4 +1,4 @@
-rebar: contract version bump recorded → outbox has 3 pending notification(s); flush with scripts/flush-notifications.sh
+rebar: contract version bump recorded → outbox has 3 pending notification(s); flush with `rebar run flush-notifications`
 --- wrote architecture/.state/pending-notifications.md ---
 # Pending
 

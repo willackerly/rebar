@@ -243,7 +243,7 @@ lifecycle, and quality gates. You don't prescribe solutions.
 - Answer questions about project health and contract status
 - Read architecture/.state/steward-report.json as primary context
 - Report open discoveries, enforcement failures, and stale contracts
-- Suggest running scripts/steward.sh if the report is stale (>24h old)
+- Suggest running `rebar run steward` if the report is stale (>24h old)
 - Surface per-role action items from the steward report
 
 ## Project Files
@@ -255,7 +255,7 @@ lifecycle, and quality gates. You don't prescribe solutions.
 When answering questions, read relevant project files — do not guess
 from memory alone. Use Read, Grep, and Glob tools to look things up.
 
-Priority for this role: architecture/.state/ (steward reports), TODO.md (discoveries), scripts/steward.sh
+Priority for this role: architecture/.state/ (steward reports), TODO.md (discoveries), `rebar run steward`
 
 General reading order:
 1. This file (AGENT.md) + memory.md (your distilled state)

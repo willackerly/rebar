@@ -2,11 +2,12 @@ package utils
 
 import (
 	"fmt"
-	"github.com/willackerly/rebar/cli/internal/config"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/willackerly/rebar/cli/internal/config"
 
 	"github.com/willackerly/rebar/cli/internal/checks"
 )
@@ -181,13 +182,6 @@ func currentRepo(dir string) string {
 	return dir
 }
 
-// isRebarSource is the rebar source repo marker (templates/project-bootstrap/
-// and scripts/steward.sh), as cli/cmd/init.go findRebarRoot uses it.
-func isRebarSource(dir string) bool {
-	info, err := os.Stat(filepath.Join(dir, "templates", "project-bootstrap"))
-	if err != nil || !info.IsDir() {
-		return false
-	}
-	info, err = os.Stat(filepath.Join(dir, "scripts", "steward.sh"))
-	return err == nil && info.Mode().IsRegular()
-}
+// isRebarSource is the rebar source repo marker (config.IsRebarTree), as
+// cli/cmd/init.go findRebarRoot uses it.
+func isRebarSource(dir string) bool { return config.IsRebarTree(dir) }

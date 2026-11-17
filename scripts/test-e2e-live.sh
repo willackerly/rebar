@@ -219,7 +219,7 @@ if curl -s -o /dev/null -m 2 "http://${ASK_SERVER_URL}/v1/health" 2>/dev/null; t
     record FAIL "ASK server /v1/agents lists rebar:architect" "rebar:architect missing from /v1/agents"
   fi
 else
-  record SKIP "ASK server smoke" "no listener at $ASK_SERVER_URL — start with: python3 bin/ask-server --port 7232 --repos-dir $DEV_DIR"
+  record SKIP "ASK server smoke" "no listener at $ASK_SERVER_URL — start with: rebar ask serve --port 7232 --repos-dir $DEV_DIR"
 fi
 
 # ─── Live LLM queries with keyword acceptance ──────────────────────────────

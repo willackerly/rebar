@@ -37,7 +37,7 @@ func runPrefixUniqueness(ctx *Context, args []string) int {
 	dir := contracts.Dir(ctx.Root)
 	registry := ctx.Root + "/" + dir + "/CONTRACT-REGISTRY.md"
 	if !isRegular(registry) {
-		fmt.Fprintf(w, "SKIP: no %s/CONTRACT-REGISTRY.md (run scripts/compute-registry.sh to generate).\n", dir)
+		fmt.Fprintf(w, "SKIP: no %s/CONTRACT-REGISTRY.md (run `rebar run compute-registry` to generate).\n", dir)
 		return 0
 	}
 	data, _ := os.ReadFile(registry) // unreadable: no lines, as grep 2>/dev/null
@@ -93,7 +93,7 @@ func runPrefixUniqueness(ctx *Context, args []string) int {
 	fmt.Fprintln(w, "Versions of the same ID are fine; two different IDs sharing a number")
 	fmt.Fprintln(w, "overload the prefix. Renumber the newer contract to the next free number,")
 	fmt.Fprintf(w, "update its implementing-file headers (grep -rn \"%s<old-id>\"), and\n", contracts.Marker)
-	fmt.Fprintln(w, "regenerate the registry with scripts/compute-registry.sh.")
+	fmt.Fprintln(w, "regenerate the registry with `rebar run compute-registry`.")
 	if n, ok := TestInt(tier); ok && n >= 3 {
 		return 1
 	}

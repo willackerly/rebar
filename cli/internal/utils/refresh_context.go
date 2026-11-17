@@ -188,7 +188,7 @@ func runRefreshContext(ctx *checks.Context, args []string) int {
 	r.say("=== Summary ===")
 	r.say("Run 'rebar context session-start' for full context loading")
 	r.say("Run 'rebar context' for the Cold Start Quad")
-	r.say("Run 'scripts/refresh-context.sh --test-baseline' to verify tests pass")
+	r.say("Run 'rebar run refresh-context --test-baseline' to verify tests pass")
 	return 0
 }
 

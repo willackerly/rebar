@@ -488,7 +488,7 @@ main() {
     # A pre-versioned install is a rebar clone: a git checkout with rebar's
     # markers. Any other git repo is foreign.
     if [[ -e "$REBAR_DIR/.git" && -d "$REBAR_DIR/templates/project-bootstrap" \
-          && -f "$REBAR_DIR/scripts/steward.sh" ]]; then
+          && ( -f "$REBAR_DIR/scripts/steward.sh" || -d "$REBAR_DIR/cli/internal/assets" ) ]]; then
       LEGACY=1
     elif [[ ! -d "$REBAR_DIR/versions" ]] && [[ -n "$(ls -A "$REBAR_DIR" 2>/dev/null)" ]]; then
       die "$REBAR_DIR exists but is neither a rebar install nor empty. Move it aside or use --dir."
@@ -636,7 +636,7 @@ EOF
     warn "this shell runs rebar from $on_path; open a new terminal (or source your RC) to pick up $REBAR_DIR/current/bin"
   fi
   if [[ -n "${REBAR_ROOT:-}" ]]; then
-    warn "REBAR_ROOT=$REBAR_ROOT is set; REBAR_CHECK_IMPL=shell and \`rebar run\` of scripts without a built-in use that tree"
+    warn "REBAR_ROOT=$REBAR_ROOT is set; rebar doc and rebar migrate (for release history) read that tree"
   fi
 
   cat <<EOF

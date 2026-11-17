@@ -47,5 +47,5 @@ WARNING: 1 worktree(s) exist — verify they're active or clean them up
 === Summary ===
 Run 'rebar context session-start' for full context loading
 Run 'rebar context' for the Cold Start Quad
-Run 'scripts/refresh-context.sh --test-baseline' to verify tests pass
+Run 'rebar run refresh-context --test-baseline' to verify tests pass
 --- exit 0 ---

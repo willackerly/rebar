@@ -56,7 +56,7 @@ FAIL: $ROOT/architecture/CONTRACT-REGISTRY.md does not exist. Generate it: rebar
 OK: no contracts found in architecture/ — nothing to check.
 
 ━━━ Prefix Uniqueness ━━━
-SKIP: no architecture/CONTRACT-REGISTRY.md (run scripts/compute-registry.sh to generate).
+SKIP: no architecture/CONTRACT-REGISTRY.md (run `rebar run compute-registry` to generate).
 
 ━━━ Ground Truth ━━━
 SKIP: tier 2 < required tier 3 (set REBAR_TIER or .rebarrc to change, or name it in checks_enable)

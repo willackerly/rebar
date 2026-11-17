@@ -54,12 +54,11 @@ files that differ). After editing them here, run
 Then apply with `source ~/.zshrc` (or open a new terminal).
 
 **Dependencies:** the `rebar` binary and the claude CLI. ASK is built into
-`rebar` (`rebar ask …`); `bin/ask` and `bin/ask-agent-loop` hand off to the
-`rebar` beside them (else `REBAR_BIN`, else the one on `PATH`), so the two
-spellings behave the same. `REBAR_CHECK_IMPL=shell` runs the original bash
-implementation instead (needs bash, jq, uuidgen; python3 for the servers)
-until it is removed. No python is needed: `ask serve`, `bin/ask-server`,
-`bin/ask-mcp-server` and `bin/test-mcp-client` run the binary too.
+`rebar` (`rebar ask …`); `bin/ask`, `bin/ask-agent-loop`, `bin/ask-server`
+and `bin/ask-mcp-server` are small sh shims that run the `rebar` beside them
+(else `REBAR_BIN`, else the one on `PATH`), so the two spellings behave the
+same. No bash implementation, jq, uuidgen or python is needed (rebar 4
+removed them; `rebar mcp client` replaces `bin/test-mcp-client`).
 
 ## Commands
 

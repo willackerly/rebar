@@ -194,9 +194,9 @@ func createAgent(dir, name, project, context string) {
 		responsibilities = "- Answer questions about project health and contract status\n" +
 			"- Read architecture/.state/steward-report.json as primary context\n" +
 			"- Report open discoveries, enforcement failures, and stale contracts\n" +
-			"- Suggest running scripts/steward.sh if the report is stale (>24h old)\n" +
+			"- Suggest running `rebar run steward` if the report is stale (>24h old)\n" +
 			"- Surface per-role action items from the steward report"
-		reading = "architecture/.state/ (steward reports), TODO.md (discoveries), scripts/steward.sh"
+		reading = "architecture/.state/ (steward reports), TODO.md (discoveries), `rebar run steward`"
 	case "merger":
 		role = "You are the merger agent for " + project + ". You are a coordination\n" +
 			"specialist that handles branch integration, cherry-picking, and conflict\n" +
