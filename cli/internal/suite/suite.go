@@ -134,8 +134,14 @@ func runFileIn(ctx *checks.Context, dir, path string, args []string, withBash bo
 func start(ctx *checks.Context, dir, name string, args []string) (int, error) {
 	cmd := exec.Command(name, args...)
 	cmd.Dir = dir
-	cmd.Env = append(append(os.Environ(), "REBAR_PROJECT_ROOT="+ctx.Root), checks.ScriptEnv(ctx.Install)...)
-	cmd.Stdin = os.Stdin
+	base := config.Environ()
+	if base == nil {
+		base = os.Environ()
+	}
+	cmd.Env = append(append(base, "REBAR_PROJECT_ROOT="+ctx.Root), checks.ScriptEnv(ctx.Install)...)
+	if !config.Overridden() {
+		cmd.Stdin = os.Stdin // under an override (rebar migrate's probes) stdin stays closed
+	}
 	cmd.Stdout, cmd.Stderr = ctx.Stdout, ctx.Stderr
 	err := cmd.Run()
 	var exit *exec.ExitError
@@ -245,7 +251,7 @@ func (e Extra) Run(ctx *checks.Context, args []string) int {
 }
 
 // skipExtras is SKIP_CHECKS_EXTRA=1, which skips every extra check.
-func skipExtras() bool { return os.Getenv("SKIP_CHECKS_EXTRA") == "1" }
+func skipExtras() bool { return config.Getenv("SKIP_CHECKS_EXTRA") == "1" }
 
 // warnOnce reports unknown checks_enable names and an invalid
 // contract_namespace once per run, before any check runs, as the suite

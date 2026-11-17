@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"regexp"
 	"sort"
 	"strconv"
@@ -34,7 +33,7 @@ const (
 
 func runGroundTruth(ctx *Context, args []string) int {
 	printOnly := len(args) > 0 && args[0] == "--print"
-	if !printOnly && Skip(ctx, 3, "check-ground-truth") {
+	if !printOnly && Skip(ctx, MinTier("check-ground-truth"), "check-ground-truth") {
 		return 0
 	}
 	root := ctx.Root
@@ -488,7 +487,7 @@ var (
 // tracks, and the directories holding a tracked file, as the script's
 // only_tracked filter does with `git ls-files` (core.quotepath=off) and awk.
 func onlyTracked(root string, paths []string) []string {
-	out, _ := exec.Command("git", "-C", root, "-c", "core.quotepath=off", "ls-files").Output()
+	out, _ := config.Command("git", "-C", root, "-c", "core.quotepath=off", "ls-files").Output()
 	tracked := map[string]bool{}
 	for _, l := range textLines(out) {
 		tracked["."] = true

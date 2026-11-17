@@ -2,6 +2,7 @@ package checks
 
 import (
 	"fmt"
+	"github.com/willackerly/rebar/cli/internal/config"
 	"os"
 	"regexp"
 	"slices"
@@ -25,11 +26,11 @@ var (
 
 func runPrefixUniqueness(ctx *Context, args []string) int {
 	w := ctx.Stdout
-	if os.Getenv("SKIP_PREFIX_UNIQUENESS") == "1" {
+	if config.Getenv("SKIP_PREFIX_UNIQUENESS") == "1" {
 		fmt.Fprintln(w, "SKIP: check-prefix-uniqueness (SKIP_PREFIX_UNIQUENESS=1)")
 		return 0
 	}
-	if Skip(ctx, 2, "check-prefix-uniqueness") {
+	if Skip(ctx, MinTier("check-prefix-uniqueness"), "check-prefix-uniqueness") {
 		return 0
 	}
 	tier := CheckTier(ctx.Root, "check-prefix-uniqueness")

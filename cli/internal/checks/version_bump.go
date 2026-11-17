@@ -2,6 +2,7 @@ package checks
 
 import (
 	"fmt"
+	"github.com/willackerly/rebar/cli/internal/config"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -45,7 +46,7 @@ func runVersionBump(ctx *Context, args []string) int {
 		return 0
 	}
 	repo := strings.TrimRight(top, "\n")
-	outbox := os.Getenv("REBAR_OUTBOX")
+	outbox := config.Getenv("REBAR_OUTBOX")
 	if outbox == "" {
 		outbox = contractsDir + "/.state/pending-notifications.md"
 	}

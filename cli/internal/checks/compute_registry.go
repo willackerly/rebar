@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"sort"
@@ -582,7 +581,7 @@ func (s *implSearch) shadowIDs(refPrefix string) []string {
 // insideGitWorkTree is `git -C root rev-parse --is-inside-work-tree`
 // succeeding.
 func insideGitWorkTree(root string) bool {
-	return exec.Command("git", "-C", root, "rev-parse", "--is-inside-work-tree").Run() == nil
+	return config.Command("git", "-C", root, "rev-parse", "--is-inside-work-tree").Run() == nil
 }
 
 // gitFiles lists the files git grep searches with the script's pathspecs:
@@ -594,7 +593,7 @@ func (r *registryRun) gitFiles() []string {
 	for _, d := range r.excludeDirs {
 		args = append(args, ":(exclude,glob)**/"+d+"/**")
 	}
-	out, err := exec.Command("git", args...).Output()
+	out, err := config.Command("git", args...).Output()
 	if err != nil {
 		return nil
 	}

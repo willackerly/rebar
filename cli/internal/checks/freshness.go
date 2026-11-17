@@ -31,7 +31,7 @@ var (
 )
 
 func runFreshness(ctx *Context, args []string) int {
-	if Skip(ctx, 2, "check-freshness") {
+	if Skip(ctx, MinTier("check-freshness"), "check-freshness") {
 		return 0
 	}
 	maxAge := ""

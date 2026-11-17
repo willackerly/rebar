@@ -23,7 +23,7 @@ import (
 // spaces dropped, when that is 1, 2 or 3; else "3". (So `tier = 1 # note`
 // reads as 3, as it does in the scripts.)
 func Tier(root string) string {
-	if v := os.Getenv("REBAR_TIER"); v != "" {
+	if v := config.Getenv("REBAR_TIER"); v != "" {
 		return v
 	}
 	if data, err := os.ReadFile(config.RCFile(root)); err == nil {
@@ -53,6 +53,26 @@ func CheckTier(root, check string) string {
 	return Tier(root)
 }
 
+// minTiers are the tiers below which a check skips itself (the scripts'
+// `_rebar_skip N`); a check not listed runs at every tier.
+var minTiers = map[string]int{
+	"check-contract-headers":  2,
+	"check-freshness":         2,
+	"check-jtbd-presence":     2,
+	"check-prefix-uniqueness": 2,
+	"check-ground-truth":      3,
+}
+
+// MinTier is the lowest tier check (with or without .sh) runs at: what
+// it passes to Skip, for callers that need it without running the check
+// (rebar migrate).
+func MinTier(check string) int {
+	if t, ok := minTiers[strings.TrimSuffix(check, ".sh")]; ok {
+		return t
+	}
+	return 1
+}
+
 // Skip reports whether check must not run because the tier is below
 // minTier, printing the scripts' SKIP line (or, when checks_enable names
 // the check, their NOTE line and false). It first warns about unknown
@@ -76,7 +96,7 @@ func Skip(ctx *Context, minTier int, check string) bool {
 // when _REBAR_CHECKS_VALIDATED is set, and sets it, so the checks and
 // scripts started after it stay quiet.
 func WarnChecksEnable(ctx *Context) {
-	if os.Getenv("_REBAR_CHECKS_VALIDATED") != "" {
+	if config.Getenv("_REBAR_CHECKS_VALIDATED") != "" {
 		return
 	}
 	os.Setenv("_REBAR_CHECKS_VALIDATED", "1")
@@ -94,7 +114,7 @@ func ContractNamespace(ctx *Context) string {
 	if ns == "" || config.ValidContractNamespace(ns) {
 		return ns
 	}
-	if os.Getenv("_REBAR_NAMESPACE_VALIDATED") == "" {
+	if config.Getenv("_REBAR_NAMESPACE_VALIDATED") == "" {
 		os.Setenv("_REBAR_NAMESPACE_VALIDATED", "1")
 		fmt.Fprintf(ctx.Stderr, "rebar: ignoring contract_namespace '%s' (allowed: letters, digits, . _ / -; must not start like a contract ID.version)\n", ns)
 	}

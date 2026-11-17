@@ -2,7 +2,7 @@ package suite
 
 import (
 	"fmt"
-	"os"
+	"github.com/willackerly/rebar/cli/internal/config"
 
 	"github.com/willackerly/rebar/cli/internal/checks"
 )
@@ -91,7 +91,7 @@ func runCICheck(ctx *checks.Context, args []string) int {
 	r := &ciRun{ctx: ctx}
 	for _, step := range ciSteps {
 		s := resolve(ctx, step.script, false)
-		if os.Getenv(step.skip) == "1" {
+		if config.Getenv(step.skip) == "1" {
 			r.skip(step.label)
 			continue
 		}

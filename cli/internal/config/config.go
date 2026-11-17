@@ -46,7 +46,7 @@ func Load(repoRoot string) (*Config, error) {
 	c.ChecksEnable = ChecksEnableFor(repoRoot)
 
 	// REBAR_TIER env takes precedence
-	if env := os.Getenv("REBAR_TIER"); env != "" {
+	if env := Getenv("REBAR_TIER"); env != "" {
 		t, err := strconv.Atoi(env)
 		if err == nil && t >= 1 && t <= 3 {
 			c.Tier = t
@@ -144,7 +144,7 @@ func EnsureRebarDir(repoRoot string) error {
 // "architecture". Mirrors _rebar_contracts_dir in scripts/_rebar-config.sh.
 // A value that is absolute or leaves the repo falls back to the default.
 func ContractsDirFor(repoRoot string) string {
-	dir := os.Getenv("REBAR_CONTRACTS_DIR")
+	dir := Getenv("REBAR_CONTRACTS_DIR")
 	if dir == "" {
 		dir = RCValue(repoRoot, "contracts_dir")
 	}
@@ -157,10 +157,17 @@ func ContractsDirFor(repoRoot string) string {
 
 // RCFile is the .rebarrc the settings of the repo at repoRoot are read
 // from: REBAR_RCFILE when set (`rebar migrate` uses it to try settings
-// before writing them), else repoRoot/.rebarrc. Mirrors _rebar_rc_file in
+// before writing them), else repoRoot/.rebarrc; under WithEnv, the
+// override's RCFile. Mirrors _rebar_rc_file in
 // scripts/_rebar-config.sh.
 func RCFile(repoRoot string) string {
-	if f := os.Getenv("REBAR_RCFILE"); f != "" {
+	if e := envOver.Load(); e != nil {
+		if e.RCFile != "" {
+			return e.RCFile
+		}
+		return filepath.Join(repoRoot, ".rebarrc")
+	}
+	if f := Getenv("REBAR_RCFILE"); f != "" {
 		return f
 	}
 	return filepath.Join(repoRoot, ".rebarrc")
@@ -203,7 +210,7 @@ func RCValueIn(rcFile, key string) string {
 // the repo's .rebarrc (RCFile), else def when that is absent or empty.
 func RCValueOr(repoRoot, key, envVar, def string) string {
 	if envVar != "" {
-		if v := os.Getenv(envVar); v != "" {
+		if v := Getenv(envVar); v != "" {
 			return v
 		}
 	}
@@ -230,7 +237,7 @@ var KnownChecks = []string{
 // UnknownChecks); the scripts warn about and ignore them. Mirrors
 // _rebar_checks_enable in scripts/_rebar-config.sh.
 func ChecksEnableFor(repoRoot string) []string {
-	raw := os.Getenv("REBAR_CHECKS_ENABLE")
+	raw := Getenv("REBAR_CHECKS_ENABLE")
 	if raw == "" {
 		raw = RCValue(repoRoot, "checks_enable")
 	}

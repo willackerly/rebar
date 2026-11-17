@@ -1,6 +1,7 @@
 package checks
 
 import (
+	"github.com/willackerly/rebar/cli/internal/config"
 	"io"
 	"os"
 )
@@ -10,7 +11,7 @@ import (
 // w is a terminal and NO_COLOR is unset or empty. Checks that colour call
 // it once per run with ctx.Stdout.
 func UseColour(w io.Writer) bool {
-	return os.Getenv("NO_COLOR") == "" && IsTerminal(w)
+	return config.Getenv("NO_COLOR") == "" && IsTerminal(w)
 }
 
 // IsTerminal is the shell's `test -t` for w: w is an *os.File open on a

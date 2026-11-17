@@ -3,6 +3,7 @@ package checks
 import (
 	"bytes"
 	"fmt"
+	"github.com/willackerly/rebar/cli/internal/config"
 	"os"
 	"regexp"
 	"slices"
@@ -24,11 +25,11 @@ var jtbdSections = []string{"Why this exists", "Who needs this", "Scenarios"}
 
 func runJTBDPresence(ctx *Context, args []string) int {
 	w := ctx.Stdout
-	if os.Getenv("SKIP_JTBD") == "1" {
+	if config.Getenv("SKIP_JTBD") == "1" {
 		fmt.Fprintln(w, "SKIP: check-jtbd-presence (SKIP_JTBD=1)")
 		return 0
 	}
-	if Skip(ctx, 2, "check-jtbd-presence") {
+	if Skip(ctx, MinTier("check-jtbd-presence"), "check-jtbd-presence") {
 		return 0
 	}
 	tier := CheckTier(ctx.Root, "check-jtbd-presence")

@@ -7,6 +7,7 @@ package gitx
 import (
 	"bytes"
 	"errors"
+	"github.com/willackerly/rebar/cli/internal/config"
 	"io"
 	"os/exec"
 	"strings"
@@ -19,7 +20,7 @@ const NotFound = 127
 // Run runs git with args in dir and returns its standard output and exit
 // code. Its standard error goes to errw (nil discards it, as 2>/dev/null).
 func Run(dir string, errw io.Writer, args ...string) (string, int) {
-	cmd := exec.Command("git", args...)
+	cmd := config.Command("git", args...)
 	cmd.Dir = dir
 	var out bytes.Buffer
 	cmd.Stdout = &out

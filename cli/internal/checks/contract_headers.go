@@ -24,7 +24,7 @@ func init() {
 const headerLines = 15
 
 func runContractHeaders(ctx *Context, args []string) int {
-	if Skip(ctx, 2, "check-contract-headers") {
+	if Skip(ctx, MinTier("check-contract-headers"), "check-contract-headers") {
 		return 0
 	}
 	sourceDirs := config.RCValueOr(ctx.Root, "source_dirs", "", sourcescan.DefaultSourceDirs)
