@@ -1,75 +1,74 @@
 #!/usr/bin/env bash
 # Regression test: the pinned-wrapper snippet in SETUP.md "## Run rebar in CI",
-# extracted from the doc and run offline. A local repo with a tag stands in for
-# github.com/willackerly/rebar and a stub `go` writes bin/rebar, so no network
-# or Go toolchain is needed.
-#   T1  first run fetches, builds and execs the pinned rebar, and leaves no
-#       temp clone behind (the snippet once set an EXIT trap and then exec'd,
-#       so the trap never ran and every cold run leaked one)
-#   T2  a cached run execs straight away
-#   T3  a tag that does not match the pinned commit is refused, and the temp
-#       clone is still cleaned up
+# extracted from the doc and run offline. A file:// directory stands in for
+# GitHub Releases (a stub rebar binary for this platform plus the checksums
+# file), so no network is needed.
+#   T1  first run downloads, verifies and execs the pinned rebar, caches it,
+#       and leaves no temp directory behind
+#   T2  a cached run execs straight away (no download)
+#   T3  a binary that does not match the release's checksum is refused,
+#       nothing is cached, and the temp directory is cleaned up
+#   T4  a nested `rebar` (PATH) is the pinned one
 # Bash 3.2 compatible.
 set -euo pipefail
 . "$(dirname "$0")/lib.sh"
 rebar_tmpdir ci-wrapper
 
 ROOT_DIR="$(cd "$REBAR_TESTS_DIR/../.." && pwd)"
-doc_snippet "$ROOT_DIR/SETUP.md" '**The trap: pinned binary, no tree.**' > "$TMP/snippet.sh"
-grep -q 'exec "$ROOT/bin/rebar"' "$TMP/snippet.sh" || fail "snippet not found in SETUP.md"
+doc_snippet "$ROOT_DIR/SETUP.md" '**Pinned wrapper.**' > "$TMP/snippet.sh"
+grep -q 'exec "$ROOT/rebar"' "$TMP/snippet.sh" || fail "snippet not found in SETUP.md"
+command -v curl >/dev/null 2>&1 || { echo "SKIP: curl not installed"; exit 0; }
 
-# Upstream: a cli/ dir and a tag.
-up="$TMP/upstream"
-mkdir -p "$up/cli"
-echo "package main" > "$up/cli/main.go"
-g -C "$up" init -q
-g -C "$up" add -A
-g -C "$up" commit -qm init
-g -C "$up" tag v9.9.9
-sha="$(g -C "$up" rev-parse HEAD)"
+os="$(uname -s | tr '[:upper:]' '[:lower:]')"
+case "$(uname -m)" in
+  x86_64|amd64)  arch=amd64 ;;
+  arm64|aarch64) arch=arm64 ;;
+  *) echo "SKIP: no release name for $(uname -m)"; exit 0 ;;
+esac
+asset="rebar_9.9.9_${os}_${arch}"
+sha256() { if command -v sha256sum >/dev/null 2>&1; then sha256sum "$@"; else shasum -a 256 "$@"; fi; }
 
-# Stub go: `go build ... -o OUT .` writes a rebar that reports its args.
-mkdir -p "$TMP/stub"
-cat > "$TMP/stub/go" <<'STUB'
-#!/usr/bin/env bash
-out=""
-while [ $# -gt 0 ]; do [ "$1" = -o ] && out="$2"; shift; done
-mkdir -p "$(dirname "$out")"
-printf '#!/usr/bin/env bash\necho "pinned rebar $*"\n' > "$out"
-chmod +x "$out"
-STUB
-chmod +x "$TMP/stub/go"
-
-wrapper() {
-  sed -e "s|^REBAR_PIN=.*|REBAR_PIN=\"v9.9.9\"|" \
-      -e "s|^REBAR_PIN_COMMIT=.*|REBAR_PIN_COMMIT=\"$1\"|" "$TMP/snippet.sh" > "$TMP/rebar.sh"
-  chmod +x "$TMP/rebar.sh"
+# release <dir>: a fake release v9.9.9 whose binary reports its args and
+# which rebar is first on PATH.
+release() {
+  mkdir -p "$1/v9.9.9"
+  printf '#!/usr/bin/env bash\necho "pinned rebar $* (path: $(command -v rebar))"\n' > "$1/v9.9.9/$asset"
+  (cd "$1/v9.9.9" && sha256 "$asset" > rebar_9.9.9_checksums.txt)
 }
+release "$TMP/releases"
+release "$TMP/bad"
+printf 'tampered\n' >> "$TMP/bad/v9.9.9/$asset"
+
+sed -e 's|^REBAR_PIN=.*|REBAR_PIN="v9.9.9"|' "$TMP/snippet.sh" > "$TMP/rebar.sh"
+chmod +x "$TMP/rebar.sh"
 mkdir -p "$TMP/tmpdir"
-run_wrapper() {
-  PATH="$TMP/stub:$PATH" TMPDIR="$TMP/tmpdir" REBAR_CACHE_DIR="$TMP/cache" \
-    REBAR_REPOSITORY="file://$up" "$TMP/rebar.sh" "$@" 2>&1
+run_wrapper() {  # run_wrapper <releases dir> args...
+  local rel="$1"
+  shift
+  TMPDIR="$TMP/tmpdir" REBAR_CACHE_DIR="$TMP/cache" REBAR_RELEASES="file://$rel" "$TMP/rebar.sh" "$@" 2>&1
 }
 leftovers() { ls -A "$TMP/tmpdir"; }
 
 # T1
-wrapper "$sha"
-out="$(run_wrapper check -v)" || fail "T1: wrapper failed: $out"
-[ "$out" = "pinned rebar check -v" ] || fail "T1: unexpected output: $out"
-[ -z "$(leftovers)" ] || fail "T1: temp clone left behind: $(leftovers)"
-[ "$(cat "$TMP/cache/v9.9.9/.pinned-commit")" = "$sha" ] || fail "T1: cache not pinned"
-ok "T1 cold run execs the pinned rebar and leaves no temp clone"
+out="$(run_wrapper "$TMP/releases" check -v)" || fail "T1: wrapper failed: $out"
+case "$out" in "pinned rebar check -v "*) ;; *) fail "T1: unexpected output: $out" ;; esac
+[ -x "$TMP/cache/v9.9.9/rebar" ] || fail "T1: binary not cached"
+[ -z "$(leftovers)" ] || fail "T1: temp directory left behind: $(leftovers)"
+ok "T1 cold run downloads, verifies and execs the pinned rebar, no temp left"
+
+# T4
+case "$out" in *"(path: $TMP/cache/v9.9.9/rebar)") ;; *) fail "T4: nested rebar is not the pinned one: $out" ;; esac
+ok "T4 nested rebar calls get the pinned binary"
 
 # T2
-rm "$TMP/stub/go"
-out="$(run_wrapper run check-todos)" || fail "T2: cached run failed: $out"
-[ "$out" = "pinned rebar run check-todos" ] || fail "T2: unexpected output: $out"
-ok "T2 cached run execs without rebuilding"
+out="$(run_wrapper "$TMP/nowhere" run check-todos)" || fail "T2: cached run failed: $out"
+case "$out" in "pinned rebar run check-todos "*) ;; *) fail "T2: unexpected output: $out" ;; esac
+ok "T2 cached run execs without downloading"
 
 # T3
 rm -rf "$TMP/cache"
-wrapper 0000000000000000000000000000000000000000
-if out="$(run_wrapper check)"; then fail "T3: mismatched pin accepted: $out"; fi
-case "$out" in *"does not point at"*) ;; *) fail "T3: unexpected error: $out" ;; esac
-[ -z "$(leftovers)" ] || fail "T3: temp clone left behind: $(leftovers)"
-ok "T3 mismatched pin refused, temp clone cleaned up"
+if out="$(run_wrapper "$TMP/bad" check)"; then fail "T3: tampered binary accepted: $out"; fi
+case "$out" in *"checksum mismatch for $asset"*) ;; *) fail "T3: unexpected error: $out" ;; esac
+[ ! -e "$TMP/cache/v9.9.9" ] || fail "T3: a tampered binary was cached"
+[ -z "$(leftovers)" ] || fail "T3: temp directory left behind: $(leftovers)"
+ok "T3 checksum mismatch refused, nothing cached, temp cleaned up"

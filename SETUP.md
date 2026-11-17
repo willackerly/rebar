@@ -11,8 +11,7 @@ parts to adopt.
 - A git repository
 - Claude Code (or another AI coding agent that reads markdown context files)
 - 30 minutes for initial setup
-- `jq` (for steward quality scanning — `brew install jq` / `apt install jq`)
-- The rebar install — see [Install rebar](#install-rebar)
+- The `rebar` binary — see [Install rebar](#install-rebar)
 
 ## Install rebar
 
@@ -37,20 +36,27 @@ exists yet, the highest pre-release). Variants (`…` is the `curl` part):
 | `… \| bash -s -- v3.1.0 --source` | from source even if a prebuilt download exists |
 | `… \| bash -s -- v3.1.0 --dir /opt/rebar` | under `/opt/rebar` instead of `~/.rebar` (CI) |
 
-Each version is a complete rebar tree in `~/.rebar/versions/<version>/`;
-`~/.rebar/current` is a symlink to the active one, so switching never edits
-your RC again (`ln -sfn versions/<version> ~/.rebar/current` switches by
-hand; `rm -rf ~/.rebar/versions/<version>` removes one). Releases with
-prebuilt assets download as a tarball verified against the release's SHA-256
-checksums (a mismatch aborts); releases without assets, branches and commits
-(by full 40-character SHA) build from source, which needs `git` and Go. Branch
+Each version lives in `~/.rebar/versions/<version>/`; `~/.rebar/current` is
+a symlink to the active one, so switching never edits your RC again
+(`ln -sfn versions/<version> ~/.rebar/current` switches by hand;
+`rm -rf ~/.rebar/versions/<version>` removes one). From 3.2 a release is one
+self-contained binary per platform, `rebar_<ver>_<os>_<arch>`: the installer
+verifies it against the release's SHA-256 checksums (a mismatch aborts), puts
+it at `versions/<version>/bin/rebar` and runs `rebar install-shims`, which
+writes the `ask*` shims, `bin/install` and the shell completions beside it.
+Releases up to v3.1.0 published a tarball of the whole tree instead, which the
+installer still unpacks. Releases without assets, branches and commits (by
+full 40-character SHA) build from source, which needs `git` and Go and keeps
+the whole tree of that ref. Branch
 names are made path-safe for the directory (`feat/x` → `versions/feat-x`); if
 two refs map to the same name, the second install is refused rather than
 replacing the first. `./setup-rebar.sh --help` lists every option.
 
-The CLI runs the scripts of the tree it belongs to, so `rebar check` always
-uses the checks of the version you run. Upgrading a project that already uses
-rebar: [UPGRADING.md](UPGRADING.md).
+The checks are built into the binary, so `rebar check` always uses the
+checks of the version you run. Downloaded the binary by hand (or built it
+with `go build`)? It works on its own; run `rebar install-shims` once if you
+want the `ask` command and the completions next to it. Upgrading a project
+that already uses rebar: [UPGRADING.md](UPGRADING.md).
 
 ### Testing a release candidate
 
@@ -80,15 +86,15 @@ pre-releases included).
 installer leaves the clone as it is — not moved, not updated — and adds
 `versions/` and `current` inside it (git-excluded). The new PATH entry comes
 later in your RC, so it wins; `.mcp.json` files and `REBAR_ROOT` that point at
-the clone keep working until you re-run `rebar init` or change them. If
-`REBAR_ROOT` is set, the CLI runs that tree's scripts, not
-`~/.rebar/current`'s; unset it to use the installed version.
+the clone keep working until you re-run `rebar init` or change them.
+`REBAR_ROOT` only matters for `REBAR_CHECK_IMPL=shell` (see "Where a rebar
+tree still matters" below).
 
 ## Run rebar in CI
 
-A project's checks run from the rebar install (`rebar check` executes the
-install's `scripts/` against the project), so CI needs a complete rebar tree
-at the version you pin, not just the `rebar` binary.
+From 3.2 the `rebar` binary is self-contained: the checks, the suites, ASK,
+the MCP server and the bootstrap templates are built in, so CI needs only the
+binary of the version you pin, no rebar tree and no `REBAR_ROOT`.
 
 **GitHub Actions, with the installer:**
 
@@ -96,7 +102,7 @@ at the version you pin, not just the `rebar` binary.
       - uses: actions/checkout@v4
       - name: Install rebar
         env:
-          REBAR_VERSION: v3.1.0
+          REBAR_VERSION: v3.2.0
         run: |
           curl -fsSL "https://raw.githubusercontent.com/willackerly/rebar/${REBAR_VERSION}/setup-rebar.sh" \
             | bash -s -- "$REBAR_VERSION" --dir "$RUNNER_TEMP/rebar"
@@ -105,79 +111,69 @@ at the version you pin, not just the `rebar` binary.
         run: rebar check            # or ./scripts/ci-check.sh
 ```
 
-The release's prebuilt tarball needs only `curl`, `tar` and `shasum` or
-`sha256sum`. A tag without prebuilt assets falls back to a source build, which
-needs `git` and Go (add `actions/setup-go`). The checks themselves need `jq`
-and `git`. The installer also appends a PATH line to the runner's shell RC,
-which is harmless there.
+The release binary needs only `curl` and `shasum` or `sha256sum`; the
+installer verifies it against the release's checksums and writes the `ask`
+shims and `bin/install` beside it. A tag without prebuilt assets falls back to
+a source build, which needs `git` and Go (add `actions/setup-go`). The checks
+themselves need `git`. The installer also appends a PATH line to the runner's
+shell RC, which is harmless there.
 
-**How the CLI finds its scripts.** In order (`findRebarRoot` in
-`cli/cmd/init.go`), the first directory that holds both
-`templates/project-bootstrap/` and `scripts/steward.sh` wins:
-
-1. `$REBAR_ROOT`
-2. the directory above the running binary, after resolving symlinks
-   (`~/.rebar/current/bin/rebar` → `~/.rebar/versions/<v>/`)
-3. the current directory (working on rebar itself)
-4. `~/.rebar/current`, `~/.rebar`, `~/dev/rebar`, `~/src/rebar`, `~/code/rebar`
-
-If none matches, `rebar check` fails (`rebar: ci-check.sh not found in the
-project or a rebar install`) and `rebar check --pre-commit` prints
-`pre-commit.sh not found … skipping` and **exits 0** (a commit hook must not
-block on a missing install). A CI step that runs `--pre-commit` without an
-install therefore passes without checking anything.
-
-**The trap: pinned binary, no tree.** A wrapper that builds only the `rebar`
-binary from a pinned commit into a cache directory (virtru-analyze's
-`scripts/rebar.sh` did) worked while the project carried copies of rebar's
-scripts. Under 3.1 that binary finds no `scripts/` beside it; it falls through
-to `~/.rebar/current` (a different version on a laptop, nothing on a CI
-runner). Keep the whole tree of the pinned commit and build the binary into
-it:
+**Pinned wrapper.** To run the version a repository pins without an install
+step, download the release binary for the platform once, verify it, cache it
+and run it; nothing else is needed:
 
 ```bash
 #!/usr/bin/env bash
-# scripts/rebar.sh — run the rebar version this repository pins, with that
-# version's own scripts. Usage: scripts/rebar.sh check | run <script> | ...
+# scripts/rebar.sh — run the rebar version this repository pins.
+# Usage: scripts/rebar.sh check | run <check> | ...
 set -euo pipefail
 
-REBAR_PIN="v3.1.0"                          # a release tag
-REBAR_PIN_COMMIT="<commit the tag points at>" # git rev-parse 'v3.1.0^{commit}' in a clone
-REBAR_REPOSITORY="${REBAR_REPOSITORY:-https://github.com/willackerly/rebar.git}"
+REBAR_PIN="v3.2.0"   # a release from 3.2 on (self-contained binary)
+REBAR_RELEASES="${REBAR_RELEASES:-https://github.com/willackerly/rebar/releases/download}"
 ROOT="${REBAR_CACHE_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/rebar}/$REBAR_PIN"
 
-if [ ! -x "$ROOT/bin/rebar" ] || [ "$(cat "$ROOT/.pinned-commit" 2>/dev/null)" != "$REBAR_PIN_COMMIT" ]; then
+if [ ! -x "$ROOT/rebar" ]; then
+  os="$(uname -s | tr '[:upper:]' '[:lower:]')"
+  case "$(uname -m)" in
+    x86_64|amd64)  arch=amd64 ;;
+    arm64|aarch64) arch=arm64 ;;
+    *) echo "rebar: no release binary for $(uname -m)" >&2; exit 1 ;;
+  esac
+  asset="rebar_${REBAR_PIN#v}_${os}_${arch}"
   tmp="$(mktemp -d "${TMPDIR:-/tmp}/rebar-pin.XXXXXX")"
-  trap 'rm -rf "$tmp"' EXIT
-  git -C "$tmp" init -q src
-  git -C "$tmp/src" fetch -q --depth 1 "$REBAR_REPOSITORY" "refs/tags/$REBAR_PIN"
-  [ "$(git -C "$tmp/src" rev-parse 'FETCH_HEAD^{commit}')" = "$REBAR_PIN_COMMIT" ] \
-    || { echo "rebar $REBAR_PIN does not point at $REBAR_PIN_COMMIT" >&2; exit 1; }
-  # The whole tree, not just the CLI: rebar check runs the tree's scripts/.
-  mkdir "$tmp/tree"
-  git -C "$tmp/src" archive FETCH_HEAD | tar -x -C "$tmp/tree"
-  (cd "$tmp/tree/cli" && CGO_ENABLED=0 go build -trimpath -o ../bin/rebar .)
-  echo "$REBAR_PIN_COMMIT" > "$tmp/tree/.pinned-commit"
-  mkdir -p "$(dirname "$ROOT")" && rm -rf "$ROOT" && mv "$tmp/tree" "$ROOT"
-  rm -rf "$tmp"; trap - EXIT   # exec below replaces the shell: no EXIT trap runs
+  curl -fsSL -o "$tmp/$asset" "$REBAR_RELEASES/$REBAR_PIN/$asset"
+  curl -fsSL -o "$tmp/sums" "$REBAR_RELEASES/$REBAR_PIN/rebar_${REBAR_PIN#v}_checksums.txt"
+  want="$(awk -v f="$asset" '$2 == f { print $1 }' "$tmp/sums")"
+  got="$( (sha256sum "$tmp/$asset" 2>/dev/null || shasum -a 256 "$tmp/$asset") | awk '{ print $1 }')"
+  if [ -z "$want" ] || [ "$want" != "$got" ]; then
+    rm -rf "$tmp"
+    echo "rebar $REBAR_PIN: checksum mismatch for $asset" >&2
+    exit 1
+  fi
+  mkdir "$tmp/bin" && mv "$tmp/$asset" "$tmp/bin/rebar" && chmod 755 "$tmp/bin/rebar"
+  mkdir -p "$(dirname "$ROOT")" && rm -rf "$ROOT" && mv "$tmp/bin" "$ROOT"
+  rm -rf "$tmp"
 fi
 
-export REBAR_ROOT="$ROOT"
-export PATH="$ROOT/bin:$PATH"   # nested `rebar` calls get the same version
-exec "$ROOT/bin/rebar" "$@"
+export PATH="$ROOT:$PATH"   # nested `rebar` calls get the same version
+exec "$ROOT/rebar" "$@"
 ```
 
-The binary would find `$ROOT` through its own `../` anyway; `REBAR_ROOT` makes
-the choice explicit and wins over a stray `~/.rebar`. The project's
-`scripts/ci-check.sh` and `scripts/pre-commit.sh`, and the wrappers
-`rebar migrate` leaves for copies that other files call, run whatever `rebar`
-is on PATH. So a project script that CI runs directly should call the pinned
-wrapper (`scripts/rebar.sh run check-todos`), not those files, unless the CI
-job puts the pinned `bin/` on PATH. In CI, cache
-`$REBAR_CACHE_DIR` between runs if the build time matters. Without Go on the
-runner, use the installer instead:
-`setup-rebar.sh "$REBAR_PIN" --dir "$ROOT_BASE" --no-switch`, then run
-`"$ROOT_BASE/versions/$REBAR_PIN/bin/rebar"`.
+The project's `scripts/ci-check.sh` and `scripts/pre-commit.sh`, and the
+wrappers `rebar migrate` leaves for copies that other files call, run
+whatever `rebar` is on PATH, so a project script that CI runs directly should
+call the pinned wrapper (`scripts/rebar.sh run check-todos`), unless the CI
+job puts `$ROOT` on PATH. Cache `$REBAR_CACHE_DIR` between runs to skip the
+download. (Before 3.2 the binary ran the scripts of the rebar tree beside it,
+so a wrapper had to keep the whole tree of the pinned commit; such a
+wrapper keeps working with 3.2, it just no longer needs the tree.)
+
+**Where a rebar tree still matters.** `REBAR_CHECK_IMPL=shell` (the bash
+scripts, until they are removed) and `rebar run` of a script that has no
+built-in (rebar's own maintainer tools) use a rebar tree: `$REBAR_ROOT`, else
+the directory above the binary, the current directory, then `~/.rebar/current`,
+`~/.rebar`, `~/dev/rebar`, `~/src/rebar`, `~/code/rebar` (`findRebarRoot` in
+`cli/cmd/init.go`). Nothing else reads one.
 
 ## Step 1: Pick Your Profiles
 

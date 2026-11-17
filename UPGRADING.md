@@ -14,6 +14,16 @@ Design notes: [self-contained install](feedback/2026-11-14-self-contained-instal
 [rebar migrate](feedback/2026-11-14-rebar-migrate.md),
 [versioned installer](feedback/2026-11-14-versioned-installer.md).
 
+**What changes in 3.2.** The `rebar` binary is self-contained: the checks,
+the suites, ASK, the MCP server and the bootstrap templates are built in. A
+release is one binary per platform (`rebar_<ver>_<os>_<arch>`, verified by
+the installer), not a tarball of the rebar tree, and nothing reads a rebar
+tree any more except `REBAR_CHECK_IMPL=shell`. `rebar migrate` compares your
+copies with the built-in checks, and also turns a `ci-check.sh` /
+`pre-commit.sh` copy that only adds calls to your own scripts into
+`checks_extra` / `checks_extra_pre_commit` lines. The steps below apply
+unchanged; step 10 (CI) gets simpler.
+
 In the commands below, `v3.1.0` is the release you are moving to. Use the
 tag you are actually installing.
 
@@ -34,8 +44,8 @@ Fetch the installer from the tag you install: until 3.1 is on `main`,
 `main`'s `setup-rebar.sh` is the old installer and has no version argument
 (see [Testing a release candidate](SETUP.md#testing-a-release-candidate)).
 
-The new version lands in `~/.rebar/versions/v3.1.0/`, a complete rebar
-tree. `--no-switch` leaves `~/.rebar/current` (the version on your PATH)
+The new version lands in `~/.rebar/versions/v3.1.0/` (a complete rebar
+tree for 3.1; from 3.2, the binary with its `ask` shims and completions). `--no-switch` leaves `~/.rebar/current` (the version on your PATH)
 alone, so other projects are unaffected while you try this one. The
 exception is a machine with **no versioned install yet**, including a
 `~/.rebar` that is a plain git clone from the old installer: the first version
@@ -45,7 +55,7 @@ not touched; `.mcp.json` files and `REBAR_ROOT` values that name it keep
 working.
 
 To run a version that is not `current`, call it by path; each version runs
-its own scripts:
+its own checks:
 
 ```bash
 ~/.rebar/versions/v3.1.0/bin/rebar version
@@ -55,8 +65,9 @@ Switch for good with `ln -sfn versions/v3.1.0 ~/.rebar/current` (or
 re-run the installer without `--no-switch`). The rest of this runbook writes
 plain `rebar` for the 3.1 CLI.
 
-If `REBAR_ROOT` is set in your shell, the CLI runs that tree's scripts rather
-than the installed version's; unset it unless you mean it.
+If `REBAR_ROOT` is set in your shell, a 3.1 CLI runs that tree's scripts
+rather than the installed version's; unset it unless you mean it. From 3.2 it
+only matters for `REBAR_CHECK_IMPL=shell`.
 
 ## 2. Migrate copied scripts: `rebar migrate`
 
@@ -74,8 +85,10 @@ rebar migrate
 ```
 
 It takes seconds on a small project and a few minutes on a large one
-(virtru-analyze: about 3 minutes). For every copy of a rebar script in
-`scripts/` it runs the copy and the install's script and prints:
+(virtru-analyze: about 3 minutes with 3.1; from 3.2 the reference side runs
+in process, so the time is mostly your copies' own). For every copy of a
+rebar script in `scripts/` it runs the copy (with bash) and rebar's check (the
+install's script in 3.1, the built-in check from 3.2) and prints:
 
 - **`.rebarrc` additions**, between `# --- rebar migrate … ---` markers and
   grouped by the script they came from: `metric.<key>.*` lines translated
@@ -94,7 +107,11 @@ It takes seconds on a small project and a few minutes on a large one
   (`steward.sh`, `inbox-watch.sh`, …) go when they are byte-identical to a
   released version; the CLI carries the list, so this works on any install.
   `ci-check.sh`, `pre-commit.sh` and `scripts/README.md` are replaced by the
-  template's files. A verified copy that another project file calls is not
+  template's files. From 3.2, a `ci-check.sh` or `pre-commit.sh` copy that is
+  a released version plus calls to your own scripts is replaced too, those
+  scripts moving to `checks_extra` / `checks_extra_pre_commit` (rebar's
+  suite runs them after its own checks), when rebar's suite with them exits
+  as the copy does on the project; otherwise it is kept with the reason. A verified copy that another project file calls is not
   deleted but **wrapped** (see step 3).
 - **keep**, with the reason: a customized copy the install does not
   reproduce keeps running as before, and so does any copy a kept copy calls.
@@ -295,14 +312,18 @@ that edit is the same on every branch and merges cleanly.
 
 ## 10. CI
 
-Under 3.1 a project's checks run the install's `scripts/`, so CI needs a
-whole rebar tree at the pinned version, not just a `rebar` binary. A CI step
-that only builds the CLI from a pinned commit into a cache directory stops
-working once the copies are gone: the binary finds no `scripts/` next to it,
-`rebar check` fails with `rebar: ci-check.sh not found in the project or a
-rebar install`, and `rebar check --pre-commit` skips every check and exits 0.
-[SETUP.md § Run rebar in CI](SETUP.md#run-rebar-in-ci) has a GitHub Actions
-step and a pinned wrapper that keeps the full tree.
+From 3.2, CI needs only the `rebar` binary of the version you pin: install it
+with `setup-rebar.sh`, or download the release binary in a pinned wrapper
+([SETUP.md § Run rebar in CI](SETUP.md#run-rebar-in-ci) has both). No rebar
+tree, no `REBAR_ROOT`.
+
+Under 3.1 a project's checks ran the install's `scripts/`, so CI needed a
+whole rebar tree at the pinned version: a step that only built the CLI from a
+pinned commit into a cache directory stopped working once the copies were
+gone (`rebar check` failed with `rebar: ci-check.sh not found in the project
+or a rebar install`, and `rebar check --pre-commit` skipped every check and
+exited 0). Such a wrapper keeps working with 3.2; it no longer needs the
+tree.
 
 ## 11. Verify
 

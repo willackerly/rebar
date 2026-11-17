@@ -59,6 +59,17 @@ extensions. Forking is the default state; divergence is made visible
 via `rebar contract drift-check`. Composition over inheritance — local
 extensions are local first-class contracts, not `extends:` metadata.
 
+### §1.7 Enforcement Ships as One Binary
+The plain-text substrate is markdown, `CONTRACT:` tags, `grep` and `git`.
+rebar's enforcement — the checks and suites, ASK and its MCP server, the
+project templates — ships as one self-contained `rebar` binary per platform,
+downloaded prebuilt and checksum-verified: nothing to build, no toolchain, no
+rebar tree beside it. A team can adopt rebar at Tier 1 with that one
+download. Amends §1.3 where it names bash scripts as the primary surface,
+calls the Go and Python binaries optional, and says "zero binaries built";
+the substrate itself is unchanged, and a project's own checks stay plain
+scripts (`checks_extra`).
+
 ---
 
 ## §2 — What rebar IS NOT
@@ -191,6 +202,11 @@ Document History for the trigger events that motivated past amendments.
 
 ## Document History
 
+- **2026-11-17** — §1.7 (Enforcement Ships as One Binary) amends §1.3's
+  tooling sentences: the go-native stack moved every check, ASK and the
+  templates into one self-contained, prebuilt `rebar` binary (releases
+  publish it per platform with checksums). Motivating proposal:
+  `feedback/2026-11-14-go-native-checks.md` (open question 1).
 - **2026-04-28 (eve)** — §1.6 (Cross-Repo Contract Federation) and §2.10
   (Not a federation registry / package manager) amendments landed
   together. Motivating proposal: `feedback/2026-04-28-cross-repo-contract-federation.md`.

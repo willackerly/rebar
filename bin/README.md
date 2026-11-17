@@ -44,6 +44,13 @@ See the [root README](../README.md) for how ASK fits into the overall system.
 This adds `bin/` to your PATH (in `.zshrc`/`.bashrc`/`.profile`), optionally
 sets `ASK_SERVER`, and checks dependencies. Idempotent — safe to run again.
 
+The shims (`ask`, `ask-agent-loop`, `ask-mcp-server`, `ask-server`),
+`install` and `completions/` are also compiled into the `rebar` binary:
+`rebar install-shims` writes them beside it (setup-rebar.sh does this for a
+release binary; `--dir DIR` writes them elsewhere, `--force` overwrites
+files that differ). After editing them here, run
+`scripts/sync-bootstrap.sh` to refresh the embedded copy.
+
 Then apply with `source ~/.zshrc` (or open a new terminal).
 
 **Dependencies:** the `rebar` binary and the claude CLI. ASK is built into

@@ -18,6 +18,37 @@ All notable changes to rebar. Versioned with [semver](https://semver.org/).
 
 ## Unreleased
 
+- **The `rebar` binary is self-contained, and releases are binaries.**
+  `rebar new / init / adopt` write the bootstrap template compiled into the
+  binary (`cli/internal/assets`, a `.embed`-suffixed copy that
+  `scripts/sync-bootstrap.sh` refreshes and, with `go test`, checks), so
+  `new / adopt / init / migrate / check / run / ask / mcp` need no rebar tree
+  and no `REBAR_ROOT`; only `REBAR_CHECK_IMPL=shell` (until S8) and `rebar
+  run` of rebar's maintainer scripts still use one. New `rebar install-shims
+  [--dir DIR] [--force]` writes the `ask*` shims, `bin/install` and the
+  completions beside the binary. The release workflow publishes
+  `rebar_<ver>_<os>_<arch>` binaries plus `rebar_<ver>_checksums.txt` (no
+  tarballs) and smoke-tests the linux/amd64 one with no tree;
+  `setup-rebar.sh` downloads and verifies the binary and runs `install-shims`
+  (whole-tree tarballs of v3.1.0 and earlier, and source builds, still
+  install as trees; `.rebar-install` records `layout=`). `rebar run` lists
+  the built-in checks; `rebar audit` and `rebar context session-start` count
+  them as available; with no rebar tree, `rebar check` marks Bootstrap Sync
+  and Script Tests "(rebar source repo only)". `bin/install` no longer asks
+  for jq or python3. Docs: SETUP's CI section (the "pinned binary, no tree"
+  trap is gone; the pinned wrapper now downloads and verifies the release
+  binary), UPGRADING, README, and CHARTER §1.7 / the DESIGN tooling row
+  ("enforcement ships as one prebuilt binary").
+- **`rebar migrate` compares copies with the built-in checks, in process.**
+  The reference side is the native check, run with the candidate `.rebarrc`
+  as an explicit rc file and a scrubbed environment (`config.WithEnv`)
+  instead of the install's script under `REBAR_RCFILE`; legacy copies still
+  run with bash. A rebar tree is optional (its git history adds released
+  versions). The migrate test package runs in about half the time. New: a
+  `ci-check.sh` / `pre-commit.sh` copy that is a released version plus calls
+  to project scripts becomes the thin wrapper with `checks_extra` /
+  `checks_extra_pre_commit` when rebar's suite with them exits as the copy
+  does; otherwise it is kept with the reason.
 - **ASK's servers run natively.** `rebar mcp serve` is the MCP server
   (was the python `bin/ask-mcp-server`): stdio and HTTP, the same flags,
   tool names (`ask_<repo>_<role>`), input schema, descriptions, resources

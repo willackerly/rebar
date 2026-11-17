@@ -201,8 +201,8 @@ tree. The binary is ~6 MB today [M].
 ### Release = binary
 
 The release workflow publishes `rebar_<ver>_<os>_<arch>` binaries (darwin /
-linux × amd64 / arm64) plus SHA256 checksums (S7; whether tarballs stay is
-decided there). ASK (`bin/ask`, `bin/ask-server`, `bin/ask-mcp-server`,
+linux × amd64 / arm64) plus SHA256 checksums (S7; no tarballs: the binary
+writes its companions with `rebar install-shims`). ASK (`bin/ask`, `bin/ask-server`, `bin/ask-mcp-server`,
 `bin/ask-agent-loop`, `bin/test-mcp-client`: ~4,000 lines of bash and Python
 [M]) is ported to Go in S6, with the same flags, MCP tool names and on-disk
 state, and thin compat shims for adopters' `.mcp.json` and scripts that name
@@ -377,8 +377,9 @@ estimates per PR, Go incl. tests: S0 ~2,050 [M]; S1 ~2,000; S2 ~2,200; S3
 
 1. **CHARTER §1.3 / DESIGN tooling row.** Amend to "the plain-text
    substrate is markdown, CONTRACT: tags, grep and git; enforcement ships as
-   one prebuilt binary"? **Resolved:** yes, in S8 with the docs, as a
-   plan-mode CHARTER amendment (the binary-only end state requires it).
+   one prebuilt binary"? **Resolved:** yes, as a CHARTER amendment (the
+   binary-only end state requires it). Landed in S7, with the self-contained
+   binary, as §1.7 (append-only, per CHARTER §5) plus the DESIGN row.
 2. **Default flip.** Per check once green, or all at once? **Resolved:** per
    check, in the PR that ports it; shell selectable until S8.
 3. **Output fidelity.** Byte-identical text including order, or identical
@@ -399,7 +400,10 @@ estimates per PR, Go incl. tests: S0 ~2,050 [M]; S1 ~2,000; S2 ~2,200; S3
 8. **ASK.** Out of scope here, so the binary alone does not cover `rebar
    ask`. Separate proposal, or keep tarballs for ASK indefinitely?
    **Resolved:** ASK is ported to Go in S6 and its bash/Python tools are
-   deleted in S8; whether tarballs stay is decided in S7.
+   deleted in S8. **S7:** tarballs are dropped; a release is the bare
+   binaries plus checksums, and the binary writes the `bin/ask*` shims,
+   `bin/install` and completions beside itself (`rebar install-shims`, run by
+   setup-rebar.sh), so release and source installs lay out the same files.
 9. **`rebar native` visibility.** Hidden during the transition, removed with
    the switch? **Resolved:** hidden through the stack; with no scripts left
    to hand off, it goes (or stays as a hidden debugging aid) in S8.

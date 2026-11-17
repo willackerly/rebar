@@ -862,7 +862,7 @@ companion docs, discovery taxonomy.
 | Code philosophy | "Code is disposable, specs are permanent" | Code and contracts are co-equal | Contracts become stale when not grounded in implementation |
 | Repo structure | Git submodules | Flat vendoring (proposed) | Submodules add complexity small teams can't absorb |
 | Dashboard | Required web UI | JSON-first, dashboard optional | `jq` should answer what a dashboard can |
-| Tooling | Purpose-built CLI | bash + jq + grep | Zero dependencies beyond a Unix shell |
+| Tooling | Purpose-built CLI | One prebuilt `rebar` binary over markdown + grep + git | Download one checksum-verified file, nothing to build; the knowledge stays plain text (CHARTER §1.7) |
 
 **What we adopted and adapted:**
 - Computed lifecycle status (derived from code, never declared)

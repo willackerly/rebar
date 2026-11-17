@@ -39,7 +39,7 @@ Each script is standalone, runs in <5 seconds, and exits 0 (pass) or 1 (fail).
 | `check-decay-patterns.sh` | Soft-hardening anti-patterns in spec/test files |
 | `check-jtbd-presence.sh` | Latest-version contracts carry non-empty Why/Who/Scenarios sections |
 | `check-prefix-uniqueness.sh` | No prefix number (S1, I3, …) claimed by two different contract IDs |
-| `sync-bootstrap.sh --check` | `templates/project-bootstrap/scripts/` holds only thin entry points; the template's `CONTRACT-TEMPLATE.md` matches `architecture/` |
+| `sync-bootstrap.sh --check` | `templates/project-bootstrap/scripts/` holds only thin entry points; the template's `CONTRACT-TEMPLATE.md` matches `architecture/`; the binary's embedded copy (`cli/internal/assets/files/`) matches the template and the `bin/` companions |
 
 ## Composite Runners
 
@@ -181,8 +181,8 @@ Pre-commit (fast, <5s)       CI (thorough, <30s)          Full scan (comprehensi
 
 | Script | What it does |
 |--------|--------------|
-| `package-release.sh <version>` | Build the release tarballs (full tree at the ref + `bin/rebar` per platform) and `rebar_<ver>_checksums.txt`; what `.github/workflows/release.yml` runs on a `v*` tag. `--targets`, `--out`, `--ref`, `--repo` |
-| `sync-bootstrap.sh` (+ `--check`) | Keep `templates/project-bootstrap/scripts/` down to the thin entry points; caught by ci-check |
+| `package-release.sh <version>` | Build the release binaries (`rebar_<ver>_<os>_<arch>`, self-contained, one per platform) and `rebar_<ver>_checksums.txt`; what `.github/workflows/release.yml` runs on a `v*` tag. `--targets`, `--out`, `--ref`, `--repo` |
+| `sync-bootstrap.sh` (+ `--check`) | Keep `templates/project-bootstrap/scripts/` down to the thin entry points and refresh the binary's embedded copy of the template and `bin/` companions (run it after editing them); caught by ci-check and `go test` |
 | `test-e2e-live.sh` | End-to-end smoke against a live LLM. Gated on `claude` CLI; per-repo gates skip cleanly when adopted repos aren't on disk. Includes version triple-check (binary / `.rebar-version` / latest tag), MCP server discovery + tools/list smoke, ASK HTTP server smoke (if running), and 4 live LLM keyword-acceptance queries (rebar:steward, rebar:architect, local-mode, cross-repo). Run after every meaningful update — single command answer to "is this still working?" |
 
 ## Source-of-truth structure

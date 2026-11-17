@@ -91,7 +91,11 @@ curl -fsSL https://raw.githubusercontent.com/willackerly/rebar/v3.1.0/setup-reba
 
 Installs rebar under `~/.rebar/versions/v3.1.0/` and puts
 `~/.rebar/current/bin` (`rebar`, `ask`) on your PATH; open a new terminal
-afterwards. Versions live side by side; options, CI, and release candidates:
+afterwards. From 3.2 a release is a single self-contained binary per
+platform (checksum-verified by the installer); the binary alone runs
+everything, so you can also download `rebar_<ver>_<os>_<arch>` from the
+GitHub Release, put it on your PATH as `rebar`, and run `rebar install-shims`
+for the `ask` command and completions. Versions live side by side; options, CI, and release candidates:
 [SETUP.md § Install rebar](SETUP.md#install-rebar),
 [§ Testing a release candidate](SETUP.md#testing-a-release-candidate),
 [§ Run rebar in CI](SETUP.md#run-rebar-in-ci). Upgrading a project that
