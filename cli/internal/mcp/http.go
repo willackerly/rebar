@@ -133,7 +133,7 @@ func (h *MCPHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if path == "/mcp" {
-		h.streamable().ServeHTTP(w, r)
+		h.streamable().ServeHTTP(notInitializedWriter{w}, r)
 		return
 	}
 	if r.Method == http.MethodGet {

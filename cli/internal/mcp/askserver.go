@@ -87,8 +87,8 @@ func (h *AskServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 func (h *AskServer) shown() string { return strings.Join(h.AskCmd, " ") }
 
 // run runs the ask command with args in the repo.
-func (h *AskServer) run(path string, timeout time.Duration, args ...string) (string, string, int, error) {
-	return runAsk(append(append([]string{}, h.AskCmd...), args...), path, timeout)
+func (h *AskServer) run(ctx context.Context, path string, timeout time.Duration, args ...string) (string, string, int, error) {
+	return runAskContext(ctx, append(append([]string{}, h.AskCmd...), args...), path, timeout)
 }
 
 func (h *AskServer) ask(w http.ResponseWriter, r *http.Request) {
@@ -113,7 +113,7 @@ func (h *AskServer) ask(w http.ResponseWriter, r *http.Request) {
 	if verbose {
 		args = append(args, "-v")
 	}
-	stdout, stderr, code, err := h.run(path, AskTimeout, append(args, role, question)...)
+	stdout, stderr, code, err := h.run(r.Context(), path, AskTimeout, append(args, role, question)...)
 	switch {
 	case errors.Is(err, context.DeadlineExceeded):
 		jsonError(w, 504, fmt.Sprintf("Agent '%s:%s' timed out (%ds)", repo, role, int(AskTimeout.Seconds())))
@@ -151,7 +151,7 @@ func (h *AskServer) status(w http.ResponseWriter, repo, role string) {
 	if !ok {
 		return
 	}
-	stdout, _, _, err := h.run(path, 10*time.Second, "status", role)
+	stdout, _, _, err := h.run(context.Background(), path, 10*time.Second, "status", role)
 	if err != nil {
 		jsonError(w, 500, fmt.Sprintf("Error checking status: %v", err))
 		return
@@ -200,7 +200,7 @@ func (h *AskServer) reset(w http.ResponseWriter, repo, role string) {
 	if !ok {
 		return
 	}
-	stdout, _, _, err := h.run(path, 10*time.Second, "reset", role)
+	stdout, _, _, err := h.run(context.Background(), path, 10*time.Second, "reset", role)
 	if err != nil {
 		jsonError(w, 500, fmt.Sprintf("Error resetting agent: %v", err))
 		return

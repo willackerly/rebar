@@ -82,7 +82,7 @@ GET /v1/repos?x=1
 GET /v1/status/web/architect 
 404 {"error": "Not found"}
 POST /mcp {"jsonrpc":"2.0","method":"tools/list","id":9}
-200 [application/json] {"jsonrpc":"2.0","id":9,"error":{"code":0,"message":"method \"tools/list\" is invalid during session initialization"}}
+200 [application/json] {"jsonrpc":"2.0","id":9,"error":{"code":-32600,"message":"method \"tools/list\" is invalid during session initialization"}}
 POST /mcp {"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"t","version":"1"}},"id":1}
 200 [application/json] [Mcp-Session-Id: $SESSION] {"jsonrpc":"2.0","id":1,"result":{"capabilities":{"resources":{},"tools":{}},"protocolVersion":"2025-11-25","serverInfo":{"name":"ask-mcp-server","description":"MCP server for ASK agent coordination platform","version":"$VERSION"}}}
 POST /mcp {"jsonrpc":"2.0","method":"notifications/initialized"}

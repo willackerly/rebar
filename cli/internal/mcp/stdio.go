@@ -22,24 +22,72 @@ import (
 //     ends the session at the first malformed line; this server reports it
 //     on stderr and reads on (no reply: a response with id null breaks
 //     Claude Code's client, CONTRACT:S3-MCP-SERVER.1.0).
-//   - at end of input it waits until every request read has been answered
-//     (the SDK answers calls concurrently and cancels the unanswered ones
-//     when its reader stops), so `printf '…' | rebar mcp serve --stdio`
-//     prints every response.
+//   - at end of input, or when ctx is done (SIGINT/SIGTERM), it stops
+//     reading, cancels the tool calls still running and waits up to
+//     ShutdownGrace for every request read to be answered (quick ones —
+//     tools/list, resources — answer; cancelled calls answer with an
+//     isError "cancelled" result): a client that exits never waits on the
+//     server, and `printf '…' | rebar mcp serve --stdio` still prints the
+//     answers of quick requests. Then the SDK session ends and leftover ask
+//     processes are killed (shutdown.go).
 
 // ServeStdio runs the MCP server over stdin/stdout; it returns at the end
-// of input.
-func (s *Server) ServeStdio(in io.Reader, out, errw io.Writer) error {
+// of input or, when ctx is done, after a shutdown.
+func (s *Server) ServeStdio(ctx context.Context, in io.Reader, out, errw io.Writer) error {
 	p := newPending()
-	t := &sdk.IOTransport{
-		Reader: &stdinFilter{in: bufio.NewReader(in), log: errw, pending: p},
-		Writer: &stdoutTracker{out: out, pending: p},
+	f := &stdinFilter{lines: readLines(in), stop: ctx.Done(), log: errw, pending: p, shutdown: s.Stop,
+		stopping: make(chan struct{}), closed: make(chan struct{})}
+	t := &sdk.IOTransport{Reader: f, Writer: &stdoutTracker{out: out, pending: p}}
+	done := make(chan error, 1)
+	go func() { done <- s.NewMCPServer().Run(context.Background(), t) }()
+	defer KillChildren()
+	var err error
+	select {
+	case err = <-done:
+	case <-f.stopping:
+		// The session ends once the filter reports end of input; its
+		// handlers were cancelled, so this does not take long, but never
+		// longer than the grace (plus a moment to write the answers).
+		select {
+		case err = <-done:
+		case <-time.After(time.Until(f.deadline) + 500*time.Millisecond):
+			return nil
+		}
 	}
-	err := s.NewMCPServer().Run(context.Background(), t)
 	if err == io.EOF {
 		return nil
 	}
 	return err
+}
+
+// line is one line of input, or the error that ended it.
+type line struct {
+	b   []byte
+	err error
+}
+
+// readLines reads in line by line (the last line may lack its newline);
+// the channel closes at the end of input. Reading runs on its own so a
+// signal can end the session while a read blocks.
+func readLines(in io.Reader) <-chan line {
+	ch := make(chan line)
+	go func() {
+		defer close(ch)
+		r := bufio.NewReader(in)
+		for {
+			b, err := r.ReadBytes('\n')
+			if len(b) > 0 {
+				ch <- line{b: b}
+			}
+			if err != nil {
+				if err != io.EOF {
+					ch <- line{err: err}
+				}
+				return
+			}
+		}
+	}()
+	return ch
 }
 
 // pending is the set of requests read and not yet answered, by id, and
@@ -101,16 +149,27 @@ func (p *pending) has(id jsonrpc.ID) bool {
 }
 
 // wait blocks until every request is answered, the transport closes, or
-// limit passes (a request the SDK never answers must not keep the server
-// alive).
-func (p *pending) wait(limit time.Duration) {
-	timer := time.AfterFunc(limit, p.close)
+// deadline passes (a request the SDK never answers must not keep the
+// server alive).
+func (p *pending) wait(deadline time.Time) {
+	timer := time.AfterFunc(time.Until(deadline), p.close)
 	defer timer.Stop()
 	p.mu.Lock()
 	for len(p.ids) > 0 && !p.closed {
 		p.cond.Wait()
 	}
 	p.mu.Unlock()
+}
+
+// count is the number of requests not yet answered.
+func (p *pending) count() int {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	n := 0
+	for _, c := range p.ids {
+		n += c
+	}
+	return n
 }
 
 func (p *pending) close() {
@@ -120,33 +179,48 @@ func (p *pending) close() {
 	p.mu.Unlock()
 }
 
-// stdinFilter is the SDK's reader: the valid messages of in, one per line.
+// stdinFilter is the SDK's reader: the valid messages of lines, one per
+// line, until the end of input or stop.
 type stdinFilter struct {
-	in      *bufio.Reader
-	log     io.Writer
-	pending *pending
-	buf     []byte
-	eof     bool
+	lines    <-chan line
+	stop     <-chan struct{}
+	log      io.Writer
+	pending  *pending
+	shutdown func() // cancels the running tool calls
+	buf      []byte
+
+	stopping chan struct{} // closed when the shutdown starts
+	deadline time.Time     // the end of the grace
+	ended    bool
+	closed   chan struct{} // closed by Close (the SDK ended the session)
+	once     sync.Once
 }
 
 func (f *stdinFilter) Read(b []byte) (int, error) {
 	for len(f.buf) == 0 {
-		if f.eof {
-			f.pending.wait(AskTimeout + 10*time.Second)
+		if f.ended {
 			return 0, io.EOF
 		}
-		line, err := f.in.ReadBytes('\n')
-		if err == io.EOF {
-			f.eof = true
-		} else if err != nil {
-			return 0, err
-		}
-		if msg := bytes.TrimSpace(line); len(msg) > 0 {
-			if reason := f.check(msg); reason != "" {
-				fmt.Fprintf(f.log, "ask-mcp-server: ignored invalid message (%s): %s\n", reason, abbreviate(msg))
+		select {
+		case l, ok := <-f.lines:
+			if !ok {
+				f.end("end of input")
 				continue
 			}
-			f.buf = append(msg, '\n')
+			if l.err != nil {
+				return 0, l.err
+			}
+			if msg := bytes.TrimSpace(l.b); len(msg) > 0 {
+				if reason := f.check(msg); reason != "" {
+					fmt.Fprintf(f.log, "ask-mcp-server: ignored invalid message (%s): %s\n", reason, abbreviate(msg))
+					continue
+				}
+				f.buf = append(msg, '\n')
+			}
+		case <-f.stop:
+			f.end("signal received")
+		case <-f.closed:
+			return 0, io.EOF
 		}
 	}
 	n := copy(b, f.buf)
@@ -154,8 +228,27 @@ func (f *stdinFilter) Read(b []byte) (int, error) {
 	return n, nil
 }
 
+// end is the shutdown: no more requests are read, running tool calls are
+// cancelled, and the answers still due get ShutdownGrace.
+func (f *stdinFilter) end(why string) {
+	f.deadline = time.Now().Add(ShutdownGrace)
+	close(f.stopping)
+	if why != "end of input" {
+		fmt.Fprintf(f.log, "ask-mcp-server: %s: shutting down\n", why)
+	}
+	if n := f.pending.count(); n > 0 {
+		fmt.Fprintf(f.log, "ask-mcp-server: %s: cancelling %d running request(s)\n", why, n)
+	}
+	f.shutdown()
+	f.pending.wait(f.deadline)
+	f.ended = true
+}
+
 func (f *stdinFilter) Close() error {
 	f.pending.close()
+	if f.closed != nil {
+		f.once.Do(func() { close(f.closed) })
+	}
 	return nil
 }
 
@@ -245,7 +338,10 @@ type stdoutTracker struct {
 }
 
 func (w *stdoutTracker) Write(b []byte) (int, error) {
-	n, err := w.out.Write(b)
+	n, err := w.out.Write(fixNotInitialized(b))
+	if err == nil {
+		n = len(b)
+	}
 	var batch []json.RawMessage
 	raws := []json.RawMessage{bytes.TrimSpace(b)}
 	if json.Unmarshal(raws[0], &batch) == nil {

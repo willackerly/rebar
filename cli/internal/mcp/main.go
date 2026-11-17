@@ -1,6 +1,7 @@
 package mcp
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -110,18 +111,48 @@ func listen(o *options) (net.Listener, error) {
 	return net.Listen("tcp", net.JoinHostPort(o.host, strconv.Itoa(o.port)))
 }
 
-// serveUntilSignal serves h on l until SIGINT/SIGTERM.
-func serveUntilSignal(l net.Listener, h http.Handler, onStop func()) error {
-	srv := &http.Server{Handler: h}
-	sigs := make(chan os.Signal, 1)
+// signalled is a context done at the first SIGINT/SIGTERM. Later signals
+// are ignored: the shutdown is bounded (ShutdownGrace), and dying on a
+// second one would orphan the ask processes it is stopping.
+func signalled() (context.Context, func()) {
+	ctx, cancel := context.WithCancel(context.Background())
+	sigs := make(chan os.Signal, 2)
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
-	defer signal.Stop(sigs)
+	go func() {
+		select {
+		case <-sigs:
+			cancel()
+		case <-ctx.Done():
+		}
+	}()
+	return ctx, func() { signal.Stop(sigs); cancel() }
+}
+
+// serveUntilSignal serves h on l until SIGINT/SIGTERM, then shuts down:
+// it stops accepting connections, cancels the requests running (their
+// contexts and stop, which cancels MCP tool calls), waits up to
+// ShutdownGrace for them to finish, and kills leftover ask processes.
+func serveUntilSignal(l net.Listener, h http.Handler, onStop, stop func()) error {
+	base, cancelRequests := context.WithCancel(context.Background())
+	defer cancelRequests()
+	srv := &http.Server{Handler: h, BaseContext: func(net.Listener) context.Context { return base }}
+	sig, unhook := signalled()
+	defer unhook()
 	errc := make(chan error, 1)
 	go func() { errc <- srv.Serve(l) }()
 	select {
-	case <-sigs:
+	case <-sig.Done():
 		onStop()
-		srv.Close()
+		cancelRequests()
+		if stop != nil {
+			stop()
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), ShutdownGrace)
+		defer cancel()
+		if srv.Shutdown(ctx) != nil {
+			srv.Close()
+		}
+		KillChildren()
 		return nil
 	case err := <-errc:
 		if errors.Is(err, http.ErrServerClosed) {
@@ -158,7 +189,9 @@ Examples:
 	server := &Server{Registry: reg, AskCmd: askCmd(o.askBin, self)}
 	if o.stdio {
 		fmt.Fprintln(stderr, "ask-mcp-server: starting MCP stdio transport")
-		if err := server.ServeStdio(stdin, stdout, stderr); err != nil {
+		sig, unhook := signalled()
+		defer unhook()
+		if err := server.ServeStdio(sig, stdin, stdout, stderr); err != nil {
 			fmt.Fprintf(stderr, "ask-mcp-server: %v\n", err)
 			return 1
 		}
@@ -183,7 +216,7 @@ Examples:
 	}
 	fmt.Fprintln(stdout)
 	h := &MCPHandler{Server: server, APIKey: o.apiKey, MCPOnly: o.mcpOnly, Log: stderr}
-	if err := serveUntilSignal(l, h, func() { fmt.Fprintln(stdout, "\nask-mcp-server: shutting down") }); err != nil {
+	if err := serveUntilSignal(l, h, func() { fmt.Fprintln(stdout, "\nask-mcp-server: shutting down") }, server.Stop); err != nil {
 		fmt.Fprintf(stderr, "ask-mcp-server: %v\n", err)
 		return 1
 	}
@@ -225,7 +258,7 @@ Then from any machine:
 	fmt.Fprintf(stdout, "ask-server: listening on %s:%d (%s)\n", o.host, o.port, auth)
 	fmt.Fprintf(stdout, "ask-server: try: curl http://localhost:%d/v1/agents\n\n", o.port)
 	h := &AskServer{Registry: reg, APIKey: o.apiKey, AskCmd: askCmd(o.askBin, self), Log: stdout}
-	if err := serveUntilSignal(l, h, func() { fmt.Fprintln(stdout, "\nask-server: shutting down") }); err != nil {
+	if err := serveUntilSignal(l, h, func() { fmt.Fprintln(stdout, "\nask-server: shutting down") }, nil); err != nil {
 		fmt.Fprintf(stderr, "ask-server: %v\n", err)
 		return 1
 	}

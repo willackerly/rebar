@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"net/http"
+	"regexp"
 	"strings"
 
 	"github.com/modelcontextprotocol/go-sdk/jsonrpc"
@@ -22,7 +24,9 @@ import (
 // resource URIs. It also guards the SDK (v1.8.0): "arguments": null
 // panicked in its schema defaults (a nil map) and took the server down, so
 // null arguments count as absent, and a panic in a handler becomes an
-// internal error instead of a crash.
+// internal error instead of a crash. (Fixed upstream in v1.9.0:
+// modelcontextprotocol/go-sdk#1340, #1343; the null guard can go with the
+// upgrade.)
 func (s *Server) aliases(next sdk.MethodHandler) sdk.MethodHandler {
 	return func(ctx context.Context, method string, req sdk.Request) (res sdk.Result, err error) {
 		defer func() {
@@ -90,3 +94,43 @@ func (s *Server) canonicalURI(uri string) string {
 	}
 	return "ask://" + kind + "/" + canonRepo + ":" + canonRole
 }
+
+// A request before initialize gets the SDK's error "method "<m>" is invalid
+// during session initialization" with code 0 (a plain Go error, raised
+// before any middleware runs). Code 0 is not a JSON-RPC error code, so the
+// answer is rewritten on its way out to -32600 (invalid request): what the
+// SDK itself answers from v1.9.0 on (modelcontextprotocol/go-sdk, server.go,
+// "nopreinitinvalidrequest"), so upgrading changes nothing on the wire and
+// this rewrite can go then. (The python server used -32002, a code MCP has
+// also used for "resource not found".)
+const codeNotInitialized = -32600
+
+var notInitialized = regexp.MustCompile(`"error":\{"code":0,("message":"method \\"[^"\\]*\\" is invalid during session initialization"\})`)
+
+// fixNotInitialized is b with the SDK's not-initialized errors given
+// codeNotInitialized.
+func fixNotInitialized(b []byte) []byte {
+	if !bytes.Contains(b, []byte("is invalid during session initialization")) {
+		return b
+	}
+	return notInitialized.ReplaceAll(b, []byte(fmt.Sprintf(`"error":{"code":%d,$1`, codeNotInitialized)))
+}
+
+// notInitializedWriter applies fixNotInitialized to the SDK's HTTP answers
+// (one JSON-RPC message or event per Write).
+type notInitializedWriter struct{ http.ResponseWriter }
+
+func (w notInitializedWriter) Write(b []byte) (int, error) {
+	if _, err := w.ResponseWriter.Write(fixNotInitialized(b)); err != nil {
+		return 0, err
+	}
+	return len(b), nil
+}
+
+func (w notInitializedWriter) Flush() {
+	if f, ok := w.ResponseWriter.(http.Flusher); ok {
+		f.Flush()
+	}
+}
+
+func (w notInitializedWriter) Unwrap() http.ResponseWriter { return w.ResponseWriter }

@@ -540,10 +540,11 @@ esac
 // rest and reported "Repository dsp not found").
 func TestMCPToolNameWithUnderscore(t *testing.T) {
 	repos, stub := mcpFixture(t)
-	input := mcpInit + "\n" +
-		`{"jsonrpc":"2.0","method":"tools/call","params":{"name":"ask_dsp_2_8_steward","arguments":{"question":"q"}},"id":2}` + "\n" +
-		`{"jsonrpc":"2.0","method":"tools/call","params":{"name":"ask_DSP_2_8_STEWARD","arguments":{"question":"q"}},"id":3}` + "\n"
-	out, errOut, code := mcpStdio(t, []string{testBinary(t), "mcp", "serve", "--stdio", "--repos-dir", repos, "--ask-bin", stub}, mcpEnv(t), input)
+	out, errOut, code := mcpConverse(t, []string{testBinary(t), "mcp", "serve", "--stdio", "--repos-dir", repos, "--ask-bin", stub}, mcpEnv(t), []mcpStep{
+		{mcpInit, true},
+		{`{"jsonrpc":"2.0","method":"tools/call","params":{"name":"ask_dsp_2_8_steward","arguments":{"question":"q"}},"id":2}`, true},
+		{`{"jsonrpc":"2.0","method":"tools/call","params":{"name":"ask_DSP_2_8_STEWARD","arguments":{"question":"q"}},"id":3}`, true},
+	})
 	if code != 0 || strings.Count(out, `"text":"answer from dsp_2_8: steward q"`) != 2 {
 		t.Errorf("exit %d:\n%s\n%s", code, out, errOut)
 	}
@@ -556,9 +557,10 @@ func TestMCPNativeAsk(t *testing.T) {
 	bin := t.TempDir()
 	testutil.WriteExecutable(t, bin, "claude", "#!/bin/sh\necho \"cwd=$(pwd) server=[$ASK_SERVER]\" >&2\nprintf '{\"result\":\"native answer\",\"session_id\":\"s-1\"}\\n'\n")
 	env := mcpEnv(t, "PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH"), "ASK_SERVER=remote:1", "HOME="+t.TempDir())
-	input := mcpInit + "\n" +
-		`{"jsonrpc":"2.0","method":"tools/call","params":{"name":"ask_web_product","arguments":{"question":"Who?"}},"id":2}` + "\n"
-	out, errOut, code := mcpStdio(t, []string{testBinary(t), "mcp", "serve", "--stdio", "--repos-dir", repos}, env, input)
+	out, errOut, code := mcpConverse(t, []string{testBinary(t), "mcp", "serve", "--stdio", "--repos-dir", repos}, env, []mcpStep{
+		{mcpInit, true},
+		{`{"jsonrpc":"2.0","method":"tools/call","params":{"name":"ask_web_product","arguments":{"question":"Who?"}},"id":2}`, true},
+	})
 	if code != 0 || !strings.Contains(out, `"text":"native answer"`) {
 		t.Fatalf("exit %d:\n%s\n%s", code, out, errOut)
 	}

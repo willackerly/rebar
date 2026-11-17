@@ -50,6 +50,8 @@ type Server struct {
 	// AskCmd is the ask command a tools/call runs, before its arguments:
 	// [ASK_BIN] or [rebar, "ask"].
 	AskCmd []string
+
+	stop stopper
 }
 
 // inputSchema is every tool's input schema (unchanged since the python
@@ -276,6 +278,8 @@ func (s *Server) ExecuteAsk(ctx context.Context, repo, role, question string, ve
 	}
 	argv = append(argv, role, question)
 	shown := strings.Join(argv, " ")
+	ctx, cancel := s.withStop(ctx)
+	defer cancel()
 	stdout, stderr, code, err := runAskContext(ctx, argv, path, AskTimeout)
 	switch {
 	case errors.Is(err, context.Canceled):
@@ -301,14 +305,13 @@ func (s *Server) ExecuteAsk(ctx context.Context, repo, role, question string, ve
 	return "", strings.Join(lines, "\n")
 }
 
-// runAsk runs argv in dir with ASK_SERVER cleared and returns its output
-// and exit status (negative for a signal, as python reports it).
-func runAsk(argv []string, dir string, timeout time.Duration) (string, string, int, error) {
-	return runAskContext(context.Background(), argv, dir, timeout)
-}
-
-// runAskContext is runAsk ended early when parent is done (a client
-// cancelled the request, or the session closed): context.Canceled.
+// runAskContext runs argv in dir with ASK_SERVER cleared and returns its
+// output and exit status (negative for a signal, as python reports it), or
+// context.Canceled when parent is done first (a client cancelled the
+// request, or the server is shutting down). The command runs in its own process group; ending it
+// early sends the group SIGTERM, then SIGKILL after KillDelay, and kills
+// what is left of the group (a backend that ignored the signal) once the
+// command has exited.
 func runAskContext(parent context.Context, argv []string, dir string, timeout time.Duration) (string, string, int, error) {
 	ctx, cancel := context.WithTimeout(parent, timeout)
 	defer cancel()
@@ -317,7 +320,22 @@ func runAskContext(parent context.Context, argv []string, dir string, timeout ti
 	cmd.Env = append(withoutEnv(os.Environ(), "ASK_SERVER", "PWD"), "ASK_SERVER=", "PWD="+dir)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
-	err := cmd.Run()
+	inOwnGroup(cmd)
+	cmd.WaitDelay = KillDelay
+	err := cmd.Start()
+	if err == nil {
+		pid := cmd.Process.Pid
+		addChild(pid)
+		err = cmd.Wait()
+		if ctx.Err() != nil {
+			killGroup(pid)
+		}
+		removeChild(pid)
+		if errors.Is(err, exec.ErrWaitDelay) {
+			// It exited 0; something it left running holds its output open.
+			err = nil
+		}
+	}
 	if parent.Err() != nil {
 		return "", "", 0, context.Canceled
 	}
