@@ -15,4 +15,10 @@ lib/d.py:1:# TODO: python
 packages/g.rs:1:// TODO: rust
 
 === Worktree State ===
---- exit 128 ---
+(skipped: not a git repository)
+
+=== Summary ===
+Run 'rebar context session-start' for full context loading
+Run 'rebar context' for the Cold Start Quad
+Run 'scripts/refresh-context.sh --test-baseline' to verify tests pass
+--- exit 0 ---

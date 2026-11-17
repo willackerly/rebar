@@ -13,7 +13,7 @@ Experience rebar's value immediately: write one contract, link it to code, see a
 ### Step 1: Install rebar and create a project (2 minutes)
 ```bash
 # Install the rebar CLI (versions side by side under ~/.rebar/versions/)
-curl -fsSL https://raw.githubusercontent.com/willackerly/rebar/v3.1.0/setup-rebar.sh | bash -s -- v3.1.0
+curl -fsSL https://raw.githubusercontent.com/willackerly/rebar/v3.1.1/setup-rebar.sh | bash -s -- v3.1.1
 # Open a new terminal (or source your shell RC) so PATH picks up ~/.rebar/current/bin
 rebar version
 

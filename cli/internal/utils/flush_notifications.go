@@ -31,9 +31,9 @@ type pendingNotification struct {
 // pending entries of the federation outbox (REBAR_OUTBOX, default
 // <contracts_dir>/.state/pending-notifications.md) to each consumer that
 // scan-consumers finds, through `$ASK_BIN <consumer>:featurerequest <msg>`,
-// then mark the entries sent. Like the script it exits 1 after a run that
-// was not --dry-run: its last line is `[ "$DRY_RUN" = "1" ] && echo …`.
-// It reads scan-consumers' JSON as the script does with jq.
+// then mark the entries sent. It exits 0 when every dispatch succeeded (or
+// there was nothing to send, or --dry-run) and 1 when one failed. It reads
+// scan-consumers' JSON as the script does with jq.
 func runFlushNotifications(ctx *checks.Context, args []string) int {
 	repo := toplevel(ctx.WorkDir())
 	outbox := os.Getenv("REBAR_OUTBOX")
@@ -90,17 +90,24 @@ func runFlushNotifications(ctx *checks.Context, args []string) int {
 	}
 	fmt.Fprintf(out, "flush-notifications: %s has %d pending notification(s)\n\n", owner, len(entries))
 
-	processed, sent, skipped := 0, 0, 0
+	processed, sent, skipped, failed := 0, 0, 0, 0
 	for _, e := range entries {
 		sev := severity
 		if sev == "" {
 			sev = inferSeverity(e.oldV, e.newV)
 		}
 		fmt.Fprintf(out, "→ %s: %s → %s (%s)\n", e.contract, e.oldV, e.newV, sev)
-		// $(scan-consumers.sh … --json 2>/dev/null || echo '{"consumers":[]}')
-		text, _, code := scanConsumers(repo, e.contract, true)
+		// scan-consumers exits 1 when a consumer's section lacks a required
+		// field; its stderr says which, and the valid consumers are still in
+		// its output.
+		var scanned strings.Builder
+		_, code := scanConsumers(repo, &scanned, errw, e.contract, true)
+		text := scanned.String()
 		if code != 0 {
-			text += `{"consumers":[]}`
+			fmt.Fprintf(errw, "    WARN: scan-consumers reported an error for %s (above)\n", e.contract)
+		}
+		if text == "" {
+			text = `{"consumers":[]}`
 		}
 		lines := consumerLines(text)
 		if len(lines) == 0 {
@@ -138,6 +145,7 @@ func runFlushNotifications(ctx *checks.Context, args []string) int {
 				processed++
 			} else {
 				fmt.Fprintf(errw, "    FAIL: %s (ask invocation failed; entry stays pending)\n", name)
+				failed++
 			}
 		}
 		fmt.Fprintln(out)
@@ -146,12 +154,14 @@ func runFlushNotifications(ctx *checks.Context, args []string) int {
 	if !dryRun && sent > 0 {
 		markSent(resolve(repo, outbox))
 	}
-	fmt.Fprintf(out, "flush-notifications: processed=%d sent=%d skipped=%d\n", processed, sent, skipped)
+	fmt.Fprintf(out, "flush-notifications: processed=%d sent=%d skipped=%d failed=%d\n", processed, sent, skipped, failed)
 	if dryRun {
 		fmt.Fprintln(out, "(dry-run — no FRs filed, no outbox state changed)")
-		return 0
 	}
-	return 1
+	if failed > 0 {
+		return 1
+	}
+	return 0
 }
 
 const flushHelp = `Usage: flush-notifications.sh [--dry-run] [--severity LEVEL]

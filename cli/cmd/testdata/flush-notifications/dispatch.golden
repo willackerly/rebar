@@ -9,7 +9,7 @@ flush-notifications: 001 has 2 pending notification(s)
     sent: alpha
     FAIL: broken (ask invocation failed; entry stays pending)
 
-flush-notifications: processed=3 sent=3 skipped=1
+flush-notifications: processed=3 sent=3 skipped=1 failed=1
 --- wrote architecture/.state/pending-notifications.md ---
 # Pending notifications
 
