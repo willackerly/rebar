@@ -40,24 +40,24 @@ consumes nopin '- **pin_date:** 2026-01-02
 out=$(REBAR_REPOS="$TMP/full,$TMP/minimal" run_in "$OWNER" scan-consumers.sh C1-FOO)
 code=$?
 [ $code -eq 0 ] || fail "T1: scan-consumers exited $code with a minimal section: $out"
-echo "$out" | grep -q 'full →' || fail "T1: full consumer missing: $out"
-echo "$out" | grep -q 'minimal →' || fail "T1: minimal consumer missing: $out"
-echo "$out" | grep -q 'version_pinned: *1.0.0$' || fail "T1: version_pinned not reported cleanly: $out"
-echo "$out" | grep -q 'pin_date: *(unset)' || fail "T1: absent pin_date not defaulted: $out"
+contains "$out" 'full →' || fail "T1: full consumer missing: $out"
+contains "$out" 'minimal →' || fail "T1: minimal consumer missing: $out"
+contains "$out" 'version_pinned: *1.0.0$' || fail "T1: version_pinned not reported cleanly: $out"
+contains "$out" 'pin_date: *(unset)' || fail "T1: absent pin_date not defaulted: $out"
 json=$(REBAR_REPOS="$TMP/full,$TMP/minimal" run_in "$OWNER" scan-consumers.sh C1-FOO --json)
 [ $? -eq 0 ] || fail "T1: scan-consumers --json failed: $json"
-echo "$json" | grep -q '"name":"minimal","path":"[^"]*","version_pinned":"1.0.0","pin_date":"","notify_on_change":"","rationale":""' \
+contains "$json" '"name":"minimal","path":"[^"]*","version_pinned":"1.0.0","pin_date":"","notify_on_change":"","rationale":""' \
   || fail "T1: minimal consumer JSON: $json"
-echo "$json" | grep -q '"name":"full",[^}]*"notify_on_change":"true"' || fail "T1: full consumer JSON: $json"
+contains "$json" '"name":"full",[^}]*"notify_on_change":"true"' || fail "T1: full consumer JSON: $json"
 ok "T1 scan-consumers defaults absent optional fields"
 
 # T2
 out=$(REBAR_REPOS="$TMP/nopin,$TMP/minimal" run_in "$OWNER" scan-consumers.sh C1-FOO)
 code=$?
 [ $code -eq 1 ] || fail "T2: missing version_pinned should exit 1, got $code: $out"
-echo "$out" | grep -q "nopin/CONSUMES.md.*version_pinned" || fail "T2: error does not name the file and field: $out"
-echo "$out" | grep -q 'minimal →' || fail "T2: valid consumer not reported alongside the error: $out"
-echo "$out" | grep -q 'nopin →' && fail "T2: invalid consumer reported: $out"
+contains "$out" "nopin/CONSUMES.md.*version_pinned" || fail "T2: error does not name the file and field: $out"
+contains "$out" 'minimal →' || fail "T2: valid consumer not reported alongside the error: $out"
+contains "$out" 'nopin →' && fail "T2: invalid consumer reported: $out"
 ok "T2 a section without version_pinned is a clear error"
 
 # T3
@@ -65,8 +65,8 @@ mkdir -p "$OWNER/architecture/.state"
 printf '# Pending\n\n## C1-FOO: 1.0 → 1.1\n- **detected:** 2026-01-03\n- **status:** pending\n- **commit:** abc1234\n' \
   > "$OWNER/architecture/.state/pending-notifications.md"
 out=$(REBAR_REPOS="$TMP/full,$TMP/minimal" run_in "$OWNER" flush-notifications.sh --dry-run)
-echo "$out" | grep -q 'DRY: ask_full_featurerequest' || fail "T3: full consumer not dispatched: $out"
-echo "$out" | grep -q 'DRY: ask_minimal_featurerequest' || fail "T3: minimal consumer not dispatched: $out"
+contains "$out" 'DRY: ask_full_featurerequest' || fail "T3: full consumer not dispatched: $out"
+contains "$out" 'DRY: ask_minimal_featurerequest' || fail "T3: minimal consumer not dispatched: $out"
 
 # Without jq: a PATH holding only the tools the two scripts use.
 NOJQ="$TMP/nojq-bin"
@@ -76,14 +76,14 @@ for t in bash git dirname basename cat cut tr grep sed awk mktemp mv rm head wc;
   ln -s "$p" "$NOJQ/$t"
 done
 out=$(PATH="$NOJQ" REBAR_REPOS="$TMP/full,$TMP/minimal" run_in "$OWNER" flush-notifications.sh --dry-run)
-echo "$out" | grep -q 'DRY: ask_full_featurerequest' || fail "T3: (no jq) full consumer not dispatched: $out"
-echo "$out" | grep -q 'DRY: ask_minimal_featurerequest' || fail "T3: (no jq) minimal consumer not dispatched: $out"
+contains "$out" 'DRY: ask_full_featurerequest' || fail "T3: (no jq) full consumer not dispatched: $out"
+contains "$out" 'DRY: ask_minimal_featurerequest' || fail "T3: (no jq) minimal consumer not dispatched: $out"
 ok "T3 flush-notifications dispatches to consumers with optional fields absent"
 
 out=$(REBAR_REPOS="$TMP/nopin,$TMP/minimal" run_in "$OWNER" flush-notifications.sh --dry-run)
-echo "$out" | grep -q 'DRY: ask_minimal_featurerequest' || fail "T3: valid consumer dropped next to an invalid one: $out"
-echo "$out" | grep -q 'nopin/CONSUMES.md.*version_pinned' || fail "T3: scan-consumers error not shown: $out"
-echo "$out" | grep -q 'ask_nopin' && fail "T3: invalid consumer dispatched: $out"
+contains "$out" 'DRY: ask_minimal_featurerequest' || fail "T3: valid consumer dropped next to an invalid one: $out"
+contains "$out" 'nopin/CONSUMES.md.*version_pinned' || fail "T3: scan-consumers error not shown: $out"
+contains "$out" 'ask_nopin' && fail "T3: invalid consumer dispatched: $out"
 ok "T3 flush-notifications reports an invalid consumer and notifies the rest"
 
 # T4 — ASK_BIN stands in for the ask CLI and logs each dispatch.
@@ -94,7 +94,7 @@ outbox="$OWNER/architecture/.state/pending-notifications.md"
 out=$(ASK_BIN="$ASK" REBAR_REPOS="$TMP/full,$TMP/minimal" run_in "$OWNER" flush-notifications.sh)
 code=$?
 [ $code -eq 0 ] || fail "T4: successful flush exited $code: $out"
-echo "$out" | grep -q 'processed=2 sent=2' || fail "T4: dispatch summary: $out"
+contains "$out" 'processed=2 sent=2' || fail "T4: dispatch summary: $out"
 grep -q 'full:featurerequest' "$TMP/asked" && grep -q 'minimal:featurerequest' "$TMP/asked" \
   || fail "T4: ask not invoked for both consumers: $(cat "$TMP/asked")"
 grep -q '^- \*\*status:\*\* sent' "$outbox" || fail "T4: entry not marked sent: $(cat "$outbox")"
@@ -103,6 +103,6 @@ sed 's/status:\*\* sent/status:** pending/' "$outbox" > "$outbox.tmp" && mv "$ou
 out=$(FAKE_ASK_EXIT=1 ASK_BIN="$ASK" REBAR_REPOS="$TMP/full,$TMP/minimal" run_in "$OWNER" flush-notifications.sh)
 code=$?
 [ $code -eq 1 ] || fail "T4: flush with failed dispatches should exit 1, got $code: $out"
-echo "$out" | grep -q 'FAIL: full' || fail "T4: failed dispatch not reported: $out"
+contains "$out" 'FAIL: full' || fail "T4: failed dispatch not reported: $out"
 grep -q '^- \*\*status:\*\* pending' "$outbox" || fail "T4: entry not left pending: $(cat "$outbox")"
 ok "T4 flush-notifications exits 0 on success, 1 on a failed dispatch"

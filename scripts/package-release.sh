@@ -88,7 +88,12 @@ for target in $TARGETS; do
   name="rebar_${VER_NAME}_${os}_${arch}"
   echo "package-release: ${name}"
 
-  git -C "$REPO" archive --format=tar --prefix="${name}/" "$REF" | tar -x -C "$WORK"
+  # Through a file, not `git archive | tar -x`: bsdtar (macOS) exits at the
+  # end-of-archive marker without reading git's trailing padding, so under
+  # pipefail git archive can die of SIGPIPE and fail the build at random.
+  git -C "$REPO" archive --format=tar --prefix="${name}/" -o "$WORK/${name}.src.tar" "$REF"
+  tar -x -C "$WORK" -f "$WORK/${name}.src.tar"
+  rm -f "$WORK/${name}.src.tar"
   (
     cd "$WORK/$name/cli"
     CGO_ENABLED=0 GOOS="$os" GOARCH="$arch" \

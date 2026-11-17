@@ -45,10 +45,10 @@ run compute-registry.sh >/dev/null || fail "T1: compute-registry failed"
 [ -f "$P/specs/CONTRACT-REGISTRY.md" ] || fail "T1: registry not written to specs/"
 [ -f "$P/architecture/CONTRACT-REGISTRY.md" ] && fail "T1: registry written to architecture/"
 reg="$(cat "$P/specs/CONTRACT-REGISTRY.md")"
-printf '%s\n' "$reg" | grep -q 'S1-FOO' || fail "T1: S1-FOO missing"
-printf '%s\n' "$reg" | grep -q 'S9-OLD' && fail "T1: stray architecture/ contract listed"
+contains "$reg" 'S1-FOO' || fail "T1: S1-FOO missing"
+contains "$reg" 'S9-OLD' && fail "T1: stray architecture/ contract listed"
 # One implementing file each: specs/ itself is excluded like architecture/ was.
-printf '%s\n' "$reg" | grep -q '| S1-FOO | 1.0 | active | 1 |' || { echo "$reg"; fail "T1: impl count"; }
+contains "$reg" '| S1-FOO | 1.0 | active | 1 |' || { echo "$reg"; fail "T1: impl count"; }
 ( cd "$P" && g add . && g commit -q -m reg )
 out="$(run compute-registry.sh --check)" || { echo "$out"; fail "T1: --check"; }
 ok "T1: registry generated and checked in specs/"
@@ -63,9 +63,9 @@ ok "T2: check-contract-refs resolves against specs/"
 # T3 — the other contract checks read specs/.
 out="$(run check-registry.sh)" || { echo "$out"; fail "T3: check-registry"; }
 out="$(run check-jtbd-presence.sh)" || { echo "$out"; fail "T3: check-jtbd-presence"; }
-printf '%s\n' "$out" | grep -q 'S9-OLD' && fail "T3: jtbd read architecture/"
+contains "$out" 'S9-OLD' && fail "T3: jtbd read architecture/"
 out="$(run check-prefix-uniqueness.sh)" || { echo "$out"; fail "T3: check-prefix-uniqueness"; }
-printf '%s\n' "$out" | grep -q 'SKIP' && { echo "$out"; fail "T3: prefix check did not find specs/ registry"; }
+contains "$out" 'SKIP' && { echo "$out"; fail "T3: prefix check did not find specs/ registry"; }
 ok "T3: check-registry / jtbd / prefix-uniqueness read specs/"
 
 # T4 — steward state and cold-start maturity follow specs/.
@@ -73,13 +73,13 @@ run steward.sh >/dev/null || fail "T4: steward failed"
 [ -f "$P/specs/.state/steward-report.json" ] || fail "T4: steward state not in specs/.state"
 [ -d "$P/architecture/.state" ] && fail "T4: steward wrote architecture/.state"
 out="$(run cold-start-checks.sh)"
-printf '%s\n' "$out" | grep -q 'of 2 contracts declare Status' || { echo "$out"; fail "T4: cold-start count"; }
+contains "$out" 'of 2 contracts declare Status' || { echo "$out"; fail "T4: cold-start count"; }
 ok "T4: steward and cold-start use specs/"
 
 # T5 — default unchanged.
 printf 'tier = 3\n' > "$P/.rebarrc"
 out="$(run check-contract-refs.sh)" && { echo "$out"; fail "T5: default should look in architecture/ (refs there are missing)"; }
-printf '%s\n' "$out" | grep -q 'Expected: architecture/CONTRACT-S1-FOO.1.0.md' || { echo "$out"; fail "T5: default dir"; }
+contains "$out" 'Expected: architecture/CONTRACT-S1-FOO.1.0.md' || { echo "$out"; fail "T5: default dir"; }
 ok "T5: architecture/ stays the default"
 
 echo "PASS: contracts_dir"
