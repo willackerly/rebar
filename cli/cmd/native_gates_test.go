@@ -17,13 +17,20 @@ import (
 // same everywhere.
 
 // fixedGit isolates git from the developer's configuration and pins the
-// commit dates, for the setup and for every run of the check.
+// commit dates, for the setup and for every run of the check. Once a test
+// has called it, calls from its (parallel) subtests change nothing:
+// runParity calls it before the cases when any has a setup.
 func fixedGit(t *testing.T) {
 	t.Helper()
+	if os.Getenv("GIT_COMMITTER_DATE") == fixedDate && os.Getenv("GIT_CONFIG_NOSYSTEM") == "1" {
+		return
+	}
 	testutil.IsolateGitConfig(t)
-	t.Setenv("GIT_AUTHOR_DATE", "2026-01-02T03:04:05Z")
-	t.Setenv("GIT_COMMITTER_DATE", "2026-01-02T03:04:05Z")
+	t.Setenv("GIT_AUTHOR_DATE", fixedDate)
+	t.Setenv("GIT_COMMITTER_DATE", fixedDate)
 }
+
+const fixedDate = "2026-01-02T03:04:05Z"
 
 // commitMsg commits everything in root (allowing an empty commit) with
 // message msg exactly as given.

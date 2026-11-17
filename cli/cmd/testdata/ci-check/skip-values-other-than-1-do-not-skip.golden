@@ -31,7 +31,7 @@ Before committing, you must either:
 Also found 1 tracked tasks (OK).
 
 ━━━ Doc Freshness ━━━
-STALE (40 days): ./docs/old.md — freshness: 2026-10-07
+STALE (40 days): ./docs/old.md — freshness: {{ago:40}}
 
 Checked 2 docs with currency markers (freshness:/last-synced:), 1 stale (>14 days).
 3 .md file(s) carry no currency marker at all — unchecked, not verified.

@@ -21,7 +21,7 @@ func Render(w io.Writer, p *Plan, applied bool) {
 		fmt.Fprintf(w, "compared with: rebar's built-in checks   tier: %d\n\n", p.Tier)
 	}
 	if len(p.Scripts) == 0 {
-		fmt.Fprintln(w, "No legacy script copies: the project already runs on the install.")
+		fmt.Fprintln(w, "No legacy script copies: the project already runs on rebar's built-in checks.")
 	}
 
 	if len(p.Added) > 0 {

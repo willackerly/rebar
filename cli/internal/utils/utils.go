@@ -10,6 +10,7 @@ package utils
 import (
 	"bytes"
 	"errors"
+	"github.com/willackerly/rebar/cli/internal/config"
 	"io"
 	"os"
 	"os/exec"
@@ -61,9 +62,11 @@ func shellBasename(p string) string {
 // it cannot be found, 126 when it cannot be run, 128+N when a signal ended
 // it.
 func run(dir string, stdout, stderr io.Writer, name string, args ...string) int {
-	cmd := exec.Command(name, args...)
+	cmd := config.Command(name, args...)
 	cmd.Dir = dir
-	cmd.Stdin = os.Stdin
+	if !config.Overridden() {
+		cmd.Stdin = os.Stdin
+	}
 	cmd.Stdout, cmd.Stderr = stdout, stderr
 	err := cmd.Run()
 	var exit *exec.ExitError

@@ -99,7 +99,7 @@ func WarnChecksEnable(ctx *Context) {
 	if config.Getenv("_REBAR_CHECKS_VALIDATED") != "" {
 		return
 	}
-	os.Setenv("_REBAR_CHECKS_VALIDATED", "1")
+	config.Setenv("_REBAR_CHECKS_VALIDATED", "1")
 	for _, name := range config.UnknownChecks(config.ChecksEnableFor(ctx.Root)) {
 		fmt.Fprintf(ctx.Stderr, "rebar: WARN: checks_enable names unknown check '%s' (ignored; use a check script name without .sh, e.g. check-ground-truth)\n", name)
 	}
@@ -115,7 +115,7 @@ func ContractNamespace(ctx *Context) string {
 		return ns
 	}
 	if config.Getenv("_REBAR_NAMESPACE_VALIDATED") == "" {
-		os.Setenv("_REBAR_NAMESPACE_VALIDATED", "1")
+		config.Setenv("_REBAR_NAMESPACE_VALIDATED", "1")
 		fmt.Fprintf(ctx.Stderr, "rebar: ignoring contract_namespace '%s' (allowed: letters, digits, . _ / -; must not start like a contract ID.version)\n", ns)
 	}
 	return ""

@@ -87,7 +87,7 @@ The rebar source repo has contracts for its own load-bearing components:
 | **T0** | Bash syntax | <2s | `for f in scripts/*.sh; do bash -n "$f"; done` |
 | **T0.5** | Shell regression tests | ~15s | `scripts/tests/run.sh [pattern]` (also in ci-check) |
 | **T1** | Single Go test file | <10s | `cd cli && go test ./cmd/<file>_test.go` |
-| **T2** | All Go tests | <30s | `cd cli && go test ./...` |
+| **T2** | All Go tests | minutes | `cd cli && go test -timeout 20m ./...` (the parity suites run the bash scripts; their cases run in parallel) |
 | **T3** | Full ci-check (rebar enforces itself) | <30s | `scripts/ci-check.sh` |
 | **T4** | MCP smoke test | <10s | `echo '{"jsonrpc":"2.0",...}' | bin/ask-mcp-server --stdio --repos-dir ~/dev` |
 | **T5** | Cross-repo audit | <30s | `rebar audit --all ~/dev` |

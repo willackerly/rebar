@@ -2,6 +2,7 @@ package utils
 
 import (
 	"fmt"
+	"github.com/willackerly/rebar/cli/internal/config"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -31,7 +32,7 @@ var agentTmp = "/tmp"
 // agent's shell; the script stays sourceable.)
 func runAgentHealth(ctx *checks.Context, args []string) int {
 	a := &agentHealth{ctx: ctx, dir: ctx.WorkDir()}
-	a.id = os.Getenv("AGENT_ID")
+	a.id = config.Getenv("AGENT_ID")
 	if a.id == "" {
 		if top, code := gitx.Run(a.dir, nil, "rev-parse", "--show-toplevel"); code == 0 {
 			a.id = shellBasename(strings.TrimRight(top, "\n"))
@@ -39,7 +40,7 @@ func runAgentHealth(ctx *checks.Context, args []string) int {
 			a.id = "agent-" + strconv.Itoa(os.Getpid())
 		}
 	}
-	a.progress = os.Getenv("AGENT_PROGRESS_FILE")
+	a.progress = config.Getenv("AGENT_PROGRESS_FILE")
 	if a.progress == "" {
 		a.progress = "agent-progress.jsonl"
 	}

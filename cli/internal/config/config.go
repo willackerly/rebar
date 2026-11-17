@@ -161,11 +161,8 @@ func ContractsDirFor(repoRoot string) string {
 // override's RCFile. Mirrors _rebar_rc_file in
 // scripts/_rebar-config.sh.
 func RCFile(repoRoot string) string {
-	if e := envOver.Load(); e != nil {
-		if e.RCFile != "" {
-			return e.RCFile
-		}
-		return filepath.Join(repoRoot, ".rebarrc")
+	if e := envOver.Load(); e != nil && e.RCFile != "" {
+		return e.RCFile
 	}
 	if f := Getenv("REBAR_RCFILE"); f != "" {
 		return f

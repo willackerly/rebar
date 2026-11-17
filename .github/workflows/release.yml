@@ -52,7 +52,9 @@ jobs:
 
       - name: Test
         working-directory: cli
-        run: go test ./...
+        # Explicit: go test's default is 10 minutes per package, and the
+        # cmd package's parity suites run every bash script under test.
+        run: go test -timeout 20m ./...
 
       - name: Package
         env:

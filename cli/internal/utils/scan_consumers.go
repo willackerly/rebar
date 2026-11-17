@@ -2,6 +2,7 @@ package utils
 
 import (
 	"fmt"
+	"github.com/willackerly/rebar/cli/internal/config"
 	"io"
 	"os"
 	"path/filepath"
@@ -195,7 +196,7 @@ func sectionField(section []string, name string) (string, bool) {
 // `IFS=, read -ra` splits it: up to its first newline, a trailing empty
 // field dropped), else the registry's paths, without the owner's entry.
 func scanPaths(owner string) []string {
-	if v := os.Getenv("REBAR_REPOS"); v != "" {
+	if v := config.Getenv("REBAR_REPOS"); v != "" {
 		v, _, _ = strings.Cut(v, "\n")
 		if v == "" {
 			return nil
@@ -206,9 +207,9 @@ func scanPaths(owner string) []string {
 		}
 		return fields
 	}
-	reg := os.Getenv("ASK_REGISTRY")
+	reg := config.Getenv("ASK_REGISTRY")
 	if reg == "" {
-		reg = filepath.Join(os.Getenv("HOME"), ".config", "ask", "projects")
+		reg = filepath.Join(config.Getenv("HOME"), ".config", "ask", "projects")
 	}
 	data, err := os.ReadFile(reg)
 	if err != nil {

@@ -2,6 +2,7 @@ package utils
 
 import (
 	"fmt"
+	"github.com/willackerly/rebar/cli/internal/config"
 	"io"
 	"os"
 	"path/filepath"
@@ -145,12 +146,12 @@ func runRebarDoc(ctx *checks.Context, args []string) int {
 	if p, ok := resolveIn(currentRepo(ctx.WorkDir())); ok {
 		return emit("local", p)
 	}
-	if root := os.Getenv("REBAR_ROOT"); root != "" {
+	if root := config.Getenv("REBAR_ROOT"); root != "" {
 		if p, ok := resolveIn(root); ok {
 			return emit("REBAR_ROOT", p)
 		}
 	}
-	if home := os.Getenv("HOME"); home != "" {
+	if home := config.Getenv("HOME"); home != "" {
 		for _, c := range []string{home + "/.rebar", home + "/dev/rebar", home + "/src/rebar", home + "/code/rebar"} {
 			if !isRebarSource(c) {
 				continue

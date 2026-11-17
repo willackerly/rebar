@@ -102,7 +102,7 @@ out=$(cd "$P" && rebar migrate --apply 2>&1) || fail "--apply exited non-zero: $
 [ ! -e "$P/scripts/check-todos.sh" ] || fail "T2: verified check-todos.sh not deleted"
 [ -f "$P/scripts/check-ground-truth.sh" ] || fail "T3: unverified ground truth copy deleted"
 head -2 "$P/.rebarrc" | grep -q '^# our settings$' || fail "existing .rebarrc lines not kept: $(cat "$P/.rebarrc")"
-echo "$out" | grep -q 'PASS  check-todos via install' || fail "T2: no post-apply check result: $out"
+echo "$out" | grep -q 'PASS  check-todos via rebar' || fail "T2: no post-apply check result: $out"
 printf '#!/bin/sh\n# TODO: probe\n' > "$P/tools/y.sh"
 res=$(cd "$P" && rebar run check-todos 2>&1) && fail "T2: install's check-todos missed a TODO in tools/: $res"
 echo "$res" | grep -q 'tools/y.sh' || fail "T2: TODO in tools/y.sh not reported: $res"

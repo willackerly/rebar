@@ -53,7 +53,9 @@ jobs:
 
       - name: Go tests
         working-directory: cli
-        run: go test ./...
+        # Explicit: go test's default is 10 minutes per package, and the
+        # cmd package's parity suites run every bash script under test.
+        run: go test -timeout 20m ./...
 
       # The release workflow's go test fails on a tag whose scripts are missing
       # from released-blobs.txt. Apply the same test to the head of a release

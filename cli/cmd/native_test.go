@@ -5,6 +5,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -12,6 +13,7 @@ import (
 	"time"
 
 	"github.com/willackerly/rebar/cli/internal/checks"
+	"github.com/willackerly/rebar/cli/internal/config"
 	"github.com/willackerly/rebar/cli/internal/sourcescan"
 	"github.com/willackerly/rebar/cli/internal/testutil"
 )
@@ -470,6 +472,25 @@ func fixtureText(s string, loc *time.Location) string {
 	})
 }
 
+// undoAgo puts back the {{ago:N}} tokens of a case's fixtures for the
+// dates they became (fixtureText), so goldens hold the tokens and do not
+// change with the date.
+func undoAgo(out string, tc parityCase, loc *time.Location) string {
+	var text strings.Builder
+	for _, body := range tc.files {
+		text.WriteString(body)
+	}
+	text.WriteString(tc.want)
+	text.WriteString(strings.Join(tc.env, "\n"))
+	text.WriteString(strings.Join(tc.args, "\n"))
+	today := time.Now().In(loc)
+	for _, m := range agoRE.FindAllStringSubmatch(text.String(), -1) {
+		n, _ := strconv.Atoi(m[1])
+		out = strings.ReplaceAll(out, today.AddDate(0, 0, -n).Format("2006-01-02"), m[0])
+	}
+	return out
+}
+
 // scriptSettings are the variables a check script reads from the
 // environment. Each in-process run starts with them unset, as the script
 // runs do (testutil.IsolatedEnv drops REBAR_* and _REBAR_*), and then gets
@@ -478,6 +499,19 @@ var scriptSettings = []string{
 	"REBAR_TIER", "REBAR_CHECKS_ENABLE", "REBAR_CONTRACTS_DIR", "REBAR_CONTRACT_NAMESPACE", "REBAR_RCFILE",
 	"_REBAR_CHECKS_VALIDATED", "_REBAR_NAMESPACE_VALIDATED", "CONTRACT_EXTENSIONS", "SKIP_JTBD", "SKIP_PREFIX_UNIQUENESS",
 	"REBAR_REGISTRY_IMPL_COUNTS", "REBAR_METRICS_STRICT",
+}
+
+// parityEnv is testutil.IsolatedEnv(extra...) without the check settings
+// the process may have (CONTRACT_EXTENSIONS, SKIP_JTBD, …), so script runs
+// see only the case's.
+func parityEnv(extra ...string) []string {
+	var env []string
+	for _, kv := range testutil.IsolatedEnv() {
+		if k, _, _ := strings.Cut(kv, "="); !slices.Contains(scriptSettings, k) {
+			env = append(env, kv)
+		}
+	}
+	return append(env, extra...)
 }
 
 // testErrorLine is bash's complaint when a script compares a setting that
@@ -549,7 +583,19 @@ func runParity(t *testing.T, check parityCheck, cases []parityCase) {
 	}
 	flavour := grepFlavour(t)
 	for _, tc := range cases {
+		if tc.setup != nil {
+			fixedGit(t) // setups commit (commits), which must not t.Setenv in a parallel case
+			break
+		}
+	}
+	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
+			// Cases run in parallel: the script runs are processes, and
+			// everything that reads rebar's settings in this process (setup,
+			// the native run, ordering) runs under config.WithEnv with the
+			// case's environment, one case at a time. A test that needs
+			// process-wide settings (t.Setenv) sets them before runParity.
+			t.Parallel()
 			scriptsDir := sourceScripts
 			if check.install != nil {
 				scriptsDir = check.install(t, tc)
@@ -578,8 +624,29 @@ func runParity(t *testing.T, check parityCheck, cases []parityCase) {
 			if tc.git {
 				gitTree(t, root, tc.untracked, loc)
 			}
+			// The in-process environment: the process's without the check
+			// settings, plus the case's (but not locale or zone).
+			var nativeVars []string
+			for _, kv := range os.Environ() {
+				if k, _, _ := strings.Cut(kv, "="); !slices.Contains(scriptSettings, k) {
+					nativeVars = append(nativeVars, kv)
+				}
+			}
+			inProcess := true
+			for _, kv := range tc.env {
+				kv = strings.ReplaceAll(kv, "$ROOT", root)
+				env = append(env, kv)
+				k, _, _ := strings.Cut(kv, "=")
+				switch {
+				case k == "TZ":
+					inProcess = false // time.Local is set once per process
+				case !strings.HasPrefix(k, "LC_") && k != "LANG":
+					nativeVars = append(nativeVars, kv)
+				}
+			}
+			inEnv := func(f func()) { config.WithEnv(&config.Env{Vars: nativeVars}, f) }
 			if tc.setup != nil {
-				tc.setup(t, root)
+				inEnv(func() { tc.setup(t, root) })
 			}
 			var before map[string]string
 			changes := func() string { return "" }
@@ -587,30 +654,18 @@ func runParity(t *testing.T, check parityCheck, cases []parityCase) {
 				before = treeState(t, root)
 				changes = func() string { return takeChanges(t, root, before) }
 			}
-			for _, k := range scriptSettings {
-				t.Setenv(k, "")
-			}
-			inProcess := true
-			for _, kv := range tc.env {
-				kv = strings.ReplaceAll(kv, "$ROOT", root)
-				env = append(env, kv)
-				k, v, _ := strings.Cut(kv, "=")
-				switch {
-				case k == "TZ":
-					inProcess = false // time.Local is set once per process
-				case !strings.HasPrefix(k, "LC_") && k != "LANG":
-					t.Setenv(k, v)
-				}
-			}
 			tcArgs := rootArgs(tc.args, root)
 			args := append([]string{script}, tcArgs...)
 			base := append([]string{"REBAR_PROJECT_ROOT=" + root, "LC_COLLATE=C"}, env...)
 
-			shellOut, shellCode := testutil.RunEnv(t, root, testutil.IsolatedEnv(base...), "bash", args...)
+			shellOut, shellCode := testutil.RunEnv(t, root, parityEnv(base...), "bash", args...)
 			shellOut = testErrorLine.ReplaceAllString(shellOut, "") + changes()
 
 			var native strings.Builder
-			nativeCode := c.Run(&checks.Context{Root: root, Install: scriptsDir, Stdout: &native, Stderr: &native}, tcArgs)
+			var nativeCode int
+			inEnv(func() {
+				nativeCode = c.Run(&checks.Context{Root: root, Install: scriptsDir, Stdout: &native, Stderr: &native}, tcArgs)
+			})
 			native.WriteString(changes())
 
 			// The hand-off goes through a wrapper that logs it, so a script
@@ -618,7 +673,7 @@ func runParity(t *testing.T, check parityCheck, cases []parityCase) {
 			wrapper, log := loggingCLI(t)
 			handEnv := append(append([]string{"REBAR_PROJECT_ROOT=" + root, "LC_COLLATE=C"}, handOffEnv(t, scriptsDir)...), env...)
 			handEnv = append(handEnv, "REBAR_BIN="+wrapper)
-			handOut, handCode := testutil.RunEnv(t, root, testutil.IsolatedEnv(handEnv...), "bash", args...)
+			handOut, handCode := testutil.RunEnv(t, root, parityEnv(handEnv...), "bash", args...)
 			handOut += changes()
 			if logged, _ := os.ReadFile(log); !strings.Contains(string(logged), "native "+check.name) && !skippedEarly(env) {
 				t.Errorf("the script did not hand off to the native check:\n%s", handOut)
@@ -626,7 +681,11 @@ func runParity(t *testing.T, check parityCheck, cases []parityCase) {
 
 			order := func(out string) string { return out }
 			if check.order != nil {
-				order = func(out string) string { return check.order(out, root, tc.args) }
+				order = func(out string) string {
+					var o string
+					inEnv(func() { o = check.order(out, root, tc.args) })
+					return o
+				}
 			}
 			if check.normalize != nil {
 				shellOut, handOut = check.normalize(shellOut), check.normalize(handOut)
@@ -646,7 +705,7 @@ func runParity(t *testing.T, check parityCheck, cases []parityCase) {
 				}
 			}
 			if check.golden != "" {
-				checkGolden(t, check.golden, tc.name, want, root, wantCode)
+				checkGolden(t, check.golden, tc.name, undoAgo(want, tc, loc), root, wantCode)
 			}
 			results := []struct {
 				how  string

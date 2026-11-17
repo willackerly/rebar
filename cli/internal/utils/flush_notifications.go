@@ -3,6 +3,7 @@ package utils
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/willackerly/rebar/cli/internal/config"
 	"io"
 	"os"
 	"path/filepath"
@@ -36,16 +37,16 @@ type pendingNotification struct {
 // It reads scan-consumers' JSON as the script does with jq.
 func runFlushNotifications(ctx *checks.Context, args []string) int {
 	repo := toplevel(ctx.WorkDir())
-	outbox := os.Getenv("REBAR_OUTBOX")
+	outbox := config.Getenv("REBAR_OUTBOX")
 	if outbox == "" {
 		outbox = contracts.Dir(ctx.Root) + "/.state/pending-notifications.md"
 	}
 	dryRun, severity := false, ""
-	notifyDefault := os.Getenv("REBAR_NOTIFY_DEFAULT")
+	notifyDefault := config.Getenv("REBAR_NOTIFY_DEFAULT")
 	if notifyDefault == "" {
 		notifyDefault = "notify"
 	}
-	askBin := os.Getenv("ASK_BIN")
+	askBin := config.Getenv("ASK_BIN")
 	if askBin == "" {
 		askBin = "ask"
 	}
