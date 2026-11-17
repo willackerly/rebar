@@ -199,6 +199,9 @@ func releasedSource(rebarRoot, blob string) []byte {
 	if data, err := releasedSources.ReadFile("released/" + blob); err == nil {
 		return data
 	}
+	if rebarRoot == "" {
+		return nil
+	}
 	if data, err := exec.Command("git", "-C", rebarRoot, "cat-file", "blob", blob).Output(); err == nil && gitBlobHash(data) == blob {
 		return data
 	}
@@ -232,6 +235,12 @@ func releasedBlobs(rebarRoot, name string) map[string]bool {
 	out := map[string]bool{}
 	for h := range manifestBlobs()[name] {
 		out[h] = true
+	}
+	if data := templateScript(name); data != nil {
+		out[gitBlobHash(data)] = true // this rebar's own template file
+	}
+	if rebarRoot == "" {
+		return out // ("git -C ''" would read the working directory's history)
 	}
 	args := []string{"-C", rebarRoot, "log", "--format=", "--raw", "--no-abbrev", "--no-renames",
 		"--tags", "--branches=main", "--branches=release/*", "--remotes=origin/main", "--remotes=origin/release/*", "HEAD",

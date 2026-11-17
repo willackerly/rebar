@@ -15,7 +15,11 @@ import (
 func Render(w io.Writer, p *Plan, applied bool) {
 	verb := map[bool]string{false: "would", true: ""}
 	fmt.Fprintf(w, "rebar migrate — %s\n", p.Project)
-	fmt.Fprintf(w, "install: %s   tier: %d\n\n", p.Install, p.Tier)
+	if p.Install != "" {
+		fmt.Fprintf(w, "compared with: rebar's built-in checks (rebar tree: %s)   tier: %d\n\n", p.Install, p.Tier)
+	} else {
+		fmt.Fprintf(w, "compared with: rebar's built-in checks   tier: %d\n\n", p.Tier)
+	}
 	if len(p.Scripts) == 0 {
 		fmt.Fprintln(w, "No legacy script copies: the project already runs on the install.")
 	}
@@ -94,7 +98,7 @@ func Render(w io.Writer, p *Plan, applied bool) {
 // CheckResult is a check run after apply.
 type CheckResult struct {
 	Name       string
-	Ran        string // "install", "legacy copy" or "wrapper"
+	Ran        string // "rebar" (the built-in check), "legacy copy" or "wrapper …"
 	Tier       int
 	BeforeCode int
 	AfterCode  int
@@ -195,10 +199,7 @@ func Apply(p *Plan, opts Options, ao ApplyOptions) (*ApplyResult, error) {
 		case Replace:
 			data := s.ReplaceContent
 			if data == nil {
-				var err error
-				if data, err = os.ReadFile(s.ReplaceWith); err != nil {
-					return fail(err)
-				}
+				return fail(fmt.Errorf("no replacement content for scripts/%s", s.Name))
 			}
 			mode := os.FileMode(0o644)
 			if strings.HasSuffix(s.Name, ".sh") {
@@ -235,7 +236,7 @@ func Apply(p *Plan, opts Options, ao ApplyOptions) (*ApplyResult, error) {
 		if err := save(reg); err != nil {
 			return fail(err)
 		}
-		r := run(opts.Timeout, p.Project, env, filepath.Join(p.Install, "scripts", "compute-registry.sh"))
+		r := runNative(p.Project, "", env, "compute-registry.sh")
 		if !r.ok() {
 			return fail(fmt.Errorf("regenerating the registry failed: %s%s", r.Stdout, r.Stderr))
 		}
@@ -250,13 +251,15 @@ func Apply(p *Plan, opts Options, ao ApplyOptions) (*ApplyResult, error) {
 		if s.MinTier > tier && !s.Enabled {
 			tier = s.MinTier
 		}
-		script := filepath.Join(p.Install, "scripts", s.Name)
-		ran := "install"
-		if s.Verdict == Keep {
-			script, ran = filepath.Join(p.Project, "scripts", s.Name), "legacy copy"
-		}
 		tierEnv := append(append([]string{}, env...), fmt.Sprintf("REBAR_TIER=%d", tier))
-		r := run(opts.Timeout, p.Project, tierEnv, append([]string{script}, s.Check...)...)
+		var r runResult
+		ran := "rebar"
+		if s.Verdict == Keep {
+			ran = "legacy copy"
+			r = run(opts.Timeout, p.Project, tierEnv, append([]string{filepath.Join(p.Project, "scripts", s.Name)}, s.Check...)...)
+		} else {
+			r = runNative(p.Project, "", tierEnv, s.Name, s.Check...)
+		}
 		res.Checks = append(res.Checks, CheckResult{Name: s.Name, Ran: ran, Tier: tier, BeforeCode: s.Before.Code, AfterCode: codeOf(r), Output: r.Stdout + r.Stderr})
 		if s.Shim {
 			// The wrapper the callers will run, the way they run it.
@@ -302,7 +305,10 @@ func wrapperEnv(bin, install string, env []string) ([]string, bool) {
 		return nil, false
 	}
 	defer func() { cleanupDirs = append(cleanupDirs, dir) }()
-	out := []string{"REBAR_ROOT=" + install}
+	var out []string
+	if install != "" {
+		out = append(out, "REBAR_ROOT="+install)
+	}
 	for _, kv := range env {
 		if strings.HasPrefix(kv, "PATH=") {
 			out = append(out, "PATH="+dir+string(os.PathListSeparator)+strings.TrimPrefix(kv, "PATH="))
@@ -399,6 +405,9 @@ func safeTarget(project, install, path string) error {
 	}
 	if !within(project, dir) {
 		return fmt.Errorf("refusing to touch %s: it resolves to %s, outside the project", path, dir)
+	}
+	if install == "" {
+		return nil
 	}
 	if inst, err := filepath.EvalSymlinks(install); err == nil && within(inst, dir) {
 		return fmt.Errorf("refusing to touch %s: it resolves into the rebar install", path)

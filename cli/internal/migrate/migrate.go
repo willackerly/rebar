@@ -23,12 +23,19 @@ import (
 	"sync"
 	"syscall"
 	"time"
+
+	"github.com/willackerly/rebar/cli/internal/checks"
+	"github.com/willackerly/rebar/cli/internal/config"
 )
 
 // Options configure a migration.
 type Options struct {
 	ProjectRoot string
-	RebarRoot   string
+	// RebarRoot is a rebar tree found on disk ("" for none, the usual case
+	// with a binary install). It is optional: copies are compared with the
+	// checks built into rebar; a tree only adds its git history (released
+	// versions) and the names of its scripts.
+	RebarRoot string
 	// RegenerateRegistry drops registry_purpose_style = bytes when only the
 	// old byte cut kept the registry identical, and regenerates
 	// CONTRACT-REGISTRY.md on apply (a one-time registry diff).
@@ -62,7 +69,8 @@ type ScriptPlan struct {
 	Verdict Verdict
 	Reason  string
 	Details []string
-	// ReplaceWith is the install file a Replace copies in.
+	// ReplaceWith names the template file a Replace copies in (for
+	// messages; the content is ReplaceContent).
 	ReplaceWith string
 	// Check is how the copy is exercised as a check (nil: not a check).
 	Check []string
@@ -208,9 +216,6 @@ func BuildPlan(opts Options) (*Plan, error) {
 	if opts.Timeout == 0 {
 		opts.Timeout = defaultTimeout
 	}
-	if opts.RebarRoot == "" {
-		return nil, fmt.Errorf("rebar install not found (set REBAR_ROOT to your rebar checkout)")
-	}
 	proj, install, err := guardProject(opts.ProjectRoot, opts.RebarRoot)
 	if err != nil {
 		return nil, err
@@ -275,6 +280,8 @@ func BuildPlan(opts Options) (*Plan, error) {
 			sp = m.check(n)
 		case n == "_rebar-config.sh":
 			sp = m.configLib()
+		case suiteExtraKeys[n] != "":
+			sp = m.suiteCopy(n, m.byProvenance(n))
 		default:
 			sp = m.byProvenance(n)
 		}
@@ -351,11 +358,17 @@ func guardProject(project, install string) (string, string, error) {
 	if proj, err = filepath.Abs(proj); err != nil {
 		return "", "", err
 	}
-	inst, err := filepath.EvalSymlinks(install)
-	if err != nil {
-		return "", "", fmt.Errorf("rebar install %s: %v", install, err)
+	if IsRebarSourceDir(proj) {
+		return "", "", fmt.Errorf("%s is a rebar source tree; its scripts are rebar's own, not legacy copies", proj)
+	}
+	inst := ""
+	if install != "" {
+		if inst, err = filepath.EvalSymlinks(install); err != nil {
+			return "", "", fmt.Errorf("rebar install %s: %v", install, err)
+		}
 	}
 	switch {
+	case inst == "":
 	case proj == inst:
 		return "", "", fmt.Errorf("%s is the rebar install itself; nothing to migrate", proj)
 	case IsRebarSourceDir(proj):
@@ -363,7 +376,7 @@ func guardProject(project, install string) (string, string, error) {
 	case within(inst, proj):
 		return "", "", fmt.Errorf("%s is inside the rebar install %s", proj, inst)
 	}
-	if roots := rootCommits(proj); len(roots) > 0 {
+	if roots := rootCommits(proj); len(roots) > 0 && inst != "" {
 		for r := range rootCommits(inst) {
 			if roots[r] {
 				return "", "", fmt.Errorf("%s shares history with the rebar install (a rebar clone?); refusing to treat rebar's scripts as legacy copies", proj)
@@ -379,7 +392,7 @@ func guardProject(project, install string) (string, string, error) {
 		if !within(proj, real) {
 			return "", "", fmt.Errorf("scripts/ resolves to %s, outside the project; refusing to delete files there", real)
 		}
-		if within(inst, real) {
+		if inst != "" && within(inst, real) {
 			return "", "", fmt.Errorf("scripts/ resolves into the rebar install (%s); refusing", real)
 		}
 	}
@@ -453,13 +466,12 @@ func (m *migrator) legacyCopies() []string {
 			continue
 		}
 		if n == "README.md" {
-			current, _ := os.ReadFile(filepath.Join(m.opts.RebarRoot, "templates", "project-bootstrap", "scripts", n))
-			if !bytes.Equal(data, current) && releasedBlobs(m.opts.RebarRoot, n)[gitBlobHash(data)] {
+			if !bytes.Equal(data, templateScript(n)) && releasedBlobs(m.opts.RebarRoot, n)[gitBlobHash(data)] {
 				out = append(out, n)
 			}
 			continue
 		}
-		if isFile(filepath.Join(m.opts.RebarRoot, "scripts", n)) {
+		if isRebarScript(m.opts.RebarRoot, n) {
 			out = append(out, n)
 		}
 	}
@@ -475,23 +487,13 @@ func (m *migrator) legacyPath(name string) string {
 	return filepath.Join(m.opts.ProjectRoot, "scripts", name)
 }
 
-func (m *migrator) installPath(name string) string {
-	return filepath.Join(m.opts.RebarRoot, "scripts", name)
-}
-
 var skipRe = regexp.MustCompile(`_rebar_skip\s+([123])`)
 
-// gates returns the install script's minimum tier and whether the legacy
-// copy has a tier gate of its own.
+// gates returns the minimum tier of rebar's built-in check and whether the
+// legacy copy has a tier gate of its own.
 func (m *migrator) gates(name string) (int, bool) {
-	minTier := 1
-	if data, err := os.ReadFile(m.installPath(name)); err == nil {
-		if mm := skipRe.FindStringSubmatch(string(data)); mm != nil {
-			minTier, _ = strconv.Atoi(mm[1])
-		}
-	}
 	legacy, _ := os.ReadFile(m.legacyPath(name))
-	return minTier, skipRe.Match(legacy)
+	return checks.MinTier(name), skipRe.Match(legacy)
 }
 
 // runLegacy runs the project's copy as the per-script override would.
@@ -521,8 +523,9 @@ func (m *migrator) workPath(name string) string {
 	return filepath.Join(m.work, "scripts", name)
 }
 
-// runInstall runs the install's script against root with candidate settings.
-// Safe to call concurrently.
+// runInstall runs rebar's built-in check for the script name against root
+// with candidate settings (in process, runNative), as the install's script
+// ran before the scripts were built in. Safe to call concurrently.
 func (m *migrator) runInstall(root, name string, extra []Setting, args ...string) runResult {
 	m.mu.Lock()
 	all := append(append([]Setting{}, m.accepted...), extra...)
@@ -539,9 +542,7 @@ func (m *migrator) runInstall(root, name string, extra []Setting, args ...string
 	if err := os.WriteFile(rcPath, rc, 0o644); err != nil {
 		return runResult{Err: err, Code: -1}
 	}
-	r = run(m.opts.Timeout, root,
-		scrubbedEnv("REBAR_PROJECT_ROOT="+root, "REBAR_TIER=3", "REBAR_RCFILE="+rcPath),
-		append([]string{m.installPath(name)}, args...)...)
+	r = runNative(root, rcPath, scrubbedEnv("REBAR_PROJECT_ROOT="+root, "REBAR_TIER=3"), name, args...)
 	m.mu.Lock()
 	m.runs[key] = r
 	m.mu.Unlock()
@@ -750,9 +751,7 @@ func (m *migrator) groundTruthStrictness(name string, keys []string, before runR
 		l := run(m.opts.Timeout, m.work, scrubbedEnv("REBAR_PROJECT_ROOT="+m.work, "REBAR_TIER=3"), m.workPath(name))
 		legacyFails[i] = !l.ok()
 		for v, extra := range variants {
-			r := run(m.opts.Timeout, m.work,
-				scrubbedEnv("REBAR_PROJECT_ROOT="+m.work, "REBAR_TIER=3", "REBAR_RCFILE="+m.rcFile(extra)),
-				m.installPath(name))
+			r := runNative(m.work, m.rcFile(extra), scrubbedEnv("REBAR_PROJECT_ROOT="+m.work, "REBAR_TIER=3"), name)
 			installFails[v][i] = !r.ok()
 		}
 		if err := m.ws.restore(); err != nil {
@@ -1072,10 +1071,9 @@ func (m *migrator) check(name string) *ScriptPlan {
 	}
 	src, _ := os.ReadFile(m.legacyPath(name))
 	cands := m.settingCandidates(name, string(src))
-	installSrc, _ := os.ReadFile(m.installPath(name))
 	_, scans := probeContent[name]
 	if scans {
-		if _, unver := exclusionBait(string(src), string(installSrc)); len(unver) > 0 {
+		if _, unver := exclusionBait(string(src), nativeFilters[name]); len(unver) > 0 {
 			sp.Reason = "has filters migrate can't exercise on a probe tree (" + strings.Join(unver, "; ") + "); review by hand"
 			return sp
 		}
@@ -1380,8 +1378,7 @@ func (m *migrator) buildProbeTreeWith(name, content string, cands []Setting, scr
 		}
 	} else {
 		src, _ := os.ReadFile(m.legacyPath(name))
-		installSrc, _ := os.ReadFile(m.installPath(name))
-		extra, _ := exclusionBait(string(src), string(installSrc))
+		extra, _ := exclusionBait(string(src), nativeFilters[name])
 		// Every top-level directory gets probe files (scope); the bait
 		// subdirectories and names (exclusions) go only where a setting or
 		// the defaults say sources live, which is enough to see a filter
@@ -1528,9 +1525,9 @@ func (m *migrator) byProvenance(name string) *ScriptPlan {
 	switch {
 	case wrapperNames[name] || name == "README.md":
 		sp.Verdict = Replace
-		sp.ReplaceWith = filepath.Join(m.opts.RebarRoot, "templates", "project-bootstrap", "scripts", name)
-		if !isFile(sp.ReplaceWith) {
-			sp.Verdict, sp.Reason = Keep, "unmodified, but the install has no template "+name+" to replace it with"
+		sp.ReplaceWith = "templates/project-bootstrap/scripts/" + name
+		if sp.ReplaceContent = templateScript(name); sp.ReplaceContent == nil {
+			sp.Verdict, sp.Reason = Keep, "unmodified, but rebar's template has no "+name+" to replace it with"
 			return sp
 		}
 		sp.Reason = "unmodified rebar copy; replaced by the template's " + name
@@ -1560,10 +1557,13 @@ func (m *migrator) configLib() *ScriptPlan {
 	env := scrubbedEnv("REBAR_PROJECT_ROOT=" + m.work)
 	a := run(m.opts.Timeout, m.work, env, "-c", q, "x", m.workPath(name))
 	m.noteWrites(name)
-	b := run(m.opts.Timeout, m.work, env, "-c", q, "x", m.installPath(name))
-	m.noteWrites("")
+	// What rebar's own settings readers report (the shell library's
+	// _rebar_tier and _rebar_contracts_dir).
+	var bl []string
+	config.WithEnv(&config.Env{Vars: env}, func() {
+		bl = []string{checks.Tier(m.work), config.ContractsDirFor(m.work)}
+	})
 	al := strings.Fields(a.Stdout)
-	bl := strings.Fields(b.Stdout)
 	if len(al) == 1 && len(bl) == 2 && bl[1] == "architecture" {
 		al = append(al, "architecture") // an old copy without contracts_dir
 	}
@@ -1794,7 +1794,7 @@ func (m *migrator) notes() {
 		if sp.Verdict == Replace && strings.HasSuffix(sp.Name, ".sh") {
 			for _, r := range m.refs[sp.Name] {
 				if r.CI {
-					p.Notes = append(p.Notes, fmt.Sprintf("CI: %s:%d runs scripts/%s, which now calls the `rebar` CLI; CI must install rebar (setup-rebar.sh, or a checkout with REBAR_ROOT and its bin/ on PATH)", r.File, r.Line, sp.Name))
+					p.Notes = append(p.Notes, fmt.Sprintf("CI: %s:%d runs scripts/%s, which now calls the `rebar` CLI; CI must install rebar (setup-rebar.sh, or the release binary on PATH)", r.File, r.Line, sp.Name))
 				}
 			}
 		}
@@ -2057,7 +2057,7 @@ func (m *migrator) ciViaCallers() []string {
 		for i, line := range strings.Split(string(data), "\n") {
 			for caller, names := range callers {
 				if strings.Contains(line, caller) {
-					out = append(out, fmt.Sprintf("CI: %s:%d runs %s, which calls the wrapper(s) %s; CI must install rebar (setup-rebar.sh, or a checkout with REBAR_ROOT and its bin/ on PATH)",
+					out = append(out, fmt.Sprintf("CI: %s:%d runs %s, which calls the wrapper(s) %s; CI must install rebar (setup-rebar.sh, or the release binary on PATH)",
 						rel, i+1, caller, "scripts/"+strings.Join(names, ", scripts/")))
 				}
 			}
@@ -2122,9 +2122,7 @@ func (m *migrator) registryAfterDeletions() {
 		return
 	}
 	reg := func(arg string) runResult {
-		return run(m.opts.Timeout, m.work,
-			scrubbedEnv("REBAR_PROJECT_ROOT="+m.work, "REBAR_TIER=3", "REBAR_RCFILE="+m.rcFile(nil)),
-			m.installPath("compute-registry.sh"), arg)
+		return runNative(m.work, m.rcFile(nil), scrubbedEnv("REBAR_PROJECT_ROOT="+m.work, "REBAR_TIER=3"), "compute-registry.sh", arg)
 	}
 	before := reg("--check")
 	if before.Err != nil || before.Code != 0 {
@@ -2135,10 +2133,8 @@ func (m *migrator) registryAfterDeletions() {
 		switch {
 		case sp.Verdict == Delete:
 			_ = os.Remove(p)
-		case sp.ReplaceContent != nil:
-			_ = os.WriteFile(p, sp.ReplaceContent, 0o755)
 		default:
-			_ = copyFile(sp.ReplaceWith, p)
+			_ = os.WriteFile(p, sp.ReplaceContent, 0o755)
 		}
 	}
 	after := reg("--check")
