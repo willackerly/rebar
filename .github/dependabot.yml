@@ -1,0 +1,29 @@
+# Weekly dependency updates, one grouped PR per ecosystem. Workflows pin
+# actions by commit SHA; Dependabot updates the SHA and its version comment.
+# Not covered: the Go toolchain (workflows use `go-version: stable`) and the
+# govulncheck version in `go run ...@vX.Y.Z` — bump those by hand.
+version: 2
+updates:
+  - package-ecosystem: gomod
+    directory: /cli
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    groups:
+      go-modules:
+        patterns: ["*"]
+    commit-message:
+      prefix: "build(deps)"
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    groups:
+      github-actions:
+        patterns: ["*"]
+    commit-message:
+      prefix: "ci(deps)"

@@ -1,4 +1,5 @@
-# CI for rebar itself: the same checks contributors run locally.
+# CI for rebar itself: the same checks contributors run locally, plus a
+# govulncheck scan and a build with the oldest Go that cli/go.mod allows.
 # Runs on PRs into and pushes to main and release/* branches.
 name: ci
 
@@ -36,9 +37,12 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
+      # Latest supported Go release, as release.yml builds with; go.mod's
+      # `go` line is only the minimum, proven by the go-min job below.
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version-file: cli/go.mod
+          go-version: stable
+          check-latest: true
           cache-dependency-path: cli/go.sum
 
       - name: Tool versions
@@ -84,3 +88,51 @@ jobs:
             echo "::endgroup::"
           done
           exit "$failed"
+
+  # cli/go.mod's `go` line is the oldest Go a source install (setup-rebar.sh,
+  # `go build`) may use; build and test with exactly that version.
+  go-min:
+    name: go-min (go.mod minimum)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      GOTOOLCHAIN: local   # no automatic switch to a newer toolchain
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: cli/go.mod
+          cache-dependency-path: cli/go.sum
+
+      - name: Build and test
+        working-directory: cli
+        run: |
+          go version
+          go build ./...
+          go test ./...
+
+  # Known vulnerabilities (Go vulnerability database) reachable from rebar's
+  # code, in its dependencies or in the standard library of the latest Go.
+  # Exits non-zero on any reachable finding. vulncheck.yml rescans weekly.
+  govulncheck:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: stable
+          check-latest: true
+          cache-dependency-path: cli/go.sum
+
+      - name: govulncheck
+        working-directory: cli
+        run: |
+          go version
+          go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
