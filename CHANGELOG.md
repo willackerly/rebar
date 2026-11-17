@@ -23,6 +23,51 @@ All notable changes to rebar. Versioned with [semver](https://semver.org/).
   link to the full CHANGELOG), followed by GitHub's list of merged PRs, and
   refuses to publish a tag with no such section — write the CHANGELOG before
   tagging. `scripts/release-notes.sh <tag>` prints the same section locally.
+- **`refresh-context.sh` works outside git history.** Outside a git repository,
+  or in one before its first commit, it exited 128 partway through the report.
+  It now skips the commit and worktree sections with a note, reports the rest,
+  and exits 0; a missing `QUICKCONTEXT.md` is still exit 1.
+- **`scan-consumers.sh` accepts sections without the optional fields.** A
+  consumer's `CONSUMES.md` section without `notify_on_change` (or `pin_date`,
+  `rationale`) made the scan exit 1, so `flush-notifications.sh` notified no
+  one for that contract. Absent optional fields now default to empty (unset
+  `notify_on_change` gets the owner default, `REBAR_NOTIFY_DEFAULT`); only a
+  missing `version_pinned` is an error, naming the file, and the scan still
+  reports the other consumers before exiting 1. `flush-notifications.sh` shows
+  that error and notifies the valid consumers, and its no-`jq` parser now
+  reads the consumer list correctly.
+- **`flush-notifications.sh` exits 0 after a successful flush.** Every real
+  (non-dry-run) flush exited 1, even when all dispatches succeeded, because the
+  script ended with `[ "$DRY_RUN" = "1" ] && echo …`. It now exits 0 when
+  every dispatch succeeds and 1 when any fails (counted as `failed=` in the
+  summary line).
+- **New projects ignore the steward's generated files.** The first `rebar
+  check` in a project from `rebar new` left `STEWARD_REPORT.md` and
+  `architecture/.state/` untracked, though the steward contract says they are
+  gitignored. `rebar new` and `rebar init` now add `STEWARD_REPORT.md` and
+  `<contracts_dir>/.state/*.json` to `.gitignore` (`init` appends only the
+  missing entries; the `.state/` outbox, `pending-notifications.md`, stays
+  tracked). The bootstrap template's `.gitignore` gets `STEWARD_REPORT.md` in
+  place of `architecture/.state/steward-report.md`, which nothing writes.
+  Existing projects: add the two lines, or run `rebar init`.
+- **Script tests no longer fail at random on SIGPIPE.** Under `set -o
+  pipefail`, `echo "$out" | grep -q …` fails when grep exits at an early match
+  while echo is still writing (exit 141; checks-enable T4 on ubuntu CI). The
+  tests use `contains` / `count_matches` from `scripts/tests/lib.sh`, which
+  feed grep a here-string; `sigpipe.test.sh` proves the old form fails on
+  large output and keeps it out of `scripts/` and `scripts/tests/`.
+  `check-fix-commit.sh` and `check-bypass-flags.sh` could misjudge a long
+  commit message the same way, and `test-e2e-live.sh` a long LLM answer;
+  they use here-strings now.
+- **`git archive | tar -x` no longer fails at random on macOS.** bsdtar stops
+  reading at the end-of-archive marker, so git archive could die of SIGPIPE
+  writing its padding: migrate T5's "extracting the old template" flake, and
+  a latent `package-release.sh` failure. Both extract from a file now; T5
+  prints the failing command's stderr.
+- **CI jobs time out** (15 min ubuntu, 30 min macOS) instead of after 6 h,
+  and the new `ci-retry` workflow re-runs, at most twice, jobs that GitHub
+  cancelled after waiting ~15 min for a macOS runner without running a step.
+  By hand: `gh run rerun <run-id> --failed`.
 - **Release binaries are built with a current Go; v3.1.0's were not.** The
   v3.1.0 binaries were built with go1.25.0 (the workflows read `cli/go.mod`'s
   `go` line literally) and include standard-library vulnerabilities fixed in

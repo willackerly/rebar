@@ -21,16 +21,25 @@ jobs:
   checks:
     name: checks (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
+    # A run takes ~3 min on ubuntu and ~5-8 on macOS; a hung test should not
+    # hold a runner for the 6 h default. This does not bound the wait for a
+    # runner: when macOS arm64 capacity runs out, GitHub cancels the queued
+    # job after ~15 min ("The job was not acquired by Runner ..."), without
+    # running a step. ci-retry.yml re-runs such jobs; by hand:
+    #   gh run rerun <run-id> --failed
+    timeout-minutes: ${{ matrix.timeout }}
     strategy:
       fail-fast: false
       matrix:
         include:
           - os: ubuntu-latest
             path_prefix: ""
+            timeout: 15
           # Stock macOS /bin/bash is 3.2; put it first so `#!/usr/bin/env bash`
           # scripts run under it, as they do on a developer's Mac.
           - os: macos-latest
             path_prefix: "/bin:/usr/bin:"
+            timeout: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

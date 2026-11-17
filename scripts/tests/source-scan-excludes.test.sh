@@ -31,14 +31,14 @@ ref S9-NESTED.1.0             > "$P/src/dist/x.go"
 
 out=$(run_in "$P" check-contract-refs.sh) && fail "broken references not reported: $out"
 for id in S2-GITHUB S3-DISTANCE S4-WORDS; do
-  echo "$out" | grep -q "references CONTRACT:$id" || fail "$id not checked: $out"
+  contains "$out" "references CONTRACT:$id" || fail "$id not checked: $out"
 done
 ok "references under .github/, in distance.go and on lines mentioning vendor are checked"
 
 for id in S9-VENDOR S9-NODE S9-DIST S9-NESTED; do
-  echo "$out" | grep -q "CONTRACT:$id" && fail "$id in a skipped directory was checked: $out"
+  contains "$out" "CONTRACT:$id" && fail "$id in a skipped directory was checked: $out"
 done
-echo "$out" | grep -q 'Checked 4 contract references, 3 broken' || fail "unexpected totals: $out"
+contains "$out" 'Checked 4 contract references, 3 broken' || fail "unexpected totals: $out"
 ok "node_modules/, vendor/, dist/ (also nested) are skipped"
 
 # check-registry.sh: a contract referenced only from .github/ or distance.go
@@ -47,9 +47,9 @@ printf '# S2\n' > "$P/architecture/CONTRACT-S2-GITHUB.1.0.md"
 printf '# S3\n' > "$P/architecture/CONTRACT-S3-DISTANCE.1.0.md"
 printf '# S9\n' > "$P/architecture/CONTRACT-S9-VENDOR.1.0.md"
 out=$(run_in "$P" check-registry.sh)
-echo "$out" | grep -q 'ORPHAN.*S2-GITHUB' && fail "check-registry: S2-GITHUB (referenced from .github/) reported as orphan: $out"
-echo "$out" | grep -q 'ORPHAN.*S3-DISTANCE' && fail "check-registry: S3-DISTANCE (referenced from distance.go) reported as orphan: $out"
-echo "$out" | grep -q 'ORPHAN.*S9-VENDOR' || fail "check-registry: S9-VENDOR (referenced only from vendor/) not reported: $out"
+contains "$out" 'ORPHAN.*S2-GITHUB' && fail "check-registry: S2-GITHUB (referenced from .github/) reported as orphan: $out"
+contains "$out" 'ORPHAN.*S3-DISTANCE' && fail "check-registry: S3-DISTANCE (referenced from distance.go) reported as orphan: $out"
+contains "$out" 'ORPHAN.*S9-VENDOR' || fail "check-registry: S9-VENDOR (referenced only from vendor/) not reported: $out"
 ok "check-registry counts references by directory, not by substring"
 
 # check-todos.sh: untracked TODOs in distance.go and on a line mentioning
@@ -61,34 +61,34 @@ printf '# TODO: two — see vendor docs\n' > "$T/src/words.sh"
 printf '# TODO: skipped\n' > "$T/src/vendor/lib.sh"
 printf 'source_dirs = src\nsource_extensions = sh\n' > "$T/.rebarrc"
 out=$(run_in "$T" check-todos.sh) && fail "check-todos: untracked TODOs not reported: $out"
-echo "$out" | grep -q 'distance.sh' || fail "check-todos: TODO in distance.sh missed: $out"
-echo "$out" | grep -q 'words.sh' || fail "check-todos: TODO on a line mentioning vendor missed: $out"
-echo "$out" | grep -q 'vendor/lib.sh' && fail "check-todos: TODO under vendor/ reported: $out"
+contains "$out" 'distance.sh' || fail "check-todos: TODO in distance.sh missed: $out"
+contains "$out" 'words.sh' || fail "check-todos: TODO on a line mentioning vendor missed: $out"
+contains "$out" 'vendor/lib.sh' && fail "check-todos: TODO under vendor/ reported: $out"
 ok "check-todos catches TODOs by directory, not by substring"
 
 # check-todos.sh: its TODO.md / check-todos filters also ran on whole lines.
 printf '# TODO: move this into TODO.md\n' > "$T/src/a.sh"
 printf '# TODO: see the check-todos docs\n' > "$T/src/c.sh"
 out=$(run_in "$T" check-todos.sh)
-echo "$out" | grep -q 'src/a.sh' || fail "check-todos: TODO mentioning TODO.md missed: $out"
-echo "$out" | grep -q 'src/c.sh' || fail "check-todos: TODO mentioning check-todos missed: $out"
+contains "$out" 'src/a.sh' || fail "check-todos: TODO mentioning TODO.md missed: $out"
+contains "$out" 'src/c.sh' || fail "check-todos: TODO mentioning check-todos missed: $out"
 ok "check-todos excludes TODO.md and itself by file name, not by line text"
 
 # Agent worktrees under .claude/ hold stale source; they are skipped.
 mkdir -p "$P/.claude/worktrees/agent-1/src"
 ref S9-WORKTREE.1.0 > "$P/.claude/worktrees/agent-1/src/old.go"
 out=$(run_in "$P" check-contract-refs.sh) || true
-echo "$out" | grep -q 'S9-WORKTREE' && fail "check-contract-refs scanned .claude/worktrees: $out"
+contains "$out" 'S9-WORKTREE' && fail "check-contract-refs scanned .claude/worktrees: $out"
 ok ".claude/ agent worktrees are skipped"
 
 # source_exclude_dirs replaces the default list (here: also skip generated/).
 mkdir -p "$P/generated"
 ref S9-GENERATED.1.0 > "$P/generated/x.go"
 out=$(run_in "$P" check-contract-refs.sh) || true
-echo "$out" | grep -q 'S9-GENERATED' || fail "generated/ skipped without being configured: $out"
+contains "$out" 'S9-GENERATED' || fail "generated/ skipped without being configured: $out"
 printf 'source_exclude_dirs = node_modules vendor dist generated\n' > "$P/.rebarrc"
 out=$(run_in "$P" check-contract-refs.sh) || true
-echo "$out" | grep -q 'S9-GENERATED' && fail "source_exclude_dirs not honoured: $out"
+contains "$out" 'S9-GENERATED' && fail "source_exclude_dirs not honoured: $out"
 rm "$P/.rebarrc"
 ok "source_exclude_dirs configures the skipped directories"
 
@@ -99,10 +99,10 @@ printf '# S5\n' > "$R/docs/specs/CONTRACT-S5-SPEC.1.0.md"
 ref S5-SPEC.1.0 > "$R/docs/specs/examples/demo.go"
 printf 'contracts_dir = ./docs/specs/\n' > "$R/.rebarrc"
 out=$(run_in "$R" check-registry.sh) || true
-echo "$out" | grep -q 'ORPHAN.*S5-SPEC' || fail "check-registry counted a reference inside the contracts dir (./docs/specs/): $out"
+contains "$out" 'ORPHAN.*S5-SPEC' || fail "check-registry counted a reference inside the contracts dir (./docs/specs/): $out"
 rm "$R/.rebarrc"
 out=$(cd "$R" && REBAR_PROJECT_ROOT="$R" "$REBAR_SCRIPTS/check-registry.sh" ./docs/specs/ 2>&1) || true
-echo "$out" | grep -q 'ORPHAN.*S5-SPEC' || fail "check-registry ./docs/specs/ (argument) counted a reference inside the contracts dir: $out"
+contains "$out" 'ORPHAN.*S5-SPEC' || fail "check-registry ./docs/specs/ (argument) counted a reference inside the contracts dir: $out"
 ok "contracts_dir is normalised (./docs/specs/ → docs/specs) before excluding it"
 
 # compute-registry's non-git fallback: a project whose own path contains
@@ -120,7 +120,7 @@ for sub in plain dist-tools/proj foo.github.io/proj; do
   ref S4-HIDDEN.1.0 > "$C/node_modules/x/y.js"
   health=$(run_in "$C" compute-registry.sh --health)
   for want in '| S2-GITHUB | 1 |' '| S3-DISTANCE | 1 |' '| S4-HIDDEN | 0 |'; do
-    echo "$health" | grep -qF "$want" || fail "compute-registry (non-git, $sub): want '$want': $health"
+    contains "$health" -F "$want" || fail "compute-registry (non-git, $sub): want '$want': $health"
   done
 done
 ok "compute-registry's non-git fallback prunes by path, not by substring"
@@ -135,11 +135,11 @@ printf '\000\001%s:S9-GHOST.1.0 TODO: binary\000' CONTRACT > "$B/bin/tool"
 printf '\000%s:S9-GHOST.1.0 TODO: binary\000' CONTRACT > "$B/src/blob.go"
 printf '// %s:S1-BIN.1.0\n' CONTRACT > "$B/src/ok.go"
 health=$(run_in "$B" compute-registry.sh --health)
-echo "$health" | grep -q 'Binary file' && fail "compute-registry read a binary file as a reference: $health"
-echo "$health" | grep -q 'S9-GHOST' && fail "compute-registry counted a reference inside a binary: $health"
-echo "$health" | grep -qF '| S1-BIN | 1 |' || fail "compute-registry lost the real reference: $health"
+contains "$health" 'Binary file' && fail "compute-registry read a binary file as a reference: $health"
+contains "$health" 'S9-GHOST' && fail "compute-registry counted a reference inside a binary: $health"
+contains "$health" -F '| S1-BIN | 1 |' || fail "compute-registry lost the real reference: $health"
 out=$(run_in "$B" check-contract-refs.sh)
-echo "$out" | grep -q 'S9-GHOST\|Binary file' && fail "check-contract-refs read a binary: $out"
+contains "$out" 'S9-GHOST\|Binary file' && fail "check-contract-refs read a binary: $out"
 printf 'source_dirs = src bin\n' > "$B/.rebarrc"
 out=$(run_in "$B" check-todos.sh) || fail "check-todos counted a TODO inside a binary: $out"
 ok "binary files are skipped by the source scanners"
