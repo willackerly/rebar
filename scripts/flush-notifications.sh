@@ -175,7 +175,12 @@ for entry in "${entries[@]}"; do
   echo "→ $contract: $old_v → $new_v ($severity)"
 
   # Find consumers of this contract. JSON output makes parsing tractable.
-  consumers_json=$("$SCRIPT_DIR/scan-consumers.sh" "$contract" --json 2>/dev/null || echo '{"consumers":[]}')
+  # scan-consumers exits 1 when a consumer's section lacks a required field;
+  # its stderr says which, and the valid consumers are still in its output.
+  if ! consumers_json=$("$SCRIPT_DIR/scan-consumers.sh" "$contract" --json); then
+    echo "    WARN: scan-consumers reported an error for $contract (above)" >&2
+  fi
+  [ -n "$consumers_json" ] || consumers_json='{"consumers":[]}'
 
   # Extract consumer names + notify_on_change preferences via jq if present,
   # otherwise via grep/sed (bash 3.2 fallback).
@@ -183,8 +188,9 @@ for entry in "${entries[@]}"; do
   if command -v jq &>/dev/null; then
     consumer_lines=$(echo "$consumers_json" | jq -r '.consumers[] | "\(.name)|\(.notify_on_change)"' 2>/dev/null || true)
   else
-    # Fallback parser — sed-based
-    consumer_lines=$(echo "$consumers_json" | tr '},' '\n' | grep '"name"' | sed -E 's/.*"name":"([^"]+)".*"notify_on_change":"([^"]*)".*/\1|\2/')
+    # Fallback parser: one consumer object per line, then pick the two fields.
+    consumer_lines=$(echo "$consumers_json" | awk '{ gsub(/[}],[{]/, "}\n{"); print }' \
+      | sed -nE 's/.*"name":"([^"]+)".*"notify_on_change":"([^"]*)".*/\1|\2/p')
   fi
 
   if [ -z "$consumer_lines" ]; then

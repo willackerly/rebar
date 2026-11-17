@@ -27,6 +27,15 @@ All notable changes to rebar. Versioned with [semver](https://semver.org/).
   or in one before its first commit, it exited 128 partway through the report.
   It now skips the commit and worktree sections with a note, reports the rest,
   and exits 0; a missing `QUICKCONTEXT.md` is still exit 1.
+- **`scan-consumers.sh` accepts sections without the optional fields.** A
+  consumer's `CONSUMES.md` section without `notify_on_change` (or `pin_date`,
+  `rationale`) made the scan exit 1, so `flush-notifications.sh` notified no
+  one for that contract. Absent optional fields now default to empty (unset
+  `notify_on_change` gets the owner default, `REBAR_NOTIFY_DEFAULT`); only a
+  missing `version_pinned` is an error, naming the file, and the scan still
+  reports the other consumers before exiting 1. `flush-notifications.sh` shows
+  that error and notifies the valid consumers, and its no-`jq` parser now
+  reads the consumer list correctly.
 
 ---
 
