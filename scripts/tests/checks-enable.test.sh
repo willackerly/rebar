@@ -38,7 +38,7 @@ run_in "$P" compute-registry.sh >/dev/null || fail "setup: registry generation"
 # T1 — unset at tier 1: ground truth skips, registry still runs.
 printf 'files >= 3\n' > "$P/METRICS"
 out="$(run_in "$P" check-ground-truth.sh)" || { echo "$out"; fail "T1: ground truth should skip at tier 1"; }
-echo "$out" | grep -q '^SKIP: tier 1 < required tier 3' || { echo "$out"; fail "T1: no SKIP line"; }
+contains "$out" '^SKIP: tier 1 < required tier 3' || { echo "$out"; fail "T1: no SKIP line"; }
 printf '\n<!-- edited -->\n' >> "$P/architecture/CONTRACT-REGISTRY.md"
 out="$(run_in "$P" compute-registry.sh --check)" && { echo "$out"; fail "T1: stale registry passed at tier 1"; }
 run_in "$P" compute-registry.sh >/dev/null
@@ -48,12 +48,12 @@ ok "T1: tier 1 without checks_enable skips ground truth; the registry check runs
 rc 1 'checks_enable = check-ground-truth compute-registry'
 printf 'files >= 2\n' > "$P/METRICS"
 out="$(run_in "$P" check-ground-truth.sh)" || { echo "$out"; fail "T2: enabled ground truth should pass"; }
-echo "$out" | grep -q 'running check-ground-truth because .rebarrc checks_enable names it' \
+contains "$out" 'running check-ground-truth because .rebarrc checks_enable names it' \
   || { echo "$out"; fail "T2: no NOTE that the check was force-enabled"; }
-echo "$out" | grep -q 'files = 2  (floor 2)' || { echo "$out"; fail "T2: metric not computed"; }
+contains "$out" 'files = 2  (floor 2)' || { echo "$out"; fail "T2: metric not computed"; }
 printf 'files >= 3\n' > "$P/METRICS"
 out="$(run_in "$P" check-ground-truth.sh)" && { echo "$out"; fail "T2: broken floor passed"; }
-echo "$out" | grep -q 'DRIFT' || { echo "$out"; fail "T2: no DRIFT for a broken floor"; }
+contains "$out" 'DRIFT' || { echo "$out"; fail "T2: no DRIFT for a broken floor"; }
 out="$(run_in "$P" compute-registry.sh --check)" || { echo "$out"; fail "T2: current registry failed"; }
 printf '\n<!-- edited -->\n' >> "$P/architecture/CONTRACT-REGISTRY.md"
 out="$(run_in "$P" compute-registry.sh --check)" && { echo "$out"; fail "T2: stale registry passed"; }
@@ -62,9 +62,9 @@ ok "T2: checks_enable runs ground truth at tier 1 (pass and fail); registry pass
 
 # T3 — the suites honour it too.
 out="$(run_in "$P" pre-commit.sh)" && { echo "$out"; fail "T3: pre-commit passed a broken floor"; }
-echo "$out" | grep -q 'DRIFT' || { echo "$out"; fail "T3: pre-commit did not run ground truth"; }
+contains "$out" 'DRIFT' || { echo "$out"; fail "T3: pre-commit did not run ground truth"; }
 out="$(run_in "$P" cold-start-checks.sh)"
-echo "$out" | grep -q '^\[FAIL\] check-ground-truth' || { echo "$out"; fail "T3: cold start did not run ground truth"; }
+contains "$out" '^\[FAIL\] check-ground-truth' || { echo "$out"; fail "T3: cold start did not run ground truth"; }
 rc 1
 out="$(run_in "$P" pre-commit.sh)" || { echo "$out"; fail "T3: pre-commit at tier 1 should skip ground truth"; }
 printf 'files >= 2\n' > "$P/METRICS"
@@ -73,33 +73,33 @@ ok "T3: pre-commit.sh and cold-start-checks.sh run an enabled check at tier 1"
 # T4 — unknown names warn once and are ignored; .sh suffix and env override work.
 rc 1 'checks_enable = check-ground-truth.sh no-such-check'
 out="$(run_in "$P" check-ground-truth.sh)" || { echo "$out"; fail "T4: unknown name changed the exit"; }
-echo "$out" | grep -q "WARN: checks_enable names unknown check 'no-such-check'" \
+contains "$out" "WARN: checks_enable names unknown check 'no-such-check'" \
   || { echo "$out"; fail "T4: no warning for an unknown name"; }
-echo "$out" | grep -q 'running check-ground-truth' || { echo "$out"; fail "T4: .sh suffix not accepted"; }
+contains "$out" 'running check-ground-truth' || { echo "$out"; fail "T4: .sh suffix not accepted"; }
 out="$(run_in "$P" pre-commit.sh)" || { echo "$out"; fail "T4: pre-commit failed on an unknown name"; }
-[ "$(echo "$out" | grep -c 'unknown check')" = 1 ] || { echo "$out"; fail "T4: warning not printed exactly once per suite run"; }
+[ "$(count_matches "$out" 'unknown check')" = 1 ] || { echo "$out"; fail "T4: warning not printed exactly once per suite run"; }
 rc 1
 out="$(REBAR_CHECKS_ENABLE=check-ground-truth run_in "$P" check-ground-truth.sh)" \
   || { echo "$out"; fail "T4: env override run failed"; }
-echo "$out" | grep -q 'running check-ground-truth' || { echo "$out"; fail "T4: REBAR_CHECKS_ENABLE ignored"; }
+contains "$out" 'running check-ground-truth' || { echo "$out"; fail "T4: REBAR_CHECKS_ENABLE ignored"; }
 ok "T4: unknown names warn once and are ignored; .sh suffix and REBAR_CHECKS_ENABLE work"
 
 # T5 — a named check runs as at tier 3; other tiers unchanged.
 printf '# C\n\n## Purpose\n\nNo JTBD sections.\n' > "$P/architecture/CONTRACT-S2-BAR.1.0.md"
 rc 2
 out="$(run_in "$P" check-jtbd-presence.sh)" || { echo "$out"; fail "T5: jtbd should be advisory at tier 2"; }
-echo "$out" | grep -q 'advisory at Tier 2' || { echo "$out"; fail "T5: no advisory line"; }
+contains "$out" 'advisory at Tier 2' || { echo "$out"; fail "T5: no advisory line"; }
 rc 2 'checks_enable = check-jtbd-presence'
 out="$(run_in "$P" check-jtbd-presence.sh)" && { echo "$out"; fail "T5: a named jtbd check should block"; }
 rc 1
 out="$(run_in "$P" check-contract-headers.sh)"
-echo "$out" | grep -q '^SKIP: tier 1' || { echo "$out"; fail "T5: contract headers should skip at tier 1"; }
+contains "$out" '^SKIP: tier 1' || { echo "$out"; fail "T5: contract headers should skip at tier 1"; }
 rc 1 'checks_enable = check-contract-headers'
 out="$(run_in "$P" check-contract-headers.sh)"
-echo "$out" | grep -q '^SKIP:' && { echo "$out"; fail "T5: enabled contract headers skipped"; }
+contains "$out" '^SKIP:' && { echo "$out"; fail "T5: enabled contract headers skipped"; }
 rm "$P/architecture/CONTRACT-S2-BAR.1.0.md"
 rc 3
 printf 'files >= 3\n' > "$P/METRICS"
 out="$(run_in "$P" check-ground-truth.sh)" && { echo "$out"; fail "T5: tier 3 ground truth passed a broken floor"; }
-echo "$out" | grep -q 'checks_enable' && { echo "$out"; fail "T5: tier 3 unset mentions checks_enable"; }
+contains "$out" 'checks_enable' && { echo "$out"; fail "T5: tier 3 unset mentions checks_enable"; }
 ok "T5: a named check runs as at tier 3 (jtbd blocks, headers run); tier 3 unset unchanged"

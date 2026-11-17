@@ -6,4 +6,10 @@ Consumers of 001/C1-API:
     notify_on_change:  true
     rationale:         we call it
 
+  beta → $ROOT/consumers/beta
+    version_pinned:    1 . 0
+    pin_date:          (unset)
+    notify_on_change:  false
+
+scan-consumers: $ROOT/consumers/gamma/CONSUMES.md: section '## 001/C1-API.1.0' has no version_pinned (required: the semver this consumer is pinned to, CHARTER §1.6) — skipped
 --- exit 1 ---

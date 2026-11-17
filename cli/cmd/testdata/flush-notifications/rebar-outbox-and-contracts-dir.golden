@@ -4,7 +4,7 @@ flush-notifications: 001 has 1 pending notification(s)
     sent: alpha
     FAIL: broken (ask invocation failed; entry stays pending)
 
-flush-notifications: processed=1 sent=1 skipped=0
+flush-notifications: processed=1 sent=1 skipped=0 failed=1
 --- wrote ask.log ---
 alpha:featurerequest Upstream change notice (auto-generated): 001/C2-LIB has been revised.
 

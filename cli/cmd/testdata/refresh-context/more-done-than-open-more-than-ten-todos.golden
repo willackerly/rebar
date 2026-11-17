@@ -4,4 +4,31 @@ Last synced: {{ago:0}}
 OK: QUICKCONTEXT is N days old
 
 Commits since last sync:
---- exit 128 ---
+  (skipped: not a git repository)
+
+=== TODO Freshness ===
+TODO.md last synced: unknown
+Open items: 1 | Completed items: 2
+WARNING: More completed than open items — consider archiving completed items
+
+=== Untracked TODOs in Code ===
+WARNING: Untracked TODO comments found:
+src/many.go:1:// TODO: again
+src/many.go:2:// TODO: again
+src/many.go:3:// TODO: again
+src/many.go:4:// TODO: again
+src/many.go:5:// TODO: again
+src/many.go:6:// TODO: again
+src/many.go:7:// TODO: again
+src/many.go:8:// TODO: again
+src/many.go:9:// TODO: again
+src/many.go:10:// TODO: again
+
+=== Worktree State ===
+(skipped: not a git repository)
+
+=== Summary ===
+Run 'rebar context session-start' for full context loading
+Run 'rebar context' for the Cold Start Quad
+Run 'rebar run refresh-context --test-baseline' to verify tests pass
+--- exit 0 ---

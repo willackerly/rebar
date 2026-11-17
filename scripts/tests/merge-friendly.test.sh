@@ -110,18 +110,18 @@ echo "ok T4: output is locale-independent"
 
 # --- T5: --health still reports counts --------------------------------------
 health="$(cd "$R1" && "$REBAR" native compute-registry --health)"
-echo "$health" | grep -q '^| S1-FOO | 3 |' \
+contains "$health" '^| S1-FOO | 3 |' \
   || fail "T5: --health does not report S1-FOO's 3 implementing files"
 echo "ok T5: --health reports implementing-file counts"
 
 # --- T6: tracked files only ---------------------------------------------------
 printf '// %s\npackage src\n' "$HEADER" > "$R1/src/scratch.go"
 health="$(cd "$R1" && "$REBAR" native compute-registry --health)"
-echo "$health" | grep -q '^| S1-FOO | 3 |' \
+contains "$health" '^| S1-FOO | 3 |' \
   || fail "T6: an untracked file changed S1-FOO's implementing-file count"
 rm -rf "$R1/.git"
 health="$(cd "$R1" && "$REBAR" native compute-registry --health)"
-echo "$health" | grep -q '^| S1-FOO | 4 |' \
+contains "$health" '^| S1-FOO | 4 |' \
   || fail "T6: grep -r fallback outside git does not count all 4 files"
 echo "ok T6: counts cover tracked files only; non-git fallback still counts"
 

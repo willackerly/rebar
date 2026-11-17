@@ -225,15 +225,14 @@ All notable changes to rebar. Versioned with [semver](https://semver.org/).
   `flush-notifications` calls ask through `ASK_BIN` as before and reads
   scan-consumers' JSON as the script did with jq. `rebar doc` and
   `rebar-doc` now share one kind table, so `rebar doc` also rejects a name
-  with whitespace or `..` (exit 2), as the script did. Kept for parity, to
-  fix later in both implementations: refresh-context ends with exit 128
-  outside a git repository (and before any commit), right after "Commits
-  since last sync:", because of `set -e` with pipefail; scan-consumers ends
-  with exit 1 at the first consumer section missing `version_pinned`,
-  `pin_date`, `notify_on_change` or `rationale`, though the template marks
-  `notify_on_change` optional (so flush-notifications sees no consumers for
-  that contract); flush-notifications exits 1 after every run that is not
-  `--dry-run`; the TODO counts print `0<newline>0` when there are none.
+  with whitespace or `..` (exit 2), as the script did. The ports include
+  v3.1.1's script fixes: refresh-context skips its git sections outside a
+  repository or before the first commit (exit 0); scan-consumers requires
+  only `version_pinned` (other fields default, a trailing `# comment` is
+  dropped; a section without it is reported and left out, the rest still
+  listed, exit 1); flush-notifications exits 0 after a successful flush and
+  1 when a dispatch failed, and its summary counts `failed=`. Kept for
+  parity: the TODO counts print `0<newline>0` when there are none.
   Platform choices: dates are read as GNU date reads them (a date that does
   not exist gives no staleness line; BSD rolled it over), binary source
   files are not untracked TODOs, the `--dry-run` message length counts
@@ -261,13 +260,6 @@ All notable changes to rebar. Versioned with [semver](https://semver.org/).
   takes 0.07 s instead of 6 s; on virtru-analyze (60 contracts) 6.6 s
   instead of 48 s, most of it the project's own check copies, which still
   run as bash.
-- **`rebar new` ignores the steward's reports.** The steward contract says
-  `STEWARD_REPORT.md` is generated and gitignored, but `rebar new` wrote a
-  `.gitignore` without it or `architecture/.state/*.json`, so a fresh
-  project's first `rebar check` left both untracked. The bootstrap
-  template's `.gitignore` listed `architecture/.state/steward-report.md`, a
-  file nothing writes, instead of `STEWARD_REPORT.md`; fixed too.
-
 - **The suites run natively: `rebar check` needs no bash for rebar's
   checks.** `rebar check`, `rebar check --pre-commit` and `rebar check
   --cold-start` (and `rebar commit`, `rebar push`, `rebar run ci-check`) run
@@ -392,6 +384,86 @@ All notable changes to rebar. Versioned with [semver](https://semver.org/).
   is binary when its first 32 KiB hold a NUL, as macOS grep decides, also on
   Linux (GNU grep checked a larger first block and stopped at a later NUL). `config.RCValue` now honors
   `REBAR_RCFILE`, as the scripts do.
+
+---
+
+## v3.1.1 — 2026-11-17
+
+A maintenance release. **Upgrade from v3.1.0:** its prebuilt binaries were
+built with go1.25.0 and carry 59 known Go standard-library vulnerabilities
+(net/http, crypto/tls, crypto/x509, …); v3.1.1 is built with the current Go
+release and every release binary is now scanned with `govulncheck` before it
+is published. Also: script fixes found while porting rebar's checks to Go,
+a bash 3.2 crash in `check-decay-patterns.sh` on larger repos, flaky tests,
+and CI hardening.
+
+- **GitHub Release notes come from the CHANGELOG.** The release workflow puts
+  the tag's `## vX.Y.Z` section first (relative links made absolute, then a
+  link to the full CHANGELOG), followed by GitHub's list of merged PRs, and
+  refuses to publish a tag with no such section — write the CHANGELOG before
+  tagging. `scripts/release-notes.sh <tag>` prints the same section locally.
+- **`refresh-context.sh` works outside git history.** Outside a git repository,
+  or in one before its first commit, it exited 128 partway through the report.
+  It now skips the commit and worktree sections with a note, reports the rest,
+  and exits 0; a missing `QUICKCONTEXT.md` is still exit 1.
+- **`scan-consumers.sh` accepts sections without the optional fields.** A
+  consumer's `CONSUMES.md` section without `notify_on_change` (or `pin_date`,
+  `rationale`) made the scan exit 1, so `flush-notifications.sh` notified no
+  one for that contract. Absent optional fields now default to empty (unset
+  `notify_on_change` gets the owner default, `REBAR_NOTIFY_DEFAULT`); only a
+  missing `version_pinned` is an error, naming the file, and the scan still
+  reports the other consumers before exiting 1. `flush-notifications.sh` shows
+  that error and notifies the valid consumers, and its no-`jq` parser now
+  reads the consumer list correctly.
+- **`flush-notifications.sh` exits 0 after a successful flush.** Every real
+  (non-dry-run) flush exited 1, even when all dispatches succeeded, because the
+  script ended with `[ "$DRY_RUN" = "1" ] && echo …`. It now exits 0 when
+  every dispatch succeeds and 1 when any fails (counted as `failed=` in the
+  summary line).
+- **New projects ignore the steward's generated files.** The first `rebar
+  check` in a project from `rebar new` left `STEWARD_REPORT.md` and
+  `architecture/.state/` untracked, though the steward contract says they are
+  gitignored. `rebar new` and `rebar init` now add `STEWARD_REPORT.md` and
+  `<contracts_dir>/.state/*.json` to `.gitignore` (`init` appends only the
+  missing entries; the `.state/` outbox, `pending-notifications.md`, stays
+  tracked). The bootstrap template's `.gitignore` gets `STEWARD_REPORT.md` in
+  place of `architecture/.state/steward-report.md`, which nothing writes.
+  Existing projects: add the two lines, or run `rebar init`.
+- **Script tests no longer fail at random on SIGPIPE.** Under `set -o
+  pipefail`, `echo "$out" | grep -q …` fails when grep exits at an early match
+  while echo is still writing (exit 141; checks-enable T4 on ubuntu CI). The
+  tests use `contains` / `count_matches` from `scripts/tests/lib.sh`, which
+  feed grep a here-string; `sigpipe.test.sh` proves the old form fails on
+  large output and keeps it out of `scripts/` and `scripts/tests/`.
+  `check-fix-commit.sh` and `check-bypass-flags.sh` could misjudge a long
+  commit message the same way, and `test-e2e-live.sh` a long LLM answer;
+  they use here-strings now.
+- **`git archive | tar -x` no longer fails at random on macOS.** bsdtar stops
+  reading at the end-of-archive marker, so git archive could die of SIGPIPE
+  writing its padding: migrate T5's "extracting the old template" flake, and
+  a latent `package-release.sh` failure. Both extract from a file now; T5
+  prints the failing command's stderr.
+- **CI jobs time out** (15 min ubuntu, 30 min macOS) instead of after 6 h,
+  and the new `ci-retry` workflow re-runs, at most twice, jobs that GitHub
+  cancelled after waiting ~15 min for a macOS runner without running a step.
+  By hand: `gh run rerun <run-id> --failed`.
+- **`check-decay-patterns.sh` no longer crashes or hangs under macOS
+  `/bin/bash` 3.2 once ~250 spec/test files are scanned.** Each file's
+  `done < <(grep …)` left a descriptor open, and bash 3.2 corrupts its heap
+  when that reaches fd 256 (abort, bus error, or a hang). The scan now pipes
+  grep into its loop; output is unchanged.
+- **Release binaries are built with a current Go; v3.1.0's were not.** The
+  v3.1.0 binaries were built with go1.25.0 (the workflows read `cli/go.mod`'s
+  `go` line literally) and include standard-library vulnerabilities fixed in
+  later Go patch releases (`govulncheck -mode=binary` reports 59, in
+  `net/http`, `crypto/x509`, `crypto/tls`, `html/template`, …); none are in
+  rebar's own code or its modules. v3.1.1 is built with the latest supported Go
+  — upgrade. The release workflow now records the Go version in the Release
+  notes and runs govulncheck on every binary, refusing to publish on a finding;
+  CI runs govulncheck on every PR and builds with `go.mod`'s minimum (still Go
+  1.25) as well; a weekly workflow rescans `main` and the latest release; and
+  Dependabot updates Go modules and the pinned actions. See
+  [SECURITY.md](SECURITY.md).
 
 ---
 
