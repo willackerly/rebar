@@ -49,6 +49,15 @@ All notable changes to rebar. Versioned with [semver](https://semver.org/).
   to project scripts becomes the thin wrapper with `checks_extra` /
   `checks_extra_pre_commit` when rebar's suite with them exits as the copy
   does; otherwise it is kept with the reason.
+- **Tests: parity cases run in parallel; goldens stop changing with the
+  date.** `runParity` runs each case in parallel (the in-process side under
+  `config.WithEnv` with the case's environment instead of `t.Setenv`): the
+  cmd package takes about 3.5 minutes instead of 8 locally, and CI and the
+  release workflow pass an explicit `go test -timeout 20m`. The ci-check and
+  refresh-context goldens held dates (and, for refresh-context, commit ids)
+  computed from the fixtures' relative dates, so they failed from the day
+  after they were written; goldens now keep the `{{ago:N}}` tokens and
+  refresh-context's commit ids are normalized.
 - **ASK's servers run natively.** `rebar mcp serve` is the MCP server
   (was the python `bin/ask-mcp-server`): stdio and HTTP, the same flags,
   tool names (`ask_<repo>_<role>`), input schema, descriptions, resources
