@@ -69,7 +69,7 @@ func scanConsumers(dir string, out, errw io.Writer, id string, asJSON bool) ([]c
 	paths := scanPaths(owner)
 	if len(paths) == 0 {
 		if asJSON {
-			io.WriteString(b, `{"contract":"` + owner + "/" + id + `","consumers":[]}` + "\n")
+			io.WriteString(b, `{"contract":"`+owner+"/"+id+`","consumers":[]}`+"\n")
 		} else {
 			io.WriteString(b, "scan-consumers: no repos to scan (registry empty + REBAR_REPOS unset)\n")
 		}
@@ -129,7 +129,7 @@ func scanConsumers(dir string, out, errw io.Writer, id string, asJSON bool) ([]c
 			continue
 		}
 		if len(results) == 0 {
-			io.WriteString(b, "Consumers of " + owner + "/" + id + ":\n\n")
+			io.WriteString(b, "Consumers of "+owner+"/"+id+":\n\n")
 		}
 		notify := c.notify
 		if notify == "" {
@@ -151,9 +151,9 @@ func scanConsumers(dir string, out, errw io.Writer, id string, asJSON bool) ([]c
 	}
 	switch {
 	case asJSON:
-		io.WriteString(b, `{"contract":"` + owner + "/" + id + `","consumers":[` + strings.Join(results, ",") + "]}\n")
+		io.WriteString(b, `{"contract":"`+owner+"/"+id+`","consumers":[`+strings.Join(results, ",")+"]}\n")
 	case len(results) == 0:
-		io.WriteString(b, "No consumers of " + owner + "/" + id + " found in scanned repos.\n")
+		io.WriteString(b, "No consumers of "+owner+"/"+id+" found in scanned repos.\n")
 		fmt.Fprintf(b, "(Searched %d repo(s); cross-machine discovery is out of scope per CHARTER §2.10.)\n", len(paths))
 	}
 	if errors > 0 {
