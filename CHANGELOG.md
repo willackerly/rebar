@@ -73,6 +73,18 @@ All notable changes to rebar. Versioned with [semver](https://semver.org/).
   `done < <(grep …)` left a descriptor open, and bash 3.2 corrupts its heap
   when that reaches fd 256 (abort, bus error, or a hang). The scan now pipes
   grep into its loop; output is unchanged.
+- **Release binaries are built with a current Go; v3.1.0's were not.** The
+  v3.1.0 binaries were built with go1.25.0 (the workflows read `cli/go.mod`'s
+  `go` line literally) and include standard-library vulnerabilities fixed in
+  later Go patch releases (`govulncheck -mode=binary` reports 59, in
+  `net/http`, `crypto/x509`, `crypto/tls`, `html/template`, …); none are in
+  rebar's own code or its modules. v3.1.1 is built with the latest supported Go
+  — upgrade. The release workflow now records the Go version in the Release
+  notes and runs govulncheck on every binary, refusing to publish on a finding;
+  CI runs govulncheck on every PR and builds with `go.mod`'s minimum (still Go
+  1.25) as well; a weekly workflow rescans `main` and the latest release; and
+  Dependabot updates Go modules and the pinned actions. See
+  [SECURITY.md](SECURITY.md).
 
 ---
 

@@ -5,6 +5,11 @@
 # (scripts/package-release.sh); setup-rebar.sh downloads and verifies it.
 # Tags with a pre-release suffix (v3.1.0-beta.1) become pre-releases.
 #
+# Built with the latest patch of the newest supported Go release (not
+# cli/go.mod's minimum), so fixed standard-library vulnerabilities don't ship;
+# every binary is scanned with govulncheck before anything is published, and
+# the Go version is recorded in the Release notes.
+#
 # Third-party actions are pinned by commit SHA (the tag in the comment).
 name: release
 
@@ -31,9 +36,13 @@ jobs:
 
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version-file: cli/go.mod
+          go-version: stable
+          check-latest: true
           # No shared module/build cache in the job that publishes assets.
           cache: false
+
+      - name: Go toolchain
+        run: go version
 
       - name: Tag matches the CLI's release version
         # Unstamped builds of this tag (go build, older installers) report
@@ -59,6 +68,7 @@ jobs:
           fi
           printf '\nFull changelog: [CHANGELOG.md](%s/%s/blob/%s/CHANGELOG.md)\n' \
             "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$TAG" >> "$RUNNER_TEMP/notes.md"
+          printf '\nBinaries built with %s.\n' "$(go env GOVERSION)" >> "$RUNNER_TEMP/notes.md"
 
       - name: Test
         working-directory: cli
@@ -68,6 +78,26 @@ jobs:
         env:
           TAG: ${{ github.ref_name }}
         run: scripts/package-release.sh "$TAG" --out dist
+
+      # Fail before upload if any built binary links code with a known
+      # vulnerability (usually a standard-library fix newer than this Go).
+      - name: govulncheck release binaries
+        run: |
+          go install golang.org/x/vuln/cmd/govulncheck@v1.9.0
+          scan="$RUNNER_TEMP/vulncheck"
+          failed=0
+          for tarball in dist/*.tar.gz; do
+            name="$(basename "$tarball" .tar.gz)"
+            mkdir -p "$scan"
+            tar -xzf "$tarball" -C "$scan" "$name/bin/rebar"
+            echo "::group::govulncheck $name"
+            "$(go env GOPATH)/bin/govulncheck" -mode=binary "$scan/$name/bin/rebar" || failed=1
+            echo "::endgroup::"
+          done
+          if [ "$failed" -ne 0 ]; then
+            echo "::error::govulncheck found known vulnerabilities in the release binaries; nothing was published"
+            exit 1
+          fi
 
       - name: Create GitHub Release
         env:

@@ -43,7 +43,9 @@ your RC again (`ln -sfn versions/<version> ~/.rebar/current` switches by
 hand; `rm -rf ~/.rebar/versions/<version>` removes one). Releases with
 prebuilt assets download as a tarball verified against the release's SHA-256
 checksums (a mismatch aborts); releases without assets, branches and commits
-(by full 40-character SHA) build from source, which needs `git` and Go. Branch
+(by full 40-character SHA) build from source, which needs `git` and Go 1.25
+or newer (use a [supported release](https://go.dev/doc/devel/release#policy):
+the binary includes its standard library; see [SECURITY.md](SECURITY.md)). Branch
 names are made path-safe for the directory (`feat/x` → `versions/feat-x`); if
 two refs map to the same name, the second install is refused rather than
 replacing the first. `./setup-rebar.sh --help` lists every option.
