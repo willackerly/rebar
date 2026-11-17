@@ -181,7 +181,7 @@ func runGolden(t *testing.T, check parityCheck, cases []parityCase) {
 			if check.normalize != nil {
 				got = check.normalize(got)
 			}
-			checkGolden(t, check.golden, tc.name, got, root, code)
+			checkGolden(t, check.golden, tc.name, undoAgo(got, tc, time.Local), root, code)
 		})
 	}
 }

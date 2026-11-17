@@ -4,31 +4,31 @@ Last synced: 2026-01-01
 WARNING: QUICKCONTEXT is N days stale — treat ALL claims as suspect
 
 Commits since last sync:
-926303d c
-7383138 c
-450f804 c
-281716b c
-0306b44 c
-dc6c7b1 c
-7dbd890 c
-f79b304 c
-24de3cf c
-ea8b0ea c
-a0db630 c
-de23d48 c
-eab42bb c
-fbc96cc c
-7c01c10 c
-5ece82c c
-1138679 c
-457dfa8 c
-e6a9182 c
-49d9e10 c
+<sha> c
+<sha> c
+<sha> c
+<sha> c
+<sha> c
+<sha> c
+<sha> c
+<sha> c
+<sha> c
+<sha> c
+<sha> c
+<sha> c
+<sha> c
+<sha> c
+<sha> c
+<sha> c
+<sha> c
+<sha> c
+<sha> c
+<sha> c
   ... and 5 more
 WARNING: 25 commits since last sync — QUICKCONTEXT is likely stale
 
 === TODO Freshness ===
-TODO.md last synced: 2026-11-07
+TODO.md last synced: {{ago:9}}
 Open items: 2 | Completed items: 1
 
 === Untracked TODOs in Code ===
@@ -39,8 +39,8 @@ lib/d.py:1:# TODO: python
 packages/g.rs:1:// TODO: rust
 
 === Worktree State ===
-<worktree>    926303d [main]
-<worktree> 926303d [side]
+<worktree>    <sha> [main]
+<worktree> <sha> [side]
 WARNING: 1 worktree(s) exist — verify they're active or clean them up
   To clean: git worktree prune
 
