@@ -470,6 +470,25 @@ func fixtureText(s string, loc *time.Location) string {
 	})
 }
 
+// undoAgo puts back the {{ago:N}} tokens of a case's fixtures for the
+// dates they became (fixtureText), so goldens hold the tokens and do not
+// change with the date.
+func undoAgo(out string, tc parityCase, loc *time.Location) string {
+	var text strings.Builder
+	for _, body := range tc.files {
+		text.WriteString(body)
+	}
+	text.WriteString(tc.want)
+	text.WriteString(strings.Join(tc.env, "\n"))
+	text.WriteString(strings.Join(tc.args, "\n"))
+	today := time.Now().In(loc)
+	for _, m := range agoRE.FindAllStringSubmatch(text.String(), -1) {
+		n, _ := strconv.Atoi(m[1])
+		out = strings.ReplaceAll(out, today.AddDate(0, 0, -n).Format("2006-01-02"), m[0])
+	}
+	return out
+}
+
 // scriptSettings are the variables a check script reads from the
 // environment. Each in-process run starts with them unset, as the script
 // runs do (testutil.IsolatedEnv drops REBAR_* and _REBAR_*), and then gets
@@ -646,7 +665,7 @@ func runParity(t *testing.T, check parityCheck, cases []parityCase) {
 				}
 			}
 			if check.golden != "" {
-				checkGolden(t, check.golden, tc.name, want, root, wantCode)
+				checkGolden(t, check.golden, tc.name, undoAgo(want, tc, loc), root, wantCode)
 			}
 			results := []struct {
 				how  string
