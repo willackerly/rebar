@@ -1,20 +1,22 @@
 GET /mcp/schema 
 200 {
   "protocol": "mcp",
-  "version": "2024-11-05",
+  "version": "2026-07-28",
+  "protocolVersions": [
+    "2026-07-28",
+    "2025-11-25",
+    "2025-06-18",
+    "2025-03-26",
+    "2024-11-05"
+  ],
   "capabilities": {
-    "tools": {
-      "listChanged": false
-    },
-    "resources": {
-      "subscribe": false,
-      "listChanged": false
-    }
+    "tools": {},
+    "resources": {}
   },
   "serverInfo": {
     "name": "ask-mcp-server",
-    "version": "1.0.0",
-    "description": "MCP server for ASK agent coordination"
+    "version": "$VERSION",
+    "description": "MCP server for ASK agent coordination platform"
   }
 }
 GET /v1/health 
@@ -79,47 +81,30 @@ GET /v1/repos?x=1
 ]
 GET /v1/status/web/architect 
 404 {"error": "Not found"}
-POST /mcp {"jsonrpc":"2.0","method":"initialize","params":{},"id":1}
-200 {
-  "jsonrpc": "2.0",
-  "id": 1,
-  "result": {
-    "protocolVersion": "2024-11-05",
-    "capabilities": {
-      "tools": {
-        "listChanged": false
-      },
-      "resources": {
-        "subscribe": false,
-        "listChanged": false
-      }
-    },
-    "serverInfo": {
-      "name": "ask-mcp-server",
-      "version": "1.0.0",
-      "description": "MCP server for ASK agent coordination platform"
-    }
-  }
-}
+POST /mcp {"jsonrpc":"2.0","method":"tools/list","id":9}
+200 [application/json] {"jsonrpc":"2.0","id":9,"error":{"code":0,"message":"method \"tools/list\" is invalid during session initialization"}}
+POST /mcp {"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"t","version":"1"}},"id":1}
+200 [application/json] [Mcp-Session-Id: $SESSION] {"jsonrpc":"2.0","id":1,"result":{"capabilities":{"resources":{},"tools":{}},"protocolVersion":"2025-11-25","serverInfo":{"name":"ask-mcp-server","description":"MCP server for ASK agent coordination platform","version":"$VERSION"}}}
 POST /mcp {"jsonrpc":"2.0","method":"notifications/initialized"}
-200 null
+202 [] 
 POST /mcp {"jsonrpc":"2.0","method":"tools/call","params":{"name":"ask_web_architect","arguments":{"question":"Why?"}},"id":2}
-200 {
-  "jsonrpc": "2.0",
-  "id": 2,
-  "result": {
-    "content": [
-      {
-        "type": "text",
-        "text": "answer from web: architect Why?"
-      }
-    ]
-  }
-}
+200 [application/json] {"jsonrpc":"2.0","id":2,"result":{"content":[{"type":"text","text":"answer from web: architect Why?"}]}}
+POST /mcp {"jsonrpc":"2.0","method":"tools/call","params":{"name":"ask_WEB_ARCHITECT","arguments":{"question":"Why?"}},"id":3}
+200 [application/json] {"jsonrpc":"2.0","id":3,"result":{"content":[{"type":"text","text":"answer from web: architect Why?"}]}}
+POST /mcp {"jsonrpc":"2.0","method":"tools/call","params":{"name":"ask_web_broken","arguments":{"question":"Why?"}},"id":4}
+200 [application/json] {"jsonrpc":"2.0","id":4,"result":{"content":[{"type":"text","text":"ask: error: claude invocation failed\n(stdout) partial output\n(exit code: 3)\n(cmd: $STUB broken Why? cwd=$REPOS/web)"}],"isError":true}}
+POST /mcp {"jsonrpc":"2.0","method":"tools/call","params":{"name":"ask_web_ghost","arguments":{"question":"Why?"}},"id":5}
+200 [application/json] {"jsonrpc":"2.0","id":5,"error":{"code":-32602,"message":"unknown tool \"ask_web_ghost\""}}
 POST /mcp not json
-400 {"error": "Invalid JSON: invalid character 'o' in literal null (expecting 'u')"}
+400 [text/plain; charset=utf-8] malformed payload: unmarshaling jsonrpc message: json: expected 'null' but found invalid token: not json
 POST /mcp 
-400 {"error": "Invalid JSON: Expecting value: line 1 column 1 (char 0)"}
+415 [text/plain; charset=utf-8] Content-Type must be 'application/json'
+POST /mcp {"jsonrpc":"2.0","method":"tools/list","id":9}
+  (Accept: application/json)
+400 [text/plain; charset=utf-8] Accept must contain both 'application/json' and 'text/event-stream'
+POST /mcp {"jsonrpc":"2.0","method":"tools/list","id":9}
+  (Mcp-Session-Id: no-such-session)
+404 [text/plain; charset=utf-8] session not found
 POST /v1/ask {"repo":"web","role":"product","question":" Who? ","verbose":true}
 200 {
   "repo": "web",
@@ -137,6 +122,8 @@ POST /v1/ask {"repo":"web","question":"q"}
 POST /v1/reset/web/architect 
 404 {"error": "Not found"}
 PUT /mcp {}
+405 [text/plain; charset=utf-8] Method Not Allowed
+PUT /v1/health {}
 501 <!DOCTYPE HTML>
 <html lang="en">
     <head>
@@ -151,4 +138,8 @@ PUT /mcp {}
     </body>
 </html>
 
+DELETE /mcp 
+204 [] 
+POST /mcp {"jsonrpc":"2.0","method":"tools/list","id":9}
+404 [text/plain; charset=utf-8] session not found
 --- exit 0 ---

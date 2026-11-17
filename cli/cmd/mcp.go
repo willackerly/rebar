@@ -14,7 +14,7 @@ var mcpCmd = &cobra.Command{
 	Long: `ASK's Model Context Protocol server, built in.
 
   rebar mcp serve --stdio --repos-dir ~/dev     # what .mcp.json runs
-  rebar mcp serve --port 7232 --repos-dir /srv  # HTTP: POST /mcp + classic API
+  rebar mcp serve --port 7232 --repos-dir /srv  # Streamable HTTP /mcp + classic API
 
 Every agents/<role>/AGENT.md in the repos found becomes a tool
 ask_<repo>_<role>; tools/call runs 'rebar ask <role> "<question>"' in that
@@ -44,6 +44,7 @@ var mcpClientCmd = &cobra.Command{
 }
 
 func init() {
+	mcp.Version = Version
 	mcpCmd.GroupID = "agents"
 	mcpCmd.AddCommand(mcpServeCmd, mcpClientCmd)
 	rootCmd.AddCommand(mcpCmd)

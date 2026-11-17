@@ -1,0 +1,8 @@
+{"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{"roots":{"listChanged":true},"elicitation":{}},"clientInfo":{"name":"claude-code","title":"Claude Code","version":"2.1.224","description":"Anthropic's agentic coding tool","websiteUrl":"https://claude.com/claude-code"}},"jsonrpc":"2.0","id":0}
+{"method":"notifications/initialized","jsonrpc":"2.0"}
+{"method":"tools/list","jsonrpc":"2.0","id":1}
+{"method":"resources/list","jsonrpc":"2.0","id":2}
+{"method":"tools/call","params":{"name":"ask_web_architect","arguments":{"question":"ping"},"_meta":{"claudecode/toolUseId":"toolu_recorded_happy_path","progressToken":3}},"jsonrpc":"2.0","id":3}
+{"method":"tools/call","params":{"name":"ask_web_architect","arguments":{"question":""},"_meta":{"claudecode/toolUseId":"toolu_recorded_empty_question","progressToken":4}},"jsonrpc":"2.0","id":4}
+{"method":"tools/call","params":{"name":"ask_web_broken","arguments":{"question":"fail?"},"_meta":{"claudecode/toolUseId":"toolu_recorded_tool_error","progressToken":5}},"jsonrpc":"2.0","id":5}
+{"method":"tools/call","params":{"name":"ask_web_ghost","arguments":{"question":"anyone?"},"_meta":{"claudecode/toolUseId":"toolu_recorded_unknown_tool","progressToken":6}},"jsonrpc":"2.0","id":6}

@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -13,6 +14,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
@@ -20,13 +22,13 @@ import (
 )
 
 // The MCP server (`rebar mcp serve`) and ask-server (`rebar ask serve`)
-// against transcripts in testdata/mcp: a JSON-RPC session over stdio and
-// HTTP request sequences. The go-native port sent the same sessions to the python
-// originals and required the same responses (byte for byte over stdio:
-// the server writes Python's json.dumps format), so the goldens hold the
-// python servers' behaviour, except where a request documents a deliberate
-// deviation. tools/call runs a stub ask (--ask-bin); TestMCPNativeAsk runs
-// the server with its own ask against a stub claude.
+// against transcripts in testdata/mcp: an MCP session over stdio and HTTP
+// request sequences. The MCP protocol layer is the official Go SDK since
+// rebar 3.2 (S9 of the go-native stack); the goldens were regenerated then
+// and the PR lists every difference from the python server's transcripts.
+// The classic ASK API and ask-server still answer in python's json.dumps
+// format. tools/call runs a stub ask (--ask-bin); TestMCPNativeAsk runs the
+// server with its own ask against a stub claude.
 
 // mcpRepos is a --repos-dir: two repos (one nested a level down, one with
 // "_" in its name), a repo opted out, a non-repo, and skipped directories.
@@ -55,52 +57,68 @@ esac
 printf '  answer from %s: %s  \n\n' "$(basename "$(pwd)")" "$*"
 `
 
-// mcpSession is the stdio transcript: each line is sent as is.
-var mcpSession = []string{
-	`{"jsonrpc":"2.0","method":"tools/list","id":0}`,
-	`{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"t","version":"1"}},"id":1}`,
-	`{"jsonrpc":"2.0","method":"notifications/initialized"}`,
-	`{"jsonrpc":"2.0","method":"tools/list","id":2}`,
-	`{"jsonrpc":"2.0","method":"tools/call","params":{"name":"ask_web_architect","arguments":{"question":"Why REST?"}},"id":3}`,
-	`{"jsonrpc":"2.0","method":"tools/call","params":{"name":"ask_web_product","arguments":{"question":"Who?","verbose":true}},"id":"str-id"}`,
-	`{"jsonrpc":"2.0","method":"tools/call","params":{"name":"ask_WEB_ARCHITECT","arguments":{"question":"case?","verbose":"no"}},"id":4.5}`,
-	`{"jsonrpc":"2.0","method":"tools/call","params":{"name":"ask_web_broken","arguments":{"question":"fail?"}},"id":5}`,
-	`{"jsonrpc":"2.0","method":"tools/call","params":{"name":"ask_nope_architect","arguments":{"question":"q"}},"id":6}`,
-	`{"jsonrpc":"2.0","method":"tools/call","params":{"name":"ask_web_nobody","arguments":{"question":"q"}},"id":7}`,
-	`{"jsonrpc":"2.0","method":"tools/call","params":{"name":"web_architect","arguments":{"question":"q"}},"id":8}`,
-	`{"jsonrpc":"2.0","method":"tools/call","params":{"name":"ask_webarchitect","arguments":{"question":"q"}},"id":9}`,
-	`{"jsonrpc":"2.0","method":"tools/call","params":{"arguments":{"question":"q"}},"id":10}`,
-	`{"jsonrpc":"2.0","method":"tools/call","params":{"name":"ask_web_architect","arguments":{}},"id":11}`,
-	`{"jsonrpc":"2.0","method":"tools/call","params":{"name":"ask_web_architect","arguments":{"question":""}},"id":12}`,
-	`{"jsonrpc":"2.0","method":"tools/call","params":null,"id":13}`,
-	`{"jsonrpc":"2.0","method":"tools/call","params":{"name":"ask_web_architect","arguments":null},"id":14}`,
-	`{"jsonrpc":"2.0","method":"tools/call","params":{"name":"ask_web_architect","arguments":{"question":42}},"id":15}`,
-	`{"jsonrpc":"2.0","method":"tools/call","params":{"name":7,"arguments":{"question":"q"}},"id":16}`,
-	`{"jsonrpc":"2.0","method":"resources/list","id":17}`,
-	`{"jsonrpc":"2.0","method":"resources/read","params":{"uri":"ask://memory/web:product"},"id":18}`,
-	`{"jsonrpc":"2.0","method":"resources/read","params":{"uri":"ask://log/WEB:Product"},"id":19}`,
-	`{"jsonrpc":"2.0","method":"resources/read","params":{"uri":"ask://agent/web:architect"},"id":20}`,
-	`{"jsonrpc":"2.0","method":"resources/read","params":{"uri":"ask://memory/web:architect"},"id":21}`,
-	`{"jsonrpc":"2.0","method":"resources/read","params":{"uri":"ask://agent/web:ghost"},"id":22}`,
-	`{"jsonrpc":"2.0","method":"resources/read","params":{"uri":"ask://secrets/web:architect"},"id":23}`,
-	`{"jsonrpc":"2.0","method":"resources/read","params":{"uri":"ask://memory"},"id":24}`,
-	`{"jsonrpc":"2.0","method":"resources/read","params":{"uri":"ask://memory/web"},"id":25}`,
-	`{"jsonrpc":"2.0","method":"resources/read","params":{"uri":"ask://memory/nope:x"},"id":26}`,
-	`{"jsonrpc":"2.0","method":"resources/read","params":{"uri":"file:///etc/passwd"},"id":27}`,
-	`{"jsonrpc":"2.0","method":"resources/read","params":{},"id":28}`,
-	`{"jsonrpc":"2.0","method":"prompts/list","id":29}`,
-	`{"jsonrpc":"2.0","id":30}`,
-	`{"jsonrpc":"1.0","method":"initialize","id":31}`,
-	`{"method":"initialize"}`,
-	`[{"jsonrpc":"2.0","method":"tools/list","id":32}]`,
-	`"just a string"`,
-	`this is not json`,
-	``,
-	`   `,
-	`{"jsonrpc":"2.0","method":"tools/list","id":null}`,
-	`{"jsonrpc":"2.0","method":"initialize","id":{"nested":[1,2]}}`,
-	`{"jsonrpc":"2.0","method":"notifications/cancelled","params":{"requestId":3}}`,
+// mcpStep is one line of a stdio transcript and whether the server
+// answers it.
+type mcpStep struct {
+	msg   string
+	reply bool
 }
+
+// mcpSession is the stdio transcript, sent one line at a time.
+var mcpSession = []mcpStep{
+	{`{"jsonrpc":"2.0","method":"tools/list","id":0}`, true},
+	{`{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"t","version":"1"}},"id":1}`, true},
+	{`{"jsonrpc":"2.0","method":"notifications/initialized"}`, false},
+	{`{"jsonrpc":"2.0","method":"tools/list","id":2}`, true},
+	{`{"jsonrpc":"2.0","method":"tools/call","params":{"name":"ask_web_architect","arguments":{"question":"Why REST?"}},"id":3}`, true},
+	{`{"jsonrpc":"2.0","method":"tools/call","params":{"name":"ask_web_product","arguments":{"question":"Who?","verbose":true}},"id":"str-id"}`, true},
+	{`{"jsonrpc":"2.0","method":"tools/call","params":{"name":"ask_WEB_ARCHITECT","arguments":{"question":"case?"}},"id":4}`, true},
+	{`{"jsonrpc":"2.0","method":"tools/call","params":{"name":"ask_WEB_ARCHITECT","arguments":{"question":"case?","verbose":"no"}},"id":4.5}`, false},
+	{`{"jsonrpc":"2.0","method":"tools/call","params":{"name":"ask_web_architect","arguments":{"question":"bool?","verbose":"no"}},"id":45}`, true},
+	{`{"jsonrpc":"2.0","method":"tools/call","params":{"name":"ask_web_broken","arguments":{"question":"fail?"}},"id":5}`, true},
+	{`{"jsonrpc":"2.0","method":"tools/call","params":{"name":"ask_nope_architect","arguments":{"question":"q"}},"id":6}`, true},
+	{`{"jsonrpc":"2.0","method":"tools/call","params":{"name":"ask_web_nobody","arguments":{"question":"q"}},"id":7}`, true},
+	{`{"jsonrpc":"2.0","method":"tools/call","params":{"name":"web_architect","arguments":{"question":"q"}},"id":8}`, true},
+	{`{"jsonrpc":"2.0","method":"tools/call","params":{"name":"ask_webarchitect","arguments":{"question":"q"}},"id":9}`, true},
+	{`{"jsonrpc":"2.0","method":"tools/call","params":{"arguments":{"question":"q"}},"id":10}`, true},
+	{`{"jsonrpc":"2.0","method":"tools/call","params":{"name":"ask_web_architect","arguments":{}},"id":11}`, true},
+	{`{"jsonrpc":"2.0","method":"tools/call","params":{"name":"ask_web_architect","arguments":{"question":""}},"id":12}`, true},
+	{`{"jsonrpc":"2.0","method":"tools/call","params":null,"id":13}`, true},
+	{`{"jsonrpc":"2.0","method":"tools/call","params":{"name":"ask_web_architect","arguments":null},"id":14}`, true},
+	{`{"jsonrpc":"2.0","method":"tools/call","params":{"name":"ask_web_architect","arguments":{"question":42}},"id":15}`, true},
+	{`{"jsonrpc":"2.0","method":"tools/call","params":{"name":7,"arguments":{"question":"q"}},"id":16}`, true},
+	{`{"jsonrpc":"2.0","method":"resources/list","id":17}`, true},
+	{`{"jsonrpc":"2.0","method":"resources/read","params":{"uri":"ask://memory/web:product"},"id":18}`, true},
+	{`{"jsonrpc":"2.0","method":"resources/read","params":{"uri":"ask://log/WEB:Product"},"id":19}`, true},
+	{`{"jsonrpc":"2.0","method":"resources/read","params":{"uri":"ask://agent/web:architect"},"id":20}`, true},
+	{`{"jsonrpc":"2.0","method":"resources/read","params":{"uri":"ask://memory/web:architect"},"id":21}`, true},
+	{`{"jsonrpc":"2.0","method":"resources/read","params":{"uri":"ask://agent/web:ghost"},"id":22}`, true},
+	{`{"jsonrpc":"2.0","method":"resources/read","params":{"uri":"ask://secrets/web:architect"},"id":23}`, true},
+	{`{"jsonrpc":"2.0","method":"resources/read","params":{"uri":"ask://memory"},"id":24}`, true},
+	{`{"jsonrpc":"2.0","method":"resources/read","params":{"uri":"ask://memory/web"},"id":25}`, true},
+	{`{"jsonrpc":"2.0","method":"resources/read","params":{"uri":"ask://memory/nope:x"},"id":26}`, true},
+	{`{"jsonrpc":"2.0","method":"resources/read","params":{"uri":"file:///etc/passwd"},"id":27}`, true},
+	{`{"jsonrpc":"2.0","method":"resources/read","params":{},"id":28}`, true},
+	{`{"jsonrpc":"2.0","method":"prompts/list","id":29}`, true},
+	{`{"jsonrpc":"2.0","method":"no/such/method","id":33}`, true},
+	{`{"jsonrpc":"2.0","method":"ping","id":34}`, true},
+	{`{"jsonrpc":"2.0","id":30}`, false},
+	{`{"jsonrpc":"1.0","method":"initialize","id":31}`, false},
+	{`{"method":"initialize"}`, false},
+	{`[{"jsonrpc":"2.0","method":"tools/list","id":32}]`, true},
+	{`[]`, false},
+	{`"just a string"`, false},
+	{`this is not json`, false},
+	{``, false},
+	{`   `, false},
+	{`{"jsonrpc":"2.0","method":"tools/list","id":null}`, false},
+	{`{"jsonrpc":"2.0","method":"initialize","id":{"nested":[1,2]}}`, false},
+	{`{"jsonrpc":"2.0","method":"notifications/cancelled","params":{"requestId":3}}`, false},
+	{`{"jsonrpc":"2.0","method":"ping","id":35}`, true},
+}
+
+// mcpInit is an initialize request.
+const mcpInit = `{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"t","version":"1"}},"id":1}`
 
 // mcpFixture writes the repos dir and the stub ask and returns them.
 func mcpFixture(t *testing.T) (repos, stub string) {
@@ -124,6 +142,84 @@ func mcpStdio(t *testing.T, argv []string, env []string, input string) (string, 
 	return runSplit(t, t.TempDir(), env, input, argv[0], argv[1:]...)
 }
 
+// mcpConverse runs argv as a stdio MCP server and sends the steps one at a
+// time, waiting for the answer of each step that has one, as a client
+// does. It returns the transcript ("> " sent, "< " received; answers that
+// arrive after the end of input are listed last), stderr and the exit code.
+func mcpConverse(t *testing.T, argv, env []string, steps []mcpStep) (string, string, int) {
+	t.Helper()
+	var cmd *exec.Cmd
+	var stdin io.WriteCloser
+	var stdout io.ReadCloser
+	var stderr bytes.Buffer
+	for try := 0; ; try++ {
+		cmd = exec.Command(argv[0], argv[1:]...)
+		cmd.Dir, cmd.Env, cmd.Stderr = t.TempDir(), env, &stderr
+		var err error
+		if stdin, err = cmd.StdinPipe(); err != nil {
+			t.Fatal(err)
+		}
+		if stdout, err = cmd.StdoutPipe(); err != nil {
+			t.Fatal(err)
+		}
+		err = cmd.Start()
+		if err == nil {
+			break
+		}
+		if !errors.Is(err, syscall.ETXTBSY) || try == 50 {
+			t.Fatalf("%v: %v", argv, err)
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	lines := make(chan string)
+	go func() {
+		sc := bufio.NewScanner(stdout)
+		sc.Buffer(nil, 16<<20)
+		for sc.Scan() {
+			lines <- sc.Text()
+		}
+		close(lines)
+	}()
+	var rec strings.Builder
+	for _, st := range steps {
+		fmt.Fprintf(&rec, "> %s\n", st.msg)
+		if _, err := io.WriteString(stdin, st.msg+"\n"); err != nil {
+			t.Fatalf("writing %s: %v", st.msg, err)
+		}
+		if !st.reply {
+			continue
+		}
+		select {
+		case l, ok := <-lines:
+			if !ok {
+				t.Fatalf("the server exited before answering %s:\n%s%s", st.msg, rec.String(), stderr.String())
+			}
+			fmt.Fprintf(&rec, "< %s\n", l)
+		case <-time.After(60 * time.Second):
+			t.Fatalf("no answer to %s:\n%s%s", st.msg, rec.String(), stderr.String())
+		}
+	}
+	stdin.Close()
+	for l := range lines {
+		fmt.Fprintf(&rec, "< (after end of input) %s\n", l)
+	}
+	code := 0
+	if err := cmd.Wait(); err != nil {
+		var ee *exec.ExitError
+		if !errors.As(err, &ee) {
+			t.Fatal(err)
+		}
+		code = ee.ExitCode()
+	}
+	return rec.String(), stderr.String(), code
+}
+
+// mcpVersion hides rebar's version (serverInfo.version) in transcripts.
+func mcpVersion(s string) string {
+	s = strings.ReplaceAll(s, `"version":"`+Version+`"`, `"version":"$VERSION"`)
+	return strings.ReplaceAll(s, `"version": "`+Version+`"`, `"version": "$VERSION"`)
+}
+
 func mcpEnv(t *testing.T, extra ...string) []string {
 	var env []string
 	for _, kv := range testutil.IsolatedEnv() {
@@ -135,31 +231,17 @@ func mcpEnv(t *testing.T, extra ...string) []string {
 	return append(append(env, "REBAR_TEST_RUN_CLI=1", "LC_ALL=C"), extra...)
 }
 
-// stdioErrLines hides each json library's own words in parse errors (the
-// python server's differed from Go's).
-func stdioErrLines(s string) string {
-	var out []string
-	for _, l := range strings.Split(s, "\n") {
-		if strings.HasPrefix(l, "ask-mcp-server: parse error:") {
-			l = "ask-mcp-server: parse error: <msg>"
-		}
-		out = append(out, l)
-	}
-	return strings.Join(out, "\n")
-}
-
 // TestMCPStdioGolden: one session through `rebar mcp serve` and through
 // the bin/ask-mcp-server shim (what .mcp.json files name).
 func TestMCPStdioGolden(t *testing.T) {
 	repos, stub := mcpFixture(t)
-	input := strings.Join(mcpSession, "\n") + "\n"
 	args := []string{"--stdio", "--repos-dir", repos, "--ask-bin", stub}
 	env := mcpEnv(t, "ASK_SERVER=elsewhere:1")
-	goOut, goErr, goCode := mcpStdio(t, append([]string{testBinary(t), "mcp", "serve"}, args...), env, input)
+	goOut, goErr, goCode := mcpConverse(t, append([]string{testBinary(t), "mcp", "serve"}, args...), env, mcpSession)
 	norm := func(s string) string {
-		return strings.ReplaceAll(strings.ReplaceAll(s, repos, "$REPOS"), stub, "$STUB")
+		return mcpVersion(strings.ReplaceAll(strings.ReplaceAll(s, repos, "$REPOS"), stub, "$STUB"))
 	}
-	checkGolden(t, "mcp", "stdio session", norm(goOut+"--- stderr ---\n"+stdioErrLines(goErr)), "\x00", goCode)
+	checkGolden(t, "mcp", "stdio session", norm(goOut+"--- stderr ---\n"+goErr), "\x00", goCode)
 
 	shimDir := t.TempDir()
 	data, err := os.ReadFile(filepath.Join(testutil.RebarSource(t), "bin", "ask-mcp-server"))
@@ -168,7 +250,7 @@ func TestMCPStdioGolden(t *testing.T) {
 	}
 	shim := testutil.WriteExecutable(t, shimDir, "ask-mcp-server", string(data))
 	testutil.WriteExecutable(t, shimDir, "rebar", "#!/bin/sh\nREBAR_TEST_RUN_CLI=1 exec '"+testBinary(t)+"' \"$@\"\n")
-	shOut, shErr, shCode := mcpStdio(t, append([]string{shim}, args...), env, input)
+	shOut, shErr, shCode := mcpConverse(t, append([]string{shim}, args...), env, mcpSession)
 	if shOut != goOut || shErr != goErr || shCode != goCode {
 		t.Errorf("bin/ask-mcp-server differs from rebar mcp serve:\n%s%s\n(exit %d)", shOut, shErr, shCode)
 	}
@@ -235,12 +317,17 @@ func startHTTP(t *testing.T, argv, env []string, port int) {
 // httpReq is one request of an HTTP transcript.
 type httpReq struct {
 	method, path, body, auth string
-	// diverges documents a deliberate difference from the python server.
-	diverges string
+	// hdr is extra request headers, "Name: value" lines; for /mcp,
+	// "!nosession" leaves out the session headers compareHTTP adds.
+	hdr string
 }
 
-// exchange sends a request and returns "status body-as-JSON".
-func exchange(t *testing.T, port int, r httpReq) (int, any, string) {
+// isMCPPath: the SDK's Streamable HTTP endpoint (not /mcp/schema).
+func isMCPPath(p string) bool { return p == "/mcp" || p == "/mcp/" }
+
+// exchange sends a request and returns status, body as JSON, raw body and
+// the response headers.
+func exchange(t *testing.T, port int, r httpReq) (int, any, string, http.Header) {
 	t.Helper()
 	req, err := http.NewRequest(r.method, "http://127.0.0.1:"+strconv.Itoa(port)+r.path, strings.NewReader(r.body))
 	if err != nil {
@@ -252,6 +339,11 @@ func exchange(t *testing.T, port int, r httpReq) (int, any, string) {
 	if r.auth != "" {
 		req.Header.Set("Authorization", r.auth)
 	}
+	for _, h := range strings.Split(r.hdr, "\n") {
+		if k, v, ok := strings.Cut(h, ": "); ok {
+			req.Header.Set(k, v)
+		}
+	}
 	resp, err := (&http.Client{Timeout: 30 * time.Second}).Do(req)
 	if err != nil {
 		t.Fatalf("%s %s: %v", r.method, r.path, err)
@@ -262,21 +354,65 @@ func exchange(t *testing.T, port int, r httpReq) (int, any, string) {
 	dec := json.NewDecoder(bytes.NewReader(data))
 	dec.UseNumber()
 	if err := dec.Decode(&v); err != nil {
-		return resp.StatusCode, "(not JSON) " + resp.Header.Get("Content-Type"), string(data)
+		return resp.StatusCode, "(not JSON) " + resp.Header.Get("Content-Type"), string(data), resp.Header
 	}
-	return resp.StatusCode, v, string(data)
+	return resp.StatusCode, v, string(data), resp.Header
 }
 
 // compareHTTP sends reqs to the server and compares status and body with
-// the golden transcript.
+// the golden transcript. Requests to /mcp go as a Streamable HTTP client
+// sends them: accepting JSON and event streams, with the session id and
+// protocol version from the initialize answer; their transcript entries
+// show those headers and the answer's Content-Type and session id.
 func compareHTTP(t *testing.T, golden string, port int, reqs []httpReq, normalize func(string) string) {
 	t.Helper()
 	var rec strings.Builder
+	var session, version string
 	for _, r := range reqs {
-		status, _, raw := exchange(t, port, r)
-		fmt.Fprintf(&rec, "%s %s %s\n%d %s\n", r.method, r.path, r.body, status, normalize(raw))
+		mcpReq := isMCPPath(r.path)
+		shown := r.hdr
+		if mcpReq {
+			var hdr []string
+			if !strings.Contains(r.hdr, "Accept: ") {
+				hdr = append(hdr, "Accept: application/json, text/event-stream")
+			}
+			if session != "" && !strings.Contains(r.hdr, "!nosession") && !strings.Contains(r.hdr, "Mcp-Session-Id: ") {
+				hdr = append(hdr, "Mcp-Session-Id: "+session, "Mcp-Protocol-Version: "+version)
+			}
+			r.hdr = strings.Join(append(hdr, r.hdr), "\n")
+		}
+		status, body, raw, h := exchange(t, port, r)
+		fmt.Fprintf(&rec, "%s %s %s\n", r.method, r.path, r.body)
+		if shown != "" {
+			fmt.Fprintf(&rec, "  (%s)\n", strings.ReplaceAll(shown, "\n", "; "))
+		}
+		if mcpReq {
+			if id := h.Get("Mcp-Session-Id"); id != "" {
+				session = id
+				if res, ok := lookupJSON(body, "result").(map[string]any); ok {
+					version, _ = res["protocolVersion"].(string)
+				}
+			}
+			fmt.Fprintf(&rec, "%d [%s] ", status, h.Get("Content-Type"))
+			if session != "" {
+				raw = strings.ReplaceAll(raw, session, "$SESSION")
+			}
+			if h.Get("Mcp-Session-Id") != "" {
+				fmt.Fprintf(&rec, "[Mcp-Session-Id: $SESSION] ")
+			}
+			fmt.Fprintf(&rec, "%s\n", normalize(strings.TrimRight(raw, "\n")))
+			continue
+		}
+		fmt.Fprintf(&rec, "%d %s\n", status, normalize(raw))
 	}
-	checkGolden(t, "mcp", golden, rec.String(), "\x00", 0)
+	checkGolden(t, "mcp", golden, mcpVersion(rec.String()), "\x00", 0)
+}
+
+func lookupJSON(v any, key string) any {
+	if m, ok := v.(map[string]any); ok {
+		return m[key]
+	}
+	return nil
 }
 
 // TestMCPHTTPGolden: the MCP server's HTTP mode (with and without
@@ -286,7 +422,11 @@ func TestMCPHTTPGolden(t *testing.T) {
 	norm := func(s string) string {
 		return strings.ReplaceAll(strings.ReplaceAll(s, repos, "$REPOS"), stub, "$STUB")
 	}
-	init := `{"jsonrpc":"2.0","method":"initialize","params":{},"id":1}`
+	init := `{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"t","version":"1"}},"id":1}`
+	call := func(name string, id int) string {
+		return `{"jsonrpc":"2.0","method":"tools/call","params":{"name":"` + name + `","arguments":{"question":"Why?"}},"id":` + strconv.Itoa(id) + `}`
+	}
+	list := `{"jsonrpc":"2.0","method":"tools/list","id":9}`
 	for _, mode := range []struct {
 		name  string
 		flags []string
@@ -298,17 +438,26 @@ func TestMCPHTTPGolden(t *testing.T) {
 			{"GET", "/v1/agents/", "", "", ""},
 			{"GET", "/v1/repos?x=1", "", "", ""},
 			{"GET", "/v1/status/web/architect", "", "", ""},
+			{"POST", "/mcp", list, "", ""},
 			{"POST", "/mcp", init, "", ""},
 			{"POST", "/mcp", `{"jsonrpc":"2.0","method":"notifications/initialized"}`, "", ""},
-			{"POST", "/mcp", `{"jsonrpc":"2.0","method":"tools/call","params":{"name":"ask_web_architect","arguments":{"question":"Why?"}},"id":2}`, "", "the session outlives a request (python: a new, uninitialized one per request)"},
+			{"POST", "/mcp", call("ask_web_architect", 2), "", ""},
+			{"POST", "/mcp", call("ask_WEB_ARCHITECT", 3), "", ""},
+			{"POST", "/mcp", call("ask_web_broken", 4), "", ""},
+			{"POST", "/mcp", call("ask_web_ghost", 5), "", ""},
 			{"POST", "/mcp", `not json`, "", ""},
 			{"POST", "/mcp", ``, "", ""},
+			{"POST", "/mcp", list, "", "Accept: application/json"},
+			{"POST", "/mcp", list, "", "Mcp-Session-Id: no-such-session"},
 			{"POST", "/v1/ask", `{"repo":"web","role":"product","question":" Who? ","verbose":true}`, "", ""},
 			{"POST", "/v1/ask", `{"repo":"web","role":"broken","question":"q"}`, "", ""},
 			{"POST", "/v1/ask", `{"repo":"WEB","role":"product","question":"q"}`, "", ""},
 			{"POST", "/v1/ask", `{"repo":"web","question":"q"}`, "", ""},
 			{"POST", "/v1/reset/web/architect", "", "", ""},
 			{"PUT", "/mcp", "{}", "", ""},
+			{"PUT", "/v1/health", "{}", "", ""},
+			{"DELETE", "/mcp", "", "", ""},
+			{"POST", "/mcp", list, "", ""},
 		}},
 		{"http mcp-only with key", []string{"--mcp-only", "--api-key", "s3cret"}, []httpReq{
 			{"GET", "/mcp/schema", "", "", ""},
@@ -317,6 +466,7 @@ func TestMCPHTTPGolden(t *testing.T) {
 			{"GET", "/v1/health", "", "Basic s3cret", ""},
 			{"GET", "/v1/health", "", "Bearer s3cret", ""},
 			{"POST", "/v1/ask", `{"repo":"web","role":"product","question":"q"}`, "Bearer s3cret", ""},
+			{"POST", "/mcp", init, "", ""},
 			{"POST", "/mcp", init, "Bearer s3cret", ""},
 		}},
 	} {
@@ -326,20 +476,6 @@ func TestMCPHTTPGolden(t *testing.T) {
 			startHTTP(t, append([]string{testBinary(t), "mcp", "serve", "--port", strconv.Itoa(goPort)}, flags...), mcpEnv(t), goPort)
 			compareHTTP(t, mode.name, goPort, mode.reqs, norm)
 		})
-	}
-}
-
-// TestMCPHTTPSession: over HTTP the native server keeps the session across
-// requests (python built a new, uninitialized one per request, so tools/list
-// after initialize failed with -32002).
-func TestMCPHTTPSession(t *testing.T) {
-	repos, stub := mcpFixture(t)
-	port := freePort(t)
-	startHTTP(t, []string{testBinary(t), "mcp", "serve", "--port", strconv.Itoa(port), "--host", "127.0.0.1", "--repos-dir", repos, "--ask-bin", stub}, mcpEnv(t), port)
-	exchange(t, port, httpReq{"POST", "/mcp", `{"jsonrpc":"2.0","method":"initialize","id":1}`, "", ""})
-	_, body, raw := exchange(t, port, httpReq{"POST", "/mcp", `{"jsonrpc":"2.0","method":"tools/list","id":2}`, "", ""})
-	if m, _ := body.(map[string]any); m["result"] == nil {
-		t.Errorf("tools/list after initialize over HTTP: %s", raw)
 	}
 }
 
@@ -404,11 +540,11 @@ esac
 // rest and reported "Repository dsp not found").
 func TestMCPToolNameWithUnderscore(t *testing.T) {
 	repos, stub := mcpFixture(t)
-	input := `{"jsonrpc":"2.0","method":"initialize","id":1}` + "\n" +
+	input := mcpInit + "\n" +
 		`{"jsonrpc":"2.0","method":"tools/call","params":{"name":"ask_dsp_2_8_steward","arguments":{"question":"q"}},"id":2}` + "\n" +
 		`{"jsonrpc":"2.0","method":"tools/call","params":{"name":"ask_DSP_2_8_STEWARD","arguments":{"question":"q"}},"id":3}` + "\n"
 	out, errOut, code := mcpStdio(t, []string{testBinary(t), "mcp", "serve", "--stdio", "--repos-dir", repos, "--ask-bin", stub}, mcpEnv(t), input)
-	if code != 0 || strings.Count(out, `"text": "answer from dsp_2_8: steward q"`) != 2 {
+	if code != 0 || strings.Count(out, `"text":"answer from dsp_2_8: steward q"`) != 2 {
 		t.Errorf("exit %d:\n%s\n%s", code, out, errOut)
 	}
 }
@@ -420,10 +556,10 @@ func TestMCPNativeAsk(t *testing.T) {
 	bin := t.TempDir()
 	testutil.WriteExecutable(t, bin, "claude", "#!/bin/sh\necho \"cwd=$(pwd) server=[$ASK_SERVER]\" >&2\nprintf '{\"result\":\"native answer\",\"session_id\":\"s-1\"}\\n'\n")
 	env := mcpEnv(t, "PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH"), "ASK_SERVER=remote:1", "HOME="+t.TempDir())
-	input := `{"jsonrpc":"2.0","method":"initialize","id":1}` + "\n" +
+	input := mcpInit + "\n" +
 		`{"jsonrpc":"2.0","method":"tools/call","params":{"name":"ask_web_product","arguments":{"question":"Who?"}},"id":2}` + "\n"
 	out, errOut, code := mcpStdio(t, []string{testBinary(t), "mcp", "serve", "--stdio", "--repos-dir", repos}, env, input)
-	if code != 0 || !strings.Contains(out, `"text": "native answer"`) {
+	if code != 0 || !strings.Contains(out, `"text":"native answer"`) {
 		t.Fatalf("exit %d:\n%s\n%s", code, out, errOut)
 	}
 	if s, err := os.ReadFile(filepath.Join(repos, "web/agents/product/.session-id")); err != nil || strings.TrimSpace(string(s)) != "s-1" {
@@ -431,14 +567,15 @@ func TestMCPNativeAsk(t *testing.T) {
 	}
 	sc := bufio.NewScanner(strings.NewReader(out))
 	for sc.Scan() {
-		if strings.Contains(sc.Text(), `"id": 2`) && strings.Contains(sc.Text(), "error") {
+		if strings.Contains(sc.Text(), `"id":2`) && (strings.Contains(sc.Text(), `"error"`) || strings.Contains(sc.Text(), `"isError"`)) {
 			t.Errorf("tools/call failed: %s", sc.Text())
 		}
 	}
 }
 
-// TestMCPClientGolden: `rebar mcp client` against an HTTP MCP server
-// prints what bin/test-mcp-client (python, removed in rebar 3.2) printed.
+// TestMCPClientGolden: `rebar mcp client` (the SDK's Streamable HTTP
+// client) against the HTTP MCP server prints what bin/test-mcp-client
+// (python, removed in rebar 3.2) printed.
 func TestMCPClientGolden(t *testing.T) {
 	repos, stub := mcpFixture(t)
 	port := freePort(t)
@@ -448,7 +585,7 @@ func TestMCPClientGolden(t *testing.T) {
 	if goCode != 0 {
 		t.Fatalf("exit %d:\n%s%s", goCode, goOut, goErr)
 	}
-	checkGolden(t, "mcp", "client", strings.ReplaceAll(goOut, repos, "$REPOS"), "\x00none\x00", goCode)
+	checkGolden(t, "mcp", "client", mcpVersion(strings.ReplaceAll(goOut, repos, "$REPOS")), "\x00none\x00", goCode)
 	usageOut, _, usageCode := runSplit(t, t.TempDir(), mcpEnv(t), "", testBinary(t), "mcp", "client")
 	if usageCode != 1 || !strings.HasPrefix(usageOut, "Usage: test-mcp-client <server-url>") {
 		t.Errorf("usage: exit %d\n%s", usageCode, usageOut)

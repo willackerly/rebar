@@ -1,17 +1,17 @@
 // Package mcp is the native (Go) implementation of ASK's servers
 // (CONTRACT:S3-MCP-SERVER.1.0): the MCP server bin/ask-mcp-server (`rebar
-// mcp serve`: JSON-RPC 2.0 over stdio or HTTP, with the classic ASK API
+// mcp serve`: MCP over stdio or Streamable HTTP, with the classic ASK API
 // alongside), the enterprise server bin/ask-server (`rebar ask serve`) and
-// the demo client bin/test-mcp-client (`rebar mcp client`). Tool names,
-// schemas, descriptions, resource URIs, error codes, messages and data,
-// HTTP endpoints, flags and output are the python originals'; responses
-// are written with Python's json.dumps formatting.
+// the demo client bin/test-mcp-client (`rebar mcp client`).
 //
-// It is a minimal JSON-RPC implementation, not the official MCP Go SDK:
-// the SDK answers with its own protocol version, error codes and shapes
-// (tool failures as isError results, "unknown tool" for the
-// case-insensitive aliases this server accepts), which would break the
-// parity this port keeps with the deployed server.
+// The MCP protocol layer is the official Go SDK
+// (github.com/modelcontextprotocol/go-sdk): it negotiates the protocol
+// version, frames and validates messages, and reports tool failures as
+// isError results. This package adds the ASK tools and resources, the
+// case-insensitive tool-name and resource aliases (compat.go) and the stdio
+// hygiene Claude Code relies on (stdio.go). The classic ASK API and
+// ask-server keep the python originals' HTTP endpoints and json.dumps
+// bodies.
 package mcp
 
 import (
@@ -25,367 +25,106 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
-	"sync"
 	"syscall"
 	"time"
 	"unicode/utf8"
+
+	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
-// ProtocolVersion is the MCP revision the server speaks.
-const ProtocolVersion = "2024-11-05"
+// Version is serverInfo.version: rebar's version (cmd sets it).
+var Version = "dev"
+
+const (
+	serverName        = "ask-mcp-server"
+	serverDescription = "MCP server for ASK agent coordination platform"
+)
 
 // AskTimeout bounds one tools/call (the python server's 300 s).
 var AskTimeout = 300 * time.Second
 
-// Server is the MCP protocol state of one session (MCPServer).
+// Server is the ASK side of the MCP server: the repos it hosts and the ask
+// command its tools run.
 type Server struct {
 	Registry *Registry
 	// AskCmd is the ask command a tools/call runs, before its arguments:
 	// [ASK_BIN] or [rebar, "ask"].
 	AskCmd []string
-
-	mu          sync.Mutex
-	initialized bool
 }
 
-// request is a decoded JSON-RPC message.
-type request struct {
-	raw    map[string]json.RawMessage
-	hasID  bool
-	id     json.RawMessage
-	method any
-	params any
-	hasPar bool
-}
+// inputSchema is every tool's input schema (unchanged since the python
+// server; the SDK validates arguments against it).
+var inputSchema = json.RawMessage(`{"type": "object", "properties": {` +
+	`"question": {"type": "string", "description": "Question to ask the agent"}, ` +
+	`"verbose": {"type": "boolean", "description": "Request verbose response with rationale", "default": false}}, ` +
+	`"required": ["question"]}`)
 
-// response builds {"jsonrpc", "id", "result"} in that order.
-func response(id json.RawMessage, result any) object {
-	return object{{"jsonrpc", "2.0"}, {"id", idValue(id)}, {"result", result}}
-}
-
-func idValue(id json.RawMessage) any {
-	if id == nil {
-		return nil
-	}
-	return id
-}
-
-// rpcError builds a JSON-RPC error response; data is omitted when empty.
-func rpcError(code int, message, data string, id json.RawMessage) object {
-	e := object{{"code", code}, {"message", message}}
-	if data != "" {
-		e = append(e, field{"data", data})
-	}
-	return object{{"jsonrpc", "2.0"}, {"id", idValue(id)}, {"error", e}}
-}
-
-// decode parses one message as python's json.loads does (one value).
-func decode(data []byte) (any, error) {
-	dec := json.NewDecoder(bytes.NewReader(data))
-	dec.UseNumber()
-	var v any
-	if err := dec.Decode(&v); err != nil {
-		return nil, err
-	}
-	if dec.More() {
-		return nil, errors.New("Extra data")
-	}
-	if _, err := dec.Token(); err == nil {
-		return nil, errors.New("Extra data")
-	}
-	return v, nil
-}
-
-// pyType is the python type name of a decoded JSON value.
-func pyType(v any) string {
-	switch x := v.(type) {
-	case nil:
-		return "NoneType"
-	case bool:
-		return "bool"
-	case string:
-		return "str"
-	case []any:
-		return "list"
-	case map[string]any:
-		return "dict"
-	case json.Number:
-		if strings.ContainsAny(string(x), ".eE") {
-			return "float"
-		}
-		return "int"
-	}
-	return fmt.Sprintf("%T", v)
-}
-
-// truthy is python truthiness of a decoded JSON value.
-func truthy(v any) bool {
-	switch x := v.(type) {
-	case nil:
-		return false
-	case bool:
-		return x
-	case string:
-		return x != ""
-	case []any:
-		return len(x) > 0
-	case map[string]any:
-		return len(x) > 0
-	case json.Number:
-		f, err := x.Float64()
-		return err != nil || f != 0
-	}
-	return true
-}
-
-// pyStr is python's str() of a decoded value, for messages.
-func pyStr(v any) string {
-	switch x := v.(type) {
-	case nil:
-		return "None"
-	case bool:
-		if x {
-			return "True"
-		}
-		return "False"
-	case string:
-		return x
-	case json.Number:
-		return x.String()
-	}
-	return fmt.Sprint(v)
-}
-
-// noGet is the AttributeError of calling .get on a non-dict.
-func noGet(v any) string {
-	return fmt.Sprintf("'%s' object has no attribute 'get'", pyType(v))
-}
-
-// Handle answers one decoded message; reply is false for a notification.
-func (s *Server) Handle(msg any) (resp object, reply bool) {
-	obj, ok := msg.(map[string]any)
-	if !ok {
-		return rpcError(-32600, "Invalid Request", "Request must be JSON object", nil), true
-	}
-	if v, ok := obj["jsonrpc"].(string); !ok || v != "2.0" {
-		return rpcError(-32600, "Invalid Request", "Must be JSON-RPC 2.0", nil), true
-	}
-	idv, hasID := obj["id"]
-	if !hasID {
-		return nil, false // a notification: never answered
-	}
-	id := rawID(idv)
-	method := obj["method"]
-	params, hasParams := obj["params"]
-	if !hasParams {
-		params = map[string]any{}
-	}
-	switch m, _ := method.(string); {
-	case method == "initialize" || m == "initialize":
-		return s.initialize(id), true
-	case m == "tools/list":
-		return s.toolsList(id), true
-	case m == "tools/call":
-		return s.toolsCall(params, id), true
-	case m == "resources/list":
-		return s.resourcesList(id), true
-	case m == "resources/read":
-		return s.resourcesRead(params, id), true
-	}
-	return rpcError(-32601, "Method not found", "Unknown method: "+pyStr(method), id), true
-}
-
-// rawID re-encodes a decoded id for echoing.
-func rawID(v any) json.RawMessage {
-	return json.RawMessage(pyDumps(v, 0))
-}
-
-// HandleBytes answers one raw message (HTTP: an invalid body was already
-// rejected).
-func (s *Server) HandleBytes(data []byte) (object, bool, error) {
-	msg, err := decode(data)
-	if err != nil {
-		return nil, false, err
-	}
-	resp, reply := s.Handle(msg)
-	return resp, reply, nil
-}
-
-func (s *Server) isInitialized() bool {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return s.initialized
-}
-
-func notInitialized(id json.RawMessage) object {
-	return rpcError(-32002, "Not initialized", "Call initialize first", id)
-}
-
-func (s *Server) initialize(id json.RawMessage) object {
-	s.mu.Lock()
-	s.initialized = true
-	s.mu.Unlock()
-	return response(id, object{
-		{"protocolVersion", ProtocolVersion},
-		{"capabilities", object{
-			{"tools", object{{"listChanged", false}}},
-			{"resources", object{{"subscribe", false}, {"listChanged", false}}},
-		}},
-		{"serverInfo", object{
-			{"name", "ask-mcp-server"},
-			{"version", "1.0.0"},
-			{"description", "MCP server for ASK agent coordination platform"},
-		}},
-	})
+// askInput is a tools/call's arguments, validated against inputSchema.
+type askInput struct {
+	Question string `json:"question"`
+	Verbose  bool   `json:"verbose"`
 }
 
 // ToolName is the MCP tool of an agent: ask_<repo>_<role>.
 func ToolName(a Agent) string { return "ask_" + strings.ReplaceAll(a.ID(), ":", "_") }
 
-func (s *Server) toolsList(id json.RawMessage) object {
-	if !s.isInitialized() {
-		return notInitialized(id)
-	}
-	tools := []any{}
-	for _, a := range s.Registry.Agents() {
-		tools = append(tools, object{
-			{"name", ToolName(a)},
-			{"description", s.description(a.Repo, a.Role)},
-			{"inputSchema", object{
-				{"type", "object"},
-				{"properties", object{
-					{"question", object{{"type", "string"}, {"description", "Question to ask the agent"}}},
-					{"verbose", object{{"type", "boolean"}, {"description", "Request verbose response with rationale"}, {"default", false}}},
-				}},
-				{"required", []any{"question"}},
-			}},
-		})
-	}
-	return response(id, object{{"tools", tools}})
+// resourceKinds are the resources of each agent: ask://<kind>/<repo>:<role>.
+var resourceKinds = []struct{ kind, name, description string }{
+	{"memory", "Memory", "Current distilled memory for %[2]s agent in %[1]s"},
+	{"log", "Log", "Full interaction history for %[2]s agent in %[1]s"},
+	{"agent", "Definition", "Agent role definition and configuration for %[2]s in %[1]s"},
 }
 
-// splitTool splits a tool name into repo and role. The python server read
-// ask_<repo>_<role> by turning every "_" into ":" and splitting at the
-// first, so a repo with "_" in its name (dsp-2_8_2) could not be called;
-// a registered agent whose tool name matches (ignoring case) is taken
-// first, then that reading.
-func (s *Server) splitTool(name string) (string, string, bool) {
+// NewMCPServer builds the MCP server: a tool per agent, three resources
+// per agent, and the alias middleware. The registry is read once, so the
+// tool list is fixed for the server's lifetime (listChanged: false).
+func (s *Server) NewMCPServer() *sdk.Server {
+	srv := sdk.NewServer(&sdk.Implementation{Name: serverName, Version: Version, Description: serverDescription},
+		&sdk.ServerOptions{Capabilities: &sdk.ServerCapabilities{
+			Tools:     &sdk.ToolCapabilities{},
+			Resources: &sdk.ResourceCapabilities{},
+		}})
 	for _, a := range s.Registry.Agents() {
-		if strings.EqualFold(ToolName(a), name) {
-			return a.Repo, a.Role, true
+		sdk.AddTool(srv, &sdk.Tool{Name: ToolName(a), Description: s.description(a.Repo, a.Role), InputSchema: inputSchema}, s.askTool(a))
+		for _, k := range resourceKinds {
+			srv.AddResource(&sdk.Resource{
+				URI:         "ask://" + k.kind + "/" + a.ID(),
+				Name:        a.ID() + " " + k.name,
+				Description: fmt.Sprintf(k.description, a.Repo, a.Role),
+				MIMEType:    "text/markdown",
+			}, s.readResource(k.kind, a))
 		}
 	}
-	agentID := strings.ReplaceAll(name[4:], "_", ":")
-	repo, role, ok := strings.Cut(agentID, ":")
-	return repo, role, ok
+	srv.AddReceivingMiddleware(s.aliases)
+	return srv
 }
 
-func (s *Server) toolsCall(params any, id json.RawMessage) object {
-	if !s.isInitialized() {
-		return notInitialized(id)
-	}
-	p, ok := params.(map[string]any)
-	if !ok {
-		return rpcError(-32603, "Internal error", noGet(params), id)
-	}
-	nameV := p["name"]
-	var arguments any = map[string]any{}
-	if v, ok := p["arguments"]; ok {
-		arguments = v
-	}
-	if !truthy(nameV) {
-		return rpcError(-32602, "Invalid params", "Tool name required", id)
-	}
-	name, ok := nameV.(string)
-	if !ok {
-		return rpcError(-32603, "Internal error", fmt.Sprintf("'%s' object has no attribute 'startswith'", pyType(nameV)), id)
-	}
-	if !strings.HasPrefix(name, "ask_") {
-		return rpcError(-32602, "Invalid params", "Invalid tool name format", id)
-	}
-	repo, role, ok := s.splitTool(name)
-	if !ok {
-		return rpcError(-32602, "Invalid params", "Invalid agent ID format", id)
-	}
-	canonRepo := s.Registry.ResolveRepo(repo)
-	if canonRepo == "" {
-		return rpcError(-32603, "Tool execution failed", "Repository "+repo+" not found", id)
-	}
-	canonRole := s.Registry.ResolveRole(canonRepo, role)
-	if canonRole == "" {
-		return rpcError(-32603, "Tool execution failed", "Role "+role+" not found in "+canonRepo, id)
-	}
-	args, ok := arguments.(map[string]any)
-	if !ok {
-		return rpcError(-32603, "Internal error", noGet(arguments), id)
-	}
-	question := args["question"]
-	verbose := args["verbose"]
-	if !truthy(question) {
-		return rpcError(-32602, "Invalid params", "Question required", id)
-	}
-	answer, errText := s.ExecuteAsk(canonRepo, canonRole, question, truthy(verbose))
-	if errText != "" {
-		return rpcError(-32603, "Tool execution failed", errText, id)
-	}
-	return response(id, object{{"content", []any{object{{"type", "text"}, {"text", answer}}}}})
-}
-
-func (s *Server) resourcesList(id json.RawMessage) object {
-	if !s.isInitialized() {
-		return notInitialized(id)
-	}
-	resources := []any{}
-	for _, a := range s.Registry.Agents() {
-		aid := a.ID()
-		resources = append(resources,
-			object{{"uri", "ask://memory/" + aid}, {"name", aid + " Memory"},
-				{"description", "Current distilled memory for " + a.Role + " agent in " + a.Repo}, {"mimeType", "text/markdown"}},
-			object{{"uri", "ask://log/" + aid}, {"name", aid + " Log"},
-				{"description", "Full interaction history for " + a.Role + " agent in " + a.Repo}, {"mimeType", "text/markdown"}},
-			object{{"uri", "ask://agent/" + aid}, {"name", aid + " Definition"},
-				{"description", "Agent role definition and configuration for " + a.Role + " in " + a.Repo}, {"mimeType", "text/markdown"}})
-	}
-	return response(id, object{{"resources", resources}})
-}
-
-func (s *Server) resourcesRead(params any, id json.RawMessage) object {
-	if !s.isInitialized() {
-		return notInitialized(id)
-	}
-	p, ok := params.(map[string]any)
-	if !ok {
-		return rpcError(-32603, "Internal error", noGet(params), id)
-	}
-	uriV := p["uri"]
-	if !truthy(uriV) {
-		return rpcError(-32602, "Invalid params", "Resource URI required", id)
-	}
-	uri, ok := uriV.(string)
-	if !ok {
-		return rpcError(-32603, "Internal error", fmt.Sprintf("'%s' object has no attribute 'startswith'", pyType(uriV)), id)
-	}
-	if !strings.HasPrefix(uri, "ask://") {
-		return rpcError(-32602, "Invalid params", "Invalid ASK resource URI", id)
-	}
-	typ, agentID, ok := strings.Cut(uri[6:], "/")
-	if !ok {
-		return rpcError(-32603, "Resource read failed", "Invalid URI format", id)
-	}
-	repo, role, ok := strings.Cut(agentID, ":")
-	if !ok {
-		return rpcError(-32603, "Resource read failed", "not enough values to unpack (expected 2, got 1)", id)
-	}
-	if canon := s.Registry.ResolveRepo(repo); canon != "" {
-		if r := s.Registry.ResolveRole(canon, role); r != "" {
-			repo, role = canon, r
+// askTool runs `ask <role> <question>` in the agent's repo. Failures are
+// tool execution errors (isError results the model can read), not
+// protocol errors.
+func (s *Server) askTool(a Agent) sdk.ToolHandlerFor[askInput, any] {
+	return func(ctx context.Context, _ *sdk.CallToolRequest, in askInput) (*sdk.CallToolResult, any, error) {
+		if strings.TrimSpace(in.Question) == "" {
+			return nil, nil, errors.New("Question required")
 		}
+		answer, errText := s.ExecuteAsk(ctx, a.Repo, a.Role, in.Question, in.Verbose)
+		if errText != "" {
+			return nil, nil, errors.New(errText)
+		}
+		return &sdk.CallToolResult{Content: []sdk.Content{&sdk.TextContent{Text: answer}}}, nil, nil
 	}
-	content, err := s.resource(typ, repo, role)
-	if err != nil {
-		return rpcError(-32603, "Resource read failed", err.Error(), id)
+}
+
+// readResource reads one of the agent's files (a placeholder when it does
+// not exist yet).
+func (s *Server) readResource(kind string, a Agent) sdk.ResourceHandler {
+	return func(_ context.Context, req *sdk.ReadResourceRequest) (*sdk.ReadResourceResult, error) {
+		content, err := s.resource(kind, a.Repo, a.Role)
+		if err != nil {
+			return nil, err
+		}
+		return &sdk.ReadResourceResult{Contents: []*sdk.ResourceContents{{URI: req.Params.URI, MIMEType: "text/markdown", Text: content}}}, nil
 	}
-	return response(id, object{{"contents", []any{object{{"uri", uri}, {"mimeType", "text/markdown"}, {"text", content}}}}})
 }
 
 // readText is Path.read_text(): the file decoded as UTF-8 with universal
@@ -523,7 +262,7 @@ func pyStrip(s string) string { return strings.TrimSpace(s) }
 // ExecuteAsk runs `ask [-v] <role> <question>` in the repo (ASK_SERVER
 // cleared, so the call never routes to a remote server) and returns the
 // answer, or the error text the python server reported.
-func (s *Server) ExecuteAsk(repo, role string, question any, verbose bool) (string, string) {
+func (s *Server) ExecuteAsk(ctx context.Context, repo, role, question string, verbose bool) (string, string) {
 	path := s.Registry.Path(repo)
 	if path == "" {
 		return "", "Repository " + repo + " not found"
@@ -531,18 +270,16 @@ func (s *Server) ExecuteAsk(repo, role string, question any, verbose bool) (stri
 	if !s.Registry.HasAgent(repo, role) {
 		return "", "Agent " + role + " not found in repository " + repo
 	}
-	q, ok := question.(string)
-	if !ok {
-		return "", fmt.Sprintf("Execution error: TypeError('expected str, bytes or os.PathLike object, not %s')", pyType(question))
-	}
 	argv := append([]string{}, s.AskCmd...)
 	if verbose {
 		argv = append(argv, "-v")
 	}
-	argv = append(argv, role, q)
+	argv = append(argv, role, question)
 	shown := strings.Join(argv, " ")
-	stdout, stderr, code, err := runAsk(argv, path, AskTimeout)
+	stdout, stderr, code, err := runAskContext(ctx, argv, path, AskTimeout)
 	switch {
+	case errors.Is(err, context.Canceled):
+		return "", fmt.Sprintf("Agent query cancelled (cmd: %s)", shown)
 	case errors.Is(err, context.DeadlineExceeded):
 		return "", fmt.Sprintf("Agent query timed out after %ds (cmd: %s)", int(AskTimeout.Seconds()), shown)
 	case errors.Is(err, exec.ErrNotFound) || errors.Is(err, os.ErrNotExist):
@@ -567,7 +304,13 @@ func (s *Server) ExecuteAsk(repo, role string, question any, verbose bool) (stri
 // runAsk runs argv in dir with ASK_SERVER cleared and returns its output
 // and exit status (negative for a signal, as python reports it).
 func runAsk(argv []string, dir string, timeout time.Duration) (string, string, int, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	return runAskContext(context.Background(), argv, dir, timeout)
+}
+
+// runAskContext is runAsk ended early when parent is done (a client
+// cancelled the request, or the session closed): context.Canceled.
+func runAskContext(parent context.Context, argv []string, dir string, timeout time.Duration) (string, string, int, error) {
+	ctx, cancel := context.WithTimeout(parent, timeout)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, argv[0], argv[1:]...)
 	cmd.Dir = dir
@@ -575,6 +318,9 @@ func runAsk(argv []string, dir string, timeout time.Duration) (string, string, i
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
 	err := cmd.Run()
+	if parent.Err() != nil {
+		return "", "", 0, context.Canceled
+	}
 	if ctx.Err() == context.DeadlineExceeded {
 		return "", "", 0, context.DeadlineExceeded
 	}

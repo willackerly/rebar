@@ -1,14 +1,16 @@
 package mcp
 
 import (
-	"bufio"
 	"fmt"
 	"io"
 	"net"
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
+
+	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
 // The HTTP side of both servers: python's BaseHTTPRequestHandler answered
@@ -76,17 +78,40 @@ func (s *statusRecorder) WriteHeader(code int) {
 	s.ResponseWriter.WriteHeader(code)
 }
 
-// MCPHandler serves bin/ask-mcp-server's HTTP mode: POST /mcp (JSON-RPC),
-// GET /mcp/schema, and unless MCPOnly the classic API's /v1/health,
-// /v1/agents, /v1/repos and POST /v1/ask. One protocol session is shared
-// by all requests (the python server made a new one per request, so only
-// initialize itself could ever succeed over HTTP).
+// Flush and Unwrap keep the SDK's event streams working through the
+// recorder.
+func (s *statusRecorder) Flush() {
+	if f, ok := s.ResponseWriter.(http.Flusher); ok {
+		f.Flush()
+	}
+}
+
+func (s *statusRecorder) Unwrap() http.ResponseWriter { return s.ResponseWriter }
+
+// MCPHandler serves bin/ask-mcp-server's HTTP mode: /mcp (the SDK's
+// Streamable HTTP transport, JSON responses), GET /mcp/schema, and unless
+// MCPOnly the classic API's /v1/health, /v1/agents, /v1/repos and POST
+// /v1/ask.
 type MCPHandler struct {
 	Server  *Server
 	APIKey  string
 	MCPOnly bool
 	// Log gets python's default request log lines (stderr).
 	Log io.Writer
+
+	once sync.Once
+	mcp  http.Handler
+}
+
+// streamable is the SDK handler of /mcp: one MCP server, a session per
+// client (Mcp-Session-Id), answers as application/json.
+func (h *MCPHandler) streamable() http.Handler {
+	h.once.Do(func() {
+		srv := h.Server.NewMCPServer()
+		h.mcp = sdk.NewStreamableHTTPHandler(func(*http.Request) *sdk.Server { return srv },
+			&sdk.StreamableHTTPOptions{JSONResponse: true})
+	})
+	return h.mcp
 }
 
 func (h *MCPHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -99,28 +124,34 @@ func (h *MCPHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 	w = rec
-	if r.Method != http.MethodGet && r.Method != http.MethodPost {
+	path := pathOf(r)
+	if path != "/mcp" && r.Method != http.MethodGet && r.Method != http.MethodPost {
 		unsupported(w, r)
 		return
 	}
 	if !h.auth(w, r) {
 		return
 	}
-	path := pathOf(r)
+	if path == "/mcp" {
+		h.streamable().ServeHTTP(w, r)
+		return
+	}
 	if r.Method == http.MethodGet {
 		switch {
 		case path == "/mcp/schema":
+			versions := sdk.SupportedProtocolVersions()
 			jsonOK(w, object{
 				{"protocol", "mcp"},
-				{"version", ProtocolVersion},
+				{"version", versions[0]},
+				{"protocolVersions", versions},
 				{"capabilities", object{
-					{"tools", object{{"listChanged", false}}},
-					{"resources", object{{"subscribe", false}, {"listChanged", false}}},
+					{"tools", object{}},
+					{"resources", object{}},
 				}},
 				{"serverInfo", object{
-					{"name", "ask-mcp-server"},
-					{"version", "1.0.0"},
-					{"description", "MCP server for ASK agent coordination"},
+					{"name", serverName},
+					{"version", Version},
+					{"description", serverDescription},
 				}},
 			})
 		case h.MCPOnly:
@@ -137,17 +168,6 @@ func (h *MCPHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	switch {
-	case path == "/mcp":
-		body, ok := readJSON(w, r)
-		if !ok {
-			return
-		}
-		resp, reply := h.Server.Handle(body)
-		if !reply {
-			jsonOK(w, nil)
-			return
-		}
-		jsonOK(w, resp)
 	case h.MCPOnly:
 		jsonError(w, 404, "Only MCP endpoints available in --mcp-only mode")
 	case path == "/v1/ask":
@@ -159,7 +179,7 @@ func (h *MCPHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if !ok {
 			return
 		}
-		answer, errText := h.Server.ExecuteAsk(repo, role, question, verbose)
+		answer, errText := h.Server.ExecuteAsk(r.Context(), repo, role, question, verbose)
 		if errText != "" {
 			jsonError(w, 500, errText)
 			return
@@ -227,31 +247,4 @@ func unsupported(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Length", strconv.Itoa(len(body)))
 	w.WriteHeader(501)
 	io.WriteString(w, body)
-}
-
-// ServeStdio runs the MCP stdio transport: one JSON-RPC message per line
-// in, one response per line out (none for notifications); unparseable
-// lines are reported on stderr and skipped (a reply with id null breaks
-// Claude Code's client).
-func (s *Server) ServeStdio(in io.Reader, out, errw io.Writer) error {
-	r := bufio.NewReader(in)
-	for {
-		line, err := r.ReadString('\n')
-		if text := strings.TrimSpace(line); text != "" {
-			msg, perr := decode([]byte(text))
-			if perr != nil {
-				fmt.Fprintf(errw, "ask-mcp-server: parse error: %v\n", perr)
-			} else if resp, reply := s.Handle(msg); reply {
-				if _, werr := io.WriteString(out, pyDumps(resp, 0)+"\n"); werr != nil {
-					return werr
-				}
-			}
-		}
-		if err == io.EOF {
-			return nil
-		}
-		if err != nil {
-			return err
-		}
-	}
 }

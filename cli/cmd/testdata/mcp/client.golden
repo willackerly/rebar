@@ -2,7 +2,7 @@
 
 1. Initializing MCP session...
    Server: ask-mcp-server
-   Protocol: 2024-11-05
+   Protocol: 2025-11-25
 
 2. Listing available tools...
    Found 6 agent tools:
@@ -13,9 +13,9 @@
 
 3. Listing available resources...
    Found 18 agent resources:
-   1. dsp_2_8:steward Memory (ask://memory/dsp_2_8:steward)
-   2. dsp_2_8:steward Log (ask://log/dsp_2_8:steward)
-   3. dsp_2_8:steward Definition (ask://agent/dsp_2_8:steward)
+   1. dsp_2_8:steward Definition (ask://agent/dsp_2_8:steward)
+   2. web:architect Definition (ask://agent/web:architect)
+   3. web:broken Definition (ask://agent/web:broken)
    ... and 15 more
 
 4. Calling an agent tool...
@@ -23,8 +23,12 @@
    Agent response: answer from dsp_2_8: steward What is your role and purpose?...
 
 5. Reading an agent resource...
-   Reading: dsp_2_8:steward Memory
-   Content: (no memory yet)...
+   Reading: dsp_2_8:steward Definition
+   Content: # Steward
+
+Keeps score: é ünïcode ✓ and emoji 🚀.
+Second line.
+...
 
 === MCP Test Complete ===
 --- exit 0 ---

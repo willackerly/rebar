@@ -3,20 +3,22 @@ GET /mcp/schema
 GET /mcp/schema 
 200 {
   "protocol": "mcp",
-  "version": "2024-11-05",
+  "version": "2026-07-28",
+  "protocolVersions": [
+    "2026-07-28",
+    "2025-11-25",
+    "2025-06-18",
+    "2025-03-26",
+    "2024-11-05"
+  ],
   "capabilities": {
-    "tools": {
-      "listChanged": false
-    },
-    "resources": {
-      "subscribe": false,
-      "listChanged": false
-    }
+    "tools": {},
+    "resources": {}
   },
   "serverInfo": {
     "name": "ask-mcp-server",
-    "version": "1.0.0",
-    "description": "MCP server for ASK agent coordination"
+    "version": "$VERSION",
+    "description": "MCP server for ASK agent coordination platform"
   }
 }
 GET /v1/health 
@@ -27,26 +29,8 @@ GET /v1/health
 404 {"error": "Only MCP endpoints available in --mcp-only mode"}
 POST /v1/ask {"repo":"web","role":"product","question":"q"}
 404 {"error": "Only MCP endpoints available in --mcp-only mode"}
-POST /mcp {"jsonrpc":"2.0","method":"initialize","params":{},"id":1}
-200 {
-  "jsonrpc": "2.0",
-  "id": 1,
-  "result": {
-    "protocolVersion": "2024-11-05",
-    "capabilities": {
-      "tools": {
-        "listChanged": false
-      },
-      "resources": {
-        "subscribe": false,
-        "listChanged": false
-      }
-    },
-    "serverInfo": {
-      "name": "ask-mcp-server",
-      "version": "1.0.0",
-      "description": "MCP server for ASK agent coordination platform"
-    }
-  }
-}
+POST /mcp {"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"t","version":"1"}},"id":1}
+401 [application/json] {"error": "Bearer token required"}
+POST /mcp {"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"t","version":"1"}},"id":1}
+200 [application/json] [Mcp-Session-Id: $SESSION] {"jsonrpc":"2.0","id":1,"result":{"capabilities":{"resources":{},"tools":{}},"protocolVersion":"2025-11-25","serverInfo":{"name":"ask-mcp-server","description":"MCP server for ASK agent coordination platform","version":"$VERSION"}}}
 --- exit 0 ---
