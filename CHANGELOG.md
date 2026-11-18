@@ -41,7 +41,9 @@ All notable changes to rebar. Versioned with [semver](https://semver.org/).
   only `version_pinned` (other fields default, a trailing `# comment` is
   dropped; a section without it is reported and left out, the rest still
   listed, exit 1); flush-notifications exits 0 after a successful flush and
-  1 when a dispatch failed, and its summary counts `failed=`. Kept for
+  1 when a dispatch failed, and its summary counts `failed=`; and v3.1.2's
+  refresh-context counts commits from midnight of the last-synced day
+  (`--since="<date> 00:00"`). Kept for
   parity: the TODO counts print `0<newline>0` when there are none.
   Platform choices: dates are read as GNU date reads them (a date that does
   not exist gives no staleness line; BSD rolled it over), binary source
