@@ -75,7 +75,8 @@ var noSteward = []string{"SKIP_STEWARD=1"}
 
 // projectCopies adds the project's own scripts: a customized executable
 // check-todos.sh, a thin-wrapper check-freshness.sh (never picked) and a
-// copy of check-doc-refs.sh that is not executable.
+// copy of check-doc-refs.sh that is not executable (runs with bash, as
+// `rebar run` runs it; the suite script skipped it).
 func projectCopies(t *testing.T, root string) {
 	testutil.WriteExecutable(t, root, "scripts/check-todos.sh", "#!/usr/bin/env bash\necho 'custom todos'\necho 'OK: custom'\n")
 	testutil.WriteExecutable(t, root, "scripts/check-freshness.sh", "#!/usr/bin/env bash\n# rebar-thin-wrapper\necho 'thin wrapper ran'; exit 1\n")
