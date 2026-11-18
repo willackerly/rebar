@@ -130,7 +130,7 @@ R7="$TMP/t7"
 new_repo "$R7" false
 grep -q '^<!-- Regenerate: rebar run compute-registry -->' "$R7/architecture/CONTRACT-REGISTRY.md" \
   || fail "T7: registry hint does not name rebar run compute-registry"
-sed 's|^<!-- Regenerate: .*-->|<!-- Regenerate: ./"$REBAR" native compute-registry -->|' \
+sed 's|^<!-- Regenerate: .*-->|<!-- Regenerate: ./scripts/compute-registry.sh -->|' \
   "$R7/architecture/CONTRACT-REGISTRY.md" > "$TMP/t7.md" && mv "$TMP/t7.md" "$R7/architecture/CONTRACT-REGISTRY.md"
 ( cd "$R7" && "$REBAR" native compute-registry --check >/dev/null ) \
   || fail "T7: a registry with the pre-3.1 hint is reported STALE"
