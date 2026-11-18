@@ -2,7 +2,7 @@
 // writes out, so that it needs no install tree: the project bootstrap
 // template (`rebar new`, `rebar init`, `rebar adopt`, `rebar migrate`) and
 // the companions an install keeps beside the binary (`rebar install-shims`:
-// the bin/ask* shims, bin/install and the shell completions).
+// the bin/ask* shims, bin/rebar-install and the shell completions).
 //
 // go:embed cannot reach outside the module (cli/), so files/ is a copy of
 // Sources, kept in step by scripts/sync-bootstrap.sh: run it after editing
@@ -32,7 +32,7 @@ var Sources = []string{
 	"bin/ask-agent-loop",
 	"bin/ask-mcp-server",
 	"bin/ask-server",
-	"bin/install",
+	"bin/rebar-install",
 	"bin/completions",
 }
 

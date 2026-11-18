@@ -87,6 +87,43 @@ All notable changes to rebar. Versioned with [semver](https://semver.org/).
   `gen-released-blobs.sh`, `test-e2e-live.sh`); the checks reference moved to
   `docs/CONFIGURATION.md`.
 
+- **Distribution review fixes (S7).** *Installer:* `latest` is the newest
+  published GitHub Release (Releases API `REBAR_RELEASES_API`, drafts and
+  bare tags skipped, `--pre` aware; clear errors for the API rate limit, for
+  only pre-releases published, and for a non-GitHub `REBAR_REPO`), and a
+  release tag is never built from source implicitly: missing assets, an
+  unreachable release server, no build for the platform or no hash tool
+  stop the install (`--source` builds on purpose; tags before v3.1.0-rc.1,
+  which have no assets, still build by themselves). Same behaviour as the
+  v3.1.2 installer fix (shared functions), plus the binary layout; `--pre`
+  with an explicit version warns. Older versions' `bin/install` is renamed
+  `bin/rebar-install` when installed. *`bin/install` is now
+  `bin/rebar-install`*: on PATH, `install` shadowed install(1) (`install -d`,
+  `make install`); `rebar install-shims` removes rebar's old `install`, and
+  the installer warns when a pre-versioned clone's `bin/` (with its
+  `install`) is still on PATH. `install-shims` writes through
+  `os.CreateTemp` + rename and never follows a symlink (a symlinked target
+  is a conflict; `--force` replaces the link). *Releases:* release.yml is
+  split into `build` (read-only token: test, package, smoke test, govulncheck
+  gate, `actions/attest-build-provenance` for every asset) and `publish`
+  (the only `contents: write` job: re-checks the assets against the
+  checksums, creates the Release); notes say how to `gh attestation verify`.
+  v4.0.x also publish `rebar_<ver>_<os>_<arch>.tar.gz` (the binary and its
+  companions) so v3.1.x installers, which look only for tarballs, install
+  the binary instead of building from source; drop them in v4.1. The weekly
+  vulncheck scans bare binaries when a release has them. SETUP's pinned
+  wrapper verifies the binary against SHA-256s committed in the adopter's
+  repo (`REBAR_SHA256`), not the release's own checksums file. *migrate:*
+  a `ci-check.sh` / `pre-commit.sh` copy becomes `checks_extra` only for
+  plain fatal calls (`run_check "X" SKIP_X <script>`, `<script> || failed=…`,
+  optionally alone in `if [ -x <script> ]`): `|| true`, CI-only `if`s,
+  `if ! check; then warn`, extra statements or arguments keep the copy with
+  the reason, and a second comparison with the extra scripts forced to fail
+  must fail the copy as it fails rebar's suite. Planning and apply put the
+  same `rebar` first on PATH for legacy copies and wrappers
+  (`Options.RebarOnPath`). `config.WithEnv`'s override is one atomically
+  swapped state, so `Setenv` outside `WithEnv` can no longer hit a nil map
+  (`-race` test).
 - **The `rebar` binary is self-contained, and releases are binaries.**
   `rebar new / init / adopt` write the bootstrap template compiled into the
   binary (`cli/internal/assets`, a `.embed`-suffixed copy that
@@ -94,10 +131,10 @@ All notable changes to rebar. Versioned with [semver](https://semver.org/).
   `new / adopt / init / migrate / check / run / ask / mcp` need no rebar tree
   and no `REBAR_ROOT`; only `REBAR_CHECK_IMPL=shell` (until S8) and `rebar
   run` of rebar's maintainer scripts still use one. New `rebar install-shims
-  [--dir DIR] [--force]` writes the `ask*` shims, `bin/install` and the
+  [--dir DIR] [--force]` writes the `ask*` shims, `rebar-install` and the
   completions beside the binary. The release workflow publishes
-  `rebar_<ver>_<os>_<arch>` binaries plus `rebar_<ver>_checksums.txt` (no
-  tarballs) and smoke-tests the linux/amd64 one with no tree;
+  `rebar_<ver>_<os>_<arch>` binaries plus `rebar_<ver>_checksums.txt` (and,
+  for v4.0.x, small compatibility tarballs) and smoke-tests the linux/amd64 one with no tree;
   `setup-rebar.sh` downloads and verifies the binary and runs `install-shims`
   (whole-tree tarballs of v3.1.0 and earlier, and source builds, still
   install as trees; `.rebar-install` records `layout=`). `rebar run` lists

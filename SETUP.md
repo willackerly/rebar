@@ -30,10 +30,10 @@ exists yet, the highest pre-release). Variants (`…` is the `curl` part):
 | Command | Installs |
 |---------|----------|
 | `… \| bash -s -- v3.1.1` | that release |
-| `… \| bash -s -- --pre` | the newest tag, pre-releases included |
+| `… \| bash -s -- --pre` | the newest published release, pre-releases included |
 | `… \| bash -s -- main` | a branch, built from source; `rebar version` says `main@<sha>` |
 | `… \| bash -s -- v3.1.1 --no-switch` | side by side, without changing the active version |
-| `… \| bash -s -- v3.1.1 --source` | from source even if a prebuilt download exists |
+| `… \| bash -s -- v3.1.1 --source` | from source with your Go (needed for a tag without prebuilt assets) |
 | `… \| bash -s -- v3.1.1 --dir /opt/rebar` | under `/opt/rebar` instead of `~/.rebar` (CI) |
 
 Each version lives in `~/.rebar/versions/<version>/`; `~/.rebar/current` is
@@ -43,10 +43,17 @@ a symlink to the active one, so switching never edits your RC again
 self-contained binary per platform, `rebar_<ver>_<os>_<arch>`: the installer
 verifies it against the release's SHA-256 checksums (a mismatch aborts), puts
 it at `versions/<version>/bin/rebar` and runs `rebar install-shims`, which
-writes the `ask*` shims, `bin/install` and the shell completions beside it.
-Releases up to v3.1.0 published a tarball of the whole tree instead, which the
-installer still unpacks. Releases without assets, branches and commits (by
-full 40-character SHA) build from source, which needs `git` and Go 1.25 or
+writes the `ask*` shims, `rebar-install` (the PATH setup; `bin/install`
+before 4.0, renamed because a file named `install` on PATH shadows
+install(1)) and the shell completions beside it. Releases v3.1.0-rc.1 to
+v3.1.x published a tarball of the whole tree instead, which the installer
+still unpacks. "latest" is the newest published GitHub Release (not a tag
+whose release is missing or still building). A release tag is never built
+from source behind your back: if its assets are missing or the download
+fails, the installer stops; `--source` builds it with your Go (tags before
+v3.1.0-rc.1, which have no assets, build from source by themselves).
+Branches and commits (by full 40-character SHA) build from source, which
+needs `git` and Go 1.25 or
 newer (use a [supported release](https://go.dev/doc/devel/release#policy):
 the binary includes its standard library; see [SECURITY.md](SECURITY.md)) and
 keeps the whole tree of that ref. Branch
@@ -81,8 +88,8 @@ on one project, then switch with
 issues on the repository.
 
 Name the candidate explicitly: without a version the installer takes the latest
-*stable* release, so a candidate is only picked by `--pre` (the newest tag,
-pre-releases included).
+*stable* release, so a candidate is only picked by `--pre` (the newest
+published release, pre-releases included).
 
 **Upgrading from a `~/.rebar` clone** (what the installer made before versioned installs): the
 installer leaves the clone as it is — not moved, not updated — and adds
@@ -115,14 +122,17 @@ binary of the version you pin, no rebar tree and no `REBAR_ROOT`.
 
 The release binary needs only `curl` and `shasum` or `sha256sum`; the
 installer verifies it against the release's checksums and writes the `ask`
-shims and `bin/install` beside it. A tag without prebuilt assets falls back to
-a source build, which needs `git` and Go (add `actions/setup-go`). The checks
+shims and `rebar-install` beside it. A tag without prebuilt assets is an
+error unless you pass `--source` (needs `git` and Go: add
+`actions/setup-go`). The checks
 themselves need `git`. The installer also appends a PATH line to the runner's
 shell RC, which is harmless there.
 
 **Pinned wrapper.** To run the version a repository pins without an install
-step, download the release binary for the platform once, verify it, cache it
-and run it; nothing else is needed:
+step, download the release binary for the platform once, verify it against a
+SHA-256 *committed in the repository*, cache it and run it; nothing else is
+needed. Pinning the hash (not just checking the release's own checksums file)
+means a release asset replaced later cannot reach your CI.
 
 ```bash
 #!/usr/bin/env bash
@@ -130,7 +140,12 @@ and run it; nothing else is needed:
 # Usage: scripts/rebar.sh check | run <check> | ...
 set -euo pipefail
 
-REBAR_PIN="v3.2.0"   # a release from 3.2 on (self-contained binary)
+REBAR_PIN="v4.0.0"   # a release from 4.0 on (self-contained binary)
+# The pinned release's rebar_<ver>_checksums.txt (at least this platform's
+# binary line); a download that does not match is refused.
+REBAR_SHA256="
+paste-the-lines-of-rebar_4.0.0_checksums.txt-here  rebar_4.0.0_linux_amd64
+"
 REBAR_RELEASES="${REBAR_RELEASES:-https://github.com/willackerly/rebar/releases/download}"
 ROOT="${REBAR_CACHE_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/rebar}/$REBAR_PIN"
 
@@ -142,14 +157,17 @@ if [ ! -x "$ROOT/rebar" ]; then
     *) echo "rebar: no release binary for $(uname -m)" >&2; exit 1 ;;
   esac
   asset="rebar_${REBAR_PIN#v}_${os}_${arch}"
+  want="$(printf '%s\n' "$REBAR_SHA256" | awk -v f="$asset" '$2 == f || $2 == "*" f { print $1; exit }')"
+  case "$want" in
+    [0-9a-f][0-9a-f][0-9a-f][0-9a-f]*) ;;
+    *) echo "rebar $REBAR_PIN: no SHA-256 pinned for $asset in REBAR_SHA256" >&2; exit 1 ;;
+  esac
   tmp="$(mktemp -d "${TMPDIR:-/tmp}/rebar-pin.XXXXXX")"
   curl -fsSL -o "$tmp/$asset" "$REBAR_RELEASES/$REBAR_PIN/$asset"
-  curl -fsSL -o "$tmp/sums" "$REBAR_RELEASES/$REBAR_PIN/rebar_${REBAR_PIN#v}_checksums.txt"
-  want="$(awk -v f="$asset" '$2 == f { print $1 }' "$tmp/sums")"
   got="$( (sha256sum "$tmp/$asset" 2>/dev/null || shasum -a 256 "$tmp/$asset") | awk '{ print $1 }')"
-  if [ -z "$want" ] || [ "$want" != "$got" ]; then
+  if [ "$want" != "$got" ]; then
     rm -rf "$tmp"
-    echo "rebar $REBAR_PIN: checksum mismatch for $asset" >&2
+    echo "rebar $REBAR_PIN: checksum mismatch for $asset (pinned $want, got $got)" >&2
     exit 1
   fi
   mkdir "$tmp/bin" && mv "$tmp/$asset" "$tmp/bin/rebar" && chmod 755 "$tmp/bin/rebar"
@@ -160,6 +178,19 @@ fi
 export PATH="$ROOT:$PATH"   # nested `rebar` calls get the same version
 exec "$ROOT/rebar" "$@"
 ```
+
+When you change `REBAR_PIN`, paste that release's
+`rebar_<ver>_checksums.txt` into `REBAR_SHA256`, after checking the file's
+build provenance:
+
+```bash
+gh release download v4.0.0 -R willackerly/rebar -p 'rebar_4.0.0_checksums.txt'
+gh attestation verify rebar_4.0.0_checksums.txt --repo willackerly/rebar
+```
+
+(`gh attestation verify <binary> --repo willackerly/rebar` checks a
+downloaded binary the same way: it was built by rebar's release workflow
+from the tagged commit.)
 
 The project's `scripts/ci-check.sh` and `scripts/pre-commit.sh`, and the
 wrappers `rebar migrate` leaves for copies that other files call, run

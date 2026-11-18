@@ -140,7 +140,7 @@ This is the latest version. No predecessor.
 - `bin/ask` — sh shim running `rebar ask` (the bash implementation was removed in rebar 3.2)
 - `bin/ask-server` — sh shim running `rebar ask serve` (the enterprise HTTP server, `cli/internal/mcp`)
 - `bin/ask-agent-loop` — sh shim running `rebar ask-agent-loop` (agent-loop harness)
-- `bin/install` — PATH installer + dependency check
+- `bin/rebar-install` — PATH installer + dependency check (`bin/install` before v4.0.0: on PATH that name shadowed install(1))
 - `agents/<role>/AGENT.md` — per-role config, read by ASK on every call
 - `agents/<role>/commands/*.sh` — unquoted-command implementations
 

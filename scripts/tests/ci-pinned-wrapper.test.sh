@@ -2,13 +2,17 @@
 # Regression test: the pinned-wrapper snippet in SETUP.md "## Run rebar in CI",
 # extracted from the doc and run offline. A file:// directory stands in for
 # GitHub Releases (a stub rebar binary for this platform plus the checksums
-# file), so no network is needed.
+# file), so no network is needed; the wrapper gets the pin and the release's
+# checksums pasted into REBAR_SHA256, as the doc says.
 #   T1  first run downloads, verifies and execs the pinned rebar, caches it,
 #       and leaves no temp directory behind
 #   T2  a cached run execs straight away (no download)
-#   T3  a binary that does not match the release's checksum is refused,
+#   T3  a binary that does not match the pinned SHA-256 is refused, even
+#       when the release's own checksums file was replaced to match it;
 #       nothing is cached, and the temp directory is cleaned up
 #   T4  a nested `rebar` (PATH) is the pinned one
+#   T5  the doc's placeholder (no hash pinned for this platform) is refused
+#       before any download
 # Bash 3.2 compatible.
 set -euo pipefail
 . "$(dirname "$0")/lib.sh"
@@ -38,9 +42,21 @@ release() {
 release "$TMP/releases"
 release "$TMP/bad"
 printf 'tampered\n' >> "$TMP/bad/v9.9.9/$asset"
+(cd "$TMP/bad/v9.9.9" && sha256 "$asset" > rebar_9.9.9_checksums.txt)  # a replaced asset with a matching sums file
 
-sed -e 's|^REBAR_PIN=.*|REBAR_PIN="v9.9.9"|' "$TMP/snippet.sh" > "$TMP/rebar.sh"
-chmod +x "$TMP/rebar.sh"
+# pin <out> <checksums file>: the snippet with REBAR_PIN v9.9.9 and the
+# REBAR_SHA256 block replaced by the file's lines.
+pin() {
+  awk -v sums="$2" '
+    /^REBAR_PIN=/ { print "REBAR_PIN=\"v9.9.9\""; next }
+    /^REBAR_SHA256="$/ { print; while ((getline l < sums) > 0) print l; skip = 1; next }
+    skip && /^"$/ { skip = 0 }
+    !skip { print }
+  ' "$TMP/snippet.sh" > "$1"
+  chmod +x "$1"
+}
+pin "$TMP/rebar.sh" "$TMP/releases/v9.9.9/rebar_9.9.9_checksums.txt"
+grep -q "  $asset\$" "$TMP/rebar.sh" || fail "could not pin the checksums into the snippet"
 mkdir -p "$TMP/tmpdir"
 run_wrapper() {  # run_wrapper <releases dir> args...
   local rel="$1"
@@ -71,4 +87,14 @@ if out="$(run_wrapper "$TMP/bad" check)"; then fail "T3: tampered binary accepte
 case "$out" in *"checksum mismatch for $asset"*) ;; *) fail "T3: unexpected error: $out" ;; esac
 [ ! -e "$TMP/cache/v9.9.9" ] || fail "T3: a tampered binary was cached"
 [ -z "$(leftovers)" ] || fail "T3: temp directory left behind: $(leftovers)"
-ok "T3 checksum mismatch refused, nothing cached, temp cleaned up"
+ok "T3 a binary not matching the pinned SHA-256 is refused (the release's sums file is not trusted), nothing cached"
+
+# T5
+sed -e 's|^REBAR_PIN=.*|REBAR_PIN="v9.9.9"|' "$TMP/snippet.sh" > "$TMP/unpinned.sh"
+chmod +x "$TMP/unpinned.sh"
+if out="$(TMPDIR="$TMP/tmpdir" REBAR_CACHE_DIR="$TMP/cache5" REBAR_RELEASES="file://$TMP/releases" "$TMP/unpinned.sh" check 2>&1)"; then
+  fail "T5: ran without a pinned hash: $out"
+fi
+case "$out" in *"no SHA-256 pinned for $asset"*) ;; *) fail "T5: unexpected error: $out" ;; esac
+[ ! -e "$TMP/cache5" ] && [ -z "$(leftovers)" ] || fail "T5: downloaded or cached something"
+ok "T5 no pinned hash for this platform → refused before downloading"

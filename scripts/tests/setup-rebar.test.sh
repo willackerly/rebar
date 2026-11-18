@@ -2,30 +2,43 @@
 # Regression test: setup-rebar.sh, the versioned installer, end to end and
 # offline. A local git repo stands in for github.com/willackerly/rebar (tags,
 # a branch, a tiny dependency-free cli/ module that prints its stamped
-# Version) and a file:// directory stands in for GitHub Releases, populated
-# by scripts/package-release.sh exactly as the release workflow does. Every
-# install runs under `env -i` with a throwaway HOME inside TMP.
+# Version), a file:// directory stands in for GitHub Releases' downloads,
+# populated by scripts/package-release.sh exactly as the release workflow
+# does, and file:// JSON fixtures in the shape of GitHub's Releases API stand
+# in for api.github.com (REBAR_RELEASES_API). Every install runs under
+# `env -i` with a throwaway HOME inside TMP.
 #
 # Run once per distinct bash found (/bin/bash — 3.2 on macOS — and the bash
 # on PATH):
-#   T1  no version → highest stable tag (v9.1.0 beats v9.0.10, and is chosen
-#       over the higher pre-release v9.2.0-beta.10 and a non-semver tag);
-#       prebuilt binary, checksum OK, companions written by the binary
-#       (install-shims), no tree; current → it; ~/.bashrc gets
-#       $REBAR_DIR/current/bin
-#   T20 a release with only a whole-tree tarball (up to v3.1.0) still
-#       installs as a tree
-#   T1b --pre → highest tag including pre-releases (v9.2.0-beta.10 beats beta.2)
-#   T1c an upstream with only pre-releases → latest falls back to the highest
-#   T2  explicit version with no release assets → source fallback, stamped
-#       version; current switches; PATH line not duplicated
-#   T3  "9.0.10" resolves to v9.0.10; --no-switch leaves current alone
+#   T1  no version → highest published stable Release: v9.1.0, over the
+#       pre-release v9.2.0-beta.10, the draft v9.3.0, the bare tag v9.1.1
+#       (pushed, never published) and a release body that mentions others;
+#       prebuilt binary preferred over the compatibility tarball, checksum
+#       OK, companions written by the binary (install-shims), no tree;
+#       current → it; ~/.bashrc gets $REBAR_DIR/current/bin; nothing named
+#       `install` in current/bin, so the system install(1) still runs
+#   T30 a release with only a whole-tree tarball (v3.1.x) still installs as
+#       a tree
+#   T1b --pre → highest published Release including pre-releases
+#       (v9.2.0-beta.10 beats beta.2; the draft v9.3.0 still skipped), prebuilt
+#   T1c only pre-releases published → latest without --pre is refused,
+#       naming --pre; nothing installed
+#   T1d latest is a published Release without assets (tag→publish window,
+#       failed gate) → refused, naming --source; no source build
+#   T2  explicit version with no release assets → refused without --source,
+#       current kept; with --source → stamped source build; current switches;
+#       PATH line not duplicated; the old bin/install name that version ships
+#       is renamed to bin/rebar-install
+#   T2b a tag older than v3.1.0-rc.1 (before prebuilt assets) → source build
+#   T3  "9.0.10" resolves to v9.0.10; --no-switch leaves current alone; --pre
+#       with an explicit version warns
 #   T4  branch feat/x → versions/feat-x, version "feat/x@<sha7>"
 #   T5  re-install with --source replaces the version in place, no leftovers
 #   T6  checksum mismatch (binary, and tarball) → refused, nothing installed,
 #       nothing left behind
 #   T7  pre-versioned ~/.rebar git clone → untouched (clean, same HEAD),
-#       versions/ + current added and git-excluded, new PATH line wins
+#       versions/ + current added and git-excluded, new PATH line wins; a
+#       warning that the clone's bin/install shadows install(1)
 #   T8  a non-rebar, non-empty ~/.rebar → refused
 #   T9  unknown ref → refused
 #   T11 a truncated download (`curl | bash` cut short at any line, or inside
@@ -39,8 +52,14 @@
 # Once:
 #   T17 HOME unset → clear error
 #   T18 credentials in REBAR_REPO never reach output or .rebar-install
-#   T19 an unreachable release server is reported as such, then source build
-#   T10 without Go: a prebuilt tag installs; a source-only tag explains Go is needed
+#   T19 an unreachable release server is fatal, also for a pre-asset tag;
+#       no source build
+#   T20 the Releases API rate limit → a clear error naming the way out
+#   T21 a compact (single-line) Releases API response parses the same
+#   T22 latest with no Releases API (non-GitHub REBAR_REPO) → clear error
+#   T31 the v3.1.1 installer (tarballs only) installs a new release from
+#       its compatibility tarball, not from source
+#   T10 without Go: a prebuilt tag installs; a pre-asset tag explains Go is needed
 #
 # Usage: bash scripts/tests/setup-rebar.test.sh
 # Needs git, go, curl, tar and shasum or sha256sum; skips without go/curl.
@@ -63,15 +82,17 @@ TMP="$(cd "$TMP" && pwd -P)"
 # ── Fake upstream ────────────────────────────────────────────────────────────
 O="$TMP/origin"
 mkdir -p "$O/bin" "$O/scripts" "$O/templates/project-bootstrap" "$O/cli/cmd"
-cp "$ROOT/bin/install" "$O/bin/install"
+# v9.0.x ship the PATH helper under its pre-v3.1.2 name, bin/install;
+# commit two (v9.1.0 on) renames it to bin/rebar-install.
+cp "$ROOT/bin/rebar-install" "$O/bin/install"
 printf '#!/usr/bin/env bash\necho steward\n' > "$O/scripts/steward.sh"
 chmod +x "$O/scripts/steward.sh"
 echo "template" > "$O/templates/project-bootstrap/README.md"
 printf 'module github.com/willackerly/rebar/cli\n\ngo 1.21\n' > "$O/cli/go.mod"
 printf 'package cmd\n\nvar Version = "v0.0.0-unstamped"\n' > "$O/cli/cmd/version.go"
-# Like the real binary, it carries bin/install and writes it (and an ask
-# shim) with `install-shims --dir DIR`.
-cp "$ROOT/bin/install" "$O/cli/install.txt"
+# Like the real binary, it carries bin/rebar-install and writes it (and an
+# ask shim) with `install-shims --dir DIR`.
+cp "$ROOT/bin/rebar-install" "$O/cli/install.txt"
 cat > "$O/cli/main.go" <<'EOF'
 package main
 
@@ -94,7 +115,7 @@ func main() {
 	if len(os.Args) == 4 && os.Args[1] == "install-shims" && os.Args[2] == "--dir" {
 		os.MkdirAll(os.Args[3], 0o755)
 		os.WriteFile(filepath.Join(os.Args[3], "ask"), []byte("#!/bin/sh\nexec rebar ask \"$@\"\n"), 0o755)
-		os.WriteFile(filepath.Join(os.Args[3], "install"), install, 0o755)
+		os.WriteFile(filepath.Join(os.Args[3], "rebar-install"), install, 0o755)
 		return
 	}
 	os.Exit(2)
@@ -104,32 +125,38 @@ EOF
   cd "$O" || exit 1
   g init -q -b main
   g add -A && g commit -qm one
-  g tag v9.0.0 && g tag v9.0.10
-  echo two > two.txt && g add two.txt && g commit -qm two
-  g tag -a -m "annotated" v9.1.0 && g tag v9.2.0-beta.2 && g tag v9.2.0-beta.10 && g tag vnext
+  g tag v3.0.0 && g tag v9.0.0 && g tag v9.0.10
+  echo two > two.txt && g mv bin/install bin/rebar-install && g add two.txt && g commit -qm two
+  g tag -a -m "annotated" v9.1.0 && g tag v9.1.1 && g tag v9.2.0-beta.2 && g tag v9.2.0-beta.10 \
+    && g tag v9.3.0 && g tag vnext
   g checkout -qb feat/x && echo x > x.txt && g add x.txt && g commit -qm x
   g checkout -qb feat-x main && echo y > y.txt && g add y.txt && g commit -qm y
   g checkout -q main
 ) || fail "could not build the fake upstream"
 FEAT_SHA="$(g -C "$O" rev-parse --short=7 feat/x)"
 FEAT_FULL="$(g -C "$O" rev-parse feat/x)"
-# An upstream that has published only pre-releases (T1c).
-PREONLY="$TMP/preonly.git"
-g init -q --bare "$PREONLY" && g -C "$O" push -q "$PREONLY" main:main \
-  && g -C "$PREONLY" tag v9.5.0-rc.1 main || fail "could not build the pre-release-only upstream"
 
-# ── Fake GitHub Releases: v9.1.0 has binaries, v9.2.0-beta.2 a tarball ──
+# ── Fake GitHub Releases: v9.1.0 and v9.2.0-beta.10 have binaries,
+# v9.2.0-beta.2 a whole-tree tarball (as v3.1.x published) ──
 GOOS_HOST="$(go env GOOS)"; GOARCH_HOST="$(go env GOARCH)"
 export GOCACHE="$TMP/gocache" GOPATH="$TMP/gopath" GOTOOLCHAIN=local GOPROXY=off GOFLAGS=""
-"$PACKAGE" v9.1.0 --repo "$O" --ref v9.1.0 \
-  --out "$TMP/releases/v9.1.0" --targets "$GOOS_HOST/$GOARCH_HOST" >/dev/null \
-  || fail "package-release.sh failed against the fake upstream"
+for v in v9.1.0 v9.2.0-beta.10; do
+  "$PACKAGE" "$v" --repo "$O" --ref "$v" \
+    --out "$TMP/releases/$v" --targets "$GOOS_HOST/$GOARCH_HOST" >/dev/null \
+    || fail "package-release.sh $v failed against the fake upstream"
+done
 ASSET="rebar_9.1.0_${GOOS_HOST}_${GOARCH_HOST}"
 [ -x "$TMP/releases/v9.1.0/$ASSET" ] || fail "package-release.sh wrote no executable $ASSET"
-[ "$(ls "$TMP/releases/v9.1.0" | tr '\n' ' ')" = "rebar_9.1.0_checksums.txt $ASSET " ] \
+[ "$(ls "$TMP/releases/v9.1.0" | tr '\n' ' ')" = "rebar_9.1.0_checksums.txt $ASSET $ASSET.tar.gz " ] \
   || fail "package-release.sh wrote $(ls "$TMP/releases/v9.1.0" | tr '\n' ' ')"
 grep -q "  $ASSET\$" "$TMP/releases/v9.1.0/rebar_9.1.0_checksums.txt" \
-  || fail "checksums file does not list $ASSET"
+  && grep -q "  $ASSET.tar.gz\$" "$TMP/releases/v9.1.0/rebar_9.1.0_checksums.txt" \
+  || fail "checksums file does not list $ASSET and $ASSET.tar.gz"
+# The compatibility tarball: <asset>/bin/ with the binary and its companions.
+tar -tzf "$TMP/releases/v9.1.0/$ASSET.tar.gz" > "$TMP/tarlist" || fail "cannot list $ASSET.tar.gz"
+grep -qx "$ASSET/bin/rebar" "$TMP/tarlist" && grep -qx "$ASSET/bin/rebar-install" "$TMP/tarlist" \
+  && grep -qx "$ASSET/bin/ask" "$TMP/tarlist" && ! grep -q "/bin/install\$" "$TMP/tarlist" \
+  || fail "$ASSET.tar.gz holds: $(tr '\n' ' ' < "$TMP/tarlist")"
 [ "$("$TMP/releases/v9.1.0/$ASSET" version)" = "rebar v9.1.0" ] || fail "$ASSET is not stamped v9.1.0"
 
 # A release as v3.1.0 and earlier published it: the whole tree plus bin/rebar.
@@ -152,6 +179,65 @@ printf 'tampered' >> "$TMP/badrel/v9.1.0/$ASSET"
 printf 'tampered' >> "$TMP/badrel/v9.2.0-beta.2/$TARASSET"
 ok "package-release.sh: $ASSET + checksums from the fake upstream (and a tarball release by hand)"
 
+# ── Fake Releases API (GitHub's JSON shape, trimmed) ─────────────────
+# rel <tag> <draft> <prerelease> [body]: one release object.
+rel() {
+  cat <<EOF
+  {
+    "url": "https://api.github.com/repos/willackerly/rebar/releases/1",
+    "html_url": "https://github.com/willackerly/rebar/releases/tag/$1",
+    "id": 1,
+    "author": { "login": "github-actions[bot]", "id": 41898282, "type": "Bot", "site_admin": false },
+    "node_id": "RE_x",
+    "tag_name": "$1",
+    "target_commitish": "main",
+    "name": "$1",
+    "draft": $2,
+    "immutable": false,
+    "prerelease": $3,
+    "created_at": "2026-11-17T18:40:00Z",
+    "published_at": "2026-11-17T18:43:36Z",
+    "assets": [
+      { "url": "https://api.github.com/x", "id": 2, "name": "rebar_checksums.txt", "label": "", "state": "uploaded", "size": 10 }
+    ],
+    "body": "${4:-}"
+  }
+EOF
+}
+# releases <file> <rel spec>...: a JSON array of releases ("tag draft pre").
+releases() {
+  local f="$1" sep="" spec
+  shift
+  { echo "["
+    for spec in "$@"; do
+      # shellcheck disable=SC2086
+      printf '%s' "$sep"; rel $spec; sep=","
+    done
+    echo "]"
+  } > "$f"
+}
+API="$TMP/api"
+mkdir -p "$API"
+# The body names a higher version in the same key syntax; it is escaped
+# inside the string and must never be read as a release.
+TRICKY='Notes, \"tag_name\": \"v99.0.0\", \"draft\": false, \"prerelease\": false, {\"tag_name\":\"v98.0.0\"}'
+{ echo "["
+  rel v9.2.0-beta.10 false true; echo ","
+  rel v9.3.0 true false; echo ","
+  rel v9.1.0 false false "$TRICKY"; echo ","
+  rel v9.2.0-beta.2 false true; echo ","
+  rel v9.0.0 false false; echo ","
+  rel v3.0.0 false false
+  echo "]"
+} > "$API/releases.json"
+tr -d '\n' < "$API/releases.json" > "$API/compact.json"
+releases "$API/preonly.json" "v9.5.0-rc.1 false true" "v9.6.0 true false"
+releases "$API/noassets.json" "v9.1.1 false false" "v9.1.0 false false"
+cat > "$API/ratelimit.json" <<'EOF'
+{"message":"API rate limit exceeded for 203.0.113.7. (But here's the good news: Authenticated requests get a higher rate limit. Check out the documentation for more details.)","documentation_url":"https://docs.github.com/rest/overview/resources-in-the-rest-api#rate-limiting"}
+EOF
+ok "fake Releases API fixtures"
+
 # ── Runner ───────────────────────────────────────────────────────────────────
 dir_of() { dirname "$(command -v "$1")"; }
 TPATH="$(dir_of go):$(dir_of git):$(dir_of curl):/usr/bin:/bin:/usr/sbin:/sbin"
@@ -165,9 +251,21 @@ inst() {
   env -i HOME="$home" PATH="${IPATH:-$TPATH}" SHELL=/bin/bash TMPDIR="$TMP" \
     GOCACHE="$GOCACHE" GOPATH="$GOPATH" GOTOOLCHAIN=local GOPROXY=off \
     REBAR_REPO="${IREPO:-$O}" REBAR_RELEASE_URL="$RELURL" \
+    REBAR_RELEASES_API="${IAPI:-file://$API/releases.json}" \
     "$sh" "$INSTALLER" "$@" 2>&1
 }
 has() { contains "$1" -F -- "$2" || { printf '%s\n' "$1" | tail -20 >&2; fail "$3: missing '$2'"; }; }
+# no_install_shadow <home> <label>: current/bin has the helper as
+# rebar-install and nothing named install, and `install -d` (as `make
+# install` runs it) still reaches the system install(1) with current/bin
+# first on PATH.
+no_install_shadow() {
+  [ -x "$1/.rebar/current/bin/rebar-install" ] || fail "$2: no bin/rebar-install"
+  [ ! -e "$1/.rebar/current/bin/install" ] || fail "$2: bin/install is in current/bin and shadows install(1)"
+  PATH="$1/.rebar/current/bin:$TPATH" install -d "$1/install-d-probe" 2>&1 \
+    || fail "$2: install -d failed with current/bin first on PATH"
+  [ -d "$1/install-d-probe" ] || fail "$2: install -d made no directory"
+}
 current_of() { readlink "$1/.rebar/current"; }
 leftovers() { ls -A "$1/.rebar/versions" | grep '^\.' || true; }
 
@@ -201,53 +299,82 @@ for sh in $BASHES; do
 
   # T1
   out="$(inst "$H" "$sh")" || { echo "$out" | tail -20 >&2; fail "T1 [$bv] latest install failed"; }
-  has "$out" "Latest: v9.1.0" "T1 [$bv]"
+  has "$out" "Latest release: v9.1.0" "T1 [$bv]"
   has "$out" "Checksum OK" "T1 [$bv]"
   [ "$(current_of "$H")" = "versions/v9.1.0" ] || fail "T1 [$bv] current is $(current_of "$H")"
   [ "$("$H/.rebar/current/bin/rebar" version)" = "rebar v9.1.0" ] || fail "T1 [$bv] wrong version"
-  [ -x "$H/.rebar/current/bin/ask" ] && [ -x "$H/.rebar/current/bin/install" ] \
+  [ -x "$H/.rebar/current/bin/ask" ] && [ -x "$H/.rebar/current/bin/rebar-install" ] \
     || fail "T1 [$bv] install-shims did not lay out the companions: $(ls "$H/.rebar/current/bin" | tr '\n' ' ')"
+  has "$out" "Running $H/.rebar/current/bin/rebar-install" "T1 [$bv]"
+  no_install_shadow "$H" "T1 [$bv]"
   [ "$(ls -A "$H/.rebar/current" | tr '\n' ' ')" = ".rebar-install bin " ] \
     || fail "T1 [$bv] a binary install holds $(ls -A "$H/.rebar/current" | tr '\n' ' ')"
   grep -q '^method=prebuilt (rebar_9.1.0_' "$H/.rebar/current/.rebar-install" || fail "T1 [$bv] not a prebuilt install"
   grep -q '^layout=binary$' "$H/.rebar/current/.rebar-install" || fail "T1 [$bv] layout not recorded"
   grep -qF "$H/.rebar/current/bin" "$H/.bashrc" || fail "T1 [$bv] PATH not wired to current/bin"
-  ok "T1 [$bv] latest = v9.1.0 (stable over v9.2.0-beta.10), prebuilt binary + checksum + companions, current, PATH"
+  ok "T1 [$bv] latest = v9.1.0 (published stable; not the bare tag v9.1.1, draft or pre-release), prebuilt binary + checksum + companions, current, PATH, no install(1) shadow"
 
-  # T20
+  # T30
   H20="$TMP/h$n-tarball"
-  out="$(inst "$H20" "$sh" v9.2.0-beta.2)" || { echo "$out" | tail -20 >&2; fail "T20 [$bv] tarball install failed"; }
-  has "$out" "Checksum OK" "T20 [$bv]"
-  [ -f "$H20/.rebar/current/scripts/steward.sh" ] || fail "T20 [$bv] tarball tree is incomplete"
-  [ "$("$H20/.rebar/current/bin/rebar" version)" = "rebar v9.2.0-beta.2" ] || fail "T20 [$bv] wrong version"
-  grep -q '^layout=tree$' "$H20/.rebar/current/.rebar-install" || fail "T20 [$bv] layout not recorded"
-  case "$out" in *"may not find its scripts"*) fail "T20 [$bv] warned about a complete tree" ;; esac
-  ok "T20 [$bv] a whole-tree tarball release installs as before"
+  out="$(inst "$H20" "$sh" v9.2.0-beta.2)" || { echo "$out" | tail -20 >&2; fail "T30 [$bv] tarball install failed"; }
+  has "$out" "Checksum OK" "T30 [$bv]"
+  [ -f "$H20/.rebar/current/scripts/steward.sh" ] || fail "T30 [$bv] tarball tree is incomplete"
+  [ "$("$H20/.rebar/current/bin/rebar" version)" = "rebar v9.2.0-beta.2" ] || fail "T30 [$bv] wrong version"
+  grep -q '^layout=tree$' "$H20/.rebar/current/.rebar-install" || fail "T30 [$bv] layout not recorded"
+  case "$out" in *"may not find its scripts"*) fail "T30 [$bv] warned about a complete tree" ;; esac
+  ok "T30 [$bv] a whole-tree tarball release installs as before"
 
   # T1b
   out="$(inst "$TMP/h$n-pre" "$sh" --pre)" || { echo "$out" | tail -20 >&2; fail "T1b [$bv] --pre failed"; }
-  has "$out" "Latest (pre-releases included): v9.2.0-beta.10" "T1b [$bv]"
+  has "$out" "Latest release (pre-releases included): v9.2.0-beta.10" "T1b [$bv]"
+  has "$out" "Checksum OK" "T1b [$bv]"
   [ "$("$TMP/h$n-pre/.rebar/current/bin/rebar" version)" = "rebar v9.2.0-beta.10" ] || fail "T1b [$bv] wrong version"
-  ok "T1b [$bv] --pre = v9.2.0-beta.10"
+  ok "T1b [$bv] --pre = v9.2.0-beta.10 (draft v9.3.0 skipped), prebuilt"
 
   # T1c
-  out="$(IREPO="$PREONLY" inst "$TMP/h$n-preonly" "$sh")" || { echo "$out" | tail -20 >&2; fail "T1c [$bv] failed"; }
-  has "$out" "no stable release yet" "T1c [$bv]"
-  [ "$(current_of "$TMP/h$n-preonly")" = "versions/v9.5.0-rc.1" ] || fail "T1c [$bv] current is $(current_of "$TMP/h$n-preonly")"
-  ok "T1c [$bv] only pre-releases upstream → latest = v9.5.0-rc.1"
+  if out="$(IAPI="file://$API/preonly.json" inst "$TMP/h$n-preonly" "$sh")"; then fail "T1c [$bv] installed a pre-release without --pre"; fi
+  has "$out" "no stable release is published yet (newest pre-release: v9.5.0-rc.1); pass --pre" "T1c [$bv]"
+  [ ! -e "$TMP/h$n-preonly/.rebar/current" ] || fail "T1c [$bv] something was installed"
+  ok "T1c [$bv] only pre-releases published → refused without --pre"
+
+  # T1d
+  H1d="$TMP/h$n-noassets"
+  if out="$(IAPI="file://$API/noassets.json" inst "$H1d" "$sh")"; then fail "T1d [$bv] installed a release without assets"; fi
+  has "$out" "Latest release: v9.1.1" "T1d [$bv]"
+  has "$out" "Release v9.1.1 has no prebuilt assets" "T1d [$bv]"
+  has "$out" "pass --source" "T1d [$bv]"
+  case "$out" in *"Building rebar"*|*"Fetching"*) fail "T1d [$bv] built from source without --source" ;; esac
+  [ ! -e "$H1d/.rebar/current" ] && [ -z "$(ls -A "$H1d/.rebar/versions")" ] || fail "T1d [$bv] something was installed"
+  ok "T1d [$bv] latest without assets → refused, no implicit source build"
 
   # T2
-  out="$(inst "$H" "$sh" v9.0.0)" || { echo "$out" | tail -20 >&2; fail "T2 [$bv] failed"; }
-  has "$out" "has no prebuilt assets" "T2 [$bv]"
-  has "$out" "Falling back to a source build" "T2 [$bv]"
+  if out="$(inst "$H" "$sh" v9.0.0)"; then fail "T2 [$bv] v9.0.0 installed without assets or --source"; fi
+  has "$out" "Release v9.0.0 has no prebuilt assets" "T2 [$bv]"
+  has "$out" "pass --source" "T2 [$bv]"
+  case "$out" in *"Building rebar"*) fail "T2 [$bv] built from source without --source" ;; esac
+  [ "$(current_of "$H")" = "versions/v9.1.0" ] || fail "T2 [$bv] refused install moved current"
+  [ ! -e "$H/.rebar/versions/v9.0.0" ] || fail "T2 [$bv] refused install left versions/v9.0.0"
+  out="$(inst "$H" "$sh" v9.0.0 --source)" || { echo "$out" | tail -20 >&2; fail "T2 [$bv] --source failed"; }
+  has "$out" "Building rebar v9.0.0" "T2 [$bv]"
   has "$out" "current: v9.1.0 → v9.0.0" "T2 [$bv]"
   [ "$("$H/.rebar/current/bin/rebar" version)" = "rebar v9.0.0" ] || fail "T2 [$bv] source build not stamped"
   [ "$(grep -cF "$H/.rebar/current/bin" "$H/.bashrc")" = "1" ] || fail "T2 [$bv] PATH line duplicated"
-  ok "T2 [$bv] no assets → source fallback, stamped v9.0.0, current switched"
+  has "$out" "Running $H/.rebar/current/bin/rebar-install" "T2 [$bv]"
+  no_install_shadow "$H" "T2 [$bv]"
+  ok "T2 [$bv] no assets → refused; --source → stamped v9.0.0, current switched, old bin/install renamed"
+
+  # T2b
+  H2b="$TMP/h$n-old"
+  out="$(inst "$H2b" "$sh" v3.0.0)" || { echo "$out" | tail -20 >&2; fail "T2b [$bv] failed"; }
+  has "$out" "v3.0.0 predates prebuilt release assets (v3.1.0-rc.1), building from source" "T2b [$bv]"
+  [ "$("$H2b/.rebar/current/bin/rebar" version)" = "rebar v3.0.0" ] || fail "T2b [$bv] source build not stamped"
+  no_install_shadow "$H2b" "T2b [$bv]"
+  ok "T2b [$bv] a pre-asset tag (v3.0.0) builds from source"
 
   # T3
-  out="$(inst "$H" "$sh" 9.0.10 --no-switch --server 127.0.0.1:7232)" || { echo "$out" | tail -20 >&2; fail "T3 [$bv] failed"; }
+  out="$(inst "$H" "$sh" 9.0.10 --source --pre --no-switch --server 127.0.0.1:7232)" || { echo "$out" | tail -20 >&2; fail "T3 [$bv] failed"; }
   has "$out" "--server was not applied" "T3 [$bv]"
+  has "$out" "--pre only applies to \"latest\"" "T3 [$bv]"
   [ "$(current_of "$H")" = "versions/v9.0.0" ] || fail "T3 [$bv] --no-switch moved current"
   [ "$("$H/.rebar/versions/v9.0.10/bin/rebar" version)" = "rebar v9.0.10" ] || fail "T3 [$bv] v9.0.10 missing"
   ok "T3 [$bv] 9.0.10 → v9.0.10 side by side, --no-switch keeps current"
@@ -302,7 +429,8 @@ for sh in $BASHES; do
   # T7
   H7="$TMP/h$n-legacy"
   mkdir -p "$H7"
-  g clone -q "$O" "$H7/.rebar" || fail "T7 clone"
+  # At v9.0.0 the clone ships bin/install, as every pre-versioned clone did.
+  g clone -q "$O" "$H7/.rebar" && g -C "$H7/.rebar" checkout -q v9.0.0 || fail "T7 clone"
   printf 'export PATH="%s/.rebar/bin:$PATH"\n' "$H7" > "$H7/.bashrc"
   head_before="$(g -C "$H7/.rebar" rev-parse HEAD)"
   out="$(inst "$H7" "$sh" v9.1.0)" || { echo "$out" | tail -20 >&2; fail "T7 [$bv] failed"; }
@@ -310,6 +438,7 @@ for sh in $BASHES; do
   [ -z "$(g -C "$H7/.rebar" status --porcelain)" ] || fail "T7 [$bv] clone is dirty: $(g -C "$H7/.rebar" status --porcelain)"
   [ "$(g -C "$H7/.rebar" rev-parse HEAD)" = "$head_before" ] || fail "T7 [$bv] clone HEAD moved"
   [ -x "$H7/.rebar/bin/install" ] || fail "T7 [$bv] clone files touched"
+  has "$out" "shadows the system install(1)" "T7 [$bv]"
   [ "$(current_of "$H7")" = "versions/v9.1.0" ] || fail "T7 [$bv] current not set"
   legacy_line="$(grep -nF "$H7/.rebar/bin:" "$H7/.bashrc" | cut -d: -f1)"
   new_line="$(grep -nF "$H7/.rebar/current/bin" "$H7/.bashrc" | cut -d: -f1)"
@@ -395,10 +524,10 @@ if ! PATH="$NOGO" command -v go >/dev/null 2>&1; then
   H10="$TMP/h-nogo"
   out="$(IPATH="$NOGO" inst "$H10" bash v9.1.0)" || { echo "$out" | tail -20 >&2; fail "T10 prebuilt without Go failed"; }
   [ "$("$H10/.rebar/current/bin/rebar" version)" = "rebar v9.1.0" ] || fail "T10 wrong version"
-  if out="$(IPATH="$NOGO" inst "$H10" bash v9.0.0)"; then fail "T10 built without Go?"; fi
+  if out="$(IPATH="$NOGO" inst "$H10" bash v3.0.0)"; then fail "T10 built without Go?"; fi
   has "$out" "Go is required" "T10"
   [ "$(current_of "$H10")" = "versions/v9.1.0" ] || fail "T10 failed install moved current"
-  ok "T10 without Go: prebuilt installs, source-only tag explains Go is needed, current kept"
+  ok "T10 without Go: prebuilt installs, pre-asset tag explains Go is needed, current kept"
 else
   echo "skip T10: go is on the system PATH here ($(PATH="$NOGO" command -v go)); covered where it isn't (macOS CI)"
 fi
@@ -417,17 +546,58 @@ mkdir -p "$H18"
 out="$(env -i HOME="$H18" PATH="$TPATH" SHELL=/bin/bash TMPDIR="$TMP" GOCACHE="$GOCACHE" GOPATH="$GOPATH" \
   GOTOOLCHAIN=local GOPROXY=off GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0="url.$O.insteadOf" \
   GIT_CONFIG_VALUE_0="$SECRET_REPO" REBAR_REPO="$SECRET_REPO" REBAR_RELEASE_URL="$RELURL" \
-  bash "$INSTALLER" v9.0.0 2>&1)" || { echo "$out" | tail -20 >&2; fail "T18 install failed"; }
+  bash "$INSTALLER" v9.0.0 --source 2>&1)" || { echo "$out" | tail -20 >&2; fail "T18 install failed"; }
 case "$out" in *s3cret*) fail "T18 the token appeared in the output" ;; esac
 grep -q s3cret "$H18/.rebar/current/.rebar-install" && fail "T18 the token was recorded"
 grep -qF 'repo=https://***@example.invalid/rebar.git' "$H18/.rebar/current/.rebar-install" || fail "T18 repo not recorded redacted"
 ok "T18 credentials in REBAR_REPO are redacted"
 
-# T19 — a release server that cannot be reached is not "no prebuilt assets".
-out="$(RELURL="https://127.0.0.1:9" inst "$TMP/h-unreachable" bash v9.1.0)" || { echo "$out" | tail -20 >&2; fail "T19 failed"; }
-has "$out" "could not check https://127.0.0.1:9/v9.1.0 for prebuilt assets" "T19"
-case "$out" in *"has no prebuilt assets"*) fail "T19 reported an unreachable server as missing assets" ;; esac
-has "$out" "Falling back to a source build" "T19"
-ok "T19 unreachable release server → named error, then source build"
+# T19 — a release server that cannot be reached is not "no prebuilt assets",
+# and is fatal: no source build, even for a pre-asset tag.
+H19="$TMP/h-unreachable"
+for v in v9.1.0 v3.0.0; do
+  if out="$(RELURL="https://127.0.0.1:9" inst "$H19" bash "$v")"; then fail "T19 $v installed despite an unreachable release server"; fi
+  has "$out" "could not check https://127.0.0.1:9/$v for prebuilt assets" "T19 $v"
+  case "$out" in *"has no prebuilt assets"*) fail "T19 $v reported an unreachable server as missing assets" ;; esac
+  case "$out" in *"Building rebar"*|*"from source"*) fail "T19 $v fell back to a source build" ;; esac
+  [ ! -e "$H19/.rebar/current" ] || fail "T19 $v something was installed"
+done
+ok "T19 unreachable release server → named error, fatal, no source build"
+
+# T20 — the unauthenticated API rate limit gets a clear error.
+if out="$(IAPI="file://$API/ratelimit.json" inst "$TMP/h-ratelimit" bash)"; then fail "T20 installed despite the rate limit"; fi
+has "$out" "rate limit for unauthenticated requests" "T20"
+has "$out" "name the version" "T20"
+[ ! -e "$TMP/h-ratelimit/.rebar/current" ] || fail "T20 something was installed"
+ok "T20 Releases API rate limit → clear error"
+
+# T21 — GitHub may send compact JSON; same answer.
+out="$(IAPI="file://$API/compact.json" inst "$TMP/h-compact" bash)" || { echo "$out" | tail -20 >&2; fail "T21 failed"; }
+has "$out" "Latest release: v9.1.0" "T21"
+ok "T21 compact Releases API JSON → latest = v9.1.0"
+
+# T22 — no Releases API to ask (non-GitHub REBAR_REPO, no override).
+out="$(env -i HOME="$TMP/h-noapi" PATH="$TPATH" SHELL=/bin/bash TMPDIR="$TMP" REBAR_REPO="$O" \
+  REBAR_RELEASE_URL="$RELURL" bash "$INSTALLER" 2>&1)" && fail "T22 installed without a Releases API"
+has "$out" "is not on github.com and REBAR_RELEASES_API is not set; pass a version" "T22"
+ok "T22 latest without a Releases API → clear error"
+
+# T31 — the v3.1.1 installer looks only for <asset>.tar.gz: it gets the
+# compatibility tarball (prebuilt, not a source build).
+if OLD="$(g -C "$ROOT" show v3.1.1:setup-rebar.sh 2>/dev/null)"; then
+  printf '%s\n' "$OLD" > "$TMP/setup-rebar-v3.1.1.sh"
+  H21="$TMP/h-old-installer"
+  mkdir -p "$H21"
+  out="$(env -i HOME="$H21" PATH="$TPATH" SHELL=/bin/bash TMPDIR="$TMP" GOCACHE="$GOCACHE" GOPATH="$GOPATH" \
+    GOTOOLCHAIN=local GOPROXY=off REBAR_REPO="$O" REBAR_RELEASE_URL="$RELURL" \
+    bash "$TMP/setup-rebar-v3.1.1.sh" v9.1.0 2>&1)" || { echo "$out" | tail -20 >&2; fail "T31 the v3.1.1 installer failed"; }
+  has "$out" "Checksum OK" "T31"
+  case "$out" in *"source build"*|*"go build"*) fail "T31 the old installer built from source" ;; esac
+  [ "$("$H21/.rebar/current/bin/rebar" version)" = "rebar v9.1.0" ] || fail "T31 wrong version"
+  [ -x "$H21/.rebar/current/bin/ask" ] && [ ! -e "$H21/.rebar/current/bin/install" ] || fail "T31 tarball layout: $(ls "$H21/.rebar/current/bin" | tr '\n' ' ')"
+  ok "T31 the v3.1.1 installer installs a new release from its compatibility tarball"
+else
+  echo "skip T31: no v3.1.1 tag in this clone"
+fi
 
 echo "PASS: setup-rebar.sh"

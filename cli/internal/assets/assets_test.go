@@ -82,7 +82,7 @@ func TestSyncScriptListsSources(t *testing.T) {
 
 func TestKitAndBootstrap(t *testing.T) {
 	kit := strings.Join(Kit(), " ")
-	for _, want := range []string{"ask", "ask-agent-loop", "ask-mcp-server", "ask-server", "install", "completions/_rebar", "completions/rebar.bash"} {
+	for _, want := range []string{"ask", "ask-agent-loop", "ask-mcp-server", "ask-server", "rebar-install", "completions/_rebar", "completions/rebar.bash"} {
 		if !strings.Contains(" "+kit+" ", " "+want+" ") {
 			t.Errorf("Kit() = %q lacks %s", kit, want)
 		}
