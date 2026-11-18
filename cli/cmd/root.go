@@ -13,7 +13,7 @@ import (
 
 // releaseVersion is the release string of this source tree. Bump it with
 // each release; the release workflow refuses a tag that disagrees with it.
-const releaseVersion = "v3.1.1"
+const releaseVersion = "v3.1.2"
 
 // Version is what `rebar version` reports. Release builds and setup-rebar.sh
 // source builds stamp it with
