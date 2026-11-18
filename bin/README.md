@@ -35,10 +35,10 @@ See the [root README](../README.md) for how ASK fits into the overall system.
 
 ```bash
 # From the rebar repo root:
-./bin/install
+./bin/rebar-install
 
 # Or with ASK_SERVER for remote agent access:
-./bin/install --server 192.168.0.181:7232
+./bin/rebar-install --server 192.168.0.181:7232
 ```
 
 This adds `bin/` to your PATH (in `.zshrc`/`.bashrc`/`.profile`), optionally

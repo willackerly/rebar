@@ -7,7 +7,7 @@
 #                                  (scripts/, templates/, agents/, bin/rebar, bin/ask*, …)
 #   ~/.rebar/current               symlink to the active version
 #
-# and puts ~/.rebar/current/bin on PATH (via that version's bin/install), so
+# and puts ~/.rebar/current/bin on PATH (via that version's bin/rebar-install), so
 # switching versions never touches your shell RC again.
 #
 #   Release tag   download rebar_<ver>_<os>_<arch>.tar.gz from the GitHub
@@ -59,7 +59,7 @@ Usage:
   --ref REF     same as <version> (kept for older docs)
   --source      build from source even if a prebuilt release exists
   --no-switch   install side by side but leave ~/.rebar/current where it is
-  --server H:P  remote ASK server, written to your shell RC by bin/install
+  --server H:P  remote ASK server, written to your shell RC by bin/rebar-install
   --dir PATH    install base (default: ~/.rebar)
 
 Layout:
@@ -480,6 +480,10 @@ main() {
     warn "$REBAR_DIR is a pre-versioned rebar clone. Leaving it as is:"
     warn "  versions/ and current/ go inside it; the clone itself is not updated."
     warn "  Projects whose .mcp.json or REBAR_ROOT point at $REBAR_DIR keep using the clone."
+    if [[ -f "$REBAR_DIR/bin/install" ]]; then
+      warn "  If your shell RC still puts $REBAR_DIR/bin on PATH, the clone's bin/install"
+      warn "  shadows the system install(1); remove that line once nothing needs the clone."
+    fi
     if have git; then
       exclude="$(git -C "$REBAR_DIR" rev-parse --git-path info/exclude 2>/dev/null || true)"
       if [[ -n "$exclude" ]]; then
@@ -540,6 +544,17 @@ main() {
   if [[ ! -d "$STAGE/templates/project-bootstrap" || ! -f "$STAGE/scripts/steward.sh" ]]; then
     warn "$VERSION lacks templates/project-bootstrap/ or scripts/steward.sh; the CLI may not find its scripts"
   fi
+  # Versions before v3.1.2 ship the PATH helper as bin/install. current/bin
+  # comes first on PATH, where that name shadows the system install(1)
+  # (`install -d dir` → "Unknown option: -d", breaking `make install`), so
+  # give it the current name.
+  if [[ -f "$STAGE/bin/install" ]]; then
+    if [[ -e "$STAGE/bin/rebar-install" ]]; then
+      rm -f "$STAGE/bin/install"
+    else
+      mv "$STAGE/bin/install" "$STAGE/bin/rebar-install"
+    fi
+  fi
 
   cat > "$STAGE/.rebar-install" <<EOF
 version=$VERSION
@@ -571,21 +586,21 @@ EOF
   INSTALLED_VERSION="$("$TARGET/bin/rebar" version 2>/dev/null | head -1)"
 
   # ── PATH wiring ──────────────────────────────────────────────────────────────
-  # Run through the symlink so bin/install records $REBAR_DIR/current/bin (it
-  # uses the logical `pwd`), which stays valid across version switches.
+  # Run through the symlink so bin/rebar-install records $REBAR_DIR/current/bin
+  # (it uses the logical `pwd`), which stays valid across version switches.
 
   if [[ "$SWITCHED" -eq 0 && -n "$ASK_SERVER" ]]; then
-    warn "--server was not applied: --no-switch skips bin/install. Apply it with: $REBAR_DIR/current/bin/install --server $ASK_SERVER"
+    warn "--server was not applied: --no-switch skips bin/rebar-install. Apply it with: $REBAR_DIR/current/bin/rebar-install --server $ASK_SERVER"
   elif [[ "$SWITCHED" -eq 1 && -z "${HOME:-}" ]]; then
     warn "HOME is not set, so PATH was not wired; add $REBAR_DIR/current/bin to PATH yourself"
-  elif [[ "$SWITCHED" -eq 1 && -x "$REBAR_DIR/current/bin/install" ]]; then
+  elif [[ "$SWITCHED" -eq 1 && -x "$REBAR_DIR/current/bin/rebar-install" ]]; then
     install_args=()
     [[ -n "$ASK_SERVER" ]] && install_args+=(--server "$ASK_SERVER")
-    log "Running $REBAR_DIR/current/bin/install ${install_args[*]:-}"
+    log "Running $REBAR_DIR/current/bin/rebar-install ${install_args[*]:-}"
     # ${arr[@]+...}: bash 3.2 treats an empty "${arr[@]}" as unbound under set -u.
-    # bin/install picks the RC file from $SHELL, which `env -i` and some CI
+    # bin/rebar-install picks the RC file from $SHELL, which `env -i` and some CI
     # shells leave unset.
-    SHELL="${SHELL:-/bin/sh}" "$REBAR_DIR/current/bin/install" ${install_args[@]+"${install_args[@]}"}
+    SHELL="${SHELL:-/bin/sh}" "$REBAR_DIR/current/bin/rebar-install" ${install_args[@]+"${install_args[@]}"}
   fi
 
   # ── Report ───────────────────────────────────────────────────────────────────

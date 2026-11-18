@@ -18,7 +18,15 @@ All notable changes to rebar. Versioned with [semver](https://semver.org/).
 
 ## Unreleased
 
-_Nothing yet._
+- **`bin/install` is now `bin/rebar-install`.** The installer puts
+  `~/.rebar/current/bin` first on PATH, where a file named `install` shadowed
+  the system `install(1)`: `install -d dir` failed with "Unknown option: -d",
+  breaking `make install`. `setup-rebar.sh` runs `bin/rebar-install`, and
+  renames the old `bin/install` when it installs an older version, so nothing
+  called `install` lands in `current/bin`. For a pre-versioned `~/.rebar`
+  clone it warns that the clone's `bin/install` still shadows `install(1)` if
+  your RC keeps `~/.rebar/bin` on PATH. See
+  [UPGRADING.md](UPGRADING.md#upgrading-from-v310-or-v311).
 
 ---
 

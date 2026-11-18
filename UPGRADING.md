@@ -321,6 +321,24 @@ individually with `rebar run <check>`.
 
 Then switch for good if you used `--no-switch` (step 1).
 
+## Upgrading from v3.1.0 or v3.1.1
+
+Install the new version with the installer from its own tag, as in step 1;
+that is all a project already on 3.1 needs. Changes to know about:
+
+- **The PATH helper is `bin/rebar-install`** (it was `bin/install`, which,
+  first on PATH, shadowed the system `install(1)`: `install -d dir` failed
+  with "Unknown option: -d"). Once `current` points at the new version,
+  `~/.rebar/current/bin` has no `install`; the old name stays only inside
+  `versions/v3.1.0/` or `versions/v3.1.1/`, which are not on PATH. Switching
+  `current` back to one of those brings it back (re-run the new installer for
+  that version instead: it renames the helper). An older `setup-rebar.sh`
+  looks for `bin/install`, so it does not wire PATH or `--server` for a
+  version that has only `bin/rebar-install`; use the installer from the tag
+  you install. If your RC still puts a pre-versioned clone's `~/.rebar/bin`
+  on PATH, its `bin/install` shadows `install(1)` too; remove that line once
+  nothing uses the clone.
+
 ## Notes for v2.0.0
 
 - `.rebar-version` and the badge say `v2.0.0`; both move in step 4.

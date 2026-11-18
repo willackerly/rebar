@@ -11,17 +11,20 @@
 #   T1  no version → highest stable tag (v9.1.0 beats v9.0.10, and is chosen
 #       over the higher pre-release v9.2.0-beta.10 and a non-semver tag);
 #       prebuilt tarball, checksum OK; current → it; ~/.bashrc gets
-#       $REBAR_DIR/current/bin
+#       $REBAR_DIR/current/bin; nothing named `install` in current/bin, so
+#       the system install(1) still runs
 #   T1b --pre → highest tag including pre-releases (v9.2.0-beta.10 beats beta.2)
 #   T1c an upstream with only pre-releases → latest falls back to the highest
 #   T2  explicit version with no release assets → source fallback, stamped
-#       version; current switches; PATH line not duplicated
+#       version; current switches; PATH line not duplicated; the old
+#       bin/install name that version ships is renamed to bin/rebar-install
 #   T3  "9.0.10" resolves to v9.0.10; --no-switch leaves current alone
 #   T4  branch feat/x → versions/feat-x, version "feat/x@<sha7>"
 #   T5  re-install with --source replaces the version in place, no leftovers
 #   T6  checksum mismatch → refused, nothing installed, nothing left behind
 #   T7  pre-versioned ~/.rebar git clone → untouched (clean, same HEAD),
-#       versions/ + current added and git-excluded, new PATH line wins
+#       versions/ + current added and git-excluded, new PATH line wins; a
+#       warning that the clone's bin/install shadows install(1)
 #   T8  a non-rebar, non-empty ~/.rebar → refused
 #   T9  unknown ref → refused
 #   T11 a truncated download (`curl | bash` cut short at any line, or inside
@@ -59,7 +62,9 @@ TMP="$(cd "$TMP" && pwd -P)"
 # ── Fake upstream ────────────────────────────────────────────────────────────
 O="$TMP/origin"
 mkdir -p "$O/bin" "$O/scripts" "$O/templates/project-bootstrap" "$O/cli/cmd"
-cp "$ROOT/bin/install" "$O/bin/install"
+# v9.0.x ship the PATH helper under its pre-v3.1.2 name, bin/install;
+# commit two (v9.1.0 on) renames it to bin/rebar-install.
+cp "$ROOT/bin/rebar-install" "$O/bin/install"
 printf '#!/usr/bin/env bash\necho steward\n' > "$O/scripts/steward.sh"
 chmod +x "$O/scripts/steward.sh"
 echo "template" > "$O/templates/project-bootstrap/README.md"
@@ -87,7 +92,7 @@ EOF
   g init -q -b main
   g add -A && g commit -qm one
   g tag v9.0.0 && g tag v9.0.10
-  echo two > two.txt && g add two.txt && g commit -qm two
+  echo two > two.txt && g mv bin/install bin/rebar-install && g add two.txt && g commit -qm two
   g tag -a -m "annotated" v9.1.0 && g tag v9.2.0-beta.2 && g tag v9.2.0-beta.10 && g tag vnext
   g checkout -qb feat/x && echo x > x.txt && g add x.txt && g commit -qm x
   g checkout -qb feat-x main && echo y > y.txt && g add y.txt && g commit -qm y
@@ -131,6 +136,17 @@ inst() {
     "$sh" "$INSTALLER" "$@" 2>&1
 }
 has() { contains "$1" -F -- "$2" || { printf '%s\n' "$1" | tail -20 >&2; fail "$3: missing '$2'"; }; }
+# no_install_shadow <home> <label>: current/bin has the helper as
+# rebar-install and nothing named install, and `install -d` (as `make
+# install` runs it) still reaches the system install(1) with current/bin
+# first on PATH.
+no_install_shadow() {
+  [ -x "$1/.rebar/current/bin/rebar-install" ] || fail "$2: no bin/rebar-install"
+  [ ! -e "$1/.rebar/current/bin/install" ] || fail "$2: bin/install is in current/bin and shadows install(1)"
+  PATH="$1/.rebar/current/bin:$TPATH" install -d "$1/install-d-probe" 2>&1 \
+    || fail "$2: install -d failed with current/bin first on PATH"
+  [ -d "$1/install-d-probe" ] || fail "$2: install -d made no directory"
+}
 current_of() { readlink "$1/.rebar/current"; }
 leftovers() { ls -A "$1/.rebar/versions" | grep '^\.' || true; }
 
@@ -171,7 +187,9 @@ for sh in $BASHES; do
   [ -f "$H/.rebar/current/scripts/steward.sh" ] || fail "T1 [$bv] tarball tree is incomplete"
   grep -q '^method=prebuilt' "$H/.rebar/current/.rebar-install" || fail "T1 [$bv] not a prebuilt install"
   grep -qF "$H/.rebar/current/bin" "$H/.bashrc" || fail "T1 [$bv] PATH not wired to current/bin"
-  ok "T1 [$bv] latest = v9.1.0 (stable over v9.2.0-beta.10), prebuilt + checksum, current, PATH"
+  has "$out" "Running $H/.rebar/current/bin/rebar-install" "T1 [$bv]"
+  no_install_shadow "$H" "T1 [$bv]"
+  ok "T1 [$bv] latest = v9.1.0 (stable over v9.2.0-beta.10), prebuilt + checksum, current, PATH, no install(1) shadow"
 
   # T1b
   out="$(inst "$TMP/h$n-pre" "$sh" --pre)" || { echo "$out" | tail -20 >&2; fail "T1b [$bv] --pre failed"; }
@@ -192,7 +210,9 @@ for sh in $BASHES; do
   has "$out" "current: v9.1.0 → v9.0.0" "T2 [$bv]"
   [ "$("$H/.rebar/current/bin/rebar" version)" = "rebar v9.0.0" ] || fail "T2 [$bv] source build not stamped"
   [ "$(grep -cF "$H/.rebar/current/bin" "$H/.bashrc")" = "1" ] || fail "T2 [$bv] PATH line duplicated"
-  ok "T2 [$bv] no assets → source fallback, stamped v9.0.0, current switched"
+  has "$out" "Running $H/.rebar/current/bin/rebar-install" "T2 [$bv]"
+  no_install_shadow "$H" "T2 [$bv]"
+  ok "T2 [$bv] no assets → source fallback, stamped v9.0.0, current switched, old bin/install renamed"
 
   # T3
   out="$(inst "$H" "$sh" 9.0.10 --no-switch --server 127.0.0.1:7232)" || { echo "$out" | tail -20 >&2; fail "T3 [$bv] failed"; }
@@ -247,7 +267,8 @@ for sh in $BASHES; do
   # T7
   H7="$TMP/h$n-legacy"
   mkdir -p "$H7"
-  g clone -q "$O" "$H7/.rebar" || fail "T7 clone"
+  # At v9.0.0 the clone ships bin/install, as every pre-versioned clone did.
+  g clone -q "$O" "$H7/.rebar" && g -C "$H7/.rebar" checkout -q v9.0.0 || fail "T7 clone"
   printf 'export PATH="%s/.rebar/bin:$PATH"\n' "$H7" > "$H7/.bashrc"
   head_before="$(g -C "$H7/.rebar" rev-parse HEAD)"
   out="$(inst "$H7" "$sh" v9.1.0)" || { echo "$out" | tail -20 >&2; fail "T7 [$bv] failed"; }
@@ -255,6 +276,7 @@ for sh in $BASHES; do
   [ -z "$(g -C "$H7/.rebar" status --porcelain)" ] || fail "T7 [$bv] clone is dirty: $(g -C "$H7/.rebar" status --porcelain)"
   [ "$(g -C "$H7/.rebar" rev-parse HEAD)" = "$head_before" ] || fail "T7 [$bv] clone HEAD moved"
   [ -x "$H7/.rebar/bin/install" ] || fail "T7 [$bv] clone files touched"
+  has "$out" "shadows the system install(1)" "T7 [$bv]"
   [ "$(current_of "$H7")" = "versions/v9.1.0" ] || fail "T7 [$bv] current not set"
   legacy_line="$(grep -nF "$H7/.rebar/bin:" "$H7/.bashrc" | cut -d: -f1)"
   new_line="$(grep -nF "$H7/.rebar/current/bin" "$H7/.bashrc" | cut -d: -f1)"
