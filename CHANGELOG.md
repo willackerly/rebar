@@ -27,6 +27,18 @@ All notable changes to rebar. Versioned with [semver](https://semver.org/).
   clone it warns that the clone's `bin/install` still shadows `install(1)` if
   your RC keeps `~/.rebar/bin` on PATH. See
   [UPGRADING.md](UPGRADING.md#upgrading-from-v310-or-v311).
+- **`setup-rebar.sh` installs only published, gated releases.** "latest" (and
+  `--pre`) is now the highest published GitHub Release, looked up through
+  GitHub's API (drafts skipped; pre-releases only with `--pre`; a used-up
+  unauthenticated rate limit is reported as such), not the highest git tag,
+  which exists before the release workflow has built, scanned and published
+  anything. A release tag whose assets are missing, or whose checksums or
+  tarball fail to download with anything but "not found", is now an error
+  instead of a silent source build with your own Go, which skipped the
+  workflow's `govulncheck` gate. Build from source with `--source`; tags
+  older than v3.1.0-rc.1 (before prebuilt assets) still build from source on
+  their own. Checksum verification is unchanged. `REBAR_RELEASES_API`
+  overrides the API URL (mirrors, tests).
 
 ---
 

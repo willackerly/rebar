@@ -338,6 +338,12 @@ that is all a project already on 3.1 needs. Changes to know about:
   you install. If your RC still puts a pre-versioned clone's `~/.rebar/bin`
   on PATH, its `bin/install` shadows `install(1)` too; remove that line once
   nothing uses the clone.
+- **The installer no longer builds release tags from source on its own.**
+  "latest" is the newest published GitHub Release (not the newest tag), and
+  a tag without downloadable prebuilt assets is an error; pass `--source` if
+  you mean to build it with your own Go (CI that relied on the fallback needs
+  `--source` and `actions/setup-go`). Tags older than v3.1.0-rc.1 still build
+  from source without it.
 
 ## Notes for v2.0.0
 

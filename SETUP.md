@@ -24,28 +24,37 @@ That installs v3.1.1 and puts `~/.rebar/current/bin` (`rebar`, `ask`,
 `ask-mcp-server`) on your PATH via your shell RC; open a new terminal (or
 source the RC) and check with `rebar version`. Fetch `setup-rebar.sh` from the
 tag you install, as above: the copy on `main` is whatever `main` holds. With no
-version argument the installer takes the latest stable release (the highest
-`vX.Y.Z` tag, ignoring pre-releases such as `v3.2.0-rc.1`; if no stable tag
-exists yet, the highest pre-release). Variants (`…` is the `curl` part):
+version argument the installer takes the latest stable release: the highest
+published GitHub Release that is not a pre-release such as `v3.2.0-rc.1`,
+looked up through GitHub's API (unauthenticated, 60 requests/hour per IP; past
+that it says so; name the version instead). A tag that is pushed but not yet
+published as a Release, and draft Releases, never count. Variants (`…` is the
+`curl` part):
 
 | Command | Installs |
 |---------|----------|
 | `… \| bash -s -- v3.1.1` | that release |
-| `… \| bash -s -- --pre` | the newest tag, pre-releases included |
+| `… \| bash -s -- --pre` | the newest published Release, pre-releases included |
 | `… \| bash -s -- main` | a branch, built from source; `rebar version` says `main@<sha>` |
 | `… \| bash -s -- v3.1.1 --no-switch` | side by side, without changing the active version |
-| `… \| bash -s -- v3.1.1 --source` | from source even if a prebuilt download exists |
+| `… \| bash -s -- v3.1.1 --source` | built from source with your Go instead of the prebuilt download |
 | `… \| bash -s -- v3.1.1 --dir /opt/rebar` | under `/opt/rebar` instead of `~/.rebar` (CI) |
 
 Each version is a complete rebar tree in `~/.rebar/versions/<version>/`;
 `~/.rebar/current` is a symlink to the active one, so switching never edits
 your RC again (`ln -sfn versions/<version> ~/.rebar/current` switches by
-hand; `rm -rf ~/.rebar/versions/<version>` removes one). Releases with
-prebuilt assets download as a tarball verified against the release's SHA-256
-checksums (a mismatch aborts); releases without assets, branches and commits
-(by full 40-character SHA) build from source, which needs `git` and Go 1.25
-or newer (use a [supported release](https://go.dev/doc/devel/release#policy):
-the binary includes its standard library; see [SECURITY.md](SECURITY.md)). Branch
+hand; `rm -rf ~/.rebar/versions/<version>` removes one). A release downloads
+as a prebuilt tarball verified against the release's SHA-256 checksums (a
+mismatch aborts). Only the release workflow publishes those assets, after
+every binary passes `govulncheck`, so a release tag never silently turns into
+a build with whatever Go is on your machine: if its assets are missing (the
+release is not published yet, or its workflow failed) or cannot be downloaded,
+the installer stops, and `--source` builds it anyway. Tags older than
+`v3.1.0-rc.1`, published before there were prebuilt assets, build from source
+without `--source`. Source builds (those, `--source`, branches and commits by
+full 40-character SHA) need `git` and Go 1.25 or newer (use a
+[supported release](https://go.dev/doc/devel/release#policy): the binary
+includes its standard library; see [SECURITY.md](SECURITY.md)). Branch
 names are made path-safe for the directory (`feat/x` → `versions/feat-x`); if
 two refs map to the same name, the second install is refused rather than
 replacing the first. `./setup-rebar.sh --help` lists every option.
@@ -75,8 +84,8 @@ on one project, then switch with
 issues on the repository.
 
 Name the candidate explicitly: without a version the installer takes the latest
-*stable* release, so a candidate is only picked by `--pre` (the newest tag,
-pre-releases included).
+*stable* release, so a candidate is only picked by `--pre` (the newest
+published Release, pre-releases included).
 
 **Upgrading from a `~/.rebar` clone** (what the installer made before versioned installs): the
 installer leaves the clone as it is — not moved, not updated — and adds
@@ -108,8 +117,8 @@ at the version you pin, not just the `rebar` binary.
 ```
 
 The release's prebuilt tarball needs only `curl`, `tar` and `shasum` or
-`sha256sum`. A tag without prebuilt assets falls back to a source build, which
-needs `git` and Go (add `actions/setup-go`). The checks themselves need `jq`
+`sha256sum`. A tag without prebuilt assets is an error unless you pass
+`--source`, which needs `git` and Go (add `actions/setup-go`). The checks themselves need `jq`
 and `git`. The installer also appends a PATH line to the runner's shell RC,
 which is harmless there.
 
