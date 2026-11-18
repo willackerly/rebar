@@ -18,6 +18,28 @@ All notable changes to rebar. Versioned with [semver](https://semver.org/).
 
 ## Unreleased
 
+_Nothing yet._
+
+---
+
+## v3.1.2 — 2026-11-18
+
+**A security release — upgrade if you run `ask-server` or `ask-mcp-server` in
+HTTP mode.** In v3.1.1 and earlier, those servers listened on all interfaces
+by default with an optional API key, and a question could be interpreted as
+an agent command or name a path outside the agent's directory, so anyone who
+could reach the port could run scripts on the host. v3.1.2 binds to
+127.0.0.1 by default (a public bind needs an API key or an explicit
+`--insecure-no-auth`), always passes questions as questions, validates agent
+names, and hardens the HTTP handling. stdio MCP — what Claude Code uses — was
+only reachable by local clients. See [SECURITY.md](SECURITY.md).
+
+Also: the `bin/install` helper is renamed `bin/rebar-install` (it shadowed
+the system `install` on PATH), the installer resolves `latest` from published
+Releases and no longer falls back to a source build silently, and
+`refresh-context` / `rebar status` no longer miss commits made on the
+last-synced day.
+
 - **Security: ASK servers and `ask` command dispatch.** Affected: the HTTP
   mode of `ask-server` (`ask serve`) and `ask-mcp-server` in rebar ≤ v3.1.1,
   which listened on all interfaces with no API key by default and passed

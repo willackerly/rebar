@@ -1,8 +1,8 @@
 # QUICKCONTEXT — rebar (main, v3 line)
 
-last-synced: 2026-11-17
-<!-- freshness: 2026-11-17 -->
-**Branch:** main — **v3 line, graduated to `v3.0.0`** 2026-11-14 (plan D12); `v3.1.1` released 2026-11-17 (maintenance; from `release/v3.1.1`)
+last-synced: 2026-11-18
+<!-- freshness: 2026-11-18 -->
+**Branch:** main — **v3 line, graduated to `v3.0.0`** 2026-11-14 (plan D12); `v3.1.2` released 2026-11-18 (security; from `release/v3.1.2`)
 **Tier:** 3 (ENFORCED) — rebar dogfoods its own methodology
 
 ---
@@ -15,6 +15,10 @@ last-synced: 2026-11-17
   re-verified after its expected 2026-08-16 close, and beta.3/beta.4 shipped
   after it. Recorded as D12 + a final scoreboard in `docs/v3-beta-plan.md`.
   No code change since beta.4. Tag `v2.0.0` remains the stable v2 point.
+- **`v3.1.2` (2026-11-18)** — security: ask-server/ask-mcp-server HTTP mode
+  (default 127.0.0.1, question-only, agent-name validation, request limits);
+  `bin/install` → `bin/rebar-install`; installer `latest` from Releases, no
+  silent source build; `--since` day-boundary fix.
 - **`v3.1.1` (2026-11-17)** — maintenance: rebuilt with a current Go (v3.1.0's
   go1.25.0 binaries carry 59 stdlib CVEs), govulncheck in CI/release/weekly,
   Dependabot, script fixes, bash 3.2 decay-patterns crash, SIGPIPE-proof tests.
@@ -112,7 +116,7 @@ Ordered roughly by cost.
 
 ## What's Next — proposed go-forward
 
-**Now — `v3.1.1` is out.** Install it (`… | bash -s -- v3.1.1`),
+**Now — `v3.1.2` is out.** Install it (`… | bash -s -- v3.1.2`),
 run UPGRADING.md on adopters; 3.1.x fixes go to `main`, the Go-native stack targets 3.2.
 
 **Done — `v3.0.0` tagged and released 2026-11-14.** After the release PR merges, tag
