@@ -7,6 +7,7 @@
 #   ask -v <agent> "<question>"  Verbose: answer + rationale + refs
 #   ask -d <agent> "<question>"  Debug: show session ID, context %, timings
 #   ask -w <agent> "<question>"  Write mode: agent can edit/create files
+#   ask --question <agent> "<q>" Question only: never run a command script
 #   ask watch <agent>            Follow agent's incremental progress
 #   ask up <agent>               Bring an agent online
 #   ask who                      List available agents
@@ -59,6 +60,7 @@ DEBUG="${ASK_DEBUG:-0}"
 MODEL="${ASK_MODEL:-sonnet}"
 CONTEXT_LIMIT="${ASK_CONTEXT_LIMIT:-70}"
 WRITE_MODE="${ASK_WRITE:-0}"
+QUESTION_MODE=0
 REGISTRY="${ASK_REGISTRY:-$HOME/.config/ask/projects}"
 SERVER="${ASK_SERVER:-}"
 SERVER_API_KEY="${ASK_API_KEY:-}"
@@ -557,12 +559,53 @@ _caller_facing_description() {
   ' "$agent_md"
 }
 
+# An agent name is one directory entry under $AGENTS_DIR: no path
+# separators, no "..", no ":" (the project:agent separator), no control
+# characters, no leading "." or "-". Anything else could name a directory
+# outside $AGENTS_DIR (e.g. ../../other/agents/x).
+_valid_agent_name() {
+  case "$1" in
+    ""|.*|-*|*/*|*\\*|*..*|*:*|*[[:cntrl:]]*) return 1 ;;
+  esac
+  return 0
+}
+
+# A command word names one script, $AGENT_DIR/commands/<word>.sh. Only
+# plain names qualify (letters, digits, ".", "_", "-"; no "..", no leading
+# "." or "-"). Anything else is a question, never a command.
+_valid_command_word() {
+  case "$1" in
+    ""|.*|-*|*..*|*[!A-Za-z0-9._-]*) return 1 ;;
+  esac
+  return 0
+}
+
+# Print the path of the command script for WORD in AGENT_DIR, or return 1
+# when WORD is not a command. WORD must be a plain name (above) and the
+# script an executable regular file directly inside the agent's commands/
+# directory; the printed path is canonical (commands/ resolved with pwd -P)
+# and re-checked to lie inside it.
+_resolve_command_script() {
+  local agent_dir="$1" word="$2" cmd_dir script
+  _valid_command_word "$word" || return 1
+  cmd_dir=$(CDPATH= cd "$agent_dir/commands" 2>/dev/null && pwd -P) || return 1
+  script="$cmd_dir/$word.sh"
+  case "$script" in
+    "$cmd_dir"/*/*|"$cmd_dir"/*..*) return 1 ;;
+    "$cmd_dir"/*) ;;
+    *) return 1 ;;
+  esac
+  [ -f "$script" ] && [ -x "$script" ] || return 1
+  printf '%s\n' "$script"
+}
+
 # Resolve an agent name case-insensitively against $AGENTS_DIR. Echoes
 # the canonical directory name on stdout (or empty string if no match).
 # Stays bash 3.2 compatible (no nameref, no associative arrays).
 _canonicalize_agent() {
   local input="$1"
   [ -z "$input" ] && return 0
+  _valid_agent_name "$input" || return 0
 
   # Fast path: exact match
   if [ -d "$AGENTS_DIR/$input" ] && [ -f "$AGENTS_DIR/$input/AGENT.md" ]; then
@@ -590,6 +633,10 @@ _canonicalize_agent() {
 require_agent_exists() {
   local agent="$1"
   local canonical
+  if ! _valid_agent_name "$agent"; then
+    echo "ask: error: invalid agent name '$agent' (must be a directory name under $AGENTS_DIR)" >&2
+    exit 2
+  fi
   canonical=$(_canonicalize_agent "$agent")
   if [ -n "$canonical" ]; then
     # Set the global so callers can normalize their agent variable.
@@ -750,6 +797,9 @@ Usage:
   ask <agent> "<question>"     Send a question, get a concise answer
   ask -v <agent> "<question>"  Verbose: answer + rationale + refs
   ask -w <agent> "<question>"  Write mode: agent can edit/create files
+  ask --question <agent> "<question>"
+                               Always a question: never runs a command script
+                               or the default command (servers use this)
   ask project:agent "question" Query an agent in another project
   ask <agent>                    Run agent's default command (if configured)
   ask <agent> <command> [args]   Run a named agent command
@@ -2057,6 +2107,7 @@ while [ $# -gt 0 ]; do
     -v|--verbose) VERBOSE=1; shift ;;
     -d|--debug)   DEBUG=1; VERBOSE=1; shift ;;
     -w|--write)   WRITE_MODE=1; shift ;;
+    --question)   QUESTION_MODE=1; shift ;;
     -V|--version)
       # Detect host rebar version if we're in a rebar project; fall back
       # to the compile-time constant otherwise. Useful for adopters who
@@ -2083,6 +2134,26 @@ while [ $# -gt 0 ]; do
     *) break ;;
   esac
 done
+
+# --- Question mode: ask --question <agent> "<question>" ---
+# The second argument is always a question: no management subcommands, no
+# command scripts, no default command. ask-server and ask-mcp-server call
+# ask this way so that text received over the network can never select a
+# script to run.
+if [ "$QUESTION_MODE" = "1" ]; then
+  if [ $# -ne 2 ] || [ -z "$1" ] || [ -z "$2" ]; then
+    echo "ask: error: --question takes exactly two arguments: <agent> \"<question>\"" >&2
+    exit 4
+  fi
+  if _is_remote_query "$1"; then
+    _remote_ask "${1%%:*}" "${1#*:}" "$2"
+    exit 0
+  fi
+  resolve_project_agent "$1"
+  require_agent_exists "$_RESOLVED_AGENT"
+  cmd_ask "$_CANONICAL_AGENT" "$2"
+  exit $?
+fi
 
 CMD="${1:-help}"
 
@@ -2254,10 +2325,12 @@ case "$CMD" in
         ;;
     esac
 
-    # --- Check if CMD_WORD matches a command script ---
-    if [ -x "$AGENT_DIR/commands/$CMD_WORD.sh" ]; then
+    # --- Check if CMD_WORD names a command script ---
+    # Only a plain word naming an executable in $AGENT_DIR/commands/ runs a
+    # script; paths, "..", and leading "-"/"." fall through to a question.
+    if _cmd_script=$(_resolve_command_script "$AGENT_DIR" "$CMD_WORD"); then
       shift 2  # remove agent name and command word
-      "$AGENT_DIR/commands/$CMD_WORD.sh" "$@"
+      "$_cmd_script" "$@"
       exit $?
     fi
 
