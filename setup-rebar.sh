@@ -7,17 +7,21 @@
 #                                  (scripts/, templates/, agents/, bin/rebar, bin/ask*, …)
 #   ~/.rebar/current               symlink to the active version
 #
-# and puts ~/.rebar/current/bin on PATH (via that version's bin/install), so
+# and puts ~/.rebar/current/bin on PATH (via that version's bin/rebar-install), so
 # switching versions never touches your shell RC again.
 #
 #   Release tag   download rebar_<ver>_<os>_<arch>.tar.gz from the GitHub
 #                 Release, verify it against the release's SHA-256 checksums,
-#                 unpack. No git or Go needed. If the release has no assets
-#                 (true of every release before the release workflow), build
-#                 from source instead.
+#                 unpack. No git or Go needed. Only the release workflow
+#                 publishes these assets, after its govulncheck gate passes.
 #   Branch / SHA  build from source: git + Go.
 #
-# A checksum mismatch is fatal — never silently replaced by a source build.
+# A tag is built from source only with --source, or when it predates
+# prebuilt assets (older than v3.1.0-rc.1, the first release that published
+# them). A tag without assets (not yet published, or its release workflow
+# failed), a download error other than "not found", and a checksum mismatch
+# are all fatal — never silently replaced by a source build with whatever Go
+# is on this machine.
 #
 # Usage (curl pipe):
 #   curl -fsSL https://raw.githubusercontent.com/willackerly/rebar/main/setup-rebar.sh | bash
@@ -27,8 +31,8 @@
 #   ./setup-rebar.sh [<version>|latest|<branch>|<full-sha>] [--pre] [--source]
 #                    [--no-switch] [--server HOST:PORT] [--dir PATH]
 #
-# "latest" (the default) is the highest stable tag; --pre includes
-# pre-releases. With no stable tag at all, latest is the highest pre-release.
+# "latest" (the default) is the highest published stable GitHub Release
+# (drafts and bare tags never count); --pre includes pre-releases.
 #
 # An existing pre-versioned ~/.rebar (a plain git clone, the layout before
 # this installer) is left untouched; versions/ and current are added next to
@@ -53,13 +57,17 @@ Usage:
   $0 --help
 
   <version>     a release tag (v3.0.0), "latest" (the default: the highest
-                stable tag, or the highest pre-release if there is no stable
-                one), a branch, or a full 40-character commit SHA
+                published stable GitHub Release), a branch, or a full
+                40-character commit SHA
   --pre         with "latest": include pre-releases (v3.1.0-rc.1 over v3.0.0)
   --ref REF     same as <version> (kept for older docs)
-  --source      build from source even if a prebuilt release exists
+  --source      build a release tag from source with your Go instead of
+                downloading its prebuilt, govulncheck-gated assets. Without
+                it a tag with no prebuilt assets is an error, except tags
+                older than v3.1.0-rc.1 (published before there were assets),
+                which are built from source
   --no-switch   install side by side but leave ~/.rebar/current where it is
-  --server H:P  remote ASK server, written to your shell RC by bin/install
+  --server H:P  remote ASK server, written to your shell RC by bin/rebar-install
   --dir PATH    install base (default: ~/.rebar)
 
 Layout:
@@ -79,6 +87,10 @@ Env vars:
   REBAR_REF          version when no <version> argument is given
   REBAR_RELEASE_URL  base URL for release assets, <url>/<tag>/<asset>
                      (default: https://github.com/<owner>/<repo>/releases/download)
+  REBAR_RELEASES_API URL of the GitHub Releases list "latest" is picked from
+                     (default: https://api.github.com/repos/<owner>/<repo>/releases?per_page=100;
+                     unauthenticated, so 60 requests/hour per IP). For mirrors
+                     and the test suite, which points it at a file:// fixture
   ASK_SERVER         same as --server
 
 Next steps after install:
@@ -191,18 +203,70 @@ semver_max() {
   '
 }
 
-list_tags() {
-  if have git; then
-    git ls-remote --tags --refs -- "$REBAR_REPO" 'v*' | sed 's#.*refs/tags/##'
-  elif [[ -n "$SLUG" ]] && have curl; then
-    # /releases misses tags that never got a Release (v3.0.0-beta.2 to
-    # beta.4); the tags list has every tag. 100 is the page cap — plenty for
-    # rebar's history.
-    curl -fsSL "${CURL_HTTPS[@]}" "https://api.github.com/repos/${SLUG}/tags?per_page=100" \
-      | sed -n 's/.*"name": *"\([^"]*\)".*/\1/p'
-  else
-    die "need git (or curl and a github.com REBAR_REPO) to resolve \"latest\"; pass a version"
+# "<tag> <draft> <prerelease>" for each release in a GitHub Releases list
+# (JSON on stdin), without jq. A key always follows "," or "{", so splitting
+# there puts every key at the start of a line. Inside a JSON string a quote
+# is always escaped, so text in a release body (\"draft\": false) never
+# starts a line with a bare quote and never matches. GitHub lists tag_name
+# before draft and prerelease in each release.
+release_rows() {
+  tr ',{' '\n\n' \
+    | sed -n -E 's/^[[:space:]]*"(tag_name|draft|prerelease)"[[:space:]]*:[[:space:]]*"?([^"[:space:]]*)"?[[:space:]]*$/\1 \2/p' \
+    | awk '
+        $1 == "tag_name" { if (tag != "") print tag, draft, pre; tag = $2; draft = "?"; pre = "?"; next }
+        $1 == "draft"      { draft = $2 }
+        $1 == "prerelease" { pre = $2 }
+        END { if (tag != "") print tag, draft, pre }
+      '
+}
+
+RATE_LIMIT_HELP="GitHub's API rate limit for unauthenticated requests (60/hour per IP) is used up. Retry later, or name the version (see https://github.com/willackerly/rebar/releases): setup-rebar.sh vX.Y.Z"
+
+# Sets VERSION to the highest published release: non-draft, and not a
+# pre-release (by GitHub's flag or a -suffix) unless --pre. Bare tags never
+# count: a tag is pushed before the release workflow builds, scans and
+# publishes its assets, and a tag whose workflow failed has none.
+resolve_latest() {
+  local api="$REBAR_RELEASES_API" json="$TMP/releases.json" st=0 rows stable newest
+  [[ -n "$api" ]] \
+    || die "cannot look up the latest release: $REPO_SHOWN is not on github.com and REBAR_RELEASES_API is not set; pass a version"
+  fetch "$api" "$json" || st=$?
+  if grep -qi 'rate limit' "$json" 2>/dev/null && ! grep -q '"tag_name"' "$json"; then
+    die "could not look up the latest release: $RATE_LIMIT_HELP"
   fi
+  case "$st" in
+    0) ;;
+    2) die "could not look up the latest release: $api was not found (or refused the request; with wget that includes the rate limit). Pass a version." ;;
+    *) case "$FETCH_ERR" in
+         "HTTP 403"|"HTTP 429") die "could not look up the latest release ($FETCH_ERR): $RATE_LIMIT_HELP" ;;
+       esac
+       die "could not look up the latest release at $api ($FETCH_ERR). Pass a version, or retry." ;;
+  esac
+  rows="$(release_rows < "$json")"
+  [[ -n "$rows" ]] || die "found no published releases at $api; pass a version"
+  stable="$(printf '%s\n' "$rows" | awk '$2 == "false" && $3 == "false" { print $1 }' | semver_max stable)"
+  newest="$(printf '%s\n' "$rows" | awk '$2 == "false" { print $1 }' | semver_max)"
+  if [[ "$PRE" -eq 1 ]]; then
+    [[ -n "$newest" ]] || die "found no published releases at $api; pass a version"
+    VERSION="$newest"
+    log "Latest release (pre-releases included): $VERSION"
+  elif [[ -n "$stable" ]]; then
+    VERSION="$stable"
+    log "Latest release: $VERSION"
+  elif [[ -n "$newest" ]]; then
+    die "no stable release is published yet (newest pre-release: $newest); pass --pre or a version"
+  else
+    die "found no published releases at $api; pass a version"
+  fi
+}
+
+# The first release whose workflow published prebuilt assets. Older release
+# tags have none and can only be built from source.
+FIRST_ASSET_RELEASE="v3.1.0-rc.1"
+predates_assets() {
+  local semver='^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$'
+  [[ "$1" =~ $semver && "$1" != "$FIRST_ASSET_RELEASE" ]] || return 1
+  [[ "$(printf '%s\n%s\n' "$1" "$FIRST_ASSET_RELEASE" | semver_max)" == "$FIRST_ASSET_RELEASE" ]]
 }
 
 # Prints tag | branch | commit for a ref, or dies.
@@ -245,20 +309,30 @@ detect_platform() {  # prints <os> <arch> (Go names), or nothing if unsupported
 
 # ── Prebuilt release ─────────────────────────────────────────────────────────
 
-# Returns 1 when there is nothing to download (no assets, unsupported
-# platform, no hash tool) so the caller can build from source. Dies on a
-# verification failure.
-install_prebuilt() {
-  local tag="$1" plat os arch vn asset sums expected actual
-  [[ -n "$REBAR_RELEASE_URL" ]] || return 1
-  plat="$(detect_platform)"
-  if [[ -z "$plat" ]]; then
-    warn "no prebuilt rebar for $(uname -s)/$(uname -m)"
+# no_prebuilt <reason>: for a tag that predates prebuilt assets, note the
+# reason and return 1 (the caller builds from source); otherwise die.
+no_prebuilt() {
+  if predates_assets "$VERSION"; then
+    log "$1; $VERSION predates prebuilt release assets ($FIRST_ASSET_RELEASE), building from source."
     return 1
   fi
+  die "$1. Not building from source on my own: pass --source to build $VERSION with your Go toolchain (it skips the release workflow's govulncheck gate)."
+}
+
+# Installs the release's prebuilt tarball. Returns 1 only when there is
+# nothing to download and the tag predates prebuilt assets (see
+# no_prebuilt); every other failure, including a download error other than
+# "not found" and a checksum mismatch, is fatal.
+install_prebuilt() {
+  local tag="$1" plat os arch vn asset sums expected actual
+  [[ -n "$REBAR_RELEASE_URL" ]] \
+    || { no_prebuilt "no release download URL for $REPO_SHOWN (set REBAR_RELEASE_URL)"; return 1; }
+  plat="$(detect_platform)"
+  [[ -n "$plat" ]] \
+    || { no_prebuilt "no prebuilt rebar for $(uname -s)/$(uname -m)"; return 1; }
   os="${plat% *}"; arch="${plat#* }"
   if ! have sha256sum && ! have shasum; then
-    warn "neither sha256sum nor shasum found; not installing an unverified download"
+    no_prebuilt "neither sha256sum nor shasum found; not installing an unverified download"
     return 1
   fi
   vn="${tag#v}"
@@ -269,15 +343,14 @@ install_prebuilt() {
   local st=0
   fetch "$REBAR_RELEASE_URL/$tag/$sums" "$TMP/$sums" || st=$?
   if [[ "$st" -eq 2 ]]; then
-    log "Release $tag has no prebuilt assets."
+    no_prebuilt "Release $tag has no prebuilt assets (not published yet, or its release workflow failed)"
     return 1
   elif [[ "$st" -ne 0 ]]; then
-    warn "could not check $REBAR_RELEASE_URL/$tag for prebuilt assets ($FETCH_ERR)"
-    return 1
+    die "could not check $REBAR_RELEASE_URL/$tag for prebuilt assets ($FETCH_ERR). Retry, or use --source."
   fi
   expected="$(awk -v f="$asset" '$2 == f || $2 == "*" f { print $1; exit }' "$TMP/$sums")"
   if [[ -z "$expected" ]]; then
-    log "Release $tag has no $os/$arch build."
+    no_prebuilt "Release $tag has no $os/$arch build"
     return 1
   fi
   fetch "$REBAR_RELEASE_URL/$tag/$asset" "$TMP/$asset" \
@@ -363,7 +436,10 @@ cleanup() {
       REPLACED=""
     fi
   fi
-  rm -rf "${TMP:-}" "${STAGE:-}" "${REPLACED:-}"
+  local d
+  for d in "${TMP:-}" "${STAGE:-}" "${REPLACED:-}"; do
+    [[ -n "$d" ]] && rm -rf "$d"
+  done
   [[ -n "${REBAR_DIR:-}" ]] && rm -f "$REBAR_DIR/.current.$$"
   return 0
 }
@@ -421,24 +497,22 @@ main() {
     REBAR_RELEASE_URL="https://github.com/${SLUG}/releases/download"
   fi
   REBAR_RELEASE_URL="${REBAR_RELEASE_URL:-}"
+  if [[ -z "${REBAR_RELEASES_API:-}" && -n "$SLUG" ]]; then
+    REBAR_RELEASES_API="https://api.github.com/repos/${SLUG}/releases?per_page=100"
+  fi
+  REBAR_RELEASES_API="${REBAR_RELEASES_API:-}"
+
+  TMP="$(mktemp -d "${TMPDIR:-/tmp}/rebar-install.XXXXXX")"
+  trap cleanup EXIT
+  # Turn signals into a normal exit so the EXIT trap (and its restore) runs.
+  trap 'exit 129' HUP
+  trap 'exit 130' INT
+  trap 'exit 143' TERM
 
   # ── Resolve what to install ──────────────────────────────────────────────────
 
   if [[ -z "$VERSION" || "$VERSION" == "latest" ]]; then
-    tags="$(list_tags)" || die "could not list the tags of $REPO_SHOWN"
-    if [[ "$PRE" -eq 1 ]]; then
-      VERSION="$(printf '%s\n' "$tags" | semver_max)"
-      [[ -n "$VERSION" ]] && log "Latest (pre-releases included): $VERSION"
-    else
-      VERSION="$(printf '%s\n' "$tags" | semver_max stable)"
-      if [[ -n "$VERSION" ]]; then
-        log "Latest: $VERSION"
-      else
-        VERSION="$(printf '%s\n' "$tags" | semver_max)"
-        [[ -n "$VERSION" ]] && log "Latest: $VERSION (no stable release yet; highest pre-release)"
-      fi
-    fi
-    [[ -n "$VERSION" ]] || die "found no release tags in $REPO_SHOWN; pass a version explicitly"
+    resolve_latest
     KIND=tag
   else
     # "3.0.0" → "v3.0.0" when only the v-prefixed tag exists.
@@ -480,6 +554,10 @@ main() {
     warn "$REBAR_DIR is a pre-versioned rebar clone. Leaving it as is:"
     warn "  versions/ and current/ go inside it; the clone itself is not updated."
     warn "  Projects whose .mcp.json or REBAR_ROOT point at $REBAR_DIR keep using the clone."
+    if [[ -f "$REBAR_DIR/bin/install" ]]; then
+      warn "  If your shell RC still puts $REBAR_DIR/bin on PATH, the clone's bin/install"
+      warn "  shadows the system install(1); remove that line once nothing needs the clone."
+    fi
     if have git; then
       exclude="$(git -C "$REBAR_DIR" rev-parse --git-path info/exclude 2>/dev/null || true)"
       if [[ -n "$exclude" ]]; then
@@ -492,15 +570,9 @@ main() {
     fi
   fi
 
-  TMP="$(mktemp -d "${TMPDIR:-/tmp}/rebar-install.XXXXXX")"
   STAGE="$REBAR_DIR/versions/.incoming.$$"
   REPLACED="$REBAR_DIR/versions/.replaced.$$"
   TARGET="$REBAR_DIR/versions/$NAME"
-  trap cleanup EXIT
-  # Turn signals into a normal exit so the EXIT trap (and its restore) runs.
-  trap 'exit 129' HUP
-  trap 'exit 130' INT
-  trap 'exit 143' TERM
 
   # One install per version directory at a time (mkdir is atomic). A lock
   # left by a killed install names its pid; remove it by hand.
@@ -525,12 +597,11 @@ main() {
   METHOD=""
   COMMIT=""
   log "Installing rebar $VERSION → $REBAR_DIR/versions/$NAME"
+  # A tag installs prebuilt; install_prebuilt returns 1 only for a tag that
+  # predates prebuilt assets. Branches, commits and --source build here.
   if [[ "$KIND" == "tag" && "$FROM_SOURCE" -eq 0 ]] && install_prebuilt "$VERSION"; then
     :
   else
-    if [[ "$KIND" == "tag" && "$FROM_SOURCE" -eq 0 ]]; then
-      log "Falling back to a source build."
-    fi
     install_source "$VERSION" "$KIND"
   fi
 
@@ -539,6 +610,17 @@ main() {
     || die "$STAGE/bin/rebar does not run on this machine"
   if [[ ! -d "$STAGE/templates/project-bootstrap" || ! -f "$STAGE/scripts/steward.sh" ]]; then
     warn "$VERSION lacks templates/project-bootstrap/ or scripts/steward.sh; the CLI may not find its scripts"
+  fi
+  # Versions before v3.1.2 ship the PATH helper as bin/install. current/bin
+  # comes first on PATH, where that name shadows the system install(1)
+  # (`install -d dir` → "Unknown option: -d", breaking `make install`), so
+  # give it the current name.
+  if [[ -f "$STAGE/bin/install" ]]; then
+    if [[ -e "$STAGE/bin/rebar-install" ]]; then
+      rm -f "$STAGE/bin/install"
+    else
+      mv "$STAGE/bin/install" "$STAGE/bin/rebar-install"
+    fi
   fi
 
   cat > "$STAGE/.rebar-install" <<EOF
@@ -571,21 +653,21 @@ EOF
   INSTALLED_VERSION="$("$TARGET/bin/rebar" version 2>/dev/null | head -1)"
 
   # ── PATH wiring ──────────────────────────────────────────────────────────────
-  # Run through the symlink so bin/install records $REBAR_DIR/current/bin (it
-  # uses the logical `pwd`), which stays valid across version switches.
+  # Run through the symlink so bin/rebar-install records $REBAR_DIR/current/bin
+  # (it uses the logical `pwd`), which stays valid across version switches.
 
   if [[ "$SWITCHED" -eq 0 && -n "$ASK_SERVER" ]]; then
-    warn "--server was not applied: --no-switch skips bin/install. Apply it with: $REBAR_DIR/current/bin/install --server $ASK_SERVER"
+    warn "--server was not applied: --no-switch skips bin/rebar-install. Apply it with: $REBAR_DIR/current/bin/rebar-install --server $ASK_SERVER"
   elif [[ "$SWITCHED" -eq 1 && -z "${HOME:-}" ]]; then
     warn "HOME is not set, so PATH was not wired; add $REBAR_DIR/current/bin to PATH yourself"
-  elif [[ "$SWITCHED" -eq 1 && -x "$REBAR_DIR/current/bin/install" ]]; then
+  elif [[ "$SWITCHED" -eq 1 && -x "$REBAR_DIR/current/bin/rebar-install" ]]; then
     install_args=()
     [[ -n "$ASK_SERVER" ]] && install_args+=(--server "$ASK_SERVER")
-    log "Running $REBAR_DIR/current/bin/install ${install_args[*]:-}"
+    log "Running $REBAR_DIR/current/bin/rebar-install ${install_args[*]:-}"
     # ${arr[@]+...}: bash 3.2 treats an empty "${arr[@]}" as unbound under set -u.
-    # bin/install picks the RC file from $SHELL, which `env -i` and some CI
+    # bin/rebar-install picks the RC file from $SHELL, which `env -i` and some CI
     # shells leave unset.
-    SHELL="${SHELL:-/bin/sh}" "$REBAR_DIR/current/bin/install" ${install_args[@]+"${install_args[@]}"}
+    SHELL="${SHELL:-/bin/sh}" "$REBAR_DIR/current/bin/rebar-install" ${install_args[@]+"${install_args[@]}"}
   fi
 
   # ── Report ───────────────────────────────────────────────────────────────────

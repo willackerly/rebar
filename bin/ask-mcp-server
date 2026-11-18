@@ -10,8 +10,16 @@ Usage:
   ask-mcp-server --stdio  # MCP over stdio
   ask-mcp-server --port 7232 --repos-dir /srv/repos --mcp-only  # Pure MCP mode
 
+Binding (HTTP mode):
+  Listens on 127.0.0.1 by default and then only answers requests whose Host
+  header is a loopback name (blocks DNS rebinding). To serve other machines,
+  bind a public address (--host 0.0.0.0) AND set an API key (--api-key or
+  ASK_API_KEY); without a key a non-loopback bind is refused unless
+  --insecure-no-auth is given. POST bodies must be Content-Type:
+  application/json and at most 1 MiB. --stdio has no network listener.
+
 Environment:
-  ASK_API_KEY    API key for HTTP mode (optional)
+  ASK_API_KEY    API key for HTTP mode (required for a non-loopback --host)
   ASK_MODEL      Claude model passed through to ask CLI (default: sonnet)
   ASK_BIN        Path to ask CLI (default: ask, found via PATH)
 
@@ -31,6 +39,8 @@ MCP-over-HTTP:
 """
 
 import argparse
+import hmac
+import ipaddress
 import json
 import os
 import re
@@ -46,6 +56,91 @@ from urllib.parse import urlparse
 # Import the existing ASK server classes
 # Note: In a real implementation, we'd refactor to share code properly
 # For this demo, I'm including the necessary parts inline
+
+
+# ---------------------------------------------------------------------------
+# Request hardening
+# ---------------------------------------------------------------------------
+
+MAX_BODY_BYTES = 1 << 20   # 1 MiB cap on POST bodies
+REQUEST_TIMEOUT = 60       # seconds a client may take to send its request
+
+_NAME_FORBIDDEN = re.compile(r"[/\\:\x00-\x1f\x7f]")
+
+
+def valid_name(name):
+    """True if name can only be a single directory entry: no path
+    separators, no "..", no ":" (ask's project:agent separator), no control
+    characters, no leading "." or "-"."""
+    return (isinstance(name, str) and bool(name)
+            and not name.startswith((".", "-"))
+            and ".." not in name
+            and not _NAME_FORBIDDEN.search(name))
+
+
+def is_loopback_host(host):
+    """True for localhost and loopback IP literals (brackets allowed)."""
+    h = (host or "").strip().lower()
+    if h.startswith("[") and h.endswith("]"):
+        h = h[1:-1]
+    if h == "localhost":
+        return True
+    try:
+        return ipaddress.ip_address(h).is_loopback
+    except ValueError:
+        return False
+
+
+def host_header_is_loopback(value):
+    """True if a Host header ("name", "name:port", "[v6]:port") names a
+    loopback host. A missing header (HTTP/1.0 clients) is allowed:
+    browsers, the DNS-rebinding vector, always send one."""
+    if value is None:
+        return True
+    v = value.strip()
+    if v.startswith("["):
+        end = v.find("]")
+        host = v[:end + 1] if end != -1 else v
+    elif v.count(":") == 1:
+        host = v.split(":", 1)[0]
+    else:
+        host = v
+    return is_loopback_host(host)
+
+
+def api_key_matches(header_value, api_key):
+    """Constant-time comparison of an Authorization header with the key."""
+    expected = ("Bearer " + api_key).encode("utf-8")
+    given = (header_value or "").encode("utf-8", "surrogateescape")
+    return hmac.compare_digest(given, expected)
+
+
+def check_bind_safety(prog, host, api_key, insecure_no_auth):
+    """Refuse to serve unauthenticated on a non-loopback address."""
+    if is_loopback_host(host) or api_key:
+        return
+    if insecure_no_auth:
+        print(f"{prog}: WARNING: listening on {host or '0.0.0.0'} with no API key "
+              f"(--insecure-no-auth): anyone who can reach this port can query "
+              f"every agent", file=sys.stderr)
+        return
+    print(f"{prog}: error: refusing to listen on non-loopback address "
+          f"'{host or '0.0.0.0'}' without an API key.\n"
+          f"  Set --api-key KEY (or ASK_API_KEY), or bind --host 127.0.0.1, or pass\n"
+          f"  --insecure-no-auth to serve unauthenticated on a trusted network.",
+          file=sys.stderr)
+    sys.exit(2)
+
+
+def ask_command(ask_bin, role, question, verbose=False):
+    """argv for asking ROLE a QUESTION. --question makes ask treat the
+    question as a question only: never a command script, subcommand, or
+    flag, whatever text it contains."""
+    cmd = [ask_bin]
+    if verbose:
+        cmd.append("-v")
+    cmd.extend(["--question", "--", role, question])
+    return cmd
 
 
 # ---------------------------------------------------------------------------
@@ -176,10 +271,12 @@ class MCPServer:
         if not self.initialized:
             return self._error(-32002, "Not initialized", "Call initialize first", req_id)
 
+        if not isinstance(params, dict):
+            return self._error(-32602, "Invalid params", "params must be an object", req_id)
         tool_name = params.get("name")
         arguments = params.get("arguments", {})
 
-        if not tool_name:
+        if not tool_name or not isinstance(tool_name, str):
             return self._error(-32602, "Invalid params", "Tool name required", req_id)
 
         # Parse tool name to extract repo and role
@@ -207,10 +304,12 @@ class MCPServer:
                                f"Role {role} not found in {canonical_repo}", req_id)
         repo, role = canonical_repo, canonical_role
 
+        if not isinstance(arguments, dict):
+            return self._error(-32602, "Invalid params", "arguments must be an object", req_id)
         question = arguments.get("question")
-        verbose = arguments.get("verbose", False)
+        verbose = arguments.get("verbose", False) is True
 
-        if not question:
+        if not question or not isinstance(question, str):
             return self._error(-32602, "Invalid params", "Question required", req_id)
 
         # Execute the ask command
@@ -297,12 +396,15 @@ class MCPServer:
             resource_type, agent_id = parts
             repo, role = agent_id.split(":", 1)
 
-            # Case-insensitive resolution (mirrors _handle_tools_call).
+            # Case-insensitive resolution (mirrors _handle_tools_call). Only
+            # registered repos and their listed agents are readable.
             canonical_repo = self.registry.resolve_repo(repo)
-            if canonical_repo:
-                canonical_role = self.registry.resolve_role(canonical_repo, role)
-                if canonical_role:
-                    repo, role = canonical_repo, canonical_role
+            if not canonical_repo:
+                raise ValueError(f"Repository {repo} not found")
+            canonical_role = self.registry.resolve_role(canonical_repo, role)
+            if not canonical_role:
+                raise ValueError(f"Role {role} not found in {canonical_repo}")
+            repo, role = canonical_repo, canonical_role
 
             content = self._get_resource_content(resource_type, repo, role)
 
@@ -497,12 +599,8 @@ class MCPServer:
         if not self.registry.has_agent(repo, role):
             return {"success": False, "error": f"Agent {role} not found in repository {repo}"}
 
-        # Build ask command
         ask_bin = getattr(self, 'ask_bin', 'ask')  # Would be set by server
-        cmd = [ask_bin]
-        if verbose:
-            cmd.append("-v")
-        cmd.extend([role, question])
+        cmd = ask_command(ask_bin, role, question, verbose)
 
         # Build a sanitized env for the ask subprocess:
         #   - ASK_SERVER explicitly cleared so the MCP path always routes
@@ -644,6 +742,8 @@ class RepoRegistry:
             return result
 
     def get_repo_path(self, repo_name):
+        if not valid_name(repo_name):
+            return None
         with self._lock:
             return self.repos.get(repo_name)
 
@@ -654,6 +754,8 @@ class RepoRegistry:
         Without this, `ask_tdflite_architect` returns -32603 even when
         the canonical `TDFLite` repo is registered. Red-team finding C2.
         """
+        if not valid_name(repo_name):
+            return None
         with self._lock:
             if repo_name in self.repos:
                 return repo_name  # exact match — fast path
@@ -669,7 +771,7 @@ class RepoRegistry:
         when a case-insensitive match exists, else None.
         """
         path = self.get_repo_path(repo_name)
-        if not path:
+        if not path or not valid_name(role_name):
             return None
         roles = self._list_agents_for(path)
         if role_name in roles:
@@ -681,10 +783,12 @@ class RepoRegistry:
         return None
 
     def has_agent(self, repo_name, role):
+        """True only if role is one of the repo's listed agents (a plain
+        directory name under agents/ with an AGENT.md)."""
         path = self.get_repo_path(repo_name)
-        if not path:
+        if not path or not valid_name(role):
             return False
-        return (Path(path) / "agents" / role / "AGENT.md").is_file()
+        return role in self._list_agents_for(path)
 
     def _list_agents_for(self, path):
         agents_dir = Path(path) / "agents"
@@ -709,6 +813,10 @@ class MCPHandler(BaseHTTPRequestHandler):
     api_key = None
     ask_bin = None
     mcp_only = False
+    loopback_only = True   # bound to a loopback address → enforce loopback Host
+
+    # Socket timeout for reading the request (slowloris guard).
+    timeout = REQUEST_TIMEOUT
 
     def __init__(self, *args, **kwargs):
         self.mcp = MCPServer(self.registry)
@@ -716,7 +824,7 @@ class MCPHandler(BaseHTTPRequestHandler):
         super().__init__(*args, **kwargs)
 
     def do_GET(self):
-        if not self._check_auth():
+        if not self._check_host() or not self._check_auth():
             return
 
         path = urlparse(self.path).path.rstrip("/")
@@ -743,7 +851,9 @@ class MCPHandler(BaseHTTPRequestHandler):
             self._handle_classic_api_get(path)
 
     def do_POST(self):
-        if not self._check_auth():
+        if not self._check_host() or not self._check_auth():
+            return
+        if not self._check_json_content_type():
             return
 
         path = urlparse(self.path).path.rstrip("/")
@@ -786,11 +896,19 @@ class MCPHandler(BaseHTTPRequestHandler):
         body = self._read_json()
         if body is None:
             return
+        if not isinstance(body, dict):
+            self._json_error(400, "Request body must be a JSON object")
+            return
 
-        repo = body.get("repo", "").strip()
-        role = body.get("role", "").strip()
-        question = body.get("question", "").strip()
-        verbose = body.get("verbose", False)
+        fields = {}
+        for key in ("repo", "role", "question"):
+            value = body.get(key, "")
+            if not isinstance(value, str):
+                self._json_error(400, f"Field '{key}' must be a string")
+                return
+            fields[key] = value.strip()
+        repo, role, question = fields["repo"], fields["role"], fields["question"]
+        verbose = body.get("verbose", False) is True
 
         if not repo or not role or not question:
             self._json_error(400, "Required fields: repo, role, question")
@@ -819,19 +937,58 @@ class MCPHandler(BaseHTTPRequestHandler):
             self._json_error(401, "Bearer token required")
             return False
 
-        token = auth_header[7:]  # Remove "Bearer "
-        if token != self.api_key:
+        if not api_key_matches(auth_header, self.api_key):
             self._json_error(403, "Invalid API key")
             return False
 
         return True
 
+    def _check_host(self):
+        """When bound to loopback, only serve loopback Host names, so a web
+        page cannot reach the server through DNS rebinding."""
+        if not self.loopback_only or host_header_is_loopback(self.headers.get("Host")):
+            return True
+        self._json_error(403, "Host not allowed (server is bound to loopback)")
+        return False
+
+    def _check_json_content_type(self):
+        """POST bodies must be declared JSON. Browsers cannot send that
+        cross-site without a CORS preflight (which this server never
+        approves), unlike text/plain or form posts."""
+        ctype = self.headers.get("Content-Type", "")
+        if ctype.split(";", 1)[0].strip().lower() == "application/json":
+            return True
+        self._json_error(415, "Content-Type must be application/json")
+        return False
+
     def _read_json(self):
-        """Read and parse JSON from request body."""
+        """Read a JSON body of at most MAX_BODY_BYTES. Never allocates more
+        than the cap, whatever Content-Length claims."""
+        if self.headers.get("Transfer-Encoding"):
+            self.close_connection = True
+            self._json_error(411, "Content-Length required (chunked bodies not supported)")
+            return None
         try:
-            length = int(self.headers.get("Content-Length", 0))
-            body = self.rfile.read(length).decode("utf-8")
-            return json.loads(body)
+            length = int(self.headers.get("Content-Length", ""))
+        except ValueError:
+            self.close_connection = True
+            self._json_error(411, "Valid Content-Length required")
+            return None
+        if length < 0:
+            self.close_connection = True
+            self._json_error(400, "Invalid Content-Length")
+            return None
+        if length > MAX_BODY_BYTES:
+            self.close_connection = True
+            self._json_error(413, f"Request body too large (max {MAX_BODY_BYTES} bytes)")
+            return None
+        raw = self.rfile.read(length)
+        if len(raw) != length:
+            self.close_connection = True
+            self._json_error(400, "Request body shorter than Content-Length")
+            return None
+        try:
+            return json.loads(raw.decode("utf-8"))
         except Exception as e:
             self._json_error(400, f"Invalid JSON: {e}")
             return None
@@ -869,13 +1026,18 @@ Examples:
   %(prog)s --port 7232 --repos-dir /srv/repos
   %(prog)s --stdio
   %(prog)s --port 7232 --repos-dir /srv/repos --mcp-only
+  %(prog)s --host 0.0.0.0 --port 7232 --repos-dir /srv/repos --api-key SECRET
+
+HTTP mode binds 127.0.0.1 by default. Binding any other address requires an
+API key (--api-key / ASK_API_KEY) unless --insecure-no-auth is given.
         """
     )
 
     # Transport mode
     parser.add_argument("--stdio", action="store_true", help="Use stdio transport (for MCP clients)")
     parser.add_argument("--port", type=int, default=7232, help="Port for HTTP transport (default: 7232)")
-    parser.add_argument("--host", default="0.0.0.0", help="Host to bind for HTTP (default: 0.0.0.0)")
+    parser.add_argument("--host", default="127.0.0.1",
+                        help="Address to bind for HTTP (default: 127.0.0.1; use 0.0.0.0 with --api-key to serve other machines)")
 
     # Repository configuration
     parser.add_argument("--repos-dir", help="Directory containing repos (each subdir with agents/)")
@@ -883,7 +1045,9 @@ Examples:
 
     # Server options
     parser.add_argument("--mcp-only", action="store_true", help="Only serve MCP endpoints, not classic ASK API")
-    parser.add_argument("--api-key", default=os.environ.get("ASK_API_KEY", ""), help="API key for auth")
+    parser.add_argument("--api-key", default=os.environ.get("ASK_API_KEY", ""), help="API key for HTTP auth (or set ASK_API_KEY)")
+    parser.add_argument("--insecure-no-auth", action="store_true",
+                        help="Allow a non-loopback --host without an API key (trusted networks only)")
 
     # ASK CLI configuration
     default_ask = os.environ.get("ASK_BIN", "")
@@ -896,6 +1060,9 @@ Examples:
 
     if not args.repos_dir and not args.repos:
         parser.error("Provide --repos-dir or --repos")
+
+    if not args.stdio:
+        check_bind_safety("ask-mcp-server", args.host, args.api_key, args.insecure_no_auth)
 
     # Build registry
     registry = RepoRegistry()
@@ -958,13 +1125,14 @@ Examples:
         MCPHandler.api_key = args.api_key or None
         MCPHandler.ask_bin = args.ask_bin
         MCPHandler.mcp_only = args.mcp_only
+        MCPHandler.loopback_only = is_loopback_host(args.host)
 
         server = ThreadedMCPServer((args.host, args.port), MCPHandler)
 
         mode_desc = "MCP-only" if args.mcp_only else "MCP + classic ASK API"
         auth_status = "with API key" if args.api_key else "no auth"
 
-        print(f"ask-mcp-server: listening on {args.host}:{args.port} ({mode_desc}, {auth_status})")
+        print(f"ask-mcp-server: listening on {args.host}:{args.port} ({mode_desc}, {auth_status})", flush=True)
         print(f"ask-mcp-server: MCP endpoint: http://localhost:{args.port}/mcp")
         if not args.mcp_only:
             print(f"ask-mcp-server: classic API: http://localhost:{args.port}/v1/agents")

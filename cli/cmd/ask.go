@@ -20,7 +20,7 @@ var askCmd = &cobra.Command{
 This is a thin wrapper around the standalone 'ask' CLI — they're
 equivalent. Use 'rebar ask' when you've installed the rebar binary but
 not added bin/ to your PATH; use 'ask' directly once bin/ is on PATH
-(via bin/install). All flags, agent names, and behaviors are identical.`,
+(via bin/rebar-install). All flags, agent names, and behaviors are identical.`,
 	DisableFlagParsing: true,
 	RunE:               runAsk,
 }
@@ -28,7 +28,7 @@ not added bin/ to your PATH; use 'ask' directly once bin/ is on PATH
 func runAsk(cmd *cobra.Command, args []string) error {
 	askPath := filepath.Join(cfg.BinDir, "ask")
 	if _, err := os.Stat(askPath); err != nil {
-		return fmt.Errorf("ask CLI not found at %s — run bin/install first", askPath)
+		return fmt.Errorf("ask CLI not found at %s — run bin/rebar-install first", askPath)
 	}
 
 	// Use syscall.Exec to fully replace this process with ask.
