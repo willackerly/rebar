@@ -8,3 +8,5 @@ import "os/exec"
 func inOwnGroup(cmd *exec.Cmd) {}
 
 func killGroup(pid int) {}
+
+func groupAlive(pid int) bool { return false }

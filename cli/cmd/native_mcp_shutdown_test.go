@@ -4,7 +4,6 @@ package cmd
 
 import (
 	"bufio"
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -14,7 +13,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"sync"
 	"syscall"
 	"testing"
 	"time"
@@ -35,7 +33,8 @@ import (
 // waits. With $MCP_TRAP set both ignore SIGTERM, so only SIGKILL ends them.
 const blockingAsk = `#!/bin/sh
 if [ -n "$MCP_TRAP" ]; then trap '' TERM; fi
-q=$(echo "$2" | tr -c 'a-zA-Z0-9\n' _)
+for q; do :; done # the question: the last argument (ask --question -- role q)
+q=$(echo "$q" | tr -c 'a-zA-Z0-9\n' _)
 sleep 300 &
 echo $! > "$MCP_PIDDIR/$q.grandchild"
 echo $$ > "$MCP_PIDDIR/$q.child"
@@ -71,10 +70,10 @@ func askProcs(t *testing.T, pids, question string) (int, int) {
 
 // startServer starts argv with stdin and stdout pipes (stdout lines on the
 // channel).
-func startServer(t *testing.T, argv, env []string) (*exec.Cmd, io.WriteCloser, <-chan string, *syncBuffer) {
+func startServer(t *testing.T, argv, env []string) (*exec.Cmd, io.WriteCloser, <-chan string, *testutil.SyncBuffer) {
 	t.Helper()
 	cmd := exec.Command(argv[0], argv[1:]...)
-	stderr := &syncBuffer{}
+	stderr := &testutil.SyncBuffer{}
 	cmd.Dir, cmd.Env, cmd.Stderr = t.TempDir(), env, stderr
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
@@ -103,24 +102,6 @@ func startServer(t *testing.T, argv, env []string) (*exec.Cmd, io.WriteCloser, <
 		close(lines)
 	}()
 	return cmd, stdin, lines, stderr
-}
-
-// syncBuffer is a bytes.Buffer safe to read while a process writes it.
-type syncBuffer struct {
-	mu sync.Mutex
-	b  bytes.Buffer
-}
-
-func (s *syncBuffer) Write(p []byte) (int, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return s.b.Write(p)
-}
-
-func (s *syncBuffer) String() string {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return s.b.String()
 }
 
 // waitExit waits for cmd within limit and returns its exit code and how
@@ -206,7 +187,7 @@ func TestMCPStdioShutdown(t *testing.T) {
 			if !strings.Contains(answer, `"isError":true`) || !strings.Contains(answer, "Agent query cancelled") {
 				t.Errorf("the blocked call's answer: %q\nstderr:\n%s", answer, stderr)
 			}
-			if want := "cancelling 1 running request(s)"; !strings.Contains(stderr.String(), want) {
+			if want := "cancelling running requests"; !strings.Contains(stderr.String(), want) {
 				t.Errorf("stderr lacks %q:\n%s", want, stderr)
 			}
 			if tc.sig != 0 && !strings.Contains(stderr.String(), "signal received: shutting down") {
@@ -226,7 +207,7 @@ func TestMCPHTTPShutdown(t *testing.T) {
 	port := freePort(t)
 	env := mcpEnv(t, "MCP_PIDDIR="+pids, "MCP_TRAP=1")
 	cmd := exec.Command(testBinary(t), "mcp", "serve", "--host", "127.0.0.1", "--port", strconv.Itoa(port), "--repos-dir", repos, "--ask-bin", stub)
-	logs := &syncBuffer{}
+	logs := &testutil.SyncBuffer{}
 	cmd.Dir, cmd.Env, cmd.Stdout, cmd.Stderr = t.TempDir(), env, logs, logs
 	if err := cmd.Start(); err != nil {
 		t.Fatal(err)
@@ -281,6 +262,14 @@ func TestMCPHTTPShutdown(t *testing.T) {
 
 	start := time.Now()
 	cmd.Process.Signal(syscall.SIGTERM)
+	// The asks ignore SIGTERM: they get SIGKILL KillDelay later, not at
+	// once.
+	time.Sleep(mcp.KillDelay / 2)
+	for what, pid := range map[string]int{"/v1/ask's ask": child1, "tools/call's ask": child2} {
+		if !testutil.Alive(pid) {
+			t.Errorf("%s was killed before KillDelay (%v)", what, mcp.KillDelay)
+		}
+	}
 	code, took := waitExit(t, cmd, start, mcp.ShutdownGrace+30*time.Second, logs)
 	if code != 0 {
 		t.Errorf("exit %d:\n%s", code, logs)
@@ -291,13 +280,19 @@ func TestMCPHTTPShutdown(t *testing.T) {
 	if !strings.Contains(logs.String(), "ask-mcp-server: shutting down") {
 		t.Errorf("no shutdown line:\n%s", logs)
 	}
-	// The cancelled calls answer before the server goes (or, if the
-	// connection closes first, the client sees that) — either way promptly.
-	for name, ch := range map[string]chan string{"/v1/ask": classic, "tools/call": tool} {
+	// The cancelled calls answer (the documented "cancelled" error) before
+	// the server goes: the connections close only after the answers.
+	for name, want := range map[string]struct {
+		ch   chan string
+		want string
+	}{
+		"/v1/ask":    {classic, `500 {"error": "Agent query cancelled"}`},
+		"tools/call": {tool, "isError=true Agent query cancelled"},
+	} {
 		select {
-		case got := <-ch:
-			if strings.HasPrefix(got, "200 ") || strings.HasPrefix(got, "isError=false") {
-				t.Errorf("%s answered as if it had finished: %s", name, got)
+		case got := <-want.ch:
+			if got != want.want {
+				t.Errorf("%s answered %q, want %q", name, got, want.want)
 			}
 		case <-time.After(10 * time.Second):
 			t.Errorf("%s still waiting after the server exited", name)

@@ -241,7 +241,7 @@ func TestMCPStdioGolden(t *testing.T) {
 	norm := func(s string) string {
 		return mcpVersion(strings.ReplaceAll(strings.ReplaceAll(s, repos, "$REPOS"), stub, "$STUB"))
 	}
-	checkGolden(t, "mcp", "stdio session", norm(goOut+"--- stderr ---\n"+goErr), "\x00", goCode)
+	checkGolden(t, "mcp", "stdio session", norm(goOut+"--- stderr ---\n"+withoutCancelling(goErr)), "\x00", goCode)
 
 	shimDir := t.TempDir()
 	data, err := os.ReadFile(filepath.Join(testutil.RebarSource(t), "bin", "ask-mcp-server"))
@@ -251,9 +251,22 @@ func TestMCPStdioGolden(t *testing.T) {
 	shim := testutil.WriteExecutable(t, shimDir, "ask-mcp-server", string(data))
 	testutil.WriteExecutable(t, shimDir, "rebar", "#!/bin/sh\nREBAR_TEST_RUN_CLI=1 exec '"+testBinary(t)+"' \"$@\"\n")
 	shOut, shErr, shCode := mcpConverse(t, append([]string{shim}, args...), env, mcpSession)
-	if shOut != goOut || shErr != goErr || shCode != goCode {
+	if shOut != goOut || withoutCancelling(shErr) != withoutCancelling(goErr) || shCode != goCode {
 		t.Errorf("bin/ask-mcp-server differs from rebar mcp serve:\n%s%s\n(exit %d)", shOut, shErr, shCode)
 	}
+}
+
+// withoutCancelling is stderr without the shutdown's "cancelling running
+// requests" line: whether an answer written just before the end of input
+// has been settled when the input ends is a matter of timing.
+func withoutCancelling(stderr string) string {
+	var keep []string
+	for _, l := range strings.SplitAfter(stderr, "\n") {
+		if !strings.HasSuffix(strings.TrimRight(l, "\n"), ": cancelling running requests") {
+			keep = append(keep, l)
+		}
+	}
+	return strings.Join(keep, "")
 }
 
 // TestMCPStdioErrors: the server's start-up failures.
@@ -333,7 +346,7 @@ func exchange(t *testing.T, port int, r httpReq) (int, any, string, http.Header)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if r.body != "" {
+	if r.body != "" || r.method == http.MethodPost {
 		req.Header.Set("Content-Type", "application/json")
 	}
 	if r.auth != "" {
@@ -545,7 +558,7 @@ func TestMCPToolNameWithUnderscore(t *testing.T) {
 		{`{"jsonrpc":"2.0","method":"tools/call","params":{"name":"ask_dsp_2_8_steward","arguments":{"question":"q"}},"id":2}`, true},
 		{`{"jsonrpc":"2.0","method":"tools/call","params":{"name":"ask_DSP_2_8_STEWARD","arguments":{"question":"q"}},"id":3}`, true},
 	})
-	if code != 0 || strings.Count(out, `"text":"answer from dsp_2_8: steward q"`) != 2 {
+	if code != 0 || strings.Count(out, `"text":"answer from dsp_2_8: --question -- steward q"`) != 2 {
 		t.Errorf("exit %d:\n%s\n%s", code, out, errOut)
 	}
 }

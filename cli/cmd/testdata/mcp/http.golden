@@ -88,17 +88,17 @@ POST /mcp {"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"20
 POST /mcp {"jsonrpc":"2.0","method":"notifications/initialized"}
 202 [] 
 POST /mcp {"jsonrpc":"2.0","method":"tools/call","params":{"name":"ask_web_architect","arguments":{"question":"Why?"}},"id":2}
-200 [application/json] {"jsonrpc":"2.0","id":2,"result":{"content":[{"type":"text","text":"answer from web: architect Why?"}]}}
+200 [application/json] {"jsonrpc":"2.0","id":2,"result":{"content":[{"type":"text","text":"answer from web: --question -- architect Why?"}]}}
 POST /mcp {"jsonrpc":"2.0","method":"tools/call","params":{"name":"ask_WEB_ARCHITECT","arguments":{"question":"Why?"}},"id":3}
-200 [application/json] {"jsonrpc":"2.0","id":3,"result":{"content":[{"type":"text","text":"answer from web: architect Why?"}]}}
+200 [application/json] {"jsonrpc":"2.0","id":3,"result":{"content":[{"type":"text","text":"answer from web: --question -- architect Why?"}]}}
 POST /mcp {"jsonrpc":"2.0","method":"tools/call","params":{"name":"ask_web_broken","arguments":{"question":"Why?"}},"id":4}
-200 [application/json] {"jsonrpc":"2.0","id":4,"result":{"content":[{"type":"text","text":"ask: error: claude invocation failed\n(stdout) partial output\n(exit code: 3)\n(cmd: $STUB broken Why? cwd=$REPOS/web)"}],"isError":true}}
+200 [application/json] {"jsonrpc":"2.0","id":4,"result":{"content":[{"type":"text","text":"Agent web:broken failed (exit code 3): ask: error: claude invocation failed"}],"isError":true}}
 POST /mcp {"jsonrpc":"2.0","method":"tools/call","params":{"name":"ask_web_ghost","arguments":{"question":"Why?"}},"id":5}
 200 [application/json] {"jsonrpc":"2.0","id":5,"error":{"code":-32602,"message":"unknown tool \"ask_web_ghost\""}}
 POST /mcp not json
 400 [text/plain; charset=utf-8] malformed payload: unmarshaling jsonrpc message: json: expected 'null' but found invalid token: not json
 POST /mcp 
-415 [text/plain; charset=utf-8] Content-Type must be 'application/json'
+400 [text/plain; charset=utf-8] POST requires a non-empty body
 POST /mcp {"jsonrpc":"2.0","method":"tools/list","id":9}
   (Accept: application/json)
 400 [text/plain; charset=utf-8] Accept must contain both 'application/json' and 'text/event-stream'
@@ -109,12 +109,12 @@ POST /v1/ask {"repo":"web","role":"product","question":" Who? ","verbose":true}
 200 {
   "repo": "web",
   "role": "product",
-  "answer": "answer from web: -v product Who?",
+  "answer": "answer from web: -v --question -- product Who?",
   "exit_code": 0,
   "error": null
 }
 POST /v1/ask {"repo":"web","role":"broken","question":"q"}
-500 {"error": "ask: error: claude invocation failed\n(stdout) partial output\n(exit code: 3)\n(cmd: $STUB broken q cwd=$REPOS/web)"}
+500 {"error": "Agent web:broken failed (exit code 3): ask: error: claude invocation failed"}
 POST /v1/ask {"repo":"WEB","role":"product","question":"q"}
 500 {"error": "Repository WEB not found"}
 POST /v1/ask {"repo":"web","question":"q"}

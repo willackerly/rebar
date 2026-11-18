@@ -5,10 +5,14 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"os"
+	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/jsonrpc"
@@ -34,16 +38,27 @@ import (
 // ServeStdio runs the MCP server over stdin/stdout; it returns at the end
 // of input or, when ctx is done, after a shutdown.
 func (s *Server) ServeStdio(ctx context.Context, in io.Reader, out, errw io.Writer) error {
+	srv, err := s.NewMCPServer()
+	if err != nil {
+		return err
+	}
 	p := newPending()
 	f := &stdinFilter{lines: readLines(in), stop: ctx.Done(), log: errw, pending: p, shutdown: s.Stop,
 		stopping: make(chan struct{}), closed: make(chan struct{})}
-	t := &sdk.IOTransport{Reader: f, Writer: &stdoutTracker{out: out, pending: p}}
+	w := &stdoutTracker{out: out, pending: p, broken: make(chan struct{})}
+	f.reply = func(b []byte) { w.Write(b) }
+	// The filter hands the SDK lines of at most maxLineLength bytes.
+	t := &sdk.IOTransport{Reader: f, Writer: w, MaxLineLength: 2 * maxLineLength}
 	done := make(chan error, 1)
-	go func() { done <- s.NewMCPServer().Run(context.Background(), t) }()
+	go func() { done <- srv.Run(context.Background(), t) }()
 	defer KillChildren()
-	var err error
 	select {
 	case err = <-done:
+	case <-w.broken:
+		// The client closed stdout: nobody reads the answers any more.
+		fmt.Fprintln(errw, "ask-mcp-server: stdout closed: shutting down")
+		s.Stop()
+		return nil
 	case <-f.stopping:
 		// The session ends once the filter reports end of input; its
 		// handlers were cancelled, so this does not take long, but never
@@ -54,16 +69,23 @@ func (s *Server) ServeStdio(ctx context.Context, in io.Reader, out, errw io.Writ
 			return nil
 		}
 	}
-	if err == io.EOF {
+	if err == io.EOF || w.isBroken() {
 		return nil
 	}
 	return err
 }
 
-// line is one line of input, or the error that ended it.
+// maxLineLength caps one line of input (one JSON-RPC message): the SDK's
+// own limit. A longer line is dropped, and logged, and the session goes
+// on; it is never buffered whole.
+var maxLineLength = sdk.DefaultMaxLineLength
+
+// line is one line of input, the size of a line dropped for its length,
+// or the error that ended the input.
 type line struct {
-	b   []byte
-	err error
+	b       []byte
+	dropped int
+	err     error
 }
 
 // readLines reads in line by line (the last line may lack its newline);
@@ -73,13 +95,27 @@ func readLines(in io.Reader) <-chan line {
 	ch := make(chan line)
 	go func() {
 		defer close(ch)
-		r := bufio.NewReader(in)
+		r := bufio.NewReaderSize(in, 64<<10)
+		var buf []byte
+		dropped := 0 // bytes of an over-long line read so far
 		for {
-			b, err := r.ReadBytes('\n')
-			if len(b) > 0 {
-				ch <- line{b: b}
+			chunk, err := r.ReadSlice('\n')
+			end := err == nil || (err != bufio.ErrBufferFull && len(chunk)+len(buf)+dropped > 0)
+			if dropped == 0 && len(buf)+len(chunk) <= maxLineLength+1 {
+				buf = append(buf, chunk...)
+				if end && len(buf) > 0 {
+					ch <- line{b: buf}
+					buf = nil
+				}
+			} else {
+				dropped += len(buf) + len(chunk)
+				buf = nil
+				if end {
+					ch <- line{dropped: dropped}
+					dropped = 0
+				}
 			}
-			if err != nil {
+			if err != nil && err != bufio.ErrBufferFull {
 				if err != io.EOF {
 					ch <- line{err: err}
 				}
@@ -187,6 +223,7 @@ type stdinFilter struct {
 	log      io.Writer
 	pending  *pending
 	shutdown func() // cancels the running tool calls
+	reply    func([]byte)
 	buf      []byte
 
 	stopping chan struct{} // closed when the shutdown starts
@@ -210,9 +247,14 @@ func (f *stdinFilter) Read(b []byte) (int, error) {
 			if l.err != nil {
 				return 0, l.err
 			}
+			if l.dropped > 0 {
+				fmt.Fprintf(f.log, "ask-mcp-server: ignored invalid message (longer than %d bytes): %d bytes\n", maxLineLength, l.dropped)
+				continue
+			}
 			if msg := bytes.TrimSpace(l.b); len(msg) > 0 {
 				if reason := f.check(msg); reason != "" {
 					fmt.Fprintf(f.log, "ask-mcp-server: ignored invalid message (%s): %s\n", reason, abbreviate(msg))
+					f.parseError(msg, reason)
 					continue
 				}
 				f.buf = append(msg, '\n')
@@ -236,8 +278,8 @@ func (f *stdinFilter) end(why string) {
 	if why != "end of input" {
 		fmt.Fprintf(f.log, "ask-mcp-server: %s: shutting down\n", why)
 	}
-	if n := f.pending.count(); n > 0 {
-		fmt.Fprintf(f.log, "ask-mcp-server: %s: cancelling %d running request(s)\n", why, n)
+	if f.pending.count() > 0 {
+		fmt.Fprintf(f.log, "ask-mcp-server: %s: cancelling running requests\n", why)
 	}
 	f.shutdown()
 	f.pending.wait(f.deadline)
@@ -255,9 +297,11 @@ func (f *stdinFilter) Close() error {
 // check is why msg would end the SDK's session ("" when it would not), as
 // its reader decides: a JSON-RPC 2.0 message or (before 2025-06-18) a
 // non-empty batch of them with distinct ids. Fractional ids are refused too
-// (MCP ids are strings or integers; the SDK would truncate 4.5 to 4). Requests read are recorded as pending, and a
-// notifications/cancelled settles the request it names (the SDK does not
-// answer a cancelled request).
+// (MCP ids are strings or integers; the SDK would truncate 4.5 to 4), and
+// so are integer ids beyond ±2^53. Requests read are recorded as pending
+// until their answer is written (stdoutTracker), also when the client
+// cancels them: the SDK still answers a cancelled call, so its id is in use
+// until then.
 func (f *stdinFilter) check(msg []byte) string {
 	if !json.Valid(msg) {
 		return "not JSON"
@@ -286,11 +330,11 @@ func (f *stdinFilter) check(msg []byte) string {
 		if json.Unmarshal(raw, &id) == nil && len(id.ID) > 0 && id.ID[0] != '"' && strings.ContainsAny(string(id.ID), ".eE") {
 			return "fractional id"
 		}
+		if len(id.ID) > 0 && id.ID[0] != '"' && string(id.ID) != "null" && !safeInteger(id.ID) {
+			return "id beyond ±2^53 (it would not survive the round trip)"
+		}
 		req, ok := m.(*jsonrpc.Request)
 		if !ok || !req.IsCall() {
-			if ok && req.Method == "notifications/cancelled" {
-				f.cancelled(req.Params)
-			}
 			continue
 		}
 		if seen[idKey(req.ID)] {
@@ -309,17 +353,111 @@ func (f *stdinFilter) check(msg []byte) string {
 	return ""
 }
 
-// cancelled settles the request a notifications/cancelled names.
-func (f *stdinFilter) cancelled(params json.RawMessage) {
-	var p struct {
-		RequestID any `json:"requestId"`
-	}
-	if json.Unmarshal(params, &p) != nil || p.RequestID == nil {
+// parseError answers a request too deeply nested for the JSON decoders
+// (Go's and the SDK's stop at 1000 levels) with a parse error, when its id
+// can be read: otherwise its client would wait for an answer forever. Other
+// invalid lines get no answer (one with id null breaks Claude Code).
+func (f *stdinFilter) parseError(msg []byte, reason string) {
+	if f.reply == nil || !strings.Contains(reason, "nesting depth") {
 		return
 	}
-	if id, err := jsonrpc.MakeID(p.RequestID); err == nil {
-		f.pending.done(idKey(id))
+	id, ok := topLevelID(msg)
+	if !ok {
+		return
 	}
+	var v any
+	if json.Unmarshal(id, &v) != nil || id[0] != '"' && !safeInteger(id) {
+		return
+	}
+	if rid, err := jsonrpc.MakeID(v); err != nil || f.pending.has(rid) {
+		return // not an id, or one in use: an answer would be taken for its
+	}
+	f.reply([]byte(`{"jsonrpc":"2.0","id":` + string(id) + `,"error":{"code":-32700,"message":"Parse error: JSON nested too deeply"}}` + "\n"))
+}
+
+// topLevelID is the raw "id" member of the JSON object msg, found without
+// decoding the other members (however deep they nest).
+func topLevelID(msg []byte) (json.RawMessage, bool) {
+	i := skipSpace(msg, 0)
+	if i >= len(msg) || msg[i] != '{' {
+		return nil, false
+	}
+	i++
+	for {
+		i = skipSpace(msg, i)
+		if i >= len(msg) || msg[i] != '"' {
+			return nil, false
+		}
+		end := skipValue(msg, i)
+		key := msg[i:end]
+		i = skipSpace(msg, end)
+		if i >= len(msg) || msg[i] != ':' {
+			return nil, false
+		}
+		i = skipSpace(msg, i+1)
+		end = skipValue(msg, i)
+		if end <= i {
+			return nil, false
+		}
+		if string(key) == `"id"` {
+			return json.RawMessage(msg[i:end]), true
+		}
+		i = skipSpace(msg, end)
+		if i >= len(msg) || msg[i] != ',' {
+			return nil, false
+		}
+		i++
+	}
+}
+
+func skipSpace(b []byte, i int) int {
+	for i < len(b) && (b[i] == ' ' || b[i] == '\t' || b[i] == '\r' || b[i] == '\n') {
+		i++
+	}
+	return i
+}
+
+// skipValue is the end of the JSON value starting at b[i] (strings, nested
+// arrays and objects, scalars); i when there is none.
+func skipValue(b []byte, i int) int {
+	if i >= len(b) {
+		return i
+	}
+	depth := 0
+	for j := i; j < len(b); j++ {
+		switch c := b[j]; {
+		case c == '"':
+			for j++; j < len(b) && b[j] != '"'; j++ {
+				if b[j] == '\\' {
+					j++
+				}
+			}
+			if depth == 0 {
+				return j + 1
+			}
+		case c == '{' || c == '[':
+			depth++
+		case c == '}' || c == ']':
+			depth--
+			if depth == 0 {
+				return j + 1
+			}
+			if depth < 0 {
+				return j
+			}
+		case depth == 0 && (c == ',' || c == ' ' || c == '\t' || c == '\r' || c == '\n'):
+			return j
+		}
+	}
+	return len(b)
+}
+
+// safeInteger reports whether a numeric id is an integer a float64 holds
+// exactly (|n| <= 2^53): the SDK decodes ids as JSON numbers, so a larger
+// one would come back altered and its answer would never match.
+func safeInteger(raw json.RawMessage) bool {
+	n, err := strconv.ParseInt(string(raw), 10, 64)
+	return err == nil && n <= 1<<53 && n >= -(1<<53)
 }
 
 // abbreviate is msg cut to 200 bytes for the log.
@@ -333,14 +471,31 @@ func abbreviate(msg []byte) string {
 // stdoutTracker is the SDK's writer: stdout, settling the requests whose
 // responses go out.
 type stdoutTracker struct {
+	mu      sync.Mutex // the SDK's writes and the filter's parse errors
 	out     io.Writer
 	pending *pending
+	broken  chan struct{} // closed when stdout is gone (EPIPE)
+	once    sync.Once
+}
+
+func (w *stdoutTracker) isBroken() bool {
+	select {
+	case <-w.broken:
+		return true
+	default:
+		return false
+	}
 }
 
 func (w *stdoutTracker) Write(b []byte) (int, error) {
-	n, err := w.out.Write(fixNotInitialized(b))
+	w.mu.Lock()
+	n, err := w.out.Write(fixErrorCodes(b))
+	w.mu.Unlock()
 	if err == nil {
 		n = len(b)
+	} else if errors.Is(err, syscall.EPIPE) || errors.Is(err, os.ErrClosed) {
+		w.once.Do(func() { close(w.broken) })
+		return n, err
 	}
 	var batch []json.RawMessage
 	raws := []json.RawMessage{bytes.TrimSpace(b)}

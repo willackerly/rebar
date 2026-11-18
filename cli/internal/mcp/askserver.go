@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -23,8 +24,26 @@ type AskServer struct {
 	Registry *Registry
 	APIKey   string
 	AskCmd   []string
-	// Log gets the one-line request log ("  POST /v1/ask → 200").
-	Log io.Writer
+	// Log gets the one-line request log ("  POST /v1/ask → 200"); ErrLog
+	// the details of failures, which callers are not shown.
+	Log, ErrLog io.Writer
+	// MaxAsks caps the asks (and status/reset commands) running at once
+	// (0: no cap); more get 503.
+	MaxAsks int
+
+	stop     stopper
+	asks     limiter
+	asksOnce sync.Once
+}
+
+// Stop cancels the running commands (shutdown).
+func (h *AskServer) Stop() { h.stop.Stop() }
+
+// logf writes a failure's details to ErrLog.
+func (h *AskServer) logf(format string, args ...any) {
+	if h.ErrLog != nil {
+		fmt.Fprintf(h.ErrLog, "ask-server: "+format+"\n", args...)
+	}
 }
 
 func (h *AskServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -35,12 +54,18 @@ func (h *AskServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 	w = rec
+	if !guardHost(w, r) {
+		return
+	}
 	if r.Method != http.MethodGet && r.Method != http.MethodPost {
 		unsupported(w, r)
 		return
 	}
-	if h.APIKey != "" && r.Header.Get("Authorization") != "Bearer "+h.APIKey {
+	if h.APIKey != "" && !keyMatches(r.Header.Get("Authorization"), "Bearer "+h.APIKey) {
 		jsonError(w, 401, "Unauthorized. Provide Authorization: Bearer <key>")
+		return
+	}
+	if !guardBody(w, r) {
 		return
 	}
 	path := pathOf(r)
@@ -86,9 +111,38 @@ func (h *AskServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func (h *AskServer) shown() string { return strings.Join(h.AskCmd, " ") }
 
+// errBusy: every command slot is taken (MaxAsks).
+var errBusy = errors.New("busy")
+
 // run runs the ask command with args in the repo.
 func (h *AskServer) run(ctx context.Context, path string, timeout time.Duration, args ...string) (string, string, int, error) {
+	h.asksOnce.Do(func() { h.asks = newLimiter(h.MaxAsks) })
+	release, ok := h.asks.acquire()
+	if !ok {
+		return "", "", 0, errBusy
+	}
+	defer release()
+	ctx, cancel := h.stop.with(ctx)
+	defer cancel()
 	return runAskContext(ctx, append(append([]string{}, h.AskCmd...), args...), path, timeout)
+}
+
+// failed answers a command that could not run: busy (503), or 500 with a
+// short message (the details go to ErrLog).
+func (h *AskServer) failed(w http.ResponseWriter, what string, err error) {
+	switch {
+	case errors.Is(err, errBusy):
+		busy(w, h.MaxAsks)
+	case errors.Is(err, context.Canceled):
+		h.logf("%s: cancelled", what)
+		jsonError(w, 503, "Server shutting down")
+	case errors.Is(err, exec.ErrNotFound) || errors.Is(err, os.ErrNotExist):
+		h.logf("%s: ask CLI not found at '%s': %v", what, h.shown(), err)
+		jsonError(w, 500, "ask CLI not found. Set ASK_BIN or ensure ask is in PATH.")
+	default:
+		h.logf("%s: %v", what, err)
+		jsonError(w, 500, "Internal error (see the server log)")
+	}
 }
 
 func (h *AskServer) ask(w http.ResponseWriter, r *http.Request) {
@@ -113,21 +167,21 @@ func (h *AskServer) ask(w http.ResponseWriter, r *http.Request) {
 	if verbose {
 		args = append(args, "-v")
 	}
-	stdout, stderr, code, err := h.run(r.Context(), path, AskTimeout, append(args, role, question)...)
+	stdout, stderr, code, err := h.run(r.Context(), path, AskTimeout, append(args, askArgs(role, question)...)...)
 	switch {
 	case errors.Is(err, context.DeadlineExceeded):
 		jsonError(w, 504, fmt.Sprintf("Agent '%s:%s' timed out (%ds)", repo, role, int(AskTimeout.Seconds())))
 		return
-	case errors.Is(err, exec.ErrNotFound) || errors.Is(err, os.ErrNotExist):
-		jsonError(w, 500, fmt.Sprintf("ask CLI not found at '%s'. Set ASK_BIN or ensure ask is in PATH.", h.shown()))
-		return
 	case err != nil:
-		jsonError(w, 500, fmt.Sprintf("Internal error: %v", err))
+		h.failed(w, "ask "+repo+":"+role, err)
 		return
 	}
 	var errField any
 	if code != 0 {
-		errField = pyStrip(stderr)
+		// The ask's own last error line; the rest of its output (paths,
+		// command lines) stays in the server log.
+		h.logf("ask %s:%s exited %d:\n%s", repo, role, code, strings.TrimRight(stderr, "\n"))
+		errField = lastLine(stderr, path)
 	}
 	jsonOK(w, object{{"repo", repo}, {"role", role}, {"answer", pyStrip(stdout)}, {"exit_code", code}, {"error", errField}})
 }
@@ -153,7 +207,7 @@ func (h *AskServer) status(w http.ResponseWriter, repo, role string) {
 	}
 	stdout, _, _, err := h.run(context.Background(), path, 10*time.Second, "status", role)
 	if err != nil {
-		jsonError(w, 500, fmt.Sprintf("Error checking status: %v", err))
+		h.failed(w, "status "+repo+":"+role, err)
 		return
 	}
 	out := object{{"repo", repo}, {"role", role}}
@@ -187,7 +241,8 @@ func (h *AskServer) log(w http.ResponseWriter, repo, role string) {
 	if f := filepath.Join(path, "agents", role, "memory.log.md"); isFile(f) {
 		text, err := readText(f)
 		if err != nil {
-			jsonError(w, 500, "Internal error: "+err.Error())
+			h.logf("log %s:%s: %v", repo, role, err)
+			jsonError(w, 500, "Internal error (see the server log)")
 			return
 		}
 		content = text
@@ -202,7 +257,7 @@ func (h *AskServer) reset(w http.ResponseWriter, repo, role string) {
 	}
 	stdout, _, _, err := h.run(context.Background(), path, 10*time.Second, "reset", role)
 	if err != nil {
-		jsonError(w, 500, fmt.Sprintf("Error resetting agent: %v", err))
+		h.failed(w, "reset "+repo+":"+role, err)
 		return
 	}
 	jsonOK(w, object{{"repo", repo}, {"role", role}, {"message", pyStrip(stdout)}})

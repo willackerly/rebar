@@ -20,11 +20,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 	"unicode/utf8"
@@ -50,8 +53,23 @@ type Server struct {
 	// AskCmd is the ask command a tools/call runs, before its arguments:
 	// [ASK_BIN] or [rebar, "ask"].
 	AskCmd []string
+	// Remote: callers are remote (HTTP), so failures are reported briefly
+	// and their details written to Log.
+	Remote bool
+	Log    io.Writer
+	// MaxAsks caps the asks running at once (0: no cap); more are
+	// refused as busy.
+	MaxAsks int
 
-	stop stopper
+	stop     stopper
+	asks     limiter
+	asksOnce sync.Once
+}
+
+// acquire takes an ask slot (see MaxAsks).
+func (s *Server) acquire() (func(), bool) {
+	s.asksOnce.Do(func() { s.asks = newLimiter(s.MaxAsks) })
+	return s.asks.acquire()
 }
 
 // inputSchema is every tool's input schema (unchanged since the python
@@ -79,26 +97,60 @@ var resourceKinds = []struct{ kind, name, description string }{
 
 // NewMCPServer builds the MCP server: a tool per agent, three resources
 // per agent, and the alias middleware. The registry is read once, so the
-// tool list is fixed for the server's lifetime (listChanged: false).
-func (s *Server) NewMCPServer() *sdk.Server {
-	srv := sdk.NewServer(&sdk.Implementation{Name: serverName, Version: Version, Description: serverDescription},
+// tool list is fixed for the server's lifetime (listChanged: false). Repo
+// and role names are path-escaped in resource URIs (a repo directory named
+// "pct%zz" is ask://memory/pct%25zz:architect); an agent the SDK still
+// refuses is left out with a warning, and an SDK panic is returned as an
+// error rather than taking the server down.
+func (s *Server) NewMCPServer() (srv *sdk.Server, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			srv, err = nil, fmt.Errorf("building the MCP server: %v", r)
+		}
+	}()
+	srv = sdk.NewServer(&sdk.Implementation{Name: serverName, Version: Version, Description: serverDescription},
 		&sdk.ServerOptions{Capabilities: &sdk.ServerCapabilities{
 			Tools:     &sdk.ToolCapabilities{},
 			Resources: &sdk.ResourceCapabilities{},
 		}})
 	for _, a := range s.Registry.Agents() {
-		sdk.AddTool(srv, &sdk.Tool{Name: ToolName(a), Description: s.description(a.Repo, a.Role), InputSchema: inputSchema}, s.askTool(a))
-		for _, k := range resourceKinds {
-			srv.AddResource(&sdk.Resource{
-				URI:         "ask://" + k.kind + "/" + a.ID(),
-				Name:        a.ID() + " " + k.name,
-				Description: fmt.Sprintf(k.description, a.Repo, a.Role),
-				MIMEType:    "text/markdown",
-			}, s.readResource(k.kind, a))
+		if err := s.addAgent(srv, a); err != nil {
+			if s.Registry.Warn != nil {
+				fmt.Fprintf(s.Registry.Warn, "%s: warning: skipping agent %s: %v\n", serverName, a.ID(), err)
+			}
 		}
 	}
 	srv.AddReceivingMiddleware(s.aliases)
-	return srv
+	return srv, nil
+}
+
+// resourceURI is ask://<kind>/<repo>:<role>, repo and role path-escaped.
+func resourceURI(kind string, a Agent) string {
+	return "ask://" + kind + "/" + url.PathEscape(a.Repo) + ":" + url.PathEscape(a.Role)
+}
+
+// addAgent adds a's tool and resources (an SDK panic becomes an error).
+func (s *Server) addAgent(srv *sdk.Server, a Agent) (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("%v", r)
+		}
+	}()
+	for _, k := range resourceKinds {
+		if _, err := url.Parse(resourceURI(k.kind, a)); err != nil {
+			return err
+		}
+	}
+	sdk.AddTool(srv, &sdk.Tool{Name: ToolName(a), Description: s.description(a.Repo, a.Role), InputSchema: inputSchema}, s.askTool(a))
+	for _, k := range resourceKinds {
+		srv.AddResource(&sdk.Resource{
+			URI:         resourceURI(k.kind, a),
+			Name:        a.ID() + " " + k.name,
+			Description: fmt.Sprintf(k.description, a.Repo, a.Role),
+			MIMEType:    "text/markdown",
+		}, s.readResource(k.kind, a))
+	}
+	return nil
 }
 
 // askTool runs `ask <role> <question>` in the agent's repo. Failures are
@@ -109,6 +161,11 @@ func (s *Server) askTool(a Agent) sdk.ToolHandlerFor[askInput, any] {
 		if strings.TrimSpace(in.Question) == "" {
 			return nil, nil, errors.New("Question required")
 		}
+		release, ok := s.acquire()
+		if !ok {
+			return nil, nil, errors.New(busyMessage(s.MaxAsks))
+		}
+		defer release()
 		answer, errText := s.ExecuteAsk(ctx, a.Repo, a.Role, in.Question, in.Verbose)
 		if errText != "" {
 			return nil, nil, errors.New(errText)
@@ -263,7 +320,13 @@ func pyStrip(s string) string { return strings.TrimSpace(s) }
 
 // ExecuteAsk runs `ask [-v] <role> <question>` in the repo (ASK_SERVER
 // cleared, so the call never routes to a remote server) and returns the
-// answer, or the error text the python server reported.
+// answer, or the error text for the caller. It runs `ask [-v] --question
+// -- <role> <question>`: whatever the question says, it is a question,
+// never an agent command. role must be one of the repo's agents.
+//
+// A local (stdio) caller gets the details of a failure: the ask's output,
+// exit code and command line. A remote (HTTP) caller gets a short error;
+// the details go to the server log.
 func (s *Server) ExecuteAsk(ctx context.Context, repo, role, question string, verbose bool) (string, string) {
 	path := s.Registry.Path(repo)
 	if path == "" {
@@ -276,42 +339,79 @@ func (s *Server) ExecuteAsk(ctx context.Context, repo, role, question string, ve
 	if verbose {
 		argv = append(argv, "-v")
 	}
-	argv = append(argv, role, question)
+	argv = append(argv, askArgs(role, question)...)
 	shown := strings.Join(argv, " ")
 	ctx, cancel := s.withStop(ctx)
 	defer cancel()
 	stdout, stderr, code, err := runAskContext(ctx, argv, path, AskTimeout)
+	detail, short := "", ""
 	switch {
 	case errors.Is(err, context.Canceled):
-		return "", fmt.Sprintf("Agent query cancelled (cmd: %s)", shown)
+		detail, short = fmt.Sprintf("Agent query cancelled (cmd: %s)", shown), "Agent query cancelled"
 	case errors.Is(err, context.DeadlineExceeded):
-		return "", fmt.Sprintf("Agent query timed out after %ds (cmd: %s)", int(AskTimeout.Seconds()), shown)
+		detail = fmt.Sprintf("Agent query timed out after %ds (cmd: %s)", int(AskTimeout.Seconds()), shown)
+		short = fmt.Sprintf("Agent query timed out after %ds", int(AskTimeout.Seconds()))
 	case errors.Is(err, exec.ErrNotFound) || errors.Is(err, os.ErrNotExist):
-		return "", fmt.Sprintf("ask binary not found: [Errno 2] No such file or directory: '%s' (looked at: %s)", argv[0], argv[0])
+		detail = fmt.Sprintf("ask binary not found: [Errno 2] No such file or directory: '%s' (looked at: %s)", argv[0], argv[0])
+		short = "ask binary not found (see the server log)"
 	case err != nil:
-		return "", fmt.Sprintf("Execution error: %v", err)
-	}
-	if code == 0 {
+		detail, short = fmt.Sprintf("Execution error: %v", err), "Execution error (see the server log)"
+	case code == 0:
 		return pyStrip(stdout), ""
+	default:
+		var lines []string
+		if stderr != "" {
+			lines = append(lines, strings.TrimRight(stderr, " \t\n\r\v\f"))
+		}
+		if stdout != "" {
+			lines = append(lines, "(stdout) "+strings.TrimRight(stdout, " \t\n\r\v\f"))
+		}
+		lines = append(lines, fmt.Sprintf("(exit code: %d)", code), fmt.Sprintf("(cmd: %s cwd=%s)", shown, path))
+		detail = strings.Join(lines, "\n")
+		short = fmt.Sprintf("Agent %s:%s failed (exit code %d)", repo, role, code)
+		if last := lastLine(stderr, path); last != "" {
+			short += ": " + last
+		}
 	}
-	var lines []string
-	if stderr != "" {
-		lines = append(lines, strings.TrimRight(stderr, " \t\n\r\v\f"))
+	if !s.Remote {
+		return "", detail
 	}
-	if stdout != "" {
-		lines = append(lines, "(stdout) "+strings.TrimRight(stdout, " \t\n\r\v\f"))
+	if s.Log != nil {
+		fmt.Fprintf(s.Log, "%s: ask %s:%s failed: %s\n", serverName, repo, role, strings.ReplaceAll(detail, "\n", "\n    "))
 	}
-	lines = append(lines, fmt.Sprintf("(exit code: %d)", code), fmt.Sprintf("(cmd: %s cwd=%s)", shown, path))
-	return "", strings.Join(lines, "\n")
+	return "", short
 }
 
-// runAskContext runs argv in dir with ASK_SERVER cleared and returns its
-// output and exit status (negative for a signal, as python reports it), or
-// context.Canceled when parent is done first (a client cancelled the
-// request, or the server is shutting down). The command runs in its own process group; ending it
-// early sends the group SIGTERM, then SIGKILL after KillDelay, and kills
-// what is left of the group (a backend that ignored the signal) once the
-// command has exited.
+// askArgs are the arguments that ask role question, question-only (as the
+// v3.1.2 python servers ask).
+func askArgs(role, question string) []string {
+	return []string{"--question", "--", role, question}
+}
+
+// lastLine is the last non-empty line of an ask's stderr (its "ask:
+// error: …"), at most 200 bytes, with the repo's path hidden: what a
+// remote caller is told about a failure.
+func lastLine(stderr, repoPath string) string {
+	lines := strings.Split(strings.TrimSpace(stderr), "\n")
+	last := strings.TrimSpace(lines[len(lines)-1])
+	if repoPath != "" {
+		last = strings.ReplaceAll(last, repoPath, "<repo>")
+	}
+	if len(last) > 200 {
+		last = strings.ToValidUTF8(last[:200], "") + "…"
+	}
+	return last
+}
+
+// runAskContext runs argv in dir with ASK_SERVER cleared and returns its output and exit status (negative
+// for a signal, as python reports it), or context.Canceled when parent is
+// done first (a client cancelled the request, or the server is shutting
+// down). The command runs in its own process group; ending it early sends
+// the group SIGTERM, then SIGKILL after KillDelay, and kills what is left of
+// the group (a backend that ignored the signal) once the command has
+// exited. What a finished command leaves running in its group (rebar ask's
+// background memory compaction) is killed when the server exits, or
+// LingerLimit after the command, whichever comes first (settle).
 func runAskContext(parent context.Context, argv []string, dir string, timeout time.Duration) (string, string, int, error) {
 	ctx, cancel := context.WithTimeout(parent, timeout)
 	defer cancel()
@@ -327,10 +427,7 @@ func runAskContext(parent context.Context, argv []string, dir string, timeout ti
 		pid := cmd.Process.Pid
 		addChild(pid)
 		err = cmd.Wait()
-		if ctx.Err() != nil {
-			killGroup(pid)
-		}
-		removeChild(pid)
+		settle(pid, ctx.Err() != nil)
 		if errors.Is(err, exec.ErrWaitDelay) {
 			// It exited 0; something it left running holds its output open.
 			err = nil

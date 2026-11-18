@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -146,14 +147,25 @@ func TestStdinFilterGrace(t *testing.T) {
 	}
 }
 
-func TestFixNotInitialized(t *testing.T) {
+func TestFixErrorCodes(t *testing.T) {
 	in := `{"jsonrpc":"2.0","id":0,"error":{"code":0,"message":"method \"tools/list\" is invalid during session initialization"}}` + "\n"
 	want := `{"jsonrpc":"2.0","id":0,"error":{"code":-32600,"message":"method \"tools/list\" is invalid during session initialization"}}` + "\n"
-	if got := string(fixNotInitialized([]byte(in))); got != want {
+	if got := string(fixErrorCodes([]byte(in))); got != want {
 		t.Errorf("got %s", got)
 	}
+	for msg, code := range map[string]int{
+		`duplicate \"initialize\" received`:                  -32600,
+		`handling 'initialize': missing required \"params\"`: -32602,
+		`something else`: -32603,
+	} {
+		in := `{"jsonrpc":"2.0","id":2,"error":{"code":0,"message":"` + msg + `"}}`
+		want := `{"jsonrpc":"2.0","id":2,"error":{"code":` + strconv.Itoa(code) + `,"message":"` + msg + `"}}`
+		if got := string(fixErrorCodes([]byte(in))); got != want {
+			t.Errorf("got %s, want %s", got, want)
+		}
+	}
 	other := `{"jsonrpc":"2.0","id":0,"result":{"content":[{"type":"text","text":"\"error\":{\"code\":0, is invalid during session initialization"}]}}`
-	if got := string(fixNotInitialized([]byte(other))); got != other {
+	if got := string(fixErrorCodes([]byte(other))); got != other {
 		t.Errorf("rewrote a result: %s", got)
 	}
 }

@@ -28,3 +28,9 @@ func inOwnGroup(cmd *exec.Cmd) {
 // killGroup sends SIGKILL to the process group pid leads (gone groups are
 // ignored).
 func killGroup(pid int) { syscall.Kill(-pid, syscall.SIGKILL) }
+
+// groupAlive reports whether the process group pid led has members left.
+func groupAlive(pid int) bool {
+	err := syscall.Kill(-pid, 0)
+	return err == nil || errors.Is(err, syscall.EPERM)
+}

@@ -387,7 +387,8 @@ func askRun(t *testing.T, tc askCase, how string, srv *askServers, dead string) 
 		log := filepath.Join(shimDir, "hand-offs.log")
 		testutil.WriteExecutable(t, shimDir, "rebar", "#!/bin/sh\nprintf '%s\\n' \"$*\" >> '"+log+"'\nREBAR_TEST_RUN_CLI=1 exec '"+testBinary(t)+"' \"$@\"\n")
 		stdout, stderr, code = runSplit(t, proj, env, tc.stdin, shim, args...)
-		if logged, _ := os.ReadFile(log); !strings.HasPrefix(string(logged), "ask") {
+		// The shim first checks that the rebar beside it runs (--version).
+		if logged, _ := os.ReadFile(log); !strings.Contains("\n"+string(logged), "\nask") {
 			t.Errorf("bin/ask did not hand off to rebar ask")
 		}
 	}

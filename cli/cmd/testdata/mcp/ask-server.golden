@@ -1,7 +1,7 @@
 GET /v1/health 
 200 {
   "status": "ok",
-  "repos": 3
+  "repos": 2
 }
 GET /v1/agents 
 200 [
@@ -9,11 +9,6 @@ GET /v1/agents
     "repo": "dsp_2_8",
     "role": "steward",
     "id": "dsp_2_8:steward"
-  },
-  {
-    "repo": "skipme",
-    "role": "architect",
-    "id": "skipme:architect"
   },
   {
     "repo": "web",
@@ -48,13 +43,6 @@ GET /v1/repos/
     "path": "$REPOS/group/dsp_2_8",
     "agents": [
       "steward"
-    ]
-  },
-  {
-    "repo": "skipme",
-    "path": "$REPOS/skipme",
-    "agents": [
-      "architect"
     ]
   },
   {
@@ -100,7 +88,7 @@ POST /v1/ask {"repo":"web","role":"architect","question":"Why?"}
 200 {
   "repo": "web",
   "role": "architect",
-  "answer": "answer from web: architect Why?",
+  "answer": "answer from web: --question -- architect Why?",
   "exit_code": 0,
   "error": null
 }
@@ -108,7 +96,7 @@ POST /v1/ask {"repo":"web","role":"product","question":"Who?","verbose":1}
 200 {
   "repo": "web",
   "role": "product",
-  "answer": "answer from web: -v product Who?",
+  "answer": "answer from web: --question -- product Who?",
   "exit_code": 0,
   "error": null
 }

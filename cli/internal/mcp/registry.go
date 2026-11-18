@@ -8,6 +8,8 @@ import (
 	"sort"
 	"strings"
 	"sync"
+
+	"github.com/willackerly/rebar/cli/internal/ask"
 )
 
 // Registry is the repos a server hosts (RepoRegistry of the python
@@ -21,7 +23,8 @@ type Registry struct {
 	// Log gets the "registered:" lines (stderr for the MCP server, stdout
 	// for ask-server); Warn gets warnings.
 	Log, Warn io.Writer
-	// SkipMarker honours .rebar-skip-mcp files (the MCP server only).
+	// SkipMarker honours .rebar-skip-mcp files: a repo with one is not
+	// served (both servers; ask-server ignored it before rebar 4.0).
 	SkipMarker bool
 }
 
@@ -80,11 +83,8 @@ func (r *Registry) scan(dir string, depth int) {
 		if !isDir(entry) || strings.HasPrefix(e.Name(), ".") || scanSkip[e.Name()] {
 			continue
 		}
-		if r.SkipMarker {
-			if _, err := os.Lstat(filepath.Join(entry, ".rebar-skip-mcp")); err == nil {
-				fmt.Fprintf(r.Warn, "  skipped: %s (.rebar-skip-mcp present)\n", e.Name())
-				continue
-			}
+		if r.skipped(entry, e.Name()) {
+			continue
 		}
 		if isDir(filepath.Join(entry, "agents")) {
 			r.AddRepo(e.Name(), entry)
@@ -94,10 +94,27 @@ func (r *Registry) scan(dir string, depth int) {
 	}
 }
 
-// AddRepos registers explicit repo paths.
+// skipped reports (and logs) a repo opted out of MCP with .rebar-skip-mcp,
+// when the registry honours the marker.
+func (r *Registry) skipped(dir, shown string) bool {
+	if !r.SkipMarker {
+		return false
+	}
+	if _, err := os.Lstat(filepath.Join(dir, ".rebar-skip-mcp")); err != nil {
+		return false
+	}
+	fmt.Fprintf(r.Warn, "  skipped: %s (.rebar-skip-mcp present)\n", shown)
+	return true
+}
+
+// AddRepos registers explicit repo paths (a repo with .rebar-skip-mcp is
+// skipped here too).
 func (r *Registry) AddRepos(paths []string) {
 	for _, p := range paths {
 		p = resolve(p)
+		if r.skipped(p, p) {
+			continue
+		}
 		if isDir(p) && isDir(filepath.Join(p, "agents")) {
 			r.AddRepo(filepath.Base(p), p)
 		} else {
@@ -170,8 +187,11 @@ func (r *Registry) reposJSON() []any {
 	return out
 }
 
-// Path is the path of repo ("" when unknown).
+// Path is the path of repo ("" when unknown, or not a plain name).
 func (r *Registry) Path(repo string) string {
+	if !ask.ValidAgentName(repo) {
+		return ""
+	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	return r.repos[repo]
@@ -219,10 +239,19 @@ func (r *Registry) ResolveRole(repo, role string) string {
 	return ""
 }
 
-// HasAgent reports whether repo has agents/<role>/AGENT.md.
+// HasAgent reports whether role is one of repo's agents: exactly a name
+// agentsFor lists, so a role is never a path ("../../other/agents/x").
 func (r *Registry) HasAgent(repo, role string) bool {
 	path := r.Path(repo)
-	return path != "" && isFile(filepath.Join(path, "agents", role, "AGENT.md"))
+	if path == "" || !ask.ValidAgentName(role) {
+		return false
+	}
+	for _, x := range agentsFor(path) {
+		if x == role {
+			return true
+		}
+	}
+	return false
 }
 
 // agentsFor lists the agents of the repo at path.
@@ -236,7 +265,7 @@ func agentsFor(path string) []string {
 	agents := []string{}
 	for _, e := range entries {
 		p := filepath.Join(dir, e.Name())
-		if isDir(p) && isFile(filepath.Join(p, "AGENT.md")) {
+		if ask.ValidAgentName(e.Name()) && isDir(p) && isFile(filepath.Join(p, "AGENT.md")) {
 			agents = append(agents, e.Name())
 		}
 	}

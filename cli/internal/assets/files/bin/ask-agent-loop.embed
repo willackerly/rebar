@@ -3,8 +3,8 @@
 # CONTRACT:S2-ASK-CLI.1.0
 #
 # Shim: runs `rebar ask-agent-loop` with the same arguments — the rebar beside this
-# script (through symlinks), else REBAR_BIN, else the one on PATH — so
-# PATH entries, .mcp.json files and scripts naming bin/ask-agent-loop keep working.
+# script (through symlinks) if it runs on this machine, else REBAR_BIN, else
+# the one on PATH — so PATH entries, .mcp.json files and scripts naming bin/ask-agent-loop keep working.
 # REBAR_ASK_HANDOFF is set for the rebar it runs: a rebar older than 3.2,
 # whose `rebar ask` runs this script, would otherwise loop.
 if [ -n "${REBAR_ASK_HANDOFF:-}" ]; then
@@ -20,7 +20,11 @@ while [ -L "$self" ]; do
   esac
 done
 rebar=$(dirname "$self")/rebar
-[ -x "$rebar" ] || rebar=${REBAR_BIN:-}
+# The rebar beside this script may be built for another platform (a git
+# checkout's bin/rebar is one platform's build): use it only if it runs.
+if [ ! -x "$rebar" ] || ! "$rebar" --version >/dev/null 2>&1; then
+  rebar=${REBAR_BIN:-}
+fi
 if [ -z "$rebar" ] || [ ! -x "$rebar" ]; then
   rebar=$(command -v rebar 2>/dev/null) || {
     echo "ask-agent-loop: the rebar binary was not found (beside this script, REBAR_BIN or PATH)" >&2

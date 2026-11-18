@@ -198,7 +198,7 @@ func checkClaudeCodeAnswer(t *testing.T, req, resp map[string]any, raw string) {
 				fail("an empty question is an isError result")
 			}
 		default:
-			if !hasResult || isError || first != "answer from web: architect "+question.(string) {
+			if !hasResult || isError || first != "answer from web: --question -- architect "+question.(string) {
 				fail("want the stub's answer as text content")
 			}
 		}
@@ -237,7 +237,7 @@ func TestMCPSDKClient(t *testing.T) {
 		t.Fatalf("tools/list: %v %v", tools, err)
 	}
 	res, err := session.CallTool(ctx, &sdk.CallToolParams{Name: "ask_web_product", Arguments: map[string]any{"question": "Who?", "verbose": true}})
-	if err != nil || res.IsError || firstTextContent(res) != "answer from web: -v product Who?" {
+	if err != nil || res.IsError || firstTextContent(res) != "answer from web: -v --question -- product Who?" {
 		t.Errorf("tools/call: %+v %v", res, err)
 	}
 	res, err = session.CallTool(ctx, &sdk.CallToolParams{Name: "ask_web_broken", Arguments: map[string]any{"question": "q"}})

@@ -19,9 +19,10 @@ import (
 // options are the flags both servers take (argparse in the originals).
 type options struct {
 	stdio, mcpOnly        bool
-	port                  int
+	port, maxAsks         int
 	host, reposDir, repos string
 	apiKey, askBin        string
+	insecureNoAuth        bool
 }
 
 // parse reads args as the python argparse parsers did; it returns the
@@ -34,10 +35,10 @@ func parse(prog, description, epilog string, mcp bool, args []string, stdout, st
 	if mcp {
 		fs.BoolVar(&o.stdio, "stdio", false, "Use stdio transport (for MCP clients)")
 		fs.IntVar(&o.port, "port", 7232, "Port for HTTP transport (default: 7232)")
-		fs.StringVar(&o.host, "host", "0.0.0.0", "Host to bind for HTTP (default: 0.0.0.0)")
+		fs.StringVar(&o.host, "host", "127.0.0.1", "Host to bind for HTTP (default: 127.0.0.1; another address needs --api-key)")
 	} else {
 		fs.IntVar(&o.port, "port", 7232, "Port to listen on (default: 7232)")
-		fs.StringVar(&o.host, "host", "0.0.0.0", "Host to bind (default: 0.0.0.0)")
+		fs.StringVar(&o.host, "host", "127.0.0.1", "Host to bind (default: 127.0.0.1; another address needs --api-key)")
 	}
 	fs.StringVar(&o.reposDir, "repos-dir", "", "Directory containing repos (each subdir with agents/)")
 	fs.StringVar(&o.repos, "repos", "", "Comma-separated paths to specific repos")
@@ -49,6 +50,8 @@ func parse(prog, description, epilog string, mcp bool, args []string, stdout, st
 		fs.StringVar(&o.apiKey, "api-key", os.Getenv("ASK_API_KEY"), "API key for auth (or set ASK_API_KEY)")
 		fs.StringVar(&o.askBin, "ask-bin", os.Getenv("ASK_BIN"), "Path to ask CLI (default: rebar ask)")
 	}
+	fs.IntVar(&o.maxAsks, "max-asks", DefaultMaxAsks, "HTTP: asks run at once at most; more get 503 (0: no limit)")
+	fs.BoolVar(&o.insecureNoAuth, "insecure-no-auth", false, "Allow a non-loopback --host without --api-key (anyone who can reach it can run agents)")
 	fs.SortFlags = false
 	usage := "usage: " + prog + " [-h] " + strings.Join(usageFlags(fs), " ") + "\n"
 	err := fs.Parse(args)
@@ -129,13 +132,16 @@ func signalled() (context.Context, func()) {
 }
 
 // serveUntilSignal serves h on l until SIGINT/SIGTERM, then shuts down:
-// it stops accepting connections, cancels the requests running (their
-// contexts and stop, which cancels MCP tool calls), waits up to
-// ShutdownGrace for them to finish, and kills leftover ask processes.
+// it stops accepting connections and cancels the asks running (stop: their
+// process groups get SIGTERM, then SIGKILL after KillDelay, and each
+// request answers "cancelled"), lets the requests finish their answers for
+// up to ShutdownGrace, then cancels what is left (request contexts) and
+// closes the connections, and kills leftover ask processes.
 func serveUntilSignal(l net.Listener, h http.Handler, onStop, stop func()) error {
 	base, cancelRequests := context.WithCancel(context.Background())
 	defer cancelRequests()
-	srv := &http.Server{Handler: h, BaseContext: func(net.Listener) context.Context { return base }}
+	srv := newHTTPServer(h)
+	srv.BaseContext = func(net.Listener) context.Context { return base }
 	sig, unhook := signalled()
 	defer unhook()
 	errc := make(chan error, 1)
@@ -143,15 +149,18 @@ func serveUntilSignal(l net.Listener, h http.Handler, onStop, stop func()) error
 	select {
 	case <-sig.Done():
 		onStop()
-		cancelRequests()
-		if stop != nil {
-			stop()
-		}
-		ctx, cancel := context.WithTimeout(context.Background(), ShutdownGrace)
-		defer cancel()
-		if srv.Shutdown(ctx) != nil {
-			srv.Close()
-		}
+		shut := make(chan struct{})
+		go func() {
+			defer close(shut)
+			ctx, cancel := context.WithTimeout(context.Background(), ShutdownGrace)
+			defer cancel()
+			if srv.Shutdown(ctx) != nil {
+				cancelRequests()
+				srv.Close()
+			}
+		}()
+		stop()
+		<-shut
 		KillChildren()
 		return nil
 	case err := <-errc:
@@ -188,6 +197,10 @@ Examples:
 	fmt.Fprintf(stderr, "\nask-mcp-server: %d repos, %d agents\n", reg.Len(), len(reg.Agents()))
 	server := &Server{Registry: reg, AskCmd: askCmd(o.askBin, self)}
 	if o.stdio {
+		// A client that closes its end of stdout must not kill the server
+		// with SIGPIPE before it has stopped its asks: writes fail with
+		// EPIPE instead, which ends the session like the end of input.
+		signal.Ignore(syscall.SIGPIPE)
 		fmt.Fprintln(stderr, "ask-mcp-server: starting MCP stdio transport")
 		sig, unhook := signalled()
 		defer unhook()
@@ -196,6 +209,16 @@ Examples:
 			return 1
 		}
 		return 0
+	}
+	if err := checkBind(prog, o, stderr); err != nil {
+		fmt.Fprintf(stderr, "ask-mcp-server: error: %v\n", err)
+		return 2
+	}
+	server.Remote, server.Log, server.MaxAsks = true, stderr, o.maxAsks
+	h, err := NewMCPHandler(server, o.apiKey, o.mcpOnly, stderr)
+	if err != nil {
+		fmt.Fprintf(stderr, "ask-mcp-server: error: %v\n", err)
+		return 1
 	}
 	l, err := listen(o)
 	if err != nil {
@@ -215,7 +238,6 @@ Examples:
 		fmt.Fprintf(stdout, "ask-mcp-server: classic API: http://localhost:%d/v1/agents\n", o.port)
 	}
 	fmt.Fprintln(stdout)
-	h := &MCPHandler{Server: server, APIKey: o.apiKey, MCPOnly: o.mcpOnly, Log: stderr}
 	if err := serveUntilSignal(l, h, func() { fmt.Fprintln(stdout, "\nask-mcp-server: shutting down") }, server.Stop); err != nil {
 		fmt.Fprintf(stderr, "ask-mcp-server: %v\n", err)
 		return 1
@@ -238,7 +260,7 @@ Then from any machine:
 	if done {
 		return code
 	}
-	reg := NewRegistry(prog, stdout, stderr, false)
+	reg := NewRegistry(prog, stdout, stderr, true)
 	fmt.Fprintln(stdout, "ask-server: scanning repos...")
 	build(o, reg)
 	if reg.Len() == 0 {
@@ -246,6 +268,10 @@ Then from any machine:
 		return 1
 	}
 	fmt.Fprintf(stdout, "\nask-server: %d repos, %d agents\n", reg.Len(), len(reg.Agents()))
+	if err := checkBind(prog, o, stderr); err != nil {
+		fmt.Fprintf(stderr, "ask-server: error: %v\n", err)
+		return 2
+	}
 	l, err := listen(o)
 	if err != nil {
 		fmt.Fprintf(stderr, "ask-server: error: %v\n", err)
@@ -257,8 +283,8 @@ Then from any machine:
 	}
 	fmt.Fprintf(stdout, "ask-server: listening on %s:%d (%s)\n", o.host, o.port, auth)
 	fmt.Fprintf(stdout, "ask-server: try: curl http://localhost:%d/v1/agents\n\n", o.port)
-	h := &AskServer{Registry: reg, APIKey: o.apiKey, AskCmd: askCmd(o.askBin, self), Log: stdout}
-	if err := serveUntilSignal(l, h, func() { fmt.Fprintln(stdout, "\nask-server: shutting down") }, nil); err != nil {
+	h := &AskServer{Registry: reg, APIKey: o.apiKey, AskCmd: askCmd(o.askBin, self), Log: stdout, ErrLog: stderr, MaxAsks: o.maxAsks}
+	if err := serveUntilSignal(l, h, func() { fmt.Fprintln(stdout, "\nask-server: shutting down") }, h.Stop); err != nil {
 		fmt.Fprintf(stderr, "ask-server: %v\n", err)
 		return 1
 	}

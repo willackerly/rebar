@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
@@ -43,16 +42,30 @@ func jsonError(w http.ResponseWriter, status int, message string) {
 	writeJSON(w, status, pyDumps(object{{"error", message}}, 0))
 }
 
-// readJSON is _read_json: the body (Content-Length bytes) as JSON, or a
-// 400 "Invalid JSON" answer.
+// readJSON is _read_json (v3.1.2): a body of at most MaxBodyBytes with a
+// valid Content-Length (411 without one, 413 beyond the cap — refused
+// before reading, never allocated from the header), parsed as JSON (400
+// "Invalid JSON" otherwise).
 func readJSON(w http.ResponseWriter, r *http.Request) (any, bool) {
-	n, _ := strconv.Atoi(r.Header.Get("Content-Length"))
-	if n < 0 {
-		n = 0
+	if len(r.TransferEncoding) > 0 {
+		jsonError(w, 411, "Content-Length required (chunked bodies not supported)")
+		return nil, false
 	}
-	data := make([]byte, n)
-	if _, err := io.ReadFull(r.Body, data); err != nil {
-		jsonError(w, 400, "Invalid JSON: "+err.Error())
+	if _, err := strconv.Atoi(r.Header.Get("Content-Length")); err != nil {
+		jsonError(w, 411, "Valid Content-Length required")
+		return nil, false
+	}
+	if r.ContentLength > MaxBodyBytes {
+		tooLargeError(w)
+		return nil, false
+	}
+	data, err := io.ReadAll(http.MaxBytesReader(w, r.Body, MaxBodyBytes))
+	if err != nil {
+		if tooLarge(err) {
+			tooLargeError(w)
+			return nil, false
+		}
+		jsonError(w, 400, "Request body shorter than Content-Length")
 		return nil, false
 	}
 	v, err := decode(data)
@@ -91,7 +104,7 @@ func (s *statusRecorder) Unwrap() http.ResponseWriter { return s.ResponseWriter 
 // MCPHandler serves bin/ask-mcp-server's HTTP mode: /mcp (the SDK's
 // Streamable HTTP transport, JSON responses), GET /mcp/schema, and unless
 // MCPOnly the classic API's /v1/health, /v1/agents, /v1/repos and POST
-// /v1/ask.
+// /v1/ask. Build it with NewMCPHandler.
 type MCPHandler struct {
 	Server  *Server
 	APIKey  string
@@ -99,19 +112,39 @@ type MCPHandler struct {
 	// Log gets python's default request log lines (stderr).
 	Log io.Writer
 
-	once sync.Once
-	mcp  http.Handler
+	sdk *sdk.Server
+	mcp http.Handler
 }
 
-// streamable is the SDK handler of /mcp: one MCP server, a session per
-// client (Mcp-Session-Id), answers as application/json.
-func (h *MCPHandler) streamable() http.Handler {
-	h.once.Do(func() {
-		srv := h.Server.NewMCPServer()
-		h.mcp = sdk.NewStreamableHTTPHandler(func(*http.Request) *sdk.Server { return srv },
-			&sdk.StreamableHTTPOptions{JSONResponse: true})
-	})
-	return h.mcp
+// SessionTimeout closes a Streamable HTTP session idle this long, and
+// MaxSessions caps the sessions open at once (a new initialize beyond it
+// gets 503): without them every initialize kept a session for the life of
+// the server.
+var (
+	SessionTimeout = 15 * time.Minute
+	MaxSessions    = 1000
+)
+
+// NewMCPHandler builds the MCP server and the HTTP handler around it (at
+// start-up, so that a failure is an error, not a broken /mcp).
+func NewMCPHandler(server *Server, apiKey string, mcpOnly bool, log io.Writer) (*MCPHandler, error) {
+	srv, err := server.NewMCPServer()
+	if err != nil {
+		return nil, err
+	}
+	h := &MCPHandler{Server: server, APIKey: apiKey, MCPOnly: mcpOnly, Log: log, sdk: srv}
+	h.mcp = sdk.NewStreamableHTTPHandler(func(*http.Request) *sdk.Server { return srv },
+		&sdk.StreamableHTTPOptions{JSONResponse: true, SessionTimeout: SessionTimeout, MaxRequestBodyBytes: MaxBodyBytes})
+	return h, nil
+}
+
+// sessions is the number of MCP sessions open.
+func (h *MCPHandler) sessions() int {
+	n := 0
+	for range h.sdk.Sessions() {
+		n++
+	}
+	return n
 }
 
 func (h *MCPHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -124,16 +157,24 @@ func (h *MCPHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 	w = rec
+	if !guardHost(w, r) {
+		return
+	}
 	path := pathOf(r)
 	if path != "/mcp" && r.Method != http.MethodGet && r.Method != http.MethodPost {
 		unsupported(w, r)
 		return
 	}
-	if !h.auth(w, r) {
+	if !h.auth(w, r) || !guardBody(w, r) {
 		return
 	}
 	if path == "/mcp" {
-		h.streamable().ServeHTTP(notInitializedWriter{w}, r)
+		if r.Method == http.MethodPost && r.Header.Get("Mcp-Session-Id") == "" && h.sessions() >= MaxSessions {
+			w.Header().Set("Retry-After", "60")
+			jsonError(w, 503, fmt.Sprintf("Too many MCP sessions open (%d); try again later", MaxSessions))
+			return
+		}
+		h.mcp.ServeHTTP(notInitializedWriter{w}, r)
 		return
 	}
 	if r.Method == http.MethodGet {
@@ -179,6 +220,12 @@ func (h *MCPHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if !ok {
 			return
 		}
+		release, ok := h.Server.acquire()
+		if !ok {
+			busy(w, h.Server.MaxAsks)
+			return
+		}
+		defer release()
 		answer, errText := h.Server.ExecuteAsk(r.Context(), repo, role, question, verbose)
 		if errText != "" {
 			jsonError(w, 500, errText)
@@ -200,40 +247,42 @@ func (h *MCPHandler) auth(w http.ResponseWriter, r *http.Request) bool {
 		jsonError(w, 401, "Bearer token required")
 		return false
 	}
-	if header[7:] != h.APIKey {
+	if !keyMatches(header[7:], h.APIKey) {
 		jsonError(w, 403, "Invalid API key")
 		return false
 	}
 	return true
 }
 
-// askFields reads {repo, role, question, verbose} of a /v1/ask body.
+// askFields reads {repo, role, question, verbose} of a /v1/ask body, as
+// the v3.1.2 python servers do: a JSON object with string fields (400
+// otherwise); verbose only when it is true.
 func askFields(w http.ResponseWriter, body any) (string, string, string, bool, bool) {
 	obj, ok := body.(map[string]any)
 	if !ok {
-		jsonError(w, 500, "Internal error: "+noGet(body))
+		jsonError(w, 400, "Request body must be a JSON object")
 		return "", "", "", false, false
 	}
-	str := func(k string) (string, bool) {
+	var fields [3]string
+	for i, k := range []string{"repo", "role", "question"} {
 		v, present := obj[k]
 		if !present {
-			return "", true
+			continue
 		}
 		s, ok := v.(string)
-		return pyStrip(s), ok
+		if !ok {
+			jsonError(w, 400, "Field '"+k+"' must be a string")
+			return "", "", "", false, false
+		}
+		fields[i] = pyStrip(s)
 	}
-	repo, ok1 := str("repo")
-	role, ok2 := str("role")
-	question, ok3 := str("question")
-	if !ok1 || !ok2 || !ok3 {
-		jsonError(w, 500, "Internal error: fields repo, role and question must be strings")
-		return "", "", "", false, false
-	}
+	repo, role, question := fields[0], fields[1], fields[2]
 	if repo == "" || role == "" || question == "" {
 		jsonError(w, 400, "Required fields: repo, role, question")
 		return "", "", "", false, false
 	}
-	return repo, role, question, truthy(obj["verbose"]), true
+	verbose, _ := obj["verbose"].(bool)
+	return repo, role, question, verbose, true
 }
 
 // unsupported is BaseHTTPRequestHandler's 501 for a method it has no
