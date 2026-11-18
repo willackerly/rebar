@@ -14,6 +14,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"os/signal"
 	"path/filepath"
 	"regexp"
@@ -1896,7 +1897,91 @@ func (m *migrator) findReferences(names []string) map[string][]reference {
 		}
 		return nil
 	})
+	m.hookReferences(names, out)
 	return out
+}
+
+// hookReferences adds the git hooks that run a legacy copy to out: a hook
+// that is a symlink to scripts/<name> (ln -sf ../../scripts/x.sh
+// .git/hooks/commit-msg), or a hook file that calls it. Hooks live in the
+// git dir (skipped by the tree walk) or core.hooksPath; git skips a hook
+// whose target is gone without a word, so deleting such a copy would stop
+// the hook silently.
+func (m *migrator) hookReferences(names []string, out map[string][]reference) {
+	root := m.opts.ProjectRoot
+	for _, dir := range HookDirs(root) {
+		entries, err := os.ReadDir(dir)
+		if err != nil {
+			continue
+		}
+		for _, e := range entries {
+			if e.IsDir() || strings.HasSuffix(e.Name(), ".sample") {
+				continue
+			}
+			path := filepath.Join(dir, e.Name())
+			label := path
+			if rel, err := filepath.Rel(root, path); err == nil && !strings.HasPrefix(rel, "..") {
+				label = rel
+			}
+			add := func(n string, line int) {
+				for _, r := range out[n] {
+					if r.File == label && r.Line == line {
+						return
+					}
+				}
+				out[n] = append(out[n], reference{File: label, Line: line})
+			}
+			if e.Type()&os.ModeSymlink != 0 {
+				target, err := filepath.EvalSymlinks(path)
+				if err != nil {
+					continue
+				}
+				for _, n := range names {
+					if copyPath, err := filepath.EvalSymlinks(filepath.Join(root, "scripts", n)); err == nil && copyPath == target {
+						add(n, 1)
+					}
+				}
+				continue
+			}
+			info, err := e.Info()
+			if err != nil || !info.Mode().IsRegular() || info.Size() > 512*1024 {
+				continue
+			}
+			data, err := os.ReadFile(path)
+			if err != nil || bytes.IndexByte(data, 0) >= 0 {
+				continue
+			}
+			for i, line := range codeLines(string(data), "") {
+				for _, n := range names {
+					if strings.Contains(line, "scripts/"+n) {
+						add(n, i+1)
+					}
+				}
+			}
+		}
+	}
+}
+
+// HookDirs are the directories git runs root's hooks from: core.hooksPath
+// (relative to the work tree) when set, and the git dir's hooks/.
+func HookDirs(root string) []string {
+	var dirs []string
+	if out, err := exec.Command("git", "-C", root, "config", "--get", "core.hooksPath").Output(); err == nil {
+		if p := strings.TrimSpace(string(out)); p != "" {
+			if !filepath.IsAbs(p) {
+				p = filepath.Join(root, p)
+			}
+			dirs = append(dirs, p)
+		}
+	}
+	if out, err := exec.Command("git", "-C", root, "rev-parse", "--git-common-dir").Output(); err == nil {
+		p := strings.TrimSpace(string(out))
+		if !filepath.IsAbs(p) {
+			p = filepath.Join(root, p)
+		}
+		dirs = append(dirs, filepath.Join(p, "hooks"))
+	}
+	return dirs
 }
 
 // shimCallers turns a verified copy that other project files call into a
@@ -2001,7 +2086,17 @@ func shimScript(name string) []byte {
 	fmt.Fprintf(&b, "# scripts/%s.sh — left by `rebar migrate` so existing callers keep working.\n", name)
 	fmt.Fprintf(&b, "# The check runs from the rebar install with this project's .rebarrc;\n")
 	fmt.Fprintf(&b, "# prefer `rebar run %s`, and delete this file once nothing calls it.\n", name)
-	b.WriteString("_rebar_shim_root=\"$(cd \"$(dirname \"${BASH_SOURCE[0]}\")/..\" && pwd)\"\n")
+	// A git hook may be a symlink to the wrapper: the project is the
+	// parent of the directory the file itself is in.
+	b.WriteString("_rebar_shim_src=\"${BASH_SOURCE[0]}\"\n")
+	b.WriteString("while [ -L \"$_rebar_shim_src\" ]; do\n")
+	b.WriteString("  _rebar_shim_link=\"$(readlink \"$_rebar_shim_src\")\"\n")
+	b.WriteString("  case \"$_rebar_shim_link\" in\n")
+	b.WriteString("    /*) _rebar_shim_src=\"$_rebar_shim_link\" ;;\n")
+	b.WriteString("    *) _rebar_shim_src=\"$(dirname \"$_rebar_shim_src\")/$_rebar_shim_link\" ;;\n")
+	b.WriteString("  esac\n")
+	b.WriteString("done\n")
+	b.WriteString("_rebar_shim_root=\"$(cd \"$(dirname \"$_rebar_shim_src\")/..\" && pwd)\"\n")
 	if name == "check-ground-truth" {
 		b.WriteString("# Sourced for compute_metrics(): the install computes the declared metrics.\n")
 		b.WriteString("compute_metrics() { REBAR_PROJECT_ROOT=\"$_rebar_shim_root\" rebar run check-ground-truth --print; }\n")

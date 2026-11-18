@@ -135,3 +135,56 @@ func TestLegacySuiteWithMissingChecks(t *testing.T) {
 		}
 	})
 }
+
+// TestBrokenHooksWarn (review S8-2): git skips a hook whose symlink target
+// is gone without a word, so a commit-msg hook linked to a deleted
+// check-fix-commit.sh copy stopped enforcing Gate G silently. `rebar check`
+// names such hooks and the one-liner that replaces them, hook files that
+// call a deleted check, and hooks that run a suite copy which would skip
+// rebar's checks.
+func TestBrokenHooksWarn(t *testing.T) {
+	requireBash(t)
+	bin, home := testBinary(t), t.TempDir()
+	root := legacySuiteProject(t, map[string]string{
+		"pre-commit.sh":    legacyFixture(t, "pre-commit.sh"),
+		"_rebar-config.sh": legacyFixture(t, "_rebar-config.sh"),
+	})
+	hooks := filepath.Join(root, ".git", "hooks")
+	for hook, target := range map[string]string{"commit-msg": "../../scripts/check-fix-commit.sh", "pre-commit": "../../scripts/pre-commit.sh"} {
+		if err := os.Symlink(target, filepath.Join(hooks, hook)); err != nil {
+			t.Skip("symlinks unsupported:", err)
+		}
+	}
+	testutil.WriteExecutable(t, root, ".git/hooks/post-commit", "#!/bin/sh\n# runs scripts/check-todos.sh too (a comment)\n./scripts/check-bypass-flags.sh --warn\n")
+
+	out, _ := testutil.RunEnv(t, root, cliEnv(home), bin, "check", "--pre-commit")
+	for _, want := range []string{
+		"rebar: git hook .git/hooks/commit-msg links to ../../scripts/check-fix-commit.sh, which does not exist, so git skips the hook without a word; " +
+			`replace it: printf '#!/bin/sh\nexec rebar run check-fix-commit "$@"\n' > .git/hooks/commit-msg && chmod +x .git/hooks/commit-msg`,
+		"rebar: git hook .git/hooks/post-commit calls scripts/check-bypass-flags.sh, which does not exist, so the hook may skip it and pass; have it run `rebar run check-bypass-flags` instead",
+		"rebar: git hook .git/hooks/pre-commit runs the project's own scripts/pre-commit.sh, which skips scripts/check-contract-refs.sh, scripts/check-ground-truth.sh, scripts/check-todos.sh (missing or not executable) and passes; run `rebar migrate`, or point the hook at `rebar check --pre-commit`",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("rebar check --pre-commit lacks\n%s\nin:\n%s", want, out)
+		}
+	}
+	if strings.Contains(out, "check-todos.sh, which does not exist") {
+		t.Errorf("a comment in a hook counted as a call:\n%s", out)
+	}
+
+	// The one-liner works: the hook enforces Gate G again.
+	testutil.WriteExecutable(t, root, ".git/hooks/commit-msg-new", "#!/bin/sh\nexec rebar run check-fix-commit \"$@\"\n")
+	_ = os.Remove(filepath.Join(hooks, "commit-msg"))
+	if err := os.Rename(filepath.Join(hooks, "commit-msg-new"), filepath.Join(hooks, "commit-msg")); err != nil {
+		t.Fatal(err)
+	}
+	pathDir := t.TempDir()
+	if err := os.Symlink(bin, filepath.Join(pathDir, "rebar")); err != nil {
+		t.Fatal(err)
+	}
+	testutil.WriteFile(t, root, "msg.txt", "fix: the widget\n")
+	env := append(cliEnv(home), "PATH="+pathDir+string(os.PathListSeparator)+os.Getenv("PATH"))
+	if out, code := testutil.RunEnv(t, root, env, filepath.Join(hooks, "commit-msg"), "msg.txt"); code == 0 || !strings.Contains(out, "Reproduced on:") {
+		t.Errorf("the replacement hook let a fix: commit without Reproduced on: through (exit %d):\n%s", code, out)
+	}
+}
