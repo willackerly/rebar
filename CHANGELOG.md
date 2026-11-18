@@ -28,8 +28,12 @@ All notable changes to rebar. Versioned with [semver](https://semver.org/).
   Code sees. `rebar ask serve` is the enterprise server (was the python
   `bin/ask-server`): the same `/v1/*` endpoints, statuses and bodies.
   `rebar mcp client` replaces `bin/test-mcp-client` (no `requests` module
-  needed). tools/call and `/v1/ask` run `rebar ask` (or `--ask-bin` /
-  `ASK_BIN`) in the repo. No python is needed any more: `bin/ask-mcp-server`,
+  needed). tools/call and `/v1/ask` run `rebar ask --question` (or
+  `--ask-bin` / `ASK_BIN`) in the repo. Both servers have v3.1.2's
+  defaults: `--host 127.0.0.1`, a non-loopback bind needs an API key unless
+  `--insecure-no-auth`, loopback Host only (403), JSON POSTs only (415),
+  bodies up to 1 MiB (413; 411 without a Content-Length), constant-time key
+  check, and roles must be listed agents (never paths). No python is needed any more: `bin/ask-mcp-server`,
   `bin/ask-server` and `bin/test-mcp-client` are POSIX sh hand-offs to the
   binary, so adopters' `.mcp.json` files keep working; the python originals
   moved to `bin/legacy/*.py` and run under `REBAR_CHECK_IMPL=shell` until

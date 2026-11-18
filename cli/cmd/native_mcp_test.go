@@ -354,6 +354,9 @@ func TestMCPHTTPParity(t *testing.T) {
 			{"POST", "/v1/ask", `{"repo":"WEB","role":"product","question":"q"}`, "", ""},
 			{"POST", "/v1/ask", `{"repo":"web","question":"q"}`, "", ""},
 			{"POST", "/v1/reset/web/architect", "", "", ""},
+			{"POST", "/v1/ask", `{"repo":"web","role":"../web/agents/architect","question":"q"}`, "", ""},
+			{"POST", "/v1/ask", `["web","architect","q"]`, "", ""},
+			{"POST", "/v1/ask", `{"repo":"web","role":"architect","question":7}`, "", ""},
 			{"PUT", "/mcp", "{}", "", ""},
 		}},
 		{"http mcp-only with key", []string{"--mcp-only", "--api-key", "s3cret"}, []httpReq{
@@ -429,8 +432,15 @@ esac
 			{"POST", "/v1/ask", `{"repo":"web","role":"architect","question":"  "}`, "", ""},
 			{"POST", "/v1/ask", `{bad`, "", ""},
 			{"POST", "/v1/reset/web/architect", "", "", ""},
+			{"POST", "/v1/reset/web/architect", "{}", "", ""},
+			{"POST", "/v1/reset/web", "{}", "", ""},
 			{"POST", "/v1/reset/web", "", "", ""},
 			{"POST", "/v1/nothing", "", "", ""},
+			{"POST", "/v1/ask", `{"repo":"web","role":"../web/agents/architect","question":"q"}`, "", ""},
+			{"POST", "/v1/ask", `{"repo":"../repos/web","role":"architect","question":"q"}`, "", ""},
+			{"POST", "/v1/ask", `{"repo":"web","role":1,"question":"q"}`, "", ""},
+			{"POST", "/v1/ask", `"just a string"`, "", ""},
+			{"GET", "/v1/log/web/..", "", "", ""},
 			{"GET", "/elsewhere", "", "", ""},
 		}},
 		{"ask-server with key", []string{"--api-key", "k"}, []httpReq{
@@ -459,7 +469,7 @@ func TestMCPToolNameWithUnderscore(t *testing.T) {
 		`{"jsonrpc":"2.0","method":"tools/call","params":{"name":"ask_dsp_2_8_steward","arguments":{"question":"q"}},"id":2}` + "\n" +
 		`{"jsonrpc":"2.0","method":"tools/call","params":{"name":"ask_DSP_2_8_STEWARD","arguments":{"question":"q"}},"id":3}` + "\n"
 	out, errOut, code := mcpStdio(t, []string{testBinary(t), "mcp", "serve", "--stdio", "--repos-dir", repos, "--ask-bin", stub}, mcpEnv(t), input)
-	if code != 0 || strings.Count(out, `"text": "answer from dsp_2_8: steward q"`) != 2 {
+	if code != 0 || strings.Count(out, `"text": "answer from dsp_2_8: --question -- steward q"`) != 2 {
 		t.Errorf("exit %d:\n%s\n%s", code, out, errOut)
 	}
 }

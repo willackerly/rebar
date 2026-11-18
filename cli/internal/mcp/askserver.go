@@ -23,6 +23,8 @@ type AskServer struct {
 	Registry *Registry
 	APIKey   string
 	AskCmd   []string
+	// LoopbackOnly: bound to loopback, so only loopback Host headers.
+	LoopbackOnly bool
 	// Log gets the one-line request log ("  POST /v1/ask → 200").
 	Log io.Writer
 }
@@ -39,8 +41,14 @@ func (h *AskServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		unsupported(w, r)
 		return
 	}
-	if h.APIKey != "" && r.Header.Get("Authorization") != "Bearer "+h.APIKey {
+	if !checkHost(w, r, h.LoopbackOnly) {
+		return
+	}
+	if h.APIKey != "" && !apiKeyMatches(r.Header.Get("Authorization"), h.APIKey) {
 		jsonError(w, 401, "Unauthorized. Provide Authorization: Bearer <key>")
+		return
+	}
+	if r.Method == http.MethodPost && !checkJSONContentType(w, r) {
 		return
 	}
 	path := pathOf(r)
@@ -109,11 +117,7 @@ func (h *AskServer) ask(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, 404, fmt.Sprintf("Agent '%s' not found in repo '%s'. Use GET /v1/agents to list available agents.", role, repo))
 		return
 	}
-	var args []string
-	if verbose {
-		args = append(args, "-v")
-	}
-	stdout, stderr, code, err := h.run(path, AskTimeout, append(args, role, question)...)
+	stdout, stderr, code, err := h.run(path, AskTimeout, askArgs(role, question, verbose)...)
 	switch {
 	case errors.Is(err, context.DeadlineExceeded):
 		jsonError(w, 504, fmt.Sprintf("Agent '%s:%s' timed out (%ds)", repo, role, int(AskTimeout.Seconds())))

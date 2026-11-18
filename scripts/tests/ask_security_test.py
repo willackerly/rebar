@@ -54,9 +54,37 @@ def free_port():
     return port
 
 
-def load(name):
-    """Import a bin/ script (no .py suffix) as a module."""
+def is_python(path):
+    with open(path, "rb") as f:
+        return b"python" in f.readline()
+
+
+def server_argv(prog):
+    """How to start bin/<prog>: the file itself. In the go-native stack it is
+    a shim that runs the rebar binary's server (REBAR_CHECK_IMPL=shell: the
+    python original in bin/legacy/)."""
+    path = os.path.join(BIN, prog)
+    return [sys.executable, path] if is_python(path) else [path]
+
+
+# The rebar binary's servers come from net/http, which answers a
+# non-numeric Content-Length with its own 400 before any handler runs.
+GO_SERVERS = not is_python(os.path.join(BIN, "ask-server")) and os.environ.get("REBAR_CHECK_IMPL") != "shell"
+
+
+def python_source(name):
+    """The python implementation of bin/<name>: the script itself, or its
+    original in bin/legacy/ when bin/<name> is a shim (None when gone)."""
     path = os.path.join(BIN, name)
+    if is_python(path):
+        return path
+    legacy = os.path.join(BIN, "legacy", name + ".py")
+    return legacy if os.path.isfile(legacy) else None
+
+
+def load(name):
+    """Import the python implementation of a bin/ script as a module."""
+    path = python_source(name)
     loader = importlib.machinery.SourceFileLoader(name.replace("-", "_"), path)
     spec = importlib.util.spec_from_loader(loader.name, loader)
     mod = importlib.util.module_from_spec(spec)
@@ -69,7 +97,7 @@ class Server:
 
     def __init__(self, prog, *extra, expect_start=True):
         self.port = free_port()
-        self.argv = [sys.executable, os.path.join(BIN, prog), "--port", str(self.port),
+        self.argv = server_argv(prog) + ["--port", str(self.port),
                      "--repos-dir", REPOS, "--ask-bin", os.path.join(BIN, "ask")] + list(extra)
         env = dict(os.environ, PYTHONUNBUFFERED="1")
         env.pop("ASK_API_KEY", None)
@@ -199,7 +227,7 @@ class AskServerTests(Base):
         s = self.start()
         self.assertIn(" 413 ", self.raw_post(s, (1 << 20) + 1, b"x" * 4096))
         self.assertIn(" 400 ", self.raw_post(s, -1))
-        self.assertIn(" 411 ", self.raw_post(s, "abc"))
+        self.assertIn(" 400 " if GO_SERVERS else " 411 ", self.raw_post(s, "abc"))
 
     def test_non_json_post_415(self):
         s = self.start()
@@ -289,7 +317,7 @@ class AskMCPServerStdioTests(Base):
     def rpc(self, *requests):
         lines = "".join(json.dumps(r) + "\n" for r in requests)
         proc = subprocess.run(
-            [sys.executable, os.path.join(BIN, "ask-mcp-server"), "--stdio",
+            server_argv("ask-mcp-server") + ["--stdio",
              "--repos-dir", REPOS, "--ask-bin", os.path.join(BIN, "ask")],
             input=lines, capture_output=True, text=True, cwd=FX, timeout=120)
         return [json.loads(l) for l in proc.stdout.splitlines() if l.strip()]
@@ -314,6 +342,8 @@ class AskMCPServerStdioTests(Base):
 class HelperTests(unittest.TestCase):
     def test_helpers(self):
         for prog in ("ask-server", "ask-mcp-server"):
+            if python_source(prog) is None:
+                continue  # no python implementation left (the Go tests cover these)
             m = load(prog)
             for bad in ("", ".", "..", "../x", "a/b", "a\\b", "-x", ".hidden", "a..b",
                         "p:a", "a\x00b", "a\nb", None, 3):
@@ -330,7 +360,7 @@ class HelperTests(unittest.TestCase):
             self.assertFalse(m.api_key_matches("Bearer k2", "k1"))
             self.assertFalse(m.api_key_matches("Bearer k\udcff", "k1"))
             self.assertFalse(m.api_key_matches(None, "k1"))
-            with open(os.path.join(BIN, prog)) as f:
+            with open(python_source(prog)) as f:
                 src = f.read()
             self.assertIn("hmac.compare_digest", src)
             self.assertEqual(m.ask_command("ask", "architect", "q", True),

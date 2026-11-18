@@ -41,17 +41,36 @@ func jsonError(w http.ResponseWriter, status int, message string) {
 	writeJSON(w, status, pyDumps(object{{"error", message}}, 0))
 }
 
-// readJSON is _read_json: the body (Content-Length bytes) as JSON, or a
-// 400 "Invalid JSON" answer.
+// readJSON is _read_json: a JSON body of at most MaxBodyBytes, read within
+// RequestTimeout, never allocated from what Content-Length claims; else
+// the error answer (411 without a Content-Length, 413 too large, 400
+// short or invalid).
 func readJSON(w http.ResponseWriter, r *http.Request) (any, bool) {
-	n, _ := strconv.Atoi(r.Header.Get("Content-Length"))
-	if n < 0 {
-		n = 0
-	}
-	data := make([]byte, n)
-	if _, err := io.ReadFull(r.Body, data); err != nil {
-		jsonError(w, 400, "Invalid JSON: "+err.Error())
+	fail := func(status int, msg string) (any, bool) {
+		w.Header().Set("Connection", "close")
+		jsonError(w, status, msg)
 		return nil, false
+	}
+	if len(r.TransferEncoding) > 0 {
+		return fail(411, "Content-Length required (chunked bodies not supported)")
+	}
+	n, err := strconv.Atoi(strings.TrimSpace(r.Header.Get("Content-Length")))
+	if err != nil {
+		return fail(411, "Valid Content-Length required")
+	}
+	if n < 0 {
+		return fail(400, "Invalid Content-Length")
+	}
+	if n > MaxBodyBytes {
+		return fail(413, fmt.Sprintf("Request body too large (max %d bytes)", MaxBodyBytes))
+	}
+	rc := http.NewResponseController(w)
+	_ = rc.SetReadDeadline(time.Now().Add(RequestTimeout))
+	data := make([]byte, n)
+	_, err = io.ReadFull(r.Body, data)
+	_ = rc.SetReadDeadline(time.Time{})
+	if err != nil {
+		return fail(400, "Request body shorter than Content-Length")
 	}
 	v, err := decode(data)
 	if err != nil {
@@ -85,6 +104,9 @@ type MCPHandler struct {
 	Server  *Server
 	APIKey  string
 	MCPOnly bool
+	// LoopbackOnly: the server is bound to loopback, so only loopback
+	// Host headers are answered.
+	LoopbackOnly bool
 	// Log gets python's default request log lines (stderr).
 	Log io.Writer
 }
@@ -103,7 +125,10 @@ func (h *MCPHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		unsupported(w, r)
 		return
 	}
-	if !h.auth(w, r) {
+	if !checkHost(w, r, h.LoopbackOnly) || !h.auth(w, r) {
+		return
+	}
+	if r.Method == http.MethodPost && !checkJSONContentType(w, r) {
 		return
 	}
 	path := pathOf(r)
@@ -180,40 +205,41 @@ func (h *MCPHandler) auth(w http.ResponseWriter, r *http.Request) bool {
 		jsonError(w, 401, "Bearer token required")
 		return false
 	}
-	if header[7:] != h.APIKey {
+	if !apiKeyMatches(header, h.APIKey) {
 		jsonError(w, 403, "Invalid API key")
 		return false
 	}
 	return true
 }
 
-// askFields reads {repo, role, question, verbose} of a /v1/ask body.
+// askFields reads {repo, role, question, verbose} of a /v1/ask body: an
+// object with string fields; verbose only when it is true.
 func askFields(w http.ResponseWriter, body any) (string, string, string, bool, bool) {
 	obj, ok := body.(map[string]any)
 	if !ok {
-		jsonError(w, 500, "Internal error: "+noGet(body))
+		jsonError(w, 400, "Request body must be a JSON object")
 		return "", "", "", false, false
 	}
-	str := func(k string) (string, bool) {
+	var fields [3]string
+	for i, k := range []string{"repo", "role", "question"} {
 		v, present := obj[k]
 		if !present {
-			return "", true
+			continue
 		}
 		s, ok := v.(string)
-		return pyStrip(s), ok
+		if !ok {
+			jsonError(w, 400, "Field '"+k+"' must be a string")
+			return "", "", "", false, false
+		}
+		fields[i] = pyStrip(s)
 	}
-	repo, ok1 := str("repo")
-	role, ok2 := str("role")
-	question, ok3 := str("question")
-	if !ok1 || !ok2 || !ok3 {
-		jsonError(w, 500, "Internal error: fields repo, role and question must be strings")
-		return "", "", "", false, false
-	}
+	repo, role, question := fields[0], fields[1], fields[2]
 	if repo == "" || role == "" || question == "" {
 		jsonError(w, 400, "Required fields: repo, role, question")
 		return "", "", "", false, false
 	}
-	return repo, role, question, truthy(obj["verbose"]), true
+	verbose, _ := obj["verbose"].(bool)
+	return repo, role, question, verbose, true
 }
 
 // unsupported is BaseHTTPRequestHandler's 501 for a method it has no
