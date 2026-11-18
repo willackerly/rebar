@@ -49,3 +49,35 @@ func TestWithEnv(t *testing.T) {
 		t.Errorf("after WithEnv: RCValue = %q, want REBAR_RCFILE's again", got)
 	}
 }
+
+// Setenv/Getenv/Environ from a goroutine outside WithEnv while overrides
+// come and go must not panic (assignment to a nil map) or race: each call
+// sees either the process environment or one whole override. Run with
+// -race.
+func TestEnvConcurrentWithOverride(t *testing.T) {
+	t.Setenv("_REBAR_ENV_RACE", "")
+	root := t.TempDir()
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		for i := 0; i < 2000; i++ {
+			WithEnv(&Env{Vars: []string{"A=1"}}, func() {
+				if v := Getenv("A"); v != "1" {
+					t.Errorf("Getenv(A) = %q inside WithEnv", v)
+				}
+			})
+		}
+	}()
+	for {
+		select {
+		case <-done:
+			return
+		default:
+		}
+		Setenv("_REBAR_ENV_RACE", "x")
+		_ = Getenv("_REBAR_ENV_RACE")
+		_ = Environ()
+		_ = RCFile(root)
+		_ = Overridden()
+	}
+}

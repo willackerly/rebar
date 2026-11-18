@@ -3,7 +3,7 @@
 #
 # Install:
 #   fpath+=(/path/to/rebar/bin/completions); autoload -U _ask
-# Or via bin/install:
+# Or via bin/rebar-install:
 #   ln -s "$(pwd)/bin/completions/_ask" /usr/local/share/zsh/site-functions/_ask
 
 _ask() {

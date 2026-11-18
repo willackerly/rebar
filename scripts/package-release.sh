@@ -2,15 +2,20 @@
 # package-release.sh — build rebar's release binaries and checksums.
 #
 # One self-contained binary per platform, built from the tree at <ref>
-# (`git archive` of cli/): the bootstrap template, the ask shims, bin/install
-# and the completions are compiled in (cli/internal/assets), so a binary
-# alone runs `rebar new / adopt / init / migrate / check / ask / mcp`.
-# setup-rebar.sh downloads one, verifies its checksum and runs
-# `rebar install-shims` to lay out the companions beside it; its source
-# fallback builds the same binary (same flags) from a git checkout.
+# (`git archive` of cli/): the bootstrap template, the ask shims,
+# bin/rebar-install and the completions are compiled in (cli/internal/assets),
+# so a binary alone runs `rebar new / adopt / init / migrate / check / ask /
+# mcp`. setup-rebar.sh downloads one, verifies its checksum and runs
+# `rebar install-shims` to lay out the companions beside it; its --source
+# build makes the same binary (same flags) from a git checkout.
 #
-# Releases up to v3.1.0 shipped tarballs of the whole tree instead;
-# setup-rebar.sh still installs those.
+# Compatibility tarballs (v4.0.x only; drop them in v4.1): the installers of
+# v3.1.x look only for rebar_<ver>_<os>_<arch>.tar.gz and build from source
+# without one. Each tarball holds rebar_<ver>_<os>_<arch>/bin/ with the
+# binary as bin/rebar plus the companions `rebar install-shims` writes
+# (taken from a host build of the same tree), so those installers install
+# the binary as a small tree. (Releases v3.1.0-rc.1 to v3.1.x shipped
+# whole-tree tarballs; setup-rebar.sh still installs those.)
 #
 # Used by .github/workflows/release.yml; runs the same locally.
 #
@@ -23,13 +28,14 @@
 #   --out       output directory (default: dist)
 #   --targets   default: "darwin/amd64 darwin/arm64 linux/amd64 linux/arm64"
 #
-# Output (version v3.2.0 → "3.2.0"):
-#   rebar_3.2.0_<os>_<arch>      one executable per target
-#   rebar_3.2.0_checksums.txt    `sha256sum` format, one line per binary
+# Output (version v4.0.0 → "4.0.0"):
+#   rebar_4.0.0_<os>_<arch>          one executable per target
+#   rebar_4.0.0_<os>_<arch>.tar.gz   the compatibility tarball per target
+#   rebar_4.0.0_checksums.txt        `sha256sum` format, one line per asset
 
 set -euo pipefail
 
-usage() { sed -n '2,29p' "$0" | sed 's/^# \{0,1\}//'; }
+usage() { sed -n '2,34p' "$0" | sed 's/^# \{0,1\}//'; }
 
 VERSION=""
 REF="HEAD"
@@ -90,6 +96,15 @@ tar -x -C "$WORK" -f "$WORK/cli.src.tar"
 rm -f "$WORK/cli.src.tar"
 [ -f "$WORK/cli/go.mod" ] || { echo "package-release: $REF has no cli/go.mod" >&2; exit 1; }
 
+# The companions every binary writes (install-shims), from a host build of
+# the same tree: they are platform-independent and compiled in.
+(
+  cd "$WORK/cli"
+  CGO_ENABLED=0 go build -trimpath -ldflags "$LDFLAGS" -o "$WORK/host-rebar" .
+)
+"$WORK/host-rebar" install-shims --dir "$WORK/kit" >/dev/null \
+  || { echo "package-release: rebar install-shims failed" >&2; exit 1; }
+
 assets=""
 for target in $TARGETS; do
   os="${target%/*}"
@@ -102,9 +117,13 @@ for target in $TARGETS; do
       go build -trimpath -ldflags "$LDFLAGS" -o "$OUT/$name" .
   )
   chmod 755 "$OUT/$name"
-  assets="$assets $name"
+  mkdir -p "$WORK/tar/$name"
+  cp -R "$WORK/kit" "$WORK/tar/$name/bin"
+  cp "$OUT/$name" "$WORK/tar/$name/bin/rebar"
+  tar -C "$WORK/tar" -czf "$OUT/$name.tar.gz" "$name"
+  assets="$assets $name $name.tar.gz"
 done
 
 # shellcheck disable=SC2086  # $assets is a list of plain file names
 (cd "$OUT" && $SHA256 $assets > "rebar_${VER_NAME}_checksums.txt")
-echo "package-release: wrote $(echo $assets | wc -w | tr -d ' ') binary(ies) + rebar_${VER_NAME}_checksums.txt to $OUT"
+echo "package-release: wrote $(echo $assets | wc -w | tr -d ' ') asset(s) (binaries + compatibility tarballs) + rebar_${VER_NAME}_checksums.txt to $OUT"

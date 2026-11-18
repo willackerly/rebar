@@ -108,7 +108,7 @@ fi
 # contracts — and git from treating the copies as live files; modes are not
 # compared, embed keeps none), nothing else. Same list as
 # cli/internal/assets.Sources.
-EMBED_SOURCES="templates/project-bootstrap bin/ask bin/ask-agent-loop bin/ask-mcp-server bin/ask-server bin/install bin/completions"
+EMBED_SOURCES="templates/project-bootstrap bin/ask bin/ask-agent-loop bin/ask-mcp-server bin/ask-server bin/rebar-install bin/completions"
 EMBED="$PROJECT_ROOT/cli/internal/assets/files"
 embed_note=""
 if [ -d "$PROJECT_ROOT/cli/internal/assets" ]; then

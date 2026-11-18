@@ -61,11 +61,18 @@ func runMigrate(cmd *cobra.Command, args []string) error {
 }
 
 func migrateMain(cmd *cobra.Command) error {
+	// Planning and apply put this binary first on PATH for the legacy copies
+	// and wrappers they run (when it is a `rebar`, not a test binary).
+	self := ""
+	if exe, err := os.Executable(); err == nil && filepath.Base(exe) == "rebar" {
+		self = exe
+	}
 	opts := migrate.Options{
 		ProjectRoot:        cfg.RepoRoot,
 		RebarRoot:          findRebarRoot(),
 		RegenerateRegistry: migrateRegenerate,
 		RebarBin:           findRebarCommand(),
+		RebarOnPath:        self,
 		Timeout:            migrateTimeout,
 		Progress:           os.Stderr,
 	}
@@ -88,10 +95,7 @@ func migrateMain(cmd *cobra.Command) error {
 		fmt.Fprintln(out, "Nothing to migrate.")
 		return nil
 	}
-	ao := migrate.ApplyOptions{AllowDirty: migrateAllowDirty}
-	if exe, err := os.Executable(); err == nil && filepath.Base(exe) == "rebar" {
-		ao.RebarBin = exe
-	}
+	ao := migrate.ApplyOptions{AllowDirty: migrateAllowDirty, RebarBin: self}
 	res, err := migrate.Apply(plan, opts, ao)
 	if err != nil {
 		return err

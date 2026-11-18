@@ -47,6 +47,11 @@ type Options struct {
 	// RebarBin is the rebar binary a rewritten .mcp.json runs when the old
 	// ask-mcp-server has no rebar beside it ("": rebar on PATH).
 	RebarBin string
+	// RebarOnPath is the rebar binary that legacy copies, thin wrappers and
+	// checks_extra scripts find first on PATH as `rebar`, both while
+	// planning and in Apply, so the plan is verified against the binary
+	// apply runs ("": PATH is left alone, so both see the rebar there).
+	RebarOnPath string
 }
 
 const defaultTimeout = 3 * time.Minute
@@ -122,6 +127,8 @@ type Plan struct {
 	// serve` (nil: nothing to rewrite).
 	MCP   *MCPEdit
 	Notes []string
+	// RebarOnPath is Options.RebarOnPath, for Apply.
+	RebarOnPath string
 }
 
 // Deletions returns the copies a plan deletes or replaces.
@@ -203,6 +210,8 @@ type migrator struct {
 	// install runs by root, script, arguments and candidate .rebarrc
 	runs map[string]runResult
 	mu   sync.Mutex
+	// binDir holds the `rebar` link put first on PATH (RebarOnPath)
+	binDir string
 }
 
 type probeTreeRun struct {
@@ -240,7 +249,12 @@ func BuildPlan(opts Options) (*Plan, error) {
 
 	rc, _ := os.ReadFile(filepath.Join(proj, ".rebarrc"))
 	m := &migrator{opts: opts, tmp: tmp, rc: rc, trees: map[string]*probeTreeRun{}, runs: map[string]runResult{}, writers: map[string][]string{}}
-	m.plan = &Plan{Project: proj, Install: install, RC: rc, Tier: tierOf(rc)}
+	m.plan = &Plan{Project: proj, Install: install, RC: rc, Tier: tierOf(rc), RebarOnPath: opts.RebarOnPath}
+	if opts.RebarOnPath != "" {
+		if m.binDir, err = linkRebar(opts.RebarOnPath, filepath.Join(tmp, "bin")); err != nil {
+			return nil, err
+		}
+	}
 	m.progress("copying the project to a scratch workspace")
 	if m.ws, err = newWorkspace(proj, tmp); err != nil {
 		return nil, err
@@ -317,6 +331,12 @@ func BuildPlan(opts Options) (*Plan, error) {
 		m.plan.MCP = edit
 	}
 	return m.plan, nil
+}
+
+// env is scrubbedEnv with the RebarOnPath binary first on PATH: the
+// environment every planning run gets.
+func (m *migrator) env(extra ...string) []string {
+	return prependPath(scrubbedEnv(extra...), m.binDir)
 }
 
 func (m *migrator) progress(msg string) {
@@ -500,7 +520,7 @@ func (m *migrator) gates(name string) (int, bool) {
 // a read-only check), and the workspace is restored.
 func (m *migrator) runLegacy(name string, args ...string) runResult {
 	r := run(m.opts.Timeout, m.work,
-		scrubbedEnv("REBAR_PROJECT_ROOT="+m.work, "REBAR_TIER=3"),
+		m.env("REBAR_PROJECT_ROOT="+m.work, "REBAR_TIER=3"),
 		append([]string{m.workPath(name)}, args...)...)
 	m.noteWrites(name)
 	return r
@@ -540,7 +560,7 @@ func (m *migrator) runInstall(root, name string, extra []Setting, args ...string
 	if err != nil {
 		return runResult{Err: err, Code: -1}
 	}
-	r = runNative(root, rcPath, scrubbedEnv("REBAR_PROJECT_ROOT="+root, "REBAR_TIER=3"), name, args...)
+	r = runNative(root, rcPath, m.env("REBAR_PROJECT_ROOT="+root, "REBAR_TIER=3"), name, args...)
 	m.mu.Lock()
 	m.runs[key] = r
 	m.mu.Unlock()
@@ -746,10 +766,10 @@ func (m *migrator) groundTruthStrictness(name string, keys []string, before runR
 			_ = m.ws.restore()
 			return nil, "could not check the copy " + sc.label + ": " + err.Error()
 		}
-		l := run(m.opts.Timeout, m.work, scrubbedEnv("REBAR_PROJECT_ROOT="+m.work, "REBAR_TIER=3"), m.workPath(name))
+		l := run(m.opts.Timeout, m.work, m.env("REBAR_PROJECT_ROOT="+m.work, "REBAR_TIER=3"), m.workPath(name))
 		legacyFails[i] = !l.ok()
 		for v, extra := range variants {
-			r := runNative(m.work, m.rcFile(extra), scrubbedEnv("REBAR_PROJECT_ROOT="+m.work, "REBAR_TIER=3"), name)
+			r := runNative(m.work, m.rcFile(extra), m.env("REBAR_PROJECT_ROOT="+m.work, "REBAR_TIER=3"), name)
 			installFails[v][i] = !r.ok()
 		}
 		if err := m.ws.restore(); err != nil {
@@ -810,7 +830,7 @@ func (m *migrator) legacyMetrics(name string) metricValues {
 func (m *migrator) legacyMetricsIn(root, name string) metricValues {
 	probe := filepath.Join(root, "scripts", ".rebar-migrate-probe")
 	r := run(m.opts.Timeout, root,
-		scrubbedEnv("REBAR_PROJECT_ROOT="+root, "REBAR_TIER=3", "REBAR_MIGRATE_LEGACY="+filepath.Join(root, "scripts", name)),
+		m.env("REBAR_PROJECT_ROOT="+root, "REBAR_TIER=3", "REBAR_MIGRATE_LEGACY="+filepath.Join(root, "scripts", name)),
 		"-c", legacyHarness, probe)
 	if root == m.work {
 		m.noteWrites(name)
@@ -1468,7 +1488,7 @@ func (m *migrator) buildProbeTreeWith(name, content string, cands []Setting, scr
 	for _, c := range []string{installDefaults["contracts_dir"], firstNonEmpty(rcValue(m.rc, "contracts_dir"), "architecture")} {
 		_ = os.MkdirAll(filepath.Join(root, c), 0o755)
 	}
-	t.legacy = run(m.opts.Timeout, root, scrubbedEnv("REBAR_PROJECT_ROOT="+root, "REBAR_TIER=3"),
+	t.legacy = run(m.opts.Timeout, root, m.env("REBAR_PROJECT_ROOT="+root, "REBAR_TIER=3"),
 		filepath.Join(root, "scripts", name))
 	return t
 }
@@ -1552,7 +1572,7 @@ func (m *migrator) configLib() *ScriptPlan {
 		return sp
 	}
 	q := `source "$1" >/dev/null 2>&1; _rebar_tier 2>/dev/null; type _rebar_contracts_dir >/dev/null 2>&1 && _rebar_contracts_dir`
-	env := scrubbedEnv("REBAR_PROJECT_ROOT=" + m.work)
+	env := m.env("REBAR_PROJECT_ROOT=" + m.work)
 	a := run(m.opts.Timeout, m.work, env, "-c", q, "x", m.workPath(name))
 	m.noteWrites(name)
 	// What rebar's own settings readers report (the shell library's
@@ -2214,7 +2234,7 @@ func (m *migrator) registryAfterDeletions() {
 		return
 	}
 	reg := func(arg string) runResult {
-		return runNative(m.work, m.rcFile(nil), scrubbedEnv("REBAR_PROJECT_ROOT="+m.work, "REBAR_TIER=3"), "compute-registry.sh", arg)
+		return runNative(m.work, m.rcFile(nil), m.env("REBAR_PROJECT_ROOT="+m.work, "REBAR_TIER=3"), "compute-registry.sh", arg)
 	}
 	before := reg("--check")
 	if before.Err != nil || before.Code != 0 {
@@ -2317,12 +2337,12 @@ func (m *migrator) settingsOnly(name, src string, before runResult, cands []Sett
 			return ""
 		}
 		args := readOnlyChecks[name]
-		r := run(m.opts.Timeout, m.work, scrubbedEnv("REBAR_PROJECT_ROOT="+m.work, "REBAR_TIER=3"), append([]string{ref}, args...)...)
+		r := run(m.opts.Timeout, m.work, m.env("REBAR_PROJECT_ROOT="+m.work, "REBAR_TIER=3"), append([]string{ref}, args...)...)
 		m.noteWrites("")
 		if same, _ := compareRuns(before, r); !same {
 			continue
 		}
-		pr := run(m.opts.Timeout, legacyTree.root, scrubbedEnv("REBAR_PROJECT_ROOT="+legacyTree.root, "REBAR_TIER=3"), append([]string{ref}, args...)...)
+		pr := run(m.opts.Timeout, legacyTree.root, m.env("REBAR_PROJECT_ROOT="+legacyTree.root, "REBAR_TIER=3"), append([]string{ref}, args...)...)
 		if same, _ := compareRuns(legacyTree.legacy, pr); same {
 			return h
 		}

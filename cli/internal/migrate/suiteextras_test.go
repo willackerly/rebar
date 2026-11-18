@@ -13,10 +13,14 @@ import (
 // releasedSuite is a suite script as rebar v3.0.0 shipped it (skips
 // without the tag in this clone).
 func releasedSuite(t *testing.T, name string) string {
+	return releasedSuiteAt(t, "v3.0.0", name)
+}
+
+func releasedSuiteAt(t *testing.T, tag, name string) string {
 	t.Helper()
-	out, err := testutil.TryGit(installRoot(t), "show", "v3.0.0:scripts/"+name)
+	out, err := testutil.TryGit(installRoot(t), "show", tag+":scripts/"+name)
 	if err != nil {
-		t.Skip("v3.0.0 is not in this clone")
+		t.Skip(tag + " is not in this clone")
 	}
 	return out + "\n"
 }
@@ -69,7 +73,10 @@ func withExtra(t *testing.T, src, before, add string) string {
 func TestSuiteCopyWithExtras(t *testing.T) {
 	ci := withExtra(t, releasedSuite(t, "ci-check.sh"), "\n# NOTE: Tag-to-CI", ciExtraLine)
 	pc := withExtra(t, releasedSuite(t, "pre-commit.sh"), `if [ "$failed" -gt 0 ]`, preCommitExtraBlock)
-	p := suiteProject(t, "0", map[string]string{"ci-check.sh": ci, "pre-commit.sh": pc})
+	// v3.0.0's pre-commit.sh skips everything ("Cannot find check
+	// scripts") without a check-todos.sh beside it.
+	todos := releasedSuite(t, "check-todos.sh")
+	p := suiteProject(t, "0", map[string]string{"ci-check.sh": ci, "pre-commit.sh": pc, "check-todos.sh": todos})
 	plan, err := BuildPlan(opts(p, ""))
 	if err != nil {
 		t.Fatal(err)
@@ -101,6 +108,23 @@ func TestSuiteCopyWithExtras(t *testing.T) {
 	}
 }
 
+// v3.1 suites name run_check's script bare; _rebar_script resolves it in
+// scripts/, so it is a plain call too.
+func TestSuiteCopyWithBareRunCheck(t *testing.T) {
+	ci := withExtra(t, releasedSuiteAt(t, "v3.1.1", "ci-check.sh"), "\n# NOTE: Tag-to-CI", `run_check "OpenAPI"             SKIP_OPENAPI          check-openapi.sh`+"\n")
+	p := suiteProject(t, "0", map[string]string{"ci-check.sh": ci})
+	plan, err := BuildPlan(opts(p, ""))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sp := scriptPlan(plan, "ci-check.sh"); sp == nil || sp.Verdict != Replace {
+		t.Fatalf("not replaced:\n%s", render(plan))
+	}
+	if !strings.Contains(string(plan.NewRC), "checks_extra = scripts/check-openapi.sh") {
+		t.Errorf("proposed .rebarrc lacks checks_extra:\n%s", plan.NewRC)
+	}
+}
+
 // A suite copy is kept when it is more than a released version plus extra
 // calls, or when rebar's suite with the extras exits otherwise.
 func TestSuiteCopyKept(t *testing.T) {
@@ -119,6 +143,51 @@ func TestSuiteCopyKept(t *testing.T) {
 			t.Errorf("checks_extra proposed anyway:\n%s", plan.NewRC)
 		}
 	})
+	// Calls whose failure the copy treats otherwise than a checks_extra
+	// entry (fatal, unconditional) keep the copy, with the reason.
+	pcReleased := releasedSuite(t, "pre-commit.sh")
+	const pcAnchor = `if [ "$failed" -gt 0 ]`
+	const ciAnchor = "\n# NOTE: Tag-to-CI"
+	todos := releasedSuite(t, "check-todos.sh")
+	for _, tc := range []struct {
+		name, suite, src, anchor, add, want string
+	}{
+		{"or true", "pre-commit.sh", pcReleased, pcAnchor,
+			"\"$BASE/check-openapi.sh\" || true\n", "is not a plain fatal call"},
+		{"warning only", "pre-commit.sh", pcReleased, pcAnchor,
+			"if ! \"$BASE/check-openapi.sh\"; then\n  echo \"warning: OpenAPI spec drifted\"\nfi\n", "is not a plain fatal call"},
+		{"CI only", "ci-check.sh", released, ciAnchor,
+			"if [ -n \"${CI:-}\" ]; then\n" + ciExtraLine + "fi\n", "runs inside `if [ -n \"${CI:-}\" ]; then`"},
+		{"guard with more", "pre-commit.sh", pcReleased, pcAnchor,
+			"if [ -x \"$BASE/check-openapi.sh\" ]; then\n  \"$BASE/check-openapi.sh\" || failed=$((failed + 1))\n  rm -f openapi.cache\nfi\n", "runs inside `if [ -x"},
+		{"extra statement on the line", "pre-commit.sh", pcReleased, pcAnchor,
+			"\"$BASE/check-openapi.sh\" || failed=$((failed + 1)); export OPENAPI_DONE=1\n", "is not a plain fatal call"},
+		{"arguments", "ci-check.sh", released, ciAnchor,
+			`run_check "OpenAPI" SKIP_OPENAPI "$SCRIPT_DIR/check-openapi.sh" --lenient` + "\n", "is not a plain fatal call"},
+		{"extra statements elsewhere", "pre-commit.sh", pcReleased, pcAnchor,
+			"export OPENAPI_STRICT=1\n\"$BASE/check-openapi.sh\" || failed=$((failed + 1))\n", "more than those calls"},
+		// v3.0.0's run_check runs its argument as given: a bare name is
+		// not found from the project root, so the copy skips the check
+		// (and passes) even when it fails, which only the forced failure
+		// shows.
+		{"failure ignored", "ci-check.sh", released, ciAnchor,
+			`run_check "OpenAPI" SKIP_OPENAPI check-openapi.sh` + "\n", "when they fail the copy exits 0 where rebar's suite exits 1"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			p := suiteProject(t, "0", map[string]string{tc.suite: withExtra(t, tc.src, tc.anchor, tc.add), "check-todos.sh": todos})
+			plan, err := BuildPlan(opts(p, ""))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if sp := scriptPlan(plan, tc.suite); sp == nil || sp.Verdict != Keep || !strings.Contains(sp.Reason, tc.want) {
+				t.Fatalf("not kept with %q:\n%s", tc.want, render(plan))
+			}
+			if strings.Contains(string(plan.NewRC), "checks_extra") {
+				t.Errorf("checks_extra proposed anyway:\n%s", plan.NewRC)
+			}
+		})
+	}
 	t.Run("different exit", func(t *testing.T) {
 		ci := withExtra(t, released, "\n# NOTE: Tag-to-CI", ciExtraLine)
 		p := suiteProject(t, "0", map[string]string{"ci-check.sh": ci})
@@ -134,4 +203,40 @@ func TestSuiteCopyKept(t *testing.T) {
 			t.Fatalf("not kept on a different exit:\n%s", render(plan))
 		}
 	})
+}
+
+// Planning and apply run legacy copies with the same `rebar` first on PATH
+// (Options.RebarOnPath), so what planning verified is what apply runs.
+func TestRebarOnPath(t *testing.T) {
+	p := testutil.InitRepo(t)
+	testutil.WriteFile(t, p, ".rebarrc", "tier = 1\n")
+	testutil.WriteExecutable(t, p, "scripts/check-todos.sh", "#!/usr/bin/env bash\n# customized\necho \"rebar=$(readlink \"$(command -v rebar)\")\"\n")
+	commitAll(t, p)
+	stub := testutil.WriteExecutable(t, t.TempDir(), "rebar-stub", "#!/bin/sh\nexit 0\n")
+	o := opts(p, "")
+	o.RebarOnPath = stub
+	plan, err := BuildPlan(o)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sp := scriptPlan(plan, "check-todos.sh")
+	if sp == nil || sp.Before == nil || !strings.Contains(sp.Before.Stdout, "rebar="+stub) {
+		t.Fatalf("planning did not put RebarOnPath first on PATH:\n%s\n%+v", render(plan), sp)
+	}
+	res, err := Apply(plan, o, ApplyOptions{AllowDirty: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ran := false
+	for _, c := range res.Checks {
+		if c.Name == "check-todos.sh" {
+			ran = true
+			if !strings.Contains(c.Output, "rebar="+stub) {
+				t.Errorf("apply ran %s with another rebar: %q", c.Ran, c.Output)
+			}
+		}
+	}
+	if !ran {
+		t.Errorf("apply did not run check-todos.sh: %+v", res.Checks)
+	}
 }

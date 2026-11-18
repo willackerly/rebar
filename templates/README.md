@@ -13,7 +13,7 @@ cp -r templates/project-bootstrap/. ../my-new-project/
 cd ../my-new-project
 
 # Install CLI tools and configure agents
-../rebar/bin/install --server your-ask-server:port
+../rebar/bin/rebar-install --server your-ask-server:port
 ```
 
 **What you get:** Working rebar project with filled examples, ready to run immediately.
