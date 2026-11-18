@@ -426,6 +426,13 @@ If you prefer user-level config (available in all projects, not just
 adopted ones), or if your layout needs a non-default `--repos-dir`,
 see **[docs/MCP-SETUP.md](docs/MCP-SETUP.md)**.
 
+The generated config runs `ask-mcp-server --stdio`, which opens no network
+port. To share agents over HTTP (`ask serve` / `ask-mcp-server --port`),
+note that the servers bind `127.0.0.1` by default and refuse a public
+`--host` without an API key (`--api-key` / `ASK_API_KEY`; or
+`--insecure-no-auth` on a trusted network) — see
+[docs/MCP-SETUP.md § Security considerations](docs/MCP-SETUP.md#security-considerations).
+
 **Commit `.mcp.json`?** It contains absolute paths specific to the
 machine that ran `rebar init`. Solo devs: commit. Team projects with
 heterogeneous dev environments: add to `.gitignore` and let each dev

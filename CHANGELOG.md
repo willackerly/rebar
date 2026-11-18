@@ -18,6 +18,35 @@ All notable changes to rebar. Versioned with [semver](https://semver.org/).
 
 ## Unreleased
 
+- **Security: ASK servers and `ask` command dispatch.** Affected: the HTTP
+  mode of `ask-server` (`ask serve`) and `ask-mcp-server` in rebar ≤ v3.1.1,
+  which listened on all interfaces with no API key by default and passed
+  request text to `ask` in a way that could run existing `*.sh` files
+  outside an agent's `commands/` directory or reach agents outside the
+  served repos — remote code execution as the server user for anyone who
+  could reach the port, or a web page via DNS rebinding / cross-site POST.
+  `ask-mcp-server --stdio` (what `rebar init` configures) opens no port and
+  was exposed only to local MCP clients. Upgrade if you run either server
+  over HTTP. See [SECURITY.md](SECURITY.md#ask-servers-ask-server-ask-mcp-server).
+  - `ask <agent> <word>` runs `commands/<word>.sh` only when the word is a
+    plain name (letters, digits, `.`, `_`, `-`; no `..`, no leading `.` or
+    `-`) naming an executable file directly in `commands/`; anything else
+    is a question. Agent names must be plain directory names under
+    `agents/` (no `/`, `..`, `:`). `ask <agent> <command> [args]` works as
+    before.
+  - New `ask --question <agent> "<question>"`: always a question, never a
+    command script, subcommand, or default command. The servers use it.
+  - Servers accept only registered repos and their listed agents.
+  - **Compatibility:** `--host` now defaults to `127.0.0.1` (was
+    `0.0.0.0`). To serve other machines pass `--host 0.0.0.0` **and**
+    `--api-key KEY` (or `ASK_API_KEY`); a non-loopback bind without a key
+    exits with an error unless `--insecure-no-auth` is given. A
+    loopback-bound server answers only `Host: localhost` / `127.0.0.1` /
+    `[::1]` (reverse proxies must send one of these). POSTs (including
+    `/v1/reset`) must be `Content-Type: application/json` (415 otherwise;
+    `ask`'s remote mode already sends it) with a body ≤ 1 MiB (413) and a
+    `Content-Length`. API keys are compared in constant time; clients get
+    60 s to send a request.
 - **`bin/install` is now `bin/rebar-install`.** The installer puts
   `~/.rebar/current/bin` first on PATH, where a file named `install` shadowed
   the system `install(1)`: `install -d dir` failed with "Unknown option: -d",
