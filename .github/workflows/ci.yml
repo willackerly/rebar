@@ -115,10 +115,10 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          # Full history, as in the checks job: migrate's tests recognize
-          # the legacy script fixtures (testdata/legacy) by their blobs in
-          # the rebar tree's history.
-          fetch-depth: 0
+          # A shallow checkout, unlike the checks job: migrate recognizes
+          # the legacy fixtures (released v3.1.1 blobs) from the manifest
+          # compiled into the binary, so the tests need no history, and
+          # this job covers that binary-only path.
           persist-credentials: false
 
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
