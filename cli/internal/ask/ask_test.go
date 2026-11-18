@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/willackerly/rebar/cli/internal/testutil"
 )
 
 func TestHelpers(t *testing.T) {
@@ -103,5 +105,56 @@ func TestLoopStops(t *testing.T) {
 	}
 	if !strings.Contains(out.String(), "[x] online") || strings.Count(out.String(), "[x] offline") != 2 {
 		t.Errorf("output:\n%s", out.String())
+	}
+}
+
+// TestCommandScriptAndAgentNames: a word from a question selects only an
+// executable script directly inside commands/ (resolved), and agent names
+// are never paths (the v3.1.2 rules).
+func TestCommandScriptAndAgentNames(t *testing.T) {
+	root := t.TempDir()
+	if real, err := filepath.EvalSymlinks(root); err == nil {
+		root = real
+	}
+	agent := filepath.Join(root, "agents", "a")
+	for _, name := range []string{"status.sh", "v1.2_x-y.sh", "run tests.sh", "-x.sh", ".hidden.sh"} {
+		testutil.WriteExecutable(t, agent, "commands/"+name, "#!/bin/sh\n")
+	}
+	testutil.WriteFile(t, agent, "commands/plain.sh", "not executable\n")
+	testutil.WriteExecutable(t, root, "evil/x.sh", "#!/bin/sh\n")
+	commands := filepath.Join(agent, "commands")
+	for word, want := range map[string]string{
+		"status":          commands + "/status.sh",
+		"v1.2_x-y":        commands + "/v1.2_x-y.sh",
+		"run tests":       "",
+		"plain":           "",
+		"missing":         "",
+		"../../../evil/x": "",
+		"..":              "",
+		"a/b":             "",
+		`a\b`:             "",
+		"-x":              "",
+		".hidden":         "",
+		"x\x00y":          "",
+		"":                "",
+		"what..that":      "",
+		"日本語":             "",
+	} {
+		got, ok := commandScript(agent, word)
+		if !ok {
+			got = ""
+		}
+		if got != want {
+			t.Errorf("commandScript(%q) = %q, want %q", word, got, want)
+		}
+	}
+	for name, want := range map[string]bool{
+		"architect": true, "my agent": true, "dsp_2_8": true, "pct%zz": true,
+		"": false, ".hidden": false, ".": false, "..": false, "a..b": false, "-v": false, "a/b": false,
+		"../../x": false, `a\b`: false, "repo:role": false, "a\x00": false, "a\nb": false, "a\x7f": false,
+	} {
+		if got := ValidAgentName(name); got != want {
+			t.Errorf("ValidAgentName(%q) = %v", name, got)
+		}
 	}
 }

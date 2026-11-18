@@ -5,6 +5,9 @@ Usage:
   ask <agent> "<question>"     Send a question, get a concise answer
   ask -v <agent> "<question>"  Verbose: answer + rationale + refs
   ask -w <agent> "<question>"  Write mode: agent can edit/create files
+  ask --question <agent> "<question>"
+                               Always a question: never runs a command script
+                               or the default command (servers use this)
   ask project:agent "question" Query an agent in another project
   ask <agent>                    Run agent's default command (if configured)
   ask <agent> <command> [args]   Run a named agent command

@@ -28,7 +28,10 @@ All notable changes to rebar. Versioned with [semver](https://semver.org/).
   `shared/messages/events.jsonl`, `~/.config/ask/projects`,
   `.rr-index`), and the inbox loop (`ask up`, `bin/ask-agent-loop`, now
   also `rebar ask-agent-loop`). It works in any directory, as `bin/ask`
-  did, and needs no jq (it writes jq's bytes itself). `bin/ask` and
+  did, and needs no jq (it writes jq's bytes itself). It has v3.1.2's
+  safety rules: a command word runs only a plain-named executable directly
+  in the agent's `commands/`, agent names cannot be paths ("invalid agent
+  name", exit 2), and `ask --question` never runs a command. `bin/ask` and
   `bin/ask-agent-loop` hand off to the `rebar` beside them (else
   `REBAR_BIN`, else `PATH`), so scripts and `run.sh` files that call them
   keep working; `REBAR_CHECK_IMPL=shell` runs the bash. `rebar init/new`
