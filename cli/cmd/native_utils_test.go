@@ -147,6 +147,16 @@ var refreshContextCases = []goldenCase{
 }
 
 func TestRefreshContextGolden(t *testing.T) {
+	// Review R6: git fills a date-only --since with the current time of
+	// day, so commits of the last-synced day dropped out late in the day
+	// (for fixedDate, after 19:04 in Los Angeles). Git runs at 23:30 Los
+	// Angeles time (GIT_TEST_DATE_NOW) so the goldens hold at any hour, in
+	// any time zone.
+	if la, err := time.LoadLocation("America/Los_Angeles"); err == nil {
+		y, m, d := time.Now().In(la).Date()
+		t.Setenv("TZ", "America/Los_Angeles")
+		t.Setenv("GIT_TEST_DATE_NOW", strconv.FormatInt(time.Date(y, m, d, 23, 30, 0, 0, la).Unix(), 10))
+	}
 	runGolden(t, refreshContextCheck, refreshContextCases)
 }
 
