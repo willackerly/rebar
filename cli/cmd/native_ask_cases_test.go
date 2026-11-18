@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"bytes"
 	"fmt"
 	"os"
 	"os/exec"
@@ -334,7 +333,8 @@ func TestAskLoopGolden(t *testing.T) {
 				cmd := exec.Command(testBinary(t), append([]string{tool.script}, tool.args...)...)
 				env = append(env, "REBAR_TEST_RUN_CLI=1")
 				before := snapshot(t, base)
-				var stdout, stderr bytes.Buffer
+				// The test polls stdout while the loop writes it.
+				var stdout, stderr testutil.SyncBuffer
 				cmd.Dir, cmd.Env, cmd.Stdout, cmd.Stderr = proj, env, &stdout, &stderr
 				if err := cmd.Start(); err != nil {
 					t.Fatal(err)

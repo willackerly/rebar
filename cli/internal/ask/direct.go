@@ -160,7 +160,7 @@ func (a *App) askDirect(agent, question string) {
 	appendEvent(a.eventsLog, event(id, agent, "human", "answer", timestamp(), response))
 	first, _, _ := strings.Cut(response, "\n")
 	_ = os.MkdirAll(dir, 0o755)
-	appendFile(dir+"/memory.log.md", "---\n**"+ts+"** Q: "+question+"\nA: "+first+"\n")
+	appendMemoryLog(dir, "---\n**"+ts+"** Q: "+question+"\nA: "+first+"\n")
 	a.maybeCompact(agent)
 	a.formatResponse(agent, response, "")
 	a.exit(0)

@@ -58,6 +58,7 @@ type App struct {
 	agentsDir, sharedDir, eventsLog string
 	timeout                         string
 	verbose, debug, writeMode       bool
+	questionOnly                    bool
 	model, contextLimit             string
 	registry, server, apiKey        string
 
@@ -180,6 +181,8 @@ func (a *App) parseFlags(args []string) []string {
 			a.debug, a.verbose = true, true
 		case arg == "-w" || arg == "--write":
 			a.writeMode = true
+		case arg == "--question":
+			a.questionOnly = true
 		case arg == "-V" || arg == "--version":
 			v := rebarVersionFallback
 			if data, err := os.ReadFile(".rebar-version"); err == nil {
@@ -214,6 +217,10 @@ func arg(args []string, i int) string {
 // dispatch is the script's Main Dispatch.
 func (a *App) dispatch(args []string) {
 	cmd := arg(args, 0)
+	if a.questionOnly {
+		a.askOnly(args)
+		a.exit(0)
+	}
 	if cmd == "" {
 		cmd = "help"
 	}
@@ -318,10 +325,82 @@ func (a *App) askOrCommand(spec string, rest []string) {
 		a.exit(4)
 	}
 
-	if script := agentDir + "/commands/" + word + ".sh"; isExecutable(script) {
+	if script, ok := commandScript(agentDir, word); ok {
 		a.exit(a.runCommand(script, rest[1:]))
 	}
 	a.ask(agent, word)
+}
+
+// askOnly is `ask --question <agent> "<question>"`: the question is a
+// question whatever it says — never a subcommand, an agent command
+// (commands/<word>.sh) or the default command. The MCP server and
+// ask-server ask this way (`ask [-v] --question -- <role> <question>`), so
+// text from the network never selects a script. As in bin/ask (v3.1.2).
+func (a *App) askOnly(args []string) {
+	if len(args) != 2 || args[0] == "" || args[1] == "" {
+		a.errf("ask: error: --question takes exactly two arguments: <agent> \"<question>\"\n")
+		a.exit(4)
+	}
+	if a.isRemoteQuery(args[0]) {
+		repo, role := splitSpec(args[0])
+		a.remoteAsk(repo, role, args[1])
+		a.exit(0)
+	}
+	agent := a.resolveProjectAgent(args[0])
+	a.requireAgentExists(agent)
+	a.ask(a.canonicalAgent, args[1])
+}
+
+// ValidAgentName reports whether name can only be one directory entry
+// under agents/: not empty, no path separator, no "..", no ":" (the
+// project:agent separator), no control character, no leading "." or "-".
+// Anything else could name a directory elsewhere (../../other/agents/x).
+func ValidAgentName(name string) bool {
+	if name == "" || name[0] == '.' || name[0] == '-' || strings.Contains(name, "..") ||
+		strings.ContainsAny(name, "/\\:") {
+		return false
+	}
+	for _, r := range name {
+		if r < 0x20 || r == 0x7f {
+			return false
+		}
+	}
+	return true
+}
+
+// validCommandWord: a command word is a plain name — letters, digits, ".",
+// "_" and "-", no "..", not starting with "." or "-". Anything else is a
+// question.
+func validCommandWord(word string) bool {
+	if word == "" || word[0] == '.' || word[0] == '-' || strings.Contains(word, "..") {
+		return false
+	}
+	for _, c := range []byte(word) {
+		switch {
+		case c >= 'a' && c <= 'z', c >= 'A' && c <= 'Z', c >= '0' && c <= '9', c == '.', c == '_', c == '-':
+		default:
+			return false
+		}
+	}
+	return true
+}
+
+// commandScript is the agent command word names: <word>.sh directly in the
+// agent's commands/ directory (resolved through symlinks), an executable
+// regular file. ok is false when word is not a command — a question.
+func commandScript(agentDir, word string) (string, bool) {
+	if !validCommandWord(word) {
+		return "", false
+	}
+	dir, err := filepath.EvalSymlinks(agentDir + "/commands")
+	if err != nil || !isDir(dir) {
+		return "", false
+	}
+	script := dir + "/" + word + ".sh"
+	if filepath.Dir(filepath.Clean(script)) != filepath.Clean(dir) || !isFile(script) || !isExecutable(script) {
+		return "", false
+	}
+	return script, true
 }
 
 // isExecutable is `[ -x path ]`.
@@ -366,6 +445,9 @@ Usage:
   ask <agent> "<question>"     Send a question, get a concise answer
   ask -v <agent> "<question>"  Verbose: answer + rationale + refs
   ask -w <agent> "<question>"  Write mode: agent can edit/create files
+  ask --question <agent> "<question>"
+                               Always a question: never runs a command script
+                               or the default command (servers use this)
   ask project:agent "question" Query an agent in another project
   ask <agent>                    Run agent's default command (if configured)
   ask <agent> <command> [args]   Run a named agent command

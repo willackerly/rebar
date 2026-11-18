@@ -121,7 +121,7 @@ Rules:
 		first = first[:i]
 	}
 	answer := jqRaw([]byte(response+"\n"), []string{"answer"}, nil, first)
-	appendFile(l.Dir+"/memory.log.md", "---\n**"+ts+"** Q: "+question+"\nA: "+answer+"\n")
+	appendMemoryLog(l.Dir, "---\n**"+ts+"** Q: "+question+"\nA: "+answer+"\n")
 	os.Remove(msg)
 	fmt.Fprintf(l.Stdout, "[%s] answered: %s\n", l.Name, id)
 }

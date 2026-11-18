@@ -2,6 +2,8 @@ package ask
 
 import (
 	"bufio"
+	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -51,7 +53,7 @@ func (a *App) requireAgentName(name string) {
 // canonicalize is _canonicalize_agent: the agent directory matching input,
 // ignoring case ("" when none does).
 func (a *App) canonicalize(input string) string {
-	if input == "" {
+	if !ValidAgentName(input) {
 		return ""
 	}
 	// The directory's own spelling, also on a case-insensitive file system
@@ -68,8 +70,8 @@ func (a *App) canonicalize(input string) string {
 			return name
 		}
 	}
-	if isDir(a.agentsDir+"/"+input) && isFile(a.agentsDir+"/"+input+"/AGENT.md") {
-		return input // a hidden agent directory, named exactly
+	if ValidAgentName(input) && isDir(a.agentsDir+"/"+input) && isFile(a.agentsDir+"/"+input+"/AGENT.md") {
+		return input
 	}
 	return ""
 }
@@ -77,6 +79,10 @@ func (a *App) canonicalize(input string) string {
 // requireAgentExists is require_agent_exists: it sets canonicalAgent or
 // reports the missing agent, with a suggestion and the list, and exits 2.
 func (a *App) requireAgentExists(agent string) {
+	if !ValidAgentName(agent) {
+		a.errf("ask: error: invalid agent name '%s' (must be a directory name under %s)\n", agent, a.agentsDir)
+		a.exit(2)
+	}
 	if canonical := a.canonicalize(agent); canonical != "" {
 		a.canonicalAgent = canonical
 		if canonical != agent {
@@ -535,11 +541,24 @@ func envInt(name string, def int) int {
 // compact is cmd_compact: summarize all but the last ASK_COMPACT_KEEP
 // entries of memory.log.md into memory.md once the log reaches
 // ASK_COMPACT_SIZE bytes or ASK_COMPACT_ENTRIES entries.
+//
+// Unlike the script it is safe to run beside asks and other compactions:
+// one compaction per agent at a time (a second one returns at once); the
+// summary call to claude is bounded by ASK_TIMEOUT; the previous memory.md
+// is folded into the new summary, not discarded; and the files are
+// replaced atomically (temporary file + rename) under the agent's memory
+// lock (appendMemoryLog), keeping entries appended while claude ran.
 func (a *App) compact(name string) {
 	a.requireAgentName(name)
 	a.requireAgentExists(name)
 	dir := a.agentsDir + "/" + name
 	logFile, memoryFile := dir+"/memory.log.md", dir+"/memory.md"
+	unlock, ok := lockFile(dir+"/AGENT.md", false)
+	if !ok {
+		a.out("%s: a compaction is already running.\n", name)
+		return
+	}
+	defer unlock()
 	data, err := os.ReadFile(logFile)
 	if err != nil || !isFile(logFile) {
 		a.out("%s has no memory log to compact.\n", name)
@@ -576,18 +595,32 @@ func (a *App) compact(name string) {
 		a.out("Not enough old entries to compact.\n")
 		return
 	}
+	previous := ""
+	if old, err := os.ReadFile(memoryFile); err == nil {
+		previous = memoryBody(string(old))
+	}
 
 	prompt := "Summarize these agent interaction logs into a concise memory document.\n" +
 		"Preserve: key decisions, facts learned, important context, open questions, recurring patterns.\n" +
 		"Discard: routine Q&A, greetings, obvious/redundant information.\n" +
-		"Format: bullet points grouped by topic. Be concise but preserve critical details.\n\n" +
-		"LOGS TO SUMMARIZE:\n" + olderText
+		"Format: bullet points grouped by topic. Be concise but preserve critical details.\n\n"
+	if previous != "" {
+		prompt += "CURRENT MEMORY (merge it into the new document; keep what still holds):\n" + previous + "\n\n"
+	}
+	prompt += "LOGS TO SUMMARIZE:\n" + olderText
 	summary := ""
 	if claude, err := exec.LookPath("claude"); err == nil {
 		a.log("Generating summary via claude...")
-		cmd := exec.Command(claude, "--print", "--model", a.model)
+		ctx, cancel := context.WithTimeout(context.Background(), a.compactTimeout())
+		cmd := exec.CommandContext(ctx, claude, "--print", "--model", a.model)
 		cmd.Stdin = strings.NewReader(prompt + "\n")
+		cmd.WaitDelay = time.Second
 		out, _ := cmd.Output() // a failing claude's output still counts
+		if ctx.Err() != nil {
+			a.log("claude did not answer within %v; keeping truncated log entries.", a.compactTimeout())
+			out = nil
+		}
+		cancel()
 		summary = strings.TrimRight(string(out), "\n")
 	}
 	if summary == "" {
@@ -598,25 +631,96 @@ func (a *App) compact(name string) {
 		}
 		summary = "## Compacted Memory (" + timestamp() + ")\n\n" + strings.TrimRight(strings.Join(head, "\n"), "\n") +
 			"\n\n_[" + strconv.Itoa(entries) + " older entries truncated during compaction]_"
+		if previous != "" {
+			summary += "\n\n" + previous
+		}
 	}
 
 	memory := "# Agent Memory: " + name + "\n\n" +
 		"<!-- Compacted at " + timestamp() + ". Source: memory.log.md -->\n" +
 		"<!-- Older entries summarized, recent entries in memory.log.md -->\n\n" +
 		summary + "\n"
-	if err := os.WriteFile(memoryFile, []byte(memory), 0o644); err != nil {
+	newLog := "<!-- Compacted at " + timestamp() + ". Prior history summarized in memory.md -->\n" + recentText + "\n"
+
+	release, _ := lockFile(dir, true)
+	defer release()
+	current, err := os.ReadFile(logFile)
+	if err != nil || !bytes.HasPrefix(current, data) {
+		// Reset or rewritten meanwhile: what was summarized is not the log.
+		a.out("%s: memory log changed during compaction; left as it is.\n", name)
+		return
+	}
+	newLog += string(current[len(data):]) // entries appended while claude ran
+	if err := writeAtomic(memoryFile, memory); err != nil {
 		a.die("cannot write %s: %v", memoryFile, err)
 	}
-	newLog := "<!-- Compacted at " + timestamp() + ". Prior history summarized in memory.md -->\n" + recentText + "\n"
-	if err := os.WriteFile(logFile, []byte(newLog), 0o644); err != nil {
+	if err := writeAtomic(logFile, newLog); err != nil {
 		a.die("cannot write %s: %v", logFile, err)
 	}
 	a.out("Compacted: %d -> %d entries, %dKB -> %dKB\n", entries, countSeparators(newLog), size/1024, len(newLog)/1024)
 	a.out("Summary written to: %s\n", memoryFile)
 }
 
-// maybeCompact is _maybe_compact: compact in the background (a detached
-// `rebar ask compact`) once the log reaches ASK_COMPACT_SIZE bytes.
+// compactTimeout bounds compaction's claude call: ASK_TIMEOUT seconds.
+func (a *App) compactTimeout() time.Duration {
+	if n, ok := atoi(a.timeout); ok && n > 0 {
+		return time.Duration(n) * time.Second
+	}
+	return 120 * time.Second
+}
+
+// memoryBody is memory.md without the header compact writes (its title
+// and comment lines).
+func memoryBody(text string) string {
+	lines := splitLines(strings.ReplaceAll(text, "\r\n", "\n"))
+	i := 0
+	for i < len(lines) {
+		l := strings.TrimSpace(lines[i])
+		if l == "" || strings.HasPrefix(l, "# Agent Memory:") || (strings.HasPrefix(l, "<!--") && strings.HasSuffix(l, "-->")) {
+			i++
+			continue
+		}
+		break
+	}
+	return strings.TrimSpace(strings.Join(lines[i:], "\n"))
+}
+
+// writeAtomic replaces path with text: a temporary file in the same
+// directory, renamed over it.
+func writeAtomic(path, text string) error {
+	f, err := os.CreateTemp(filepath.Dir(path), "."+filepath.Base(path)+".*.tmp")
+	if err != nil {
+		return err
+	}
+	_, err = f.WriteString(text)
+	if cerr := f.Close(); err == nil {
+		err = cerr
+	}
+	if err == nil {
+		err = os.Chmod(f.Name(), 0o644)
+	}
+	if err == nil {
+		err = os.Rename(f.Name(), path)
+	}
+	if err != nil {
+		os.Remove(f.Name())
+	}
+	return err
+}
+
+// appendMemoryLog appends an entry to the agent's memory.log.md under the
+// agent's memory lock (its directory), so that a compaction replacing the
+// log never loses it.
+func appendMemoryLog(dir, entry string) {
+	release, _ := lockFile(dir, true)
+	defer release()
+	appendFile(dir+"/memory.log.md", entry)
+}
+
+// maybeCompact is _maybe_compact: compact in the background (`rebar ask
+// compact`, not waited for) once the log reaches ASK_COMPACT_SIZE bytes.
+// The compaction stays in this process's group, so whoever ends the ask's
+// group (the MCP server at shutdown, a terminal's job control) ends it too.
 func (a *App) maybeCompact(name string) {
 	info, err := os.Stat(a.agentsDir + "/" + name + "/memory.log.md")
 	if err != nil || !info.Mode().IsRegular() {
@@ -629,7 +733,6 @@ func (a *App) maybeCompact(name string) {
 	a.log("Memory log exceeds %d bytes, auto-compacting in background...", threshold)
 	cmd := exec.Command(a.Exe, "ask", "compact", name)
 	cmd.Env = append(os.Environ(), "ASK_AGENTS_DIR="+a.agentsDir, "ASK_SHARED_DIR="+a.sharedDir, noRegisterEnv+"=1")
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	if cmd.Start() == nil {
 		go cmd.Wait()
 	}

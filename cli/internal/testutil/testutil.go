@@ -5,13 +5,34 @@
 package testutil
 
 import (
+	"bytes"
 	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 )
+
+// SyncBuffer is a bytes.Buffer safe to read while a process (os/exec's
+// copying goroutine) writes it.
+type SyncBuffer struct {
+	mu sync.Mutex
+	b  bytes.Buffer
+}
+
+func (s *SyncBuffer) Write(p []byte) (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.b.Write(p)
+}
+
+func (s *SyncBuffer) String() string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.b.String()
+}
 
 // gitArgs isolates test repos from the developer's git config: a fixed
 // identity, no commit signing (which would need the developer's signer), and
