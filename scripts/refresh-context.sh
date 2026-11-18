@@ -100,10 +100,12 @@ else
   elif ! $HAS_COMMITS; then
     echo "  (skipped: no commits yet)"
   else
-    COMMIT_COUNT=$(git log --since="$LAST_SYNCED" --oneline 2>/dev/null | wc -l | tr -d ' ')
+    # "<date> 00:00": a bare date means that day at the current time of day
+    # to git, which dropped commits made earlier on the last-synced day.
+    COMMIT_COUNT=$(git log --since="$LAST_SYNCED 00:00" --oneline 2>/dev/null | wc -l | tr -d ' ')
     # -n 20, not `| head -20`: with more commits than head reads, git log gets
     # SIGPIPE and, under pipefail, set -e ended the script with exit 141.
-    git log -n 20 --since="$LAST_SYNCED" --oneline 2>/dev/null || true
+    git log -n 20 --since="$LAST_SYNCED 00:00" --oneline 2>/dev/null || true
 
     if [[ "$COMMIT_COUNT" -gt 20 ]]; then
       echo "  ... and $((COMMIT_COUNT - 20)) more"
