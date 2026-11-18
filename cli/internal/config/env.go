@@ -23,11 +23,19 @@ type Env struct {
 	RCFile string
 }
 
+// envState is one WithEnv override: the Env and its variables as Setenv
+// changes them. It is published and withdrawn as a whole (cur), and its map
+// is never reset, so a reader that loaded it as a call ended still finds a
+// valid map (and a late Setenv only changes the finished override's copy).
+type envState struct {
+	env  *Env
+	mu   sync.Mutex
+	vars map[string]string
+}
+
 var (
-	envMu   sync.Mutex          // held for the whole of a WithEnv call
-	envOver atomic.Pointer[Env] // the override in effect
-	varsMu  sync.Mutex
-	vars    map[string]string // the override's variables, as Setenv changes them
+	envMu sync.Mutex               // held for the whole of a WithEnv call
+	cur   atomic.Pointer[envState] // the override in effect
 )
 
 // WithEnv runs f with e in place of the process environment for everything
@@ -37,59 +45,62 @@ var (
 // must use WithEnv too.
 func WithEnv(e *Env, f func()) {
 	envMu.Lock()
-	m := map[string]string{}
+	defer envMu.Unlock()
+	s := &envState{env: e, vars: map[string]string{}}
 	for _, kv := range e.Vars {
 		if k, v, ok := strings.Cut(kv, "="); ok {
-			m[k] = v // the last of duplicate keys wins, as in exec
+			s.vars[k] = v // the last of duplicate keys wins, as in exec
 		}
 	}
-	varsMu.Lock()
-	vars = m
-	varsMu.Unlock()
-	envOver.Store(e)
-	defer func() {
-		envOver.Store(nil)
-		varsMu.Lock()
-		vars = nil
-		varsMu.Unlock()
-		envMu.Unlock()
-	}()
+	cur.Store(s)
+	defer cur.Store(nil)
 	f()
+}
+
+// override is the Env in effect (nil without WithEnv).
+func override() *Env {
+	if s := cur.Load(); s != nil {
+		return s.env
+	}
+	return nil
 }
 
 // Getenv is os.Getenv, or the value in the WithEnv override.
 func Getenv(key string) string {
-	if envOver.Load() == nil {
+	s := cur.Load()
+	if s == nil {
 		return os.Getenv(key)
 	}
-	varsMu.Lock()
-	defer varsMu.Unlock()
-	return vars[key]
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.vars[key]
 }
 
 // Setenv is os.Setenv, or a change to the WithEnv override (the process
 // environment is left alone), for markers such as _REBAR_CHECKS_VALIDATED
 // that a run sets for the checks after it.
 func Setenv(key, value string) {
-	if envOver.Load() == nil {
+	s := cur.Load()
+	if s == nil {
 		os.Setenv(key, value)
 		return
 	}
-	varsMu.Lock()
-	defer varsMu.Unlock()
-	vars[key] = value
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.vars[key] = value
 }
 
 // Environ is the environment for a child process: nil (inherit the
 // process's) without an override, else the override's variables.
 func Environ() []string {
-	if envOver.Load() == nil {
+	s := cur.Load()
+	if s == nil {
 		return nil
 	}
-	varsMu.Lock()
-	defer varsMu.Unlock()
-	out := make([]string, 0, len(vars))
-	for k, v := range vars {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := make([]string, 0, len(s.vars))
+	for k, v := range s.vars {
 		out = append(out, k+"="+v)
 	}
 	sort.Strings(out)
@@ -97,7 +108,7 @@ func Environ() []string {
 }
 
 // Overridden reports whether a WithEnv override is in effect.
-func Overridden() bool { return envOver.Load() != nil }
+func Overridden() bool { return cur.Load() != nil }
 
 // Command is exec.Command with the WithEnv override's environment, if any.
 // Under an override a name without a slash is looked up in the override's
