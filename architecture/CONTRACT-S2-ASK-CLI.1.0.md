@@ -138,7 +138,7 @@ This is the latest version. No predecessor.
 - `bin/ask` — primary CLI entry point (Python, ~1900 lines)
 - `bin/ask-server` — long-running session server
 - `bin/ask-agent-loop` — agent-loop harness
-- `bin/install` — PATH installer + dependency check
+- `bin/rebar-install` — PATH installer + dependency check
 - `agents/<role>/AGENT.md` — per-role config, read by ASK on every call
 - `agents/<role>/commands/*.sh` — unquoted-command implementations
 
