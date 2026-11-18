@@ -14,8 +14,8 @@
 ## Checklist
 
 - [ ] Every new/modified source file has a `CONTRACT:` header comment
-- [ ] Contract references point to existing files (`./scripts/check-contract-refs.sh`)
-- [ ] No untracked `TODO:` comments (`./scripts/check-todos.sh`)
+- [ ] Contract references point to existing files (`rebar run check-contract-refs`)
+- [ ] No untracked `TODO:` comments (`rebar run check-todos`)
 - [ ] Tests pass at T2+ (package-level or higher)
 - [ ] Docs updated if behavior changed (QUICKCONTEXT, TODO, relevant READMEs)
 

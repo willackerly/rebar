@@ -1,5 +1,5 @@
 Pre-commit: checking TODO tracking...
-rebar: running project copy scripts/check-todos.sh (deprecated: move its settings to .rebarrc and delete it)
+rebar: running project copy scripts/check-todos.sh (deprecated: run `rebar migrate` to replace it with the built-in check)
 custom todos
 OK: custom
 

@@ -6,8 +6,11 @@ SKIP: tier 1 < required tier 2 (set REBAR_TIER or .rebarrc to change, or name it
 ━━━ Contract References ━━━
 
 Checked 0 contract references, 0 broken.
-rebar: running project copy scripts/check-doc-refs.sh (deprecated: move its settings to .rebarrc and delete it)
-rebar: running project copy scripts/check-todos.sh (deprecated: move its settings to .rebarrc and delete it)
+rebar: running project copy scripts/check-doc-refs.sh (deprecated: run `rebar migrate` to replace it with the built-in check)
+
+━━━ Doc References ━━━
+not executable
+rebar: running project copy scripts/check-todos.sh (deprecated: run `rebar migrate` to replace it with the built-in check)
 
 ━━━ TODO Tracking ━━━
 custom todos
@@ -55,7 +58,7 @@ SUMMARY
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   PASS  Contract Headers
   PASS  Contract References
-  SKIP  Doc References (script not found or not executable)
+  PASS  Doc References
   PASS  TODO Tracking
   PASS  Doc Freshness
   FAIL  Registry Consistency
@@ -70,7 +73,7 @@ SUMMARY
   PASS  Bypass Flags Gate
   SKIP  Steward
 
-  11 passed, 1 failed, 4 skipped
+  12 passed, 1 failed, 3 skipped
 
 CI check failed. Fix the issues above or skip individual checks
 with environment variables (e.g., SKIP_FRESHNESS=1).

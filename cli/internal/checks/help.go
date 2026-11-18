@@ -1,10 +1,12 @@
 package checks
 
-// The scripts' --help text: their header comment, as `sed -n '2,/^$/p' "$0" | sed 's/^# \{0,1\}//'` prints it.
-// Generated from scripts/*.sh; the --help parity cases keep it in step.
+// The checks' --help text: the header comment of the script each check
+// replaced, as `sed -n '2,/^$/p' "$0" | sed 's/^# \{0,1\}//'` printed it,
+// with the usage lines naming `rebar run <check>` (the scripts are gone);
+// the --help golden cases keep it in step.
 var scriptHelp = map[string]string{
 	"check-fix-commit": "" +
-		"check-fix-commit.sh — Gate G enforcement: fix:/regression: commits must\n" +
+		"check-fix-commit — Gate G enforcement: fix:/regression: commits must\n" +
 		"document where the symptom was reproduced.\n" +
 		"\n" +
 		"Source: feedback/processed/2026-04-24-process-gates-G-through-L.md §Gate G.\n" +
@@ -16,17 +18,15 @@ var scriptHelp = map[string]string{
 		"been observed independently before fixing began.\n" +
 		"\n" +
 		"Modes:\n" +
-		"  ./scripts/check-fix-commit.sh                       # check HEAD's commit msg\n" +
-		"  ./scripts/check-fix-commit.sh <commit-msg-file>     # check given file (commit-msg hook usage)\n" +
-		"  ./scripts/check-fix-commit.sh --range <sha>..<sha>  # audit a range of commits\n" +
-		"  ./scripts/check-fix-commit.sh --warn                # flag but don't fail\n" +
+		"  rebar run check-fix-commit                       # check HEAD's commit msg\n" +
+		"  rebar run check-fix-commit <commit-msg-file>     # check given file (commit-msg hook usage)\n" +
+		"  rebar run check-fix-commit --range <sha>..<sha>  # audit a range of commits\n" +
+		"  rebar run check-fix-commit --warn                # flag but don't fail\n" +
 		"\n" +
 		"Exit code: 0 if all qualifying commits are clean, 1 if any violations.\n" +
-		"\n" +
-		"Bash 3.2 compatible.\n" +
 		"\n",
 	"check-bypass-flags": "" +
-		"check-bypass-flags.sh — Gate I enforcement: bypass flags require ticket refs.\n" +
+		"check-bypass-flags — Gate I enforcement: bypass flags require ticket refs.\n" +
 		"\n" +
 		"Source: feedback/processed/2026-04-24-process-gates-G-through-L.md §Gate I.\n" +
 		"\n" +
@@ -41,20 +41,18 @@ var scriptHelp = map[string]string{
 		"project-specific and lives in your project's deploy scripts.\n" +
 		"\n" +
 		"Modes:\n" +
-		"  ./scripts/check-bypass-flags.sh                       # check HEAD's commit msg\n" +
-		"  ./scripts/check-bypass-flags.sh <commit-msg-file>     # check given file (commit-msg hook usage)\n" +
-		"  ./scripts/check-bypass-flags.sh --range <sha>..<sha>  # audit a range of commits\n" +
-		"  ./scripts/check-bypass-flags.sh --warn                # flag but don't fail\n" +
+		"  rebar run check-bypass-flags                       # check HEAD's commit msg\n" +
+		"  rebar run check-bypass-flags <commit-msg-file>     # check given file (commit-msg hook usage)\n" +
+		"  rebar run check-bypass-flags --range <sha>..<sha>  # audit a range of commits\n" +
+		"  rebar run check-bypass-flags --warn                # flag but don't fail\n" +
 		"\n" +
 		"Exit code: 0 if all qualifying commits are clean, 1 if any violations.\n" +
-		"\n" +
-		"Bash 3.2 compatible.\n" +
 		"\n",
 	"check-doc-refs": "" +
-		"check-doc-refs.sh — Verify that every file referenced from a tracked *.md\n" +
+		"check-doc-refs — Verify that every file referenced from a tracked *.md\n" +
 		"is itself tracked in git.\n" +
 		"\n" +
-		"Catches a class of drift Tier 2 ci-check.sh misses: a load-bearing doc\n" +
+		"Catches a class of drift the Tier 2 suite (rebar check) misses: a load-bearing doc\n" +
 		"(e.g., FEDERATION-STORIES-DRAFT.md) is added to the working tree, cited\n" +
 		"from another doc, but never `git add`-ed. The current repo passes; a\n" +
 		"fresh clone fails to resolve the link.\n" +
@@ -62,9 +60,9 @@ var scriptHelp = map[string]string{
 		"Source: rebar/feedback/2026-04-21-filedag-cross-ref-and-federation-coord.md §1\n" +
 		"\n" +
 		"Usage:\n" +
-		"  ./scripts/check-doc-refs.sh           # report broken refs, exit 1 if any\n" +
-		"  ./scripts/check-doc-refs.sh --quiet   # only print failures\n" +
-		"  ./scripts/check-doc-refs.sh --json    # JSON summary on stdout\n" +
+		"  rebar run check-doc-refs           # report broken refs, exit 1 if any\n" +
+		"  rebar run check-doc-refs --quiet   # only print failures\n" +
+		"  rebar run check-doc-refs --json    # JSON summary on stdout\n" +
 		"\n" +
 		"Heuristics:\n" +
 		"  - Walks every tracked *.md file (`git ls-files '*.md'`).\n" +
@@ -74,11 +72,9 @@ var scriptHelp = map[string]string{
 		"    paths from .rebar/doc-refs-allow.txt (one path per line, # for comments).\n" +
 		"  - Resolves remaining targets relative to the source file's directory.\n" +
 		"  - Fails if resolved target is not in `git ls-files`.\n" +
-		"\n" +
-		"Bash 3.2 compatible (macOS default).\n" +
 		"\n",
 	"check-decay-patterns": "" +
-		"check-decay-patterns.sh — Flag soft-hardening patterns that look like\n" +
+		"check-decay-patterns — Flag soft-hardening patterns that look like\n" +
 		"done work but ship a longer-fuse failure mode.\n" +
 		"\n" +
 		"Sources: rebar/feedback/2026-04-24-fidelity-decay-soft-hardening-patterns.md\n" +
@@ -86,7 +82,7 @@ var scriptHelp = map[string]string{
 		"\n" +
 		"An author cannot reliably self-audit hardening work because the author's\n" +
 		"context (right now, with the test fresh) matches the consumer's context\n" +
-		"(six months from now, scanning a dashboard). This script applies external\n" +
+		"(six months from now, scanning a dashboard). This check applies external\n" +
 		"state — a structural lens — at commit time.\n" +
 		"\n" +
 		"Eight named patterns from the fidelity-decay feedback. The grep-detectable\n" +
@@ -97,13 +93,11 @@ var scriptHelp = map[string]string{
 		"the surface a user touches (see practices/test-fidelity.md, Gate 2).\n" +
 		"\n" +
 		"Modes:\n" +
-		"  ./scripts/check-decay-patterns.sh              # scan staged files\n" +
-		"  ./scripts/check-decay-patterns.sh --all        # scan everything tracked\n" +
-		"  ./scripts/check-decay-patterns.sh --paths a b  # scan specific paths\n" +
-		"  ./scripts/check-decay-patterns.sh --warn       # flag but don't fail\n" +
+		"  rebar run check-decay-patterns              # scan staged files\n" +
+		"  rebar run check-decay-patterns --all        # scan everything tracked\n" +
+		"  rebar run check-decay-patterns --paths a b  # scan specific paths\n" +
+		"  rebar run check-decay-patterns --warn       # flag but don't fail\n" +
 		"\n" +
 		"Exit code: 0 if no findings (or --warn), 1 if findings in default mode.\n" +
-		"\n" +
-		"Bash 3.2 compatible (macOS default).\n" +
 		"\n",
 }

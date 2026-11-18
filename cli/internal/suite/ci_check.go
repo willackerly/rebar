@@ -52,6 +52,18 @@ func SkipVars() []string {
 	return append(vars, "SKIP_CHECKS_EXTRA")
 }
 
+// StepSkipVar is the variable that skips the full suite's step running
+// script (relative to scripts/, e.g. check-todos.sh), "" when no step runs
+// it.
+func StepSkipVar(script string) string {
+	for _, s := range ciSteps {
+		if s.script == script {
+			return s.skip
+		}
+	}
+	return ""
+}
+
 // ciRun tallies the full suite's results.
 type ciRun struct {
 	ctx                     *checks.Context

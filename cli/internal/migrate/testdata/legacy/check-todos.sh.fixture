@@ -22,8 +22,6 @@ EXCLUDE_DIRS="node_modules vendor dist .git .claude"
 if [ -f "$SCRIPT_DIR/_rebar-config.sh" ]; then
   # shellcheck source=scripts/_rebar-config.sh
   source "$SCRIPT_DIR/_rebar-config.sh"
-  # Under `REBAR_CHECK_IMPL=go rebar check` (the default) the CLI's native port runs instead.
-  _rebar_native check-todos "$@"
   SOURCE_DIRS=$(_rebar_config source_dirs _REBAR_NO_ENV "$SOURCE_DIRS")
   SOURCE_EXTENSIONS=$(_rebar_config source_extensions _REBAR_NO_ENV "$SOURCE_EXTENSIONS")
   EXCLUDE_DIRS=$(_rebar_source_exclude_dirs)

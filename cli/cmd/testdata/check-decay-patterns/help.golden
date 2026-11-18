@@ -1,4 +1,4 @@
-check-decay-patterns.sh — Flag soft-hardening patterns that look like
+check-decay-patterns — Flag soft-hardening patterns that look like
 done work but ship a longer-fuse failure mode.
 
 Sources: rebar/feedback/2026-04-24-fidelity-decay-soft-hardening-patterns.md
@@ -6,7 +6,7 @@ Sources: rebar/feedback/2026-04-24-fidelity-decay-soft-hardening-patterns.md
 
 An author cannot reliably self-audit hardening work because the author's
 context (right now, with the test fresh) matches the consumer's context
-(six months from now, scanning a dashboard). This script applies external
+(six months from now, scanning a dashboard). This check applies external
 state — a structural lens — at commit time.
 
 Eight named patterns from the fidelity-decay feedback. The grep-detectable
@@ -17,13 +17,11 @@ the e2e-bypass feedback: demo-claiming and uaks-declared specs must drive
 the surface a user touches (see practices/test-fidelity.md, Gate 2).
 
 Modes:
-  ./scripts/check-decay-patterns.sh              # scan staged files
-  ./scripts/check-decay-patterns.sh --all        # scan everything tracked
-  ./scripts/check-decay-patterns.sh --paths a b  # scan specific paths
-  ./scripts/check-decay-patterns.sh --warn       # flag but don't fail
+  rebar run check-decay-patterns              # scan staged files
+  rebar run check-decay-patterns --all        # scan everything tracked
+  rebar run check-decay-patterns --paths a b  # scan specific paths
+  rebar run check-decay-patterns --warn       # flag but don't fail
 
 Exit code: 0 if no findings (or --warn), 1 if findings in default mode.
-
-Bash 3.2 compatible (macOS default).
 
 --- exit 0 ---

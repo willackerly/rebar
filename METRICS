@@ -1,4 +1,4 @@
-# Ground truth metrics — verified by scripts/check-ground-truth.sh
+# Ground truth metrics — verified by `rebar run check-ground-truth`
 # Last verified: 2026-04-25
 
 # Contracts (rebar's own, not templates)

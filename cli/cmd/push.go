@@ -55,7 +55,20 @@ func runPush(cmd *cobra.Command, args []string) error {
 	fmt.Println("Running checks...")
 	var checkOut []byte
 	var code int
-	if s, ok := resolveScript(cfg.RepoRoot, "ci-check.sh"); ok && s.Legacy {
+	s, ok := resolveScript(cfg.RepoRoot, "ci-check.sh")
+	legacy := ok && s.Legacy
+	var notice bytes.Buffer
+	if legacy {
+		switch decideLegacySuite(&notice, s) {
+		case runBuiltIn:
+			legacy = false
+		case refuseCopy:
+			fmt.Print(notice.String())
+			return fmt.Errorf("checks failed — fix before pushing")
+		}
+		fmt.Print(notice.String())
+	}
+	if legacy {
 		warnLegacy(s)
 		checkOut, code, err = scripts.OutputInProject(s.Path, cfg.RepoRoot)
 	} else {

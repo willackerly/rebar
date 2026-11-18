@@ -20,5 +20,5 @@ check-bypass-flags: VIOLATION (08e1bd54f8ab1cca28e19091a461de939f83bccf)
   ships an unowned regression. Source: practices/regression-fix-protocol.md §Gate I
 
 check-bypass-flags: 2 violation(s)
-Wire as commit-msg hook:  ln -sf ../../scripts/check-bypass-flags.sh .git/hooks/commit-msg
+Wire as commit-msg hook:  printf '#!/bin/sh\nexec rebar run check-bypass-flags "$1"\n' > .git/hooks/commit-msg && chmod +x .git/hooks/commit-msg
 --- exit 1 ---

@@ -6,8 +6,7 @@ description: Use at the start of every session in a REBAR-managed repo, before t
 # rebar-coldstart — the session-start ritual
 
 Canonical practice: `rebar:practice/session-lifecycle` (Session Start section)
-— resolve with `rebar run rebar-doc rebar:practice/session-lifecycle --cat`
-(or `rebar doc` if the CLI is installed).
+— resolve with `rebar doc rebar:practice/session-lifecycle --cat`.
 This skill is a pointer to the ritual, not a replacement for the practice doc.
 
 ## Steps
@@ -16,11 +15,11 @@ This skill is a pointer to the ritual, not a replacement for the practice doc.
    (or `AGENTS.md` where that is the agent-facing doc), and recent reality —
    `git log --oneline -15`.
 2. **Look for the hook output.** A `SessionStart` hook (configured in
-   `.claude/settings.json`) runs `scripts/cold-start-checks.sh` and injects a
+   `.claude/settings.json`) runs `rebar check --cold-start` and injects a
    `<rebar-cold-start>…</rebar-cold-start>` block into your first turn. If the
    block is present, read it — it is harness ground truth, not prose.
 3. **No block? Run it yourself.** On harnesses without hooks (or before the
-   hook is installed), run `scripts/cold-start-checks.sh` manually and read
+   hook is installed), run `rebar check --cold-start` manually and read
    its output. Missing block = missing hook; say so.
 4. **Cross-check freshness.** Compare QUICKCONTEXT claims against `git log`;
    if its last-synced date is >1 week old, treat all claims as suspect and
