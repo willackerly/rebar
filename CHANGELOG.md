@@ -47,6 +47,33 @@ All notable changes to rebar. Versioned with [semver](https://semver.org/).
     `ask`'s remote mode already sends it) with a body ≤ 1 MiB (413) and a
     `Content-Length`. API keys are compared in constant time; clients get
     60 s to send a request.
+- **`bin/install` is now `bin/rebar-install`.** The installer puts
+  `~/.rebar/current/bin` first on PATH, where a file named `install` shadowed
+  the system `install(1)`: `install -d dir` failed with "Unknown option: -d",
+  breaking `make install`. `setup-rebar.sh` runs `bin/rebar-install`, and
+  renames the old `bin/install` when it installs an older version, so nothing
+  called `install` lands in `current/bin`. For a pre-versioned `~/.rebar`
+  clone it warns that the clone's `bin/install` still shadows `install(1)` if
+  your RC keeps `~/.rebar/bin` on PATH. See
+  [UPGRADING.md](UPGRADING.md#upgrading-from-v310-or-v311).
+- **`setup-rebar.sh` installs only published, gated releases.** "latest" (and
+  `--pre`) is now the highest published GitHub Release, looked up through
+  GitHub's API (drafts skipped; pre-releases only with `--pre`; a used-up
+  unauthenticated rate limit is reported as such), not the highest git tag,
+  which exists before the release workflow has built, scanned and published
+  anything. A release tag whose assets are missing, or whose checksums or
+  tarball fail to download with anything but "not found", is now an error
+  instead of a silent source build with your own Go, which skipped the
+  workflow's `govulncheck` gate. Build from source with `--source`; tags
+  older than v3.1.0-rc.1 (before prebuilt assets) still build from source on
+  their own. Checksum verification is unchanged. `REBAR_RELEASES_API`
+  overrides the API URL (mirrors, tests).
+- **Commits on the last-synced day count as "since last sync".**
+  `refresh-context.sh`, `rebar status` and `rebar commit`'s checkpoint nudge
+  passed the QUICKCONTEXT date to `git --since` bare, which git reads as that
+  day at the current time of day, so commits made earlier on the sync day
+  were dropped (and the count depended on when you ran it). They now count
+  from local midnight.
 
 ---
 
