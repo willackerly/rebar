@@ -1,8 +1,8 @@
 # rebar
 
-> **rebar v3.1.1** | **Tier 3: ENFORCED**
+> **rebar v3.1.2** | **Tier 3: ENFORCED**
 
-[![rebar v3.1.1](https://img.shields.io/badge/rebar-v3.1.0-green)](DESIGN.md)
+[![rebar v3.1.2](https://img.shields.io/badge/rebar-v3.1.0-green)](DESIGN.md)
 [![Tier 3: Enforced](https://img.shields.io/badge/tier-3_enforced-brightgreen)](DESIGN.md)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
@@ -86,10 +86,10 @@ contract; everything else is opt-in.
 ## Installation
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/willackerly/rebar/v3.1.1/setup-rebar.sh | bash -s -- v3.1.1
+curl -fsSL https://raw.githubusercontent.com/willackerly/rebar/v3.1.2/setup-rebar.sh | bash -s -- v3.1.2
 ```
 
-Installs rebar under `~/.rebar/versions/v3.1.1/` and puts
+Installs rebar under `~/.rebar/versions/v3.1.2/` and puts
 `~/.rebar/current/bin` (`rebar`, `ask`) on your PATH; open a new terminal
 afterwards. Versions live side by side; options, CI, and release candidates:
 [SETUP.md § Install rebar](SETUP.md#install-rebar),
@@ -329,7 +329,7 @@ later. See `feedback/2026-04-21-...`, `2026-04-22-...`, and
 Every rebar repo declares its version and tier at the top of README.md:
 
 ```markdown
-> **rebar v3.1.1** | **Tier 2: ADOPTED**
+> **rebar v3.1.2** | **Tier 2: ADOPTED**
 ```
 
 This is validated by `check-compliance` (run by `rebar check`) against the
