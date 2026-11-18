@@ -19,9 +19,12 @@ func commitAll(t *testing.T, p string) {
 	testutil.Git(t, p, "commit", "-q", "-m", "update")
 }
 
-// installScript is the last version of one of rebar's scripts before rebar
-// became a single binary (kept in testdata/legacy): the copy an
-// adopter would have. install is unused (rebar's tree has no scripts now).
+// installScript is one of rebar's scripts as released in v3.1.1, the last
+// release that shipped them (testdata/legacy, byte-identical to
+// `git show v3.1.1:scripts/<name>`): the copy an adopter would have. Being
+// a released blob, migrate recognizes it from the manifest embedded in the
+// CLI, without the rebar tree's git history. install is unused (rebar's
+// tree has no scripts now).
 func installScript(t *testing.T, install, name string) string {
 	t.Helper()
 	data, err := os.ReadFile(filepath.Join("testdata", "legacy", name+".fixture"))
