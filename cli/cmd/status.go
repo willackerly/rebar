@@ -144,7 +144,7 @@ func printSessionFreshness(repoRoot string) {
 		}
 
 		// Count commits since last sync
-		commitCount := gitOutput("rev-list", "--count", "--since="+lastSynced, "HEAD")
+		commitCount := commitsSince(cfg.RepoRoot, lastSynced)
 		if commitCount != "" && commitCount != "0" {
 			fmt.Printf("  Since sync:    %s commit(s)\n", commitCount)
 		}
