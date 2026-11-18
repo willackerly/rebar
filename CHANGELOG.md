@@ -118,6 +118,7 @@ All notable changes to rebar. Versioned with [semver](https://semver.org/).
   Tests: goldens in `cli/cmd/testdata/mcp` regenerated, and a Claude Code
   compatibility test replays sessions recorded from Claude Code 2.1.224 and
   2.1.311.
+
 - **Legacy copies and hooks never pass silently (review of the shell
   removal).** A project that kept its copy of `scripts/ci-check.sh` or
   `scripts/pre-commit.sh` but deleted the check copies it runs got every
