@@ -442,7 +442,7 @@ func runUpstream(cmd *cobra.Command, args []string) error {
 
 	askBin := findAskBinForUpstream()
 	if askBin == "" {
-		return fmt.Errorf("ask CLI not found; run bin/install or set ASK_BIN")
+		return fmt.Errorf("ask CLI not found; run bin/rebar-install or set ASK_BIN")
 	}
 
 	target := owner + ":featurerequest"
