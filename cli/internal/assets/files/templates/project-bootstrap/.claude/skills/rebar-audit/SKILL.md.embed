@@ -9,8 +9,8 @@ description: Use when asked about a rebar repo's health, compliance, tier, or co
 
 1. **`rebar audit`** — REBAR CLI compliance audit; sectioned score out of 10
    (rebar itself expects 9–10/10).
-2. **`scripts/ci-check.sh`** — the full enforcement-script suite; the exit
-   code is the verdict, the output names each failing check.
+2. **`rebar check`** — the full enforcement suite; the exit code is the
+   verdict, the output names each failing check.
 3. **`rebar run steward --summary`** — one-liner: contract counts by
    computed lifecycle, open discoveries, enforcement passing. A full
    `rebar run steward` run writes `STEWARD_REPORT.md` +

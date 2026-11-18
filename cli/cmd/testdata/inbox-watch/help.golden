@@ -1,4 +1,4 @@
-inbox-watch.sh — Live watch on peer inbox/ dirs; one line per new deposit.
+inbox-watch — Live watch on peer inbox/ dirs; one line per new deposit.
 rebar-scripts: 2026.07.11
 
 Canonical implementation of practices/inbox-watch.md and federation
@@ -29,7 +29,7 @@ Each emitted line is an event the hosting harness can surface into the
 agent's session.
 
 Usage:
-  ./scripts/inbox-watch.sh [options] [dir ...]
+  rebar run inbox-watch [options] [dir ...]
 
   dir ...            inbox directories to watch (default: ./inbox)
 
@@ -42,6 +42,6 @@ A watched directory that does not exist yet is warned about once (stderr)
 and kept in the watch: it lists as empty until created, so files present
 at creation are reported as new deposits.
 
-Zero dependencies beyond POSIX tools. Bash 3.2 compatible (macOS default).
+Built into the rebar binary; no other dependencies.
 
 --- exit 0 ---

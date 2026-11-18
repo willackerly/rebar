@@ -224,6 +224,13 @@ func manifestBlobs() map[string]map[string]bool {
 	return out
 }
 
+// IsReleasedScript reports whether data is byte-identical to a released
+// version of rebar's scripts/<name>, by the manifest embedded in the CLI
+// (no install or git history needed).
+func IsReleasedScript(name string, data []byte) bool {
+	return manifestBlobs()[name][gitBlobHash(data)]
+}
+
 // releasedBlobs returns the blob ids of every released version of a
 // bootstrap file (scripts/<name>, templates/project-bootstrap/scripts/<name>):
 // the manifest embedded in the CLI (scripts/gen-released-blobs.sh; works for

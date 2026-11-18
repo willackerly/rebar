@@ -45,8 +45,6 @@ REF_ERE='CONTRACT:'   # with contract_namespace: CONTRACT:(<namespace>:)?
 if [ -f "$SCRIPT_DIR/_rebar-config.sh" ]; then
   # shellcheck source=scripts/_rebar-config.sh
   source "$SCRIPT_DIR/_rebar-config.sh"
-  # Under `REBAR_CHECK_IMPL=go rebar check` (the default) the CLI's native port runs instead.
-  _rebar_native compute-registry "$@"
   IMPL_COUNTS=$(_rebar_config registry_impl_counts REBAR_REGISTRY_IMPL_COUNTS false)
   SCOPE_PREFIXES=$(_rebar_config registry_scope_prefixes _REBAR_NO_ENV "")
   PURPOSE_HEADING=$(_rebar_config registry_purpose_heading _REBAR_NO_ENV "")

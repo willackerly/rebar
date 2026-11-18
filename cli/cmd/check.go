@@ -58,6 +58,7 @@ func runCheck(cmd *cobra.Command, args []string) error {
 	}
 
 	warnExtrasIgnored(name)
+	warnBrokenHooks(os.Stderr, cfg.RepoRoot)
 	exitCode, found, err := runRebarScript(name, scriptArgs...)
 	if err != nil {
 		return fmt.Errorf("running %s: %w", name, err)

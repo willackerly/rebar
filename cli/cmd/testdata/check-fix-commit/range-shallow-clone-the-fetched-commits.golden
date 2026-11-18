@@ -18,5 +18,5 @@ check-fix-commit: VIOLATION (456920d1c11673e21519d148fe7c4fcb93a09441)
   Source: practices/regression-fix-protocol.md §Gate G
 
 check-fix-commit: 2 violation(s)
-Wire as commit-msg hook:  ln -sf ../../scripts/check-fix-commit.sh .git/hooks/commit-msg
+Wire as commit-msg hook:  printf '#!/bin/sh\nexec rebar run check-fix-commit "$1"\n' > .git/hooks/commit-msg && chmod +x .git/hooks/commit-msg
 --- exit 1 ---

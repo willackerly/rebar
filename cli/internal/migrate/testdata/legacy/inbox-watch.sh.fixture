@@ -47,14 +47,6 @@
 
 set -uo pipefail
 
-_IW_DIR="$(cd "$(dirname "$0")" && pwd)"
-if [ -f "$_IW_DIR/_rebar-config.sh" ]; then
-  # shellcheck source=scripts/_rebar-config.sh
-  source "$_IW_DIR/_rebar-config.sh"
-  # Under `rebar run` (REBAR_CHECK_IMPL=go, the default) the CLI's native port runs instead.
-  _rebar_native inbox-watch "$@"
-fi
-
 INTERVAL=30
 PREVIEW=0
 # Own-sender suppression (see the emit loop). Defaults to the repo directory

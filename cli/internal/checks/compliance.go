@@ -222,7 +222,7 @@ func runCompliance(ctx *Context, args []string) int {
 				say("OK: drift-check is wired into CI")
 			} else {
 				say("FAIL: CONSUMES.md declares dependencies but `rebar contract drift-check` is not wired into CI",
-					"  Add to scripts/ci-check.sh (or your CI of choice):",
+					"  Add to your CI workflow (or the CI script it runs):",
 					"    rebar contract drift-check",
 					"  Without this, consumed contracts can silently age out as upstream evolves (CHARTER §1.6).")
 				errors++

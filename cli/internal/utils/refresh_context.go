@@ -115,12 +115,16 @@ func runRefreshContext(ctx *checks.Context, args []string) int {
 		case !hasCommits:
 			r.say("  (skipped: no commits yet)")
 		default:
-			log, _ := gitx.Run(r.repo, nil, "log", "--since="+synced, "--oneline")
+			// From the start of the last-synced day: git fills a date-only
+			// --since with the current time of day, which dropped that
+			// day's later commits.
+			since := "--since=" + synced + " 00:00"
+			log, _ := gitx.Run(r.repo, nil, "log", since, "--oneline")
 			count := strings.Count(log, "\n")
 			if log != "" && !strings.HasSuffix(log, "\n") {
 				count++
 			}
-			run(r.repo, ctx.Stdout, nil, "git", "log", "-n", "20", "--since="+synced, "--oneline")
+			run(r.repo, ctx.Stdout, nil, "git", "log", "-n", "20", since, "--oneline")
 			if count > 20 {
 				r.say(fmt.Sprintf("  ... and %d more", count-20))
 			}

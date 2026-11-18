@@ -2,7 +2,7 @@
 #
 # Install:
 #   source bin/completions/ask.bash
-# Or system-wide (via bin/install):
+# Or system-wide (via bin/rebar-install):
 #   ln -s "$(pwd)/bin/completions/ask.bash" /usr/local/etc/bash_completion.d/ask
 #
 # Completes:

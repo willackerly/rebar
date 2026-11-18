@@ -14,6 +14,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"os/signal"
 	"path/filepath"
 	"regexp"
@@ -46,6 +47,11 @@ type Options struct {
 	// RebarBin is the rebar binary a rewritten .mcp.json runs when the old
 	// ask-mcp-server has no rebar beside it ("": rebar on PATH).
 	RebarBin string
+	// RebarOnPath is the rebar binary that legacy copies, thin wrappers and
+	// checks_extra scripts find first on PATH as `rebar`, both while
+	// planning and in Apply, so the plan is verified against the binary
+	// apply runs ("": PATH is left alone, so both see the rebar there).
+	RebarOnPath string
 }
 
 const defaultTimeout = 3 * time.Minute
@@ -121,6 +127,8 @@ type Plan struct {
 	// serve` (nil: nothing to rewrite).
 	MCP   *MCPEdit
 	Notes []string
+	// RebarOnPath is Options.RebarOnPath, for Apply.
+	RebarOnPath string
 }
 
 // Deletions returns the copies a plan deletes or replaces.
@@ -202,6 +210,8 @@ type migrator struct {
 	// install runs by root, script, arguments and candidate .rebarrc
 	runs map[string]runResult
 	mu   sync.Mutex
+	// binDir holds the `rebar` link put first on PATH (RebarOnPath)
+	binDir string
 }
 
 type probeTreeRun struct {
@@ -239,7 +249,12 @@ func BuildPlan(opts Options) (*Plan, error) {
 
 	rc, _ := os.ReadFile(filepath.Join(proj, ".rebarrc"))
 	m := &migrator{opts: opts, tmp: tmp, rc: rc, trees: map[string]*probeTreeRun{}, runs: map[string]runResult{}, writers: map[string][]string{}}
-	m.plan = &Plan{Project: proj, Install: install, RC: rc, Tier: tierOf(rc)}
+	m.plan = &Plan{Project: proj, Install: install, RC: rc, Tier: tierOf(rc), RebarOnPath: opts.RebarOnPath}
+	if opts.RebarOnPath != "" {
+		if m.binDir, err = linkRebar(opts.RebarOnPath, filepath.Join(tmp, "bin")); err != nil {
+			return nil, err
+		}
+	}
 	m.progress("copying the project to a scratch workspace")
 	if m.ws, err = newWorkspace(proj, tmp); err != nil {
 		return nil, err
@@ -316,6 +331,12 @@ func BuildPlan(opts Options) (*Plan, error) {
 		m.plan.MCP = edit
 	}
 	return m.plan, nil
+}
+
+// env is scrubbedEnv with the RebarOnPath binary first on PATH: the
+// environment every planning run gets.
+func (m *migrator) env(extra ...string) []string {
+	return prependPath(scrubbedEnv(extra...), m.binDir)
 }
 
 func (m *migrator) progress(msg string) {
@@ -499,7 +520,7 @@ func (m *migrator) gates(name string) (int, bool) {
 // a read-only check), and the workspace is restored.
 func (m *migrator) runLegacy(name string, args ...string) runResult {
 	r := run(m.opts.Timeout, m.work,
-		scrubbedEnv("REBAR_PROJECT_ROOT="+m.work, "REBAR_TIER=3"),
+		m.env("REBAR_PROJECT_ROOT="+m.work, "REBAR_TIER=3"),
 		append([]string{m.workPath(name)}, args...)...)
 	m.noteWrites(name)
 	return r
@@ -539,7 +560,7 @@ func (m *migrator) runInstall(root, name string, extra []Setting, args ...string
 	if err != nil {
 		return runResult{Err: err, Code: -1}
 	}
-	r = runNative(root, rcPath, scrubbedEnv("REBAR_PROJECT_ROOT="+root, "REBAR_TIER=3"), name, args...)
+	r = runNative(root, rcPath, m.env("REBAR_PROJECT_ROOT="+root, "REBAR_TIER=3"), name, args...)
 	m.mu.Lock()
 	m.runs[key] = r
 	m.mu.Unlock()
@@ -745,10 +766,10 @@ func (m *migrator) groundTruthStrictness(name string, keys []string, before runR
 			_ = m.ws.restore()
 			return nil, "could not check the copy " + sc.label + ": " + err.Error()
 		}
-		l := run(m.opts.Timeout, m.work, scrubbedEnv("REBAR_PROJECT_ROOT="+m.work, "REBAR_TIER=3"), m.workPath(name))
+		l := run(m.opts.Timeout, m.work, m.env("REBAR_PROJECT_ROOT="+m.work, "REBAR_TIER=3"), m.workPath(name))
 		legacyFails[i] = !l.ok()
 		for v, extra := range variants {
-			r := runNative(m.work, m.rcFile(extra), scrubbedEnv("REBAR_PROJECT_ROOT="+m.work, "REBAR_TIER=3"), name)
+			r := runNative(m.work, m.rcFile(extra), m.env("REBAR_PROJECT_ROOT="+m.work, "REBAR_TIER=3"), name)
 			installFails[v][i] = !r.ok()
 		}
 		if err := m.ws.restore(); err != nil {
@@ -809,7 +830,7 @@ func (m *migrator) legacyMetrics(name string) metricValues {
 func (m *migrator) legacyMetricsIn(root, name string) metricValues {
 	probe := filepath.Join(root, "scripts", ".rebar-migrate-probe")
 	r := run(m.opts.Timeout, root,
-		scrubbedEnv("REBAR_PROJECT_ROOT="+root, "REBAR_TIER=3", "REBAR_MIGRATE_LEGACY="+filepath.Join(root, "scripts", name)),
+		m.env("REBAR_PROJECT_ROOT="+root, "REBAR_TIER=3", "REBAR_MIGRATE_LEGACY="+filepath.Join(root, "scripts", name)),
 		"-c", legacyHarness, probe)
 	if root == m.work {
 		m.noteWrites(name)
@@ -1467,7 +1488,7 @@ func (m *migrator) buildProbeTreeWith(name, content string, cands []Setting, scr
 	for _, c := range []string{installDefaults["contracts_dir"], firstNonEmpty(rcValue(m.rc, "contracts_dir"), "architecture")} {
 		_ = os.MkdirAll(filepath.Join(root, c), 0o755)
 	}
-	t.legacy = run(m.opts.Timeout, root, scrubbedEnv("REBAR_PROJECT_ROOT="+root, "REBAR_TIER=3"),
+	t.legacy = run(m.opts.Timeout, root, m.env("REBAR_PROJECT_ROOT="+root, "REBAR_TIER=3"),
 		filepath.Join(root, "scripts", name))
 	return t
 }
@@ -1551,7 +1572,7 @@ func (m *migrator) configLib() *ScriptPlan {
 		return sp
 	}
 	q := `source "$1" >/dev/null 2>&1; _rebar_tier 2>/dev/null; type _rebar_contracts_dir >/dev/null 2>&1 && _rebar_contracts_dir`
-	env := scrubbedEnv("REBAR_PROJECT_ROOT=" + m.work)
+	env := m.env("REBAR_PROJECT_ROOT=" + m.work)
 	a := run(m.opts.Timeout, m.work, env, "-c", q, "x", m.workPath(name))
 	m.noteWrites(name)
 	// What rebar's own settings readers report (the shell library's
@@ -1896,7 +1917,91 @@ func (m *migrator) findReferences(names []string) map[string][]reference {
 		}
 		return nil
 	})
+	m.hookReferences(names, out)
 	return out
+}
+
+// hookReferences adds the git hooks that run a legacy copy to out: a hook
+// that is a symlink to scripts/<name> (ln -sf ../../scripts/x.sh
+// .git/hooks/commit-msg), or a hook file that calls it. Hooks live in the
+// git dir (skipped by the tree walk) or core.hooksPath; git skips a hook
+// whose target is gone without a word, so deleting such a copy would stop
+// the hook silently.
+func (m *migrator) hookReferences(names []string, out map[string][]reference) {
+	root := m.opts.ProjectRoot
+	for _, dir := range HookDirs(root) {
+		entries, err := os.ReadDir(dir)
+		if err != nil {
+			continue
+		}
+		for _, e := range entries {
+			if e.IsDir() || strings.HasSuffix(e.Name(), ".sample") {
+				continue
+			}
+			path := filepath.Join(dir, e.Name())
+			label := path
+			if rel, err := filepath.Rel(root, path); err == nil && !strings.HasPrefix(rel, "..") {
+				label = rel
+			}
+			add := func(n string, line int) {
+				for _, r := range out[n] {
+					if r.File == label && r.Line == line {
+						return
+					}
+				}
+				out[n] = append(out[n], reference{File: label, Line: line})
+			}
+			if e.Type()&os.ModeSymlink != 0 {
+				target, err := filepath.EvalSymlinks(path)
+				if err != nil {
+					continue
+				}
+				for _, n := range names {
+					if copyPath, err := filepath.EvalSymlinks(filepath.Join(root, "scripts", n)); err == nil && copyPath == target {
+						add(n, 1)
+					}
+				}
+				continue
+			}
+			info, err := e.Info()
+			if err != nil || !info.Mode().IsRegular() || info.Size() > 512*1024 {
+				continue
+			}
+			data, err := os.ReadFile(path)
+			if err != nil || bytes.IndexByte(data, 0) >= 0 {
+				continue
+			}
+			for i, line := range codeLines(string(data), "") {
+				for _, n := range names {
+					if strings.Contains(line, "scripts/"+n) {
+						add(n, i+1)
+					}
+				}
+			}
+		}
+	}
+}
+
+// HookDirs are the directories git runs root's hooks from: core.hooksPath
+// (relative to the work tree) when set, and the git dir's hooks/.
+func HookDirs(root string) []string {
+	var dirs []string
+	if out, err := exec.Command("git", "-C", root, "config", "--get", "core.hooksPath").Output(); err == nil {
+		if p := strings.TrimSpace(string(out)); p != "" {
+			if !filepath.IsAbs(p) {
+				p = filepath.Join(root, p)
+			}
+			dirs = append(dirs, p)
+		}
+	}
+	if out, err := exec.Command("git", "-C", root, "rev-parse", "--git-common-dir").Output(); err == nil {
+		p := strings.TrimSpace(string(out))
+		if !filepath.IsAbs(p) {
+			p = filepath.Join(root, p)
+		}
+		dirs = append(dirs, filepath.Join(p, "hooks"))
+	}
+	return dirs
 }
 
 // shimCallers turns a verified copy that other project files call into a
@@ -2001,7 +2106,17 @@ func shimScript(name string) []byte {
 	fmt.Fprintf(&b, "# scripts/%s.sh — left by `rebar migrate` so existing callers keep working.\n", name)
 	fmt.Fprintf(&b, "# The check runs from the rebar install with this project's .rebarrc;\n")
 	fmt.Fprintf(&b, "# prefer `rebar run %s`, and delete this file once nothing calls it.\n", name)
-	b.WriteString("_rebar_shim_root=\"$(cd \"$(dirname \"${BASH_SOURCE[0]}\")/..\" && pwd)\"\n")
+	// A git hook may be a symlink to the wrapper: the project is the
+	// parent of the directory the file itself is in.
+	b.WriteString("_rebar_shim_src=\"${BASH_SOURCE[0]}\"\n")
+	b.WriteString("while [ -L \"$_rebar_shim_src\" ]; do\n")
+	b.WriteString("  _rebar_shim_link=\"$(readlink \"$_rebar_shim_src\")\"\n")
+	b.WriteString("  case \"$_rebar_shim_link\" in\n")
+	b.WriteString("    /*) _rebar_shim_src=\"$_rebar_shim_link\" ;;\n")
+	b.WriteString("    *) _rebar_shim_src=\"$(dirname \"$_rebar_shim_src\")/$_rebar_shim_link\" ;;\n")
+	b.WriteString("  esac\n")
+	b.WriteString("done\n")
+	b.WriteString("_rebar_shim_root=\"$(cd \"$(dirname \"$_rebar_shim_src\")/..\" && pwd)\"\n")
 	if name == "check-ground-truth" {
 		b.WriteString("# Sourced for compute_metrics(): the install computes the declared metrics.\n")
 		b.WriteString("compute_metrics() { REBAR_PROJECT_ROOT=\"$_rebar_shim_root\" rebar run check-ground-truth --print; }\n")
@@ -2119,7 +2234,7 @@ func (m *migrator) registryAfterDeletions() {
 		return
 	}
 	reg := func(arg string) runResult {
-		return runNative(m.work, m.rcFile(nil), scrubbedEnv("REBAR_PROJECT_ROOT="+m.work, "REBAR_TIER=3"), "compute-registry.sh", arg)
+		return runNative(m.work, m.rcFile(nil), m.env("REBAR_PROJECT_ROOT="+m.work, "REBAR_TIER=3"), "compute-registry.sh", arg)
 	}
 	before := reg("--check")
 	if before.Err != nil || before.Code != 0 {
@@ -2222,12 +2337,12 @@ func (m *migrator) settingsOnly(name, src string, before runResult, cands []Sett
 			return ""
 		}
 		args := readOnlyChecks[name]
-		r := run(m.opts.Timeout, m.work, scrubbedEnv("REBAR_PROJECT_ROOT="+m.work, "REBAR_TIER=3"), append([]string{ref}, args...)...)
+		r := run(m.opts.Timeout, m.work, m.env("REBAR_PROJECT_ROOT="+m.work, "REBAR_TIER=3"), append([]string{ref}, args...)...)
 		m.noteWrites("")
 		if same, _ := compareRuns(before, r); !same {
 			continue
 		}
-		pr := run(m.opts.Timeout, legacyTree.root, scrubbedEnv("REBAR_PROJECT_ROOT="+legacyTree.root, "REBAR_TIER=3"), append([]string{ref}, args...)...)
+		pr := run(m.opts.Timeout, legacyTree.root, m.env("REBAR_PROJECT_ROOT="+legacyTree.root, "REBAR_TIER=3"), append([]string{ref}, args...)...)
 		if same, _ := compareRuns(legacyTree.legacy, pr); same {
 			return h
 		}
@@ -2385,13 +2500,15 @@ func (m *migrator) substringHint(name, src string, cands []Setting) string {
 }
 
 // registryBody drops the registry's header comments that aren't content —
-// the timestamp older versions wrote and the regenerate hint (which named
-// ./scripts/compute-registry.sh before 3.1) — as compute-registry.sh --check
-// does, so a copy that differs only there still reproduces the registry.
+// the timestamp older versions wrote, the regenerate hint (which named
+// ./scripts/compute-registry.sh before 3.1) and the AUTO-GENERATED line
+// (which named scripts/compute-registry.sh before 4.0) — as
+// `rebar run compute-registry --check` does, so a copy that differs only
+// there still reproduces the registry.
 func registryBody(s string) string {
 	var b strings.Builder
 	for _, line := range strings.SplitAfter(s, "\n") {
-		if strings.HasPrefix(line, "<!-- Generated:") || strings.HasPrefix(line, "<!-- Regenerate:") {
+		if checks.IsRegistryHeaderComment(line) {
 			continue
 		}
 		b.WriteString(line)

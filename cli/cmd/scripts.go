@@ -81,6 +81,13 @@ func runRebarScript(name string, args ...string) (exitCode int, found bool, err 
 	if !ok {
 		return 0, false, nil
 	}
+	switch decideLegacySuite(os.Stderr, s) {
+	case runBuiltIn:
+		c, _ := checks.Lookup(name)
+		return runNativeCheck(c, cfg.RepoRoot, cfg.RepoRoot, args), true, nil
+	case refuseCopy:
+		return 1, true, nil
+	}
 	warnLegacy(s)
 	code, err := scripts.RunInProject(s.Path, cfg.RepoRoot, args...)
 	return code, true, err
@@ -88,7 +95,7 @@ func runRebarScript(name string, args ...string) (exitCode int, found bool, err 
 
 func warnLegacy(s resolvedScript) {
 	if s.Legacy {
-		fmt.Fprintf(os.Stderr, "rebar: running the project's own %s (deprecated: rebar's checks are built in; move customizations to .rebarrc and delete the copy)\n",
+		fmt.Fprintf(os.Stderr, "rebar: running the project's own %s (deprecated: rebar's checks are built in; run `rebar migrate` to move its customizations to .rebarrc and replace it)\n",
 			filepath.Join("scripts", filepath.Base(s.Path)))
 	}
 }

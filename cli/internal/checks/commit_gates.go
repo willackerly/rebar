@@ -189,7 +189,7 @@ func (g *commitGate) run(ctx *Context, args []string) int {
 		return 0
 	}
 	fmt.Fprintf(w, "\n%s: %d violation(s)\n", g.name, violations)
-	fmt.Fprintf(w, "Wire as commit-msg hook:  ln -sf ../../scripts/%s.sh .git/hooks/commit-msg\n", g.name)
+	fmt.Fprintf(w, "Wire as commit-msg hook:  printf '#!/bin/sh\\nexec rebar run %s \"$1\"\\n' > .git/hooks/commit-msg && chmod +x .git/hooks/commit-msg\n", g.name)
 	if warnOnly {
 		return 0
 	}

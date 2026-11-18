@@ -15,7 +15,7 @@ OK: AGENTS.md mentions ASK CLI
 === Federation (CONSUMES.md present) ===
 OK: CONSUMES.md declares 1 cross-repo dependency(ies)
 FAIL: CONSUMES.md declares dependencies but `rebar contract drift-check` is not wired into CI
-  Add to scripts/ci-check.sh (or your CI of choice):
+  Add to your CI workflow (or the CI script it runs):
     rebar contract drift-check
   Without this, consumed contracts can silently age out as upstream evolves (CHARTER §1.6).
 

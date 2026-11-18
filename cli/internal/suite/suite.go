@@ -35,6 +35,11 @@ type script struct {
 	// path is the script to run when native is nil; "" when neither the
 	// project nor the install has it.
 	path string
+	// copy marks path as the project's own copy of one of rebar's checks.
+	// A copy that is not executable runs with bash, as `rebar run` runs
+	// it, rather than being skipped: the suite scripts' [ -x ] skip would
+	// drop the check without a word.
+	copy bool
 }
 
 // thinWrapperMarker tags a project script that only hands off to the CLI;
@@ -58,9 +63,9 @@ func resolve(ctx *checks.Context, name string, quiet bool) script {
 	}
 	if isProjectCopy(local) {
 		if !quiet {
-			fmt.Fprintf(ctx.Stderr, "rebar: running project copy scripts/%s (deprecated: move its settings to .rebarrc and delete it)\n", name)
+			fmt.Fprintf(ctx.Stderr, "rebar: running project copy scripts/%s (deprecated: run `rebar migrate` to replace it with the built-in check)\n", name)
 		}
-		return script{path: local}
+		return script{path: local, copy: true}
 	}
 	if c, ok := checks.Lookup(name); ok {
 		return script{native: c}
@@ -87,19 +92,21 @@ func isProjectCopy(local string) bool {
 }
 
 // found is the suites' [ -x "$script" ] (ci-check, pre-commit): a native
-// check always runs; a script must be executable.
+// check always runs; a script must be executable, except a project copy,
+// which runs with bash when it is not (run).
 func (s script) found() bool {
-	return s.native != nil || isExecutable(s.path)
+	return s.native != nil || isExecutable(s.path) || (s.copy && isRegular(s.path))
 }
 
 // run runs s with args in the project root, its output on ctx's writers,
 // and returns its exit code. Scripts are started as "$script" "$@" (their
-// own interpreter); the cold-start hook runs them with bash instead.
+// own interpreter); the cold-start hook runs them with bash instead, and
+// so does a project copy that is not executable.
 func (s script) run(ctx *checks.Context, args []string, withBash bool) int {
 	if s.native != nil {
 		return s.native.Run(&checks.Context{Root: ctx.Root, Dir: ctx.Root, Stdout: ctx.Stdout, Stderr: ctx.Stderr}, args)
 	}
-	return runFile(ctx, s.path, args, withBash)
+	return runFile(ctx, s.path, args, withBash || (s.copy && !isExecutable(s.path)))
 }
 
 // runFile runs the file at path with args in the project root, with
@@ -171,7 +178,7 @@ func RunQuiet(ctx *checks.Context, name string, args []string) (code int, found 
 	if s.native != nil {
 		return s.native.Run(quiet, args), true
 	}
-	return runFileIn(quiet, quiet.Dir, s.path, args, false), true
+	return runFileIn(quiet, quiet.Dir, s.path, args, s.copy && !isExecutable(s.path)), true
 }
 
 // output runs s with stdout and stderr captured together and returns them
