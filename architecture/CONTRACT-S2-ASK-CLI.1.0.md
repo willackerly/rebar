@@ -140,7 +140,7 @@ This is the latest version. No predecessor.
 - `bin/ask` — hand-off to `rebar ask` (bash implementation under `REBAR_CHECK_IMPL=shell`)
 - `bin/ask-server` — hand-off to `rebar ask serve` (the enterprise HTTP server, `cli/internal/mcp`; python original in `bin/legacy/`)
 - `bin/ask-agent-loop` — hand-off to `rebar ask-agent-loop` (agent-loop harness)
-- `bin/install` — PATH installer + dependency check
+- `bin/rebar-install` — PATH installer + dependency check
 - `agents/<role>/AGENT.md` — per-role config, read by ASK on every call
 - `agents/<role>/commands/*.sh` — unquoted-command implementations
 

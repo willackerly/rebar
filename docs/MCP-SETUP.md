@@ -215,6 +215,23 @@ committed `.mcp.json` won't work universally. Options:
 
 ## Security considerations
 
+- **stdio vs HTTP.** `--stdio` (what `.mcp.json` uses) opens no network
+  listener: only the local MCP client that started the server can call it.
+  HTTP mode (`--port`) is a network service — see the defaults below.
+- **HTTP defaults (since v3.1.2).** `--host` defaults to `127.0.0.1`, and a
+  loopback-bound server answers only requests whose `Host` header is
+  `localhost`, `127.0.0.1` or `[::1]` (blocks DNS rebinding from web pages).
+  To serve other machines, bind a public address **and** set an API key:
+  `--host 0.0.0.0 --api-key KEY` (or `ASK_API_KEY=KEY`); clients send
+  `Authorization: Bearer KEY`. A non-loopback bind without a key is refused
+  at startup unless you pass `--insecure-no-auth` (trusted, isolated
+  networks only). POSTs must be `Content-Type: application/json` and at most
+  1 MiB. A reverse proxy in front of a loopback-bound server must send
+  `Host: localhost`. Up to v3.1.1 HTTP mode listened on `0.0.0.0` with no
+  key by default; see [SECURITY.md](../SECURITY.md).
+- Tool calls run `ask --question`: a question is only ever asked, never
+  treated as the name of an agent command script, and `repo` / `role` must
+  be a served repo and one of its agents.
 - The MCP server spawns `rebar ask` subprocesses (or `--ask-bin` /
   `ASK_BIN`), one per tool call, in the repo, with `ASK_SERVER` cleared. These inherit the
   user's environment and filesystem access. Treat ASK agents as trusted
@@ -238,8 +255,11 @@ rebar adopt                             # existing project
 # Start MCP server manually for debugging
 rebar mcp serve --stdio --repos-dir ~/dev     # bin/ask-mcp-server runs this
 
-# HTTP mode (enterprise server) — for multi-user orgs
+# HTTP mode, this machine only (binds 127.0.0.1)
 rebar mcp serve --port 7232 --repos-dir /srv/repos --mcp-only
+
+# HTTP mode for other machines (enterprise server): public bind + API key
+ASK_API_KEY=SECRET rebar mcp serve --host 0.0.0.0 --port 7232 --repos-dir /srv/repos --mcp-only
 
 # Point an old .mcp.json at the native server
 rebar migrate            # report
