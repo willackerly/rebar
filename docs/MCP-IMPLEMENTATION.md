@@ -377,14 +377,34 @@ rebar's adapters around the SDK (`cli/internal/mcp`):
   after 1 s (`KillDelay`), and whatever is left of the groups when the server
   exits is killed, so no `rebar ask`, `claude` or `git` outlives the server.
   2 s because Claude Code's stdio client (the TypeScript SDK) closes stdin
-  and sends SIGTERM 2 s later: the server is gone before it has to. (The
-  background memory compaction `rebar ask` may start after answering is
-  detached on purpose and not killed.) `printf '…' | rebar mcp serve --stdio`
+  and sends SIGTERM 2 s later: the server is gone before it has to. What a
+  finished ask leaves running in its group (its background memory
+  compaction) stays in the kill set until it exits, 300 s pass
+  (`LingerLimit`) or the server exits. A closed stdout (EPIPE; SIGPIPE is
+  ignored in stdio mode) ends the session like the end of input. Over HTTP
+  the server stops accepting, cancels the asks, lets the requests write their
+  "cancelled" answers within the grace, then cancels request contexts and
+  closes the connections. `printf '…' | rebar mcp serve --stdio`
   still prints every quick answer, but a `tools/call` piped that way is
   cancelled at the end of input — keep stdin open until it answers.
-- **Error code** (`compat.go`): the SDK answers a request before
-  `initialize` with code 0; rebar rewrites it to -32600 (invalid request) on
-  stdout and on `/mcp` — the code the SDK uses itself from v1.9.0.
+- **Error codes** (`compat.go`): the SDK answers a request before
+  `initialize` and a second `initialize` with code 0; rebar rewrites them to
+  -32600 (invalid request) on stdout and on `/mcp` — the code the SDK uses
+  itself from v1.9.0 — a missing `params` to -32602 and any other code 0 to
+  -32603.
+- **Stdio limits** (`stdio.go`): lines over 16 MiB
+  (`sdk.DefaultMaxLineLength`) are dropped and logged, never buffered whole;
+  integer ids beyond ±2^53 are refused and logged (the SDK decodes ids as
+  JSON numbers, so the answer would carry a different id); a request nested
+  deeper than the JSON decoders allow (1000) gets a -32700 parse error with
+  its id. An id stays in use until its answer is written — also after
+  `notifications/cancelled`, which the SDK still answers.
+- **Resource URIs**: repo and role are path-escaped (`pct%zz` →
+  `ask://memory/pct%25zz:architect`); the SDK server is built at start-up.
+- **HTTP** (`httpsec.go`, `http.go`): Streamable HTTP sessions close after
+  15 min idle (`SessionTimeout`), at most 1000 are open (`MaxSessions`);
+  the request rules of both HTTP servers (bind, Host, cross-origin, JSON
+  POSTs, 1 MiB bodies, `--max-asks`) are in docs/MCP-SETUP.md.
 - **Guard**: `"arguments": null` counts as absent (it panicked inside the SDK
   v1.8.0), and a panic in a handler is an internal error, not a crash.
 

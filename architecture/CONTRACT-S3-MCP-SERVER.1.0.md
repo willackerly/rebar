@@ -75,12 +75,16 @@ ask-mcp-server [OPTIONS]
 
   --stdio              Use stdio transport (for MCP clients)
   --port PORT          Port for HTTP transport (default: 7232)
-  --host HOST          Bind host for HTTP (default: 0.0.0.0)
+  --host HOST          Bind host for HTTP (default: 127.0.0.1; another address
+                       needs --api-key unless --insecure-no-auth)
   --repos-dir DIR      Directory to scan for repos (subdirs with agents/)
   --repos PATHS        Comma-separated explicit repo paths
   --mcp-only           Only serve MCP, not classic ASK API
   --api-key KEY        Bearer-auth key
-  --ask-bin PATH       Path to ask CLI (default: alongside this script)
+  --ask-bin PATH       Path to ask CLI (default: rebar ask; must accept
+                       `--question -- <role> <question>`)
+  --max-asks N         HTTP: asks at once at most, 503 beyond (default 8)
+  --insecure-no-auth   Allow a non-loopback --host without an API key
 ```
 
 JSON-RPC surface:
@@ -90,7 +94,7 @@ JSON-RPC surface:
 | `initialize` | Standard MCP handshake; negotiates the protocol version (2024-11-05 … 2025-11-25); advertises capabilities |
 | `server/discover` | 2026-07-28 sessionless discovery (Claude Code 2.1.3xx probes it first); later requests carry the version in `_meta` |
 | `tools/list` | Returns one tool per (repo, role) pair, named `ask_<repo>_<role>`, with caller-facing description |
-| `tools/call` | Routes `{ name, arguments: { question } }` to `ask <repo>:<role> "<question>"` and returns the answer; names match case-insensitively |
+| `tools/call` | Routes `{ name, arguments: { question } }` to `ask [-v] --question -- <role> "<question>"` in the repo (question-only: never a command script) and returns the answer; names match case-insensitively |
 | `resources/list` | Per-role memory + log files exposed as MCP resources |
 | `resources/read` | Returns file contents (memory.md, memory.log.md, AGENT.md); URIs match case-insensitively |
 | Notifications (any method without `id`) | **Silently ignored** — never reply with `id: null` |
@@ -107,7 +111,10 @@ JSON-RPC surface:
 | HTTP transport | MCP Streamable HTTP at `/mcp` (session per client via `Mcp-Session-Id`, JSON responses); `GET /mcp/schema` and the classic `/v1/*` API alongside |
 | Cross-repo invocation | `tools/call` with `name=ask_<repo>_<role>` runs `cd <repo-path> && ask <role> "<question>"` |
 | Tool count discipline | At most one tool per (repo, role); duplicates are deduplicated by name |
-| Authentication | If `--api-key` set, requires `Authorization: Bearer <key>` for HTTP transport; stdio is trusted (subprocess-of-Claude) |
+| Authentication | If `--api-key` set, requires `Authorization: Bearer <key>` for HTTP transport (constant-time compare); stdio is trusted (subprocess-of-Claude) |
+| HTTP hardening | Binds 127.0.0.1 by default; a non-loopback bind without a key exits 2 unless `--insecure-no-auth`. Requests on a loopback listener need a loopback `Host` (403); browsers' cross-origin requests 403; POST needs `application/json` (415); bodies ≤ 1 MiB (413), `/v1/ask` needs `Content-Length` (411), read within 60 s; ≤ `--max-asks` asks at once (503 / isError "Server busy"); Streamable HTTP sessions close after 15 min idle, ≤ 1000 open (503) |
+| Names | A role is one of the repo's listed agents (plain name); repos with `.rebar-skip-mcp` are not served, also when named with `--repos`; resource URIs path-escape repo and role (`ask://memory/pct%25zz:architect`) |
+| Stdio limits | Lines over 16 MiB are dropped and logged; integer ids beyond ±2^53 are refused (logged: they would not survive the round trip); a request nested too deeply for the decoders gets -32700 with its id; SIGPIPE is ignored (EPIPE ends the session like end of input) |
 
 ## Error Contracts
 
@@ -116,10 +123,11 @@ JSON-RPC surface:
 | `--repos-dir` missing | Path doesn't exist | Warn on stderr, continue (allows running with `--repos` only) |
 | `tools/call` for unknown tool | Name not in registry (ignoring case) | JSON-RPC error code -32602, `unknown tool "<name>"` |
 | Invalid tool arguments | Missing/empty `question`, wrong types | Tool result with `isError: true` naming the problem |
-| `ask` subprocess fails | Underlying ASK CLI error, timeout | Forward exit code + stderr + cmd + cwd in tool result with `isError: true` |
+| `ask` subprocess fails | Underlying ASK CLI error, timeout | stdio: exit code + stderr + cmd + cwd in the tool result (`isError: true`); HTTP (remote callers): `Agent <repo>:<role> failed (exit code N): <last stderr line>`, details in the server log |
+| Duplicate `initialize` / missing params | SDK errors sent with code 0 | Rewritten to -32600 / -32602 (other code-0 errors -32603) |
 | `resources/read` unknown URI | Not a registered `ask://` resource | JSON-RPC error -32602, "Resource not found" |
 | `initialize` not called | Other method invoked first (pre-2026-07-28 protocol) | JSON-RPC error -32600, `method "<m>" is invalid during session initialization` |
-| Client goes away / server stopped | End of stdin; SIGINT/SIGTERM (stdio or HTTP) | Stop reading/accepting; cancel running tool calls (their answer: `isError` "Agent query cancelled"); the ask process group gets SIGTERM, SIGKILL 1 s later; exit 0 within 2 s, leaving no ask/LLM/git process behind |
+| Client goes away / server stopped | End of stdin, stdout closed; SIGINT/SIGTERM (stdio or HTTP) | Stop reading/accepting; cancel running tool calls (their answer: `isError` "Agent query cancelled"; HTTP connections close after the answers); the ask process group gets SIGTERM, SIGKILL 1 s later; exit 0 within 2 s (HTTP: request contexts are cancelled at the end of the grace), leaving no ask/LLM/git process behind — also none a finished ask left in its group (killed at exit, or 300 s after the ask) |
 | Method not implemented | Unknown method (non-notification) | Error -32601, "method not found" |
 
 ## Dependencies

@@ -104,7 +104,12 @@ ask architect "What are the system boundaries?"
 ```
 
 **Unquoted = command.** A single word matching a script in
-`agents/<role>/commands/` runs that script directly:
+`agents/<role>/commands/` runs that script directly. Only plain names count
+(letters, digits, `.`, `_`, `-`; no `..`; not starting with `.` or `-`), and
+the script must be an executable file directly in `commands/`; anything else
+(`../x`, `-x`, `two words`) is a question. `ask --question <role> "<q>"` is
+always a question — the MCP server and `ask serve` ask that way, so text from
+the network never runs a script:
 
 ```bash
 ask steward summary      # runs agents/steward/commands/summary.sh
@@ -245,9 +250,18 @@ ask serve --port 7232 --repos-dir /srv/repos
 # Serve specific repos
 ask serve --port 7232 --repos /srv/repos/billing,/srv/repos/auth
 
-# With API key auth
-ask serve --port 7232 --repos-dir /srv/repos --api-key SECRET
+# Serve other machines: bind a public address AND set an API key
+ask serve --host 0.0.0.0 --port 7232 --repos-dir /srv/repos --api-key SECRET
 ```
+
+`ask serve` (like `rebar mcp serve` in HTTP mode) listens on 127.0.0.1 by
+default and then answers only requests whose `Host` is a loopback name. A
+non-loopback `--host` without `--api-key`/`ASK_API_KEY` is refused (exit 2)
+unless `--insecure-no-auth`. POST bodies must be `Content-Type:
+application/json`, at most 1 MiB (413; `/v1/ask` also needs a
+`Content-Length`, 411), sent within 60 s; at most `--max-asks` (default 8)
+asks run at once (503 beyond). Repos with `.rebar-skip-mcp` are not served.
+A failed ask returns its last error line; the details are in the server log.
 
 ### Query from any machine
 

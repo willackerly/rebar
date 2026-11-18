@@ -18,6 +18,56 @@ All notable changes to rebar. Versioned with [semver](https://semver.org/).
 
 ## Unreleased
 
+- **Security: `ask` command words and agent names cannot traverse; the
+  servers ask question-only and bind 127.0.0.1 (v4.0.0 review R1–R3, S6,
+  S9; the Go side of the v3.1.2 fix).** A command word is a plain name
+  (`[A-Za-z0-9._-]`, no `..`, not starting with `.`/`-`) naming an
+  executable directly in `agents/<role>/commands/`; anything else is a
+  question (`ask architect ../../../../evil/x` used to run `evil/x.sh`, also
+  through `POST /v1/ask`). Agent names are one directory entry ("invalid
+  agent name", exit 2). New `ask --question <agent> "<q>"`: always a
+  question. `rebar mcp serve` and `rebar ask serve` ask `ask [-v] --question
+  -- <role> <q>` (a custom `--ask-bin` must accept that, as bin/ask 3.1.2
+  does), accept only a repo's listed agents as roles, and skip repos with
+  `.rebar-skip-mcp` (also with `--repos`, and in ask-server). HTTP:
+  **`--host` defaults to 127.0.0.1**; a non-loopback bind without
+  `--api-key`/`ASK_API_KEY` exits 2 unless **`--insecure-no-auth`**; requests
+  on a loopback listener need a loopback `Host` (403) and no browser
+  cross-origin request is served (403); POST needs `application/json` (415);
+  bodies ≤ 1 MiB (413 — a huge `Content-Length` no longer allocates, which
+  killed the Go server), `/v1/ask` needs a `Content-Length` (411) and string
+  fields (400), `verbose` only when `true`; bodies read within 60 s,
+  headers within 10 s, idle connections closed after 120 s; constant-time key
+  compare; at most **`--max-asks`** (default 8) asks at once (503 +
+  Retry-After, or an isError "Server busy"). Remote callers get a short
+  error for a failed ask (its last stderr line); stderr, command line and
+  cwd go to the server log.
+- **`rebar mcp serve`: bounded sessions and input, no orphans (S9).**
+  Streamable HTTP sessions close after 15 min idle and at most 1000 are open
+  (20,000 initializes used to grow the server by 220 MB for good). A repo
+  directory like `pct%zz` no longer panics the server: resource URIs
+  path-escape repo and role, and the SDK server is built at start-up. Stdin
+  lines over 16 MiB are dropped and logged instead of ending the session.
+  SIGPIPE is ignored in stdio mode; a closed stdout ends the session like
+  the end of input, still killing the ask groups. HTTP shutdown lets
+  in-flight calls answer "Agent query cancelled" (they got an empty 200)
+  and keeps the 1 s SIGTERM→SIGKILL delay. An id is settled only when its
+  answer is written (no cancellation hook): reusing it earlier is refused
+  and logged. What a finished ask leaves in its process group is killed
+  at exit (or 300 s later). Code-0 SDK errors get -32600/-32602/-32603; a
+  request nested too deeply gets a -32700 parse error with its id; integer
+  ids beyond ±2^53 are refused (logged).
+- **`rebar ask` memory compaction is safe beside asks (S6-5).** It stays in
+  the asking process's group (the MCP server's shutdown reaches it), its
+  claude call is bounded by `ASK_TIMEOUT`, one compaction per agent runs at
+  a time, `memory.md`/`memory.log.md` are replaced atomically with entries
+  appended meanwhile kept, and the old `memory.md` is merged into the new
+  summary instead of discarded.
+- **`bin/ask*` shims skip a `bin/rebar` that does not run on this machine**
+  (the tracked binary is one platform's build) for `REBAR_BIN`, then PATH,
+  instead of failing with "exec format error". `bin/rebar` rebuilt with
+  go1.27.4 (govulncheck clean).
+
 - **`rebar mcp serve` shuts down promptly and takes its children with it.**
   At the end of stdin (Claude Code exiting or restarting the server) and on
   SIGINT/SIGTERM — stdio and HTTP — the server stops reading requests (HTTP:

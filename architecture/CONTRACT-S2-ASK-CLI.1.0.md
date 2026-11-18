@@ -91,7 +91,10 @@ Exit codes: 0 success, 1 ask-level failure, 2 invocation error.
 | Persistent session | One per (repo, role); accumulates across calls until `ask reset <role>` |
 | Memory durability | `agents/<role>/memory.md` is the durable distillation; reloaded each call |
 | Memory log | `agents/<role>/memory.log.md` is append-only event log (gitignored) |
-| Quoted vs unquoted | Quoted arg = question for LLM; unquoted = command name resolving to `agents/<role>/commands/<name>.sh` |
+| Quoted vs unquoted | Quoted arg = question for LLM; unquoted = command name resolving to `agents/<role>/commands/<name>.sh` — only a plain name (`[A-Za-z0-9._-]`, no `..`, no leading `.`/`-`) naming an executable directly in `commands/`; anything else is a question |
+| Question only | `ask --question <role> "<q>"` is always a question (never a subcommand, command script or default command); the servers ask this way |
+| Agent names | One directory entry under `agents/`: no `/`, `\`, `..`, `:`, control characters, leading `.`/`-` — otherwise "invalid agent name", exit 2 |
+| Memory compaction | Background `ask compact` stays in the asking process's group, bounded by `ASK_TIMEOUT`, one per agent at a time; files replaced atomically, appends during compaction kept, old `memory.md` merged |
 | Default command | `ask <role>` with no args runs `agents/<role>/commands/default.sh` |
 | Cross-repo asks | `ask <repo>:<role> "..."` resolves repo via the registry the MCP server uses; `cd`s into that repo before invoking |
 | --json mode | Wraps stdout in `{"role":..., "answer":...}` JSON shape for CI/automation |

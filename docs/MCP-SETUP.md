@@ -270,6 +270,19 @@ committed `.mcp.json` won't work universally. Options:
   Claude Code session on the machine.
 - Don't commit `.mcp.json` to a public repo if the command path reveals
   private directory structure you'd rather not disclose.
+- Tool calls run `rebar ask --question -- <role> "<question>"`: the question is
+  never taken as an agent command, and a role must be one of the repo's
+  agents. A repo with `.rebar-skip-mcp` is not served.
+- HTTP mode (`--port`) listens on 127.0.0.1 by default and answers only
+  requests with a loopback `Host` (DNS rebinding) that are not browser
+  cross-origin requests. To serve other machines bind `--host 0.0.0.0` with
+  `--api-key KEY` (or `ASK_API_KEY`); without a key a non-loopback bind exits
+  2 unless `--insecure-no-auth`. POST bodies: `application/json`, ≤ 1 MiB,
+  sent within 60 s. At most `--max-asks` (default 8) asks run at once (503 /
+  "Server busy"); idle sessions close after 15 min, at most 1000 are open.
+  Remote callers get a short error for a failed ask; the details go to the
+  server's stderr. A reverse proxy in front of a loopback-bound server must
+  send `Host: localhost`.
 
 ---
 
@@ -284,7 +297,8 @@ rebar adopt                             # existing project
 rebar mcp serve --stdio --repos-dir ~/dev     # bin/ask-mcp-server runs this
 
 # HTTP mode (enterprise server) — for multi-user orgs: Streamable HTTP at /mcp
-rebar mcp serve --port 7232 --repos-dir /srv/repos --mcp-only --api-key "$KEY"
+# (127.0.0.1 by default; another address needs --api-key or --insecure-no-auth)
+rebar mcp serve --host 0.0.0.0 --port 7232 --repos-dir /srv/repos --mcp-only --api-key "$KEY"
 
 # Point an old .mcp.json at the native server
 rebar migrate            # report
