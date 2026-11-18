@@ -47,8 +47,57 @@ func TestInstallShims(t *testing.T) {
 	if w, _, _ := installShims(dir, true); strings.Join(w, " ") != "ask" {
 		t.Fatalf("--force wrote %v", w)
 	}
-	if _, err := os.Stat(mine + ".rebar-tmp"); err == nil {
-		t.Fatal("temporary file left behind")
+	if left, _ := filepath.Glob(filepath.Join(dir, ".*rebar-tmp*")); len(left) != 0 {
+		t.Fatalf("temporary files left behind: %v", left)
+	}
+}
+
+// install-shims never writes through a symlink: not one at a target (a
+// conflict; --force replaces the link itself), and not a planted
+// temporary name (the old fixed <file>.rebar-tmp).
+func TestInstallShimsSymlinks(t *testing.T) {
+	dir, outside := t.TempDir(), t.TempDir()
+	victim := filepath.Join(outside, "victim")
+	os.WriteFile(victim, []byte("keep\n"), 0o644)
+	os.Symlink(victim, filepath.Join(dir, "ask"))
+	os.Symlink(victim, filepath.Join(dir, "ask-server.rebar-tmp"))
+	_, conflicts, err := installShims(dir, false)
+	if err != nil || strings.Join(conflicts, " ") != "ask" {
+		t.Fatalf("conflicts %v, %v; want the symlinked ask", conflicts, err)
+	}
+	if _, _, err := installShims(dir, true); err != nil {
+		t.Fatal(err)
+	}
+	if data, _ := os.ReadFile(victim); string(data) != "keep\n" {
+		t.Fatalf("wrote through a symlink: victim now %q", data)
+	}
+	if info, err := os.Lstat(filepath.Join(dir, "ask")); err != nil || !info.Mode().IsRegular() {
+		t.Fatalf("--force did not replace the ask symlink with the shim: %v %v", info, err)
+	}
+}
+
+// A bin/install left by rebar before v4.0.0 (it shadows install(1) on PATH)
+// is removed once rebar-install is written; anyone else's install is kept.
+func TestInstallShimsRemovesLegacyInstall(t *testing.T) {
+	legacy := "#!/usr/bin/env bash\n" + legacyInstallMarker + " and optionally configure ASK_SERVER.\n"
+	for _, tc := range []struct {
+		name, body string
+		removed    bool
+	}{{"rebar's", legacy, true}, {"someone else's", "#!/bin/sh\nexec /usr/bin/install \"$@\"\n", false}} {
+		dir := t.TempDir()
+		os.WriteFile(filepath.Join(dir, "install"), []byte(tc.body), 0o755)
+		if _, _, err := installShims(dir, false); err != nil {
+			t.Fatal(err)
+		}
+		_, err := os.Stat(filepath.Join(dir, "install"))
+		if gone := os.IsNotExist(err); gone != tc.removed {
+			t.Errorf("%s install: removed = %v, want %v", tc.name, gone, tc.removed)
+		}
+	}
+	for _, rel := range assets.Kit() {
+		if rel == "install" {
+			t.Error("the kit puts a file named install on PATH")
+		}
 	}
 }
 

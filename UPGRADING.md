@@ -21,8 +21,26 @@ the installer), not a tarball of the rebar tree, and nothing reads a rebar
 tree any more except `REBAR_CHECK_IMPL=shell`. `rebar migrate` compares your
 copies with the built-in checks, and also turns a `ci-check.sh` /
 `pre-commit.sh` copy that only adds calls to your own scripts into
-`checks_extra` / `checks_extra_pre_commit` lines. The steps below apply
+`checks_extra` / `checks_extra_pre_commit` lines (only for plain calls whose
+failure fails the suite: a copy that runs a script with `|| true`, only in
+CI, or only to warn is kept for you to review). The steps below apply
 unchanged; step 10 (CI) gets simpler.
+
+**Installer changes in 4.0.** `bin/install` (the PATH setup beside the
+binary) is now `rebar-install`: on PATH, a file named `install` shadowed
+install(1) and broke `install -d` / `make install`. `rebar install-shims`
+removes rebar's old `install` from the directory it writes; a pre-versioned
+`~/.rebar` clone still has one in `~/.rebar/bin`, so drop that directory's
+old PATH line from your shell RC. "latest" now means the newest published
+GitHub Release, and a release tag is no longer built from source when its
+download is missing or fails: the installer stops, and `--source` builds it
+on purpose. Use the installer from the tag you install (step 1). The
+installer of a 3.1.x tag still works for 4.0.x releases, which also ship a
+small `rebar_<ver>_<os>_<arch>.tar.gz` for it (the binary and its
+companions; dropped in 4.1). It warns that the version "lacks
+templates/project-bootstrap/ or scripts/steward.sh" (harmless: they are
+built in) and, finding no `bin/install`, does not touch your shell RC,
+which already has `~/.rebar/current/bin` if you installed 3.1 with it.
 
 In the commands below, `v3.1.1` is the release you are moving to. Use the
 tag you are actually installing.

@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
-# install — Add rebar's bin/ to PATH and optionally configure ASK_SERVER.
+# rebar-install — Add rebar's bin/ to PATH and optionally configure ASK_SERVER.
+# (Called bin/install before v4.0.0; renamed because a file named install on
+# PATH shadows install(1).)
 #
 # Usage:
-#   ./bin/install              # interactive
-#   ./bin/install --server IP:PORT  # also set ASK_SERVER
+#   ./bin/rebar-install              # interactive
+#   ./bin/rebar-install --server IP:PORT  # also set ASK_SERVER
 #
 # Idempotent — safe to run multiple times.
 
@@ -26,7 +28,7 @@ while [ $# -gt 0 ]; do
     --server) ASK_SERVER_VAL="$2"; shift 2 ;;
     --server=*) ASK_SERVER_VAL="${1#--server=}"; shift ;;
     -h|--help)
-      echo "Usage: ./bin/install [--server HOST:PORT]"
+      echo "Usage: ./bin/rebar-install [--server HOST:PORT]"
       echo ""
       echo "Adds rebar bin/ to PATH in your shell RC file."
       echo "With --server, also sets ASK_SERVER for remote agent queries."
