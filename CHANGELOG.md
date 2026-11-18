@@ -39,6 +39,12 @@ All notable changes to rebar. Versioned with [semver](https://semver.org/).
   older than v3.1.0-rc.1 (before prebuilt assets) still build from source on
   their own. Checksum verification is unchanged. `REBAR_RELEASES_API`
   overrides the API URL (mirrors, tests).
+- **Commits on the last-synced day count as "since last sync".**
+  `refresh-context.sh`, `rebar status` and `rebar commit`'s checkpoint nudge
+  passed the QUICKCONTEXT date to `git --since` bare, which git reads as that
+  day at the current time of day, so commits made earlier on the sync day
+  were dropped (and the count depended on when you ran it). They now count
+  from local midnight.
 
 ---
 
