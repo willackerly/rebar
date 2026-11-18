@@ -17,10 +17,10 @@ parts to adopt.
 ## Install rebar
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/willackerly/rebar/v3.1.1/setup-rebar.sh | bash -s -- v3.1.1
+curl -fsSL https://raw.githubusercontent.com/willackerly/rebar/v3.1.2/setup-rebar.sh | bash -s -- v3.1.2
 ```
 
-That installs v3.1.1 and puts `~/.rebar/current/bin` (`rebar`, `ask`,
+That installs v3.1.2 and puts `~/.rebar/current/bin` (`rebar`, `ask`,
 `ask-mcp-server`) on your PATH via your shell RC; open a new terminal (or
 source the RC) and check with `rebar version`. Fetch `setup-rebar.sh` from the
 tag you install, as above: the copy on `main` is whatever `main` holds. With no
@@ -33,12 +33,12 @@ published as a Release, and draft Releases, never count. Variants (`…` is the
 
 | Command | Installs |
 |---------|----------|
-| `… \| bash -s -- v3.1.1` | that release |
+| `… \| bash -s -- v3.1.2` | that release |
 | `… \| bash -s -- --pre` | the newest published Release, pre-releases included |
 | `… \| bash -s -- main` | a branch, built from source; `rebar version` says `main@<sha>` |
-| `… \| bash -s -- v3.1.1 --no-switch` | side by side, without changing the active version |
-| `… \| bash -s -- v3.1.1 --source` | built from source with your Go instead of the prebuilt download |
-| `… \| bash -s -- v3.1.1 --dir /opt/rebar` | under `/opt/rebar` instead of `~/.rebar` (CI) |
+| `… \| bash -s -- v3.1.2 --no-switch` | side by side, without changing the active version |
+| `… \| bash -s -- v3.1.2 --source` | built from source with your Go instead of the prebuilt download |
+| `… \| bash -s -- v3.1.2 --dir /opt/rebar` | under `/opt/rebar` instead of `~/.rebar` (CI) |
 
 Each version is a complete rebar tree in `~/.rebar/versions/<version>/`;
 `~/.rebar/current` is a symlink to the active one, so switching never edits
@@ -107,7 +107,7 @@ at the version you pin, not just the `rebar` binary.
       - uses: actions/checkout@v4
       - name: Install rebar
         env:
-          REBAR_VERSION: v3.1.1
+          REBAR_VERSION: v3.1.2
         run: |
           curl -fsSL "https://raw.githubusercontent.com/willackerly/rebar/${REBAR_VERSION}/setup-rebar.sh" \
             | bash -s -- "$REBAR_VERSION" --dir "$RUNNER_TEMP/rebar"
@@ -152,8 +152,8 @@ it:
 # version's own scripts. Usage: scripts/rebar.sh check | run <script> | ...
 set -euo pipefail
 
-REBAR_PIN="v3.1.1"                          # a release tag
-REBAR_PIN_COMMIT="<commit the tag points at>" # git rev-parse 'v3.1.1^{commit}' in a clone
+REBAR_PIN="v3.1.2"                          # a release tag
+REBAR_PIN_COMMIT="<commit the tag points at>" # git rev-parse 'v3.1.2^{commit}' in a clone
 REBAR_REPOSITORY="${REBAR_REPOSITORY:-https://github.com/willackerly/rebar.git}"
 ROOT="${REBAR_CACHE_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/rebar}/$REBAR_PIN"
 
@@ -311,7 +311,7 @@ The universal first-read. Every agent, every session, no exceptions.
 
 1. **Rebar badge** — First line after `# Title` MUST be the rebar badge:
    ```markdown
-   > **rebar v3.1.1** | **Tier 2: ADOPTED**
+   > **rebar v3.1.2** | **Tier 2: ADOPTED**
    ```
    This is validated by `check-compliance` (part of `rebar check`) against
    `.rebar-version`. Update both when you upgrade rebar
