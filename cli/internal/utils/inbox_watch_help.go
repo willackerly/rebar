@@ -1,10 +1,11 @@
 package utils
 
-// inboxWatchHelp is inbox-watch.sh --help: its header comment, as
-// `sed -n '2,/^$/p' "$0" | sed 's/^# \{0,1\}//'` prints it (the --help
-// parity case keeps it in step).
+// inboxWatchHelp is inbox-watch --help: the header comment of the
+// inbox-watch.sh script it replaced, as `sed -n '2,/^$/p' "$0" | sed 's/^#
+// \{0,1\}//'` printed it, with the usage line naming `rebar run
+// inbox-watch` (the --help golden case keeps it in step).
 const inboxWatchHelp = "" +
-	"inbox-watch.sh — Live watch on peer inbox/ dirs; one line per new deposit.\n" +
+	"inbox-watch — Live watch on peer inbox/ dirs; one line per new deposit.\n" +
 	"rebar-scripts: 2026.07.11\n" +
 	"\n" +
 	"Canonical implementation of practices/inbox-watch.md and federation\n" +
@@ -35,7 +36,7 @@ const inboxWatchHelp = "" +
 	"agent's session.\n" +
 	"\n" +
 	"Usage:\n" +
-	"  ./scripts/inbox-watch.sh [options] [dir ...]\n" +
+	"  rebar run inbox-watch [options] [dir ...]\n" +
 	"\n" +
 	"  dir ...            inbox directories to watch (default: ./inbox)\n" +
 	"\n" +
@@ -48,5 +49,5 @@ const inboxWatchHelp = "" +
 	"and kept in the watch: it lists as empty until created, so files present\n" +
 	"at creation are reported as new deposits.\n" +
 	"\n" +
-	"Zero dependencies beyond POSIX tools. Bash 3.2 compatible (macOS default).\n" +
+	"Built into the rebar binary; no other dependencies.\n" +
 	"\n"

@@ -2480,13 +2480,15 @@ func (m *migrator) substringHint(name, src string, cands []Setting) string {
 }
 
 // registryBody drops the registry's header comments that aren't content —
-// the timestamp older versions wrote and the regenerate hint (which named
-// ./scripts/compute-registry.sh before 3.1) — as compute-registry.sh --check
-// does, so a copy that differs only there still reproduces the registry.
+// the timestamp older versions wrote, the regenerate hint (which named
+// ./scripts/compute-registry.sh before 3.1) and the AUTO-GENERATED line
+// (which named scripts/compute-registry.sh before 4.0) — as
+// `rebar run compute-registry --check` does, so a copy that differs only
+// there still reproduces the registry.
 func registryBody(s string) string {
 	var b strings.Builder
 	for _, line := range strings.SplitAfter(s, "\n") {
-		if strings.HasPrefix(line, "<!-- Generated:") || strings.HasPrefix(line, "<!-- Regenerate:") {
+		if checks.IsRegistryHeaderComment(line) {
 			continue
 		}
 		b.WriteString(line)
