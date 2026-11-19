@@ -34,21 +34,21 @@ func parse(prog, description, epilog string, mcp bool, args []string, stdout, st
 	help := fs.BoolP("help", "h", false, "show this help message and exit")
 	if mcp {
 		fs.BoolVar(&o.stdio, "stdio", false, "Use stdio transport (for MCP clients)")
-		fs.IntVar(&o.port, "port", 7232, "Port for HTTP transport (default: 7232)")
-		fs.StringVar(&o.host, "host", "127.0.0.1", "Host to bind for HTTP (default: 127.0.0.1; another address needs --api-key)")
+		fs.IntVar(&o.port, "port", 7232, "Port for HTTP transport")
+		fs.StringVar(&o.host, "host", "127.0.0.1", "Host to bind for HTTP (another address needs --api-key)")
 	} else {
-		fs.IntVar(&o.port, "port", 7232, "Port to listen on (default: 7232)")
-		fs.StringVar(&o.host, "host", "127.0.0.1", "Host to bind (default: 127.0.0.1; another address needs --api-key)")
+		fs.IntVar(&o.port, "port", 7232, "Port to listen on")
+		fs.StringVar(&o.host, "host", "127.0.0.1", "Host to bind (another address needs --api-key)")
 	}
 	fs.StringVar(&o.reposDir, "repos-dir", "", "Directory containing repos (each subdir with agents/)")
 	fs.StringVar(&o.repos, "repos", "", "Comma-separated paths to specific repos")
 	if mcp {
 		fs.BoolVar(&o.mcpOnly, "mcp-only", false, "Only serve MCP endpoints, not classic ASK API")
-		fs.StringVar(&o.apiKey, "api-key", os.Getenv("ASK_API_KEY"), "API key for auth")
-		fs.StringVar(&o.askBin, "ask-bin", os.Getenv("ASK_BIN"), "Path to ask CLI (default: rebar ask)")
+		fs.StringVar(&o.apiKey, "api-key", "", "API key for auth (or set ASK_API_KEY)")
+		fs.StringVar(&o.askBin, "ask-bin", "", "Path to ask CLI (or set ASK_BIN; default: rebar ask)")
 	} else {
-		fs.StringVar(&o.apiKey, "api-key", os.Getenv("ASK_API_KEY"), "API key for auth (or set ASK_API_KEY)")
-		fs.StringVar(&o.askBin, "ask-bin", os.Getenv("ASK_BIN"), "Path to ask CLI (default: rebar ask)")
+		fs.StringVar(&o.apiKey, "api-key", "", "API key for auth (or set ASK_API_KEY)")
+		fs.StringVar(&o.askBin, "ask-bin", "", "Path to ask CLI (or set ASK_BIN; default: rebar ask)")
 	}
 	fs.IntVar(&o.maxAsks, "max-asks", DefaultMaxAsks, "HTTP: asks run at once at most; more get 503 (0: no limit)")
 	fs.BoolVar(&o.insecureNoAuth, "insecure-no-auth", false, "Allow a non-loopback --host without --api-key (anyone who can reach it can run agents)")
@@ -62,6 +62,14 @@ func parse(prog, description, epilog string, mcp bool, args []string, stdout, st
 		fmt.Fprint(stderr, usage)
 		fmt.Fprintf(stderr, "%s: error: %v\n", prog, err)
 		return nil, 2, true
+	}
+	// The environment defaults are applied after parsing, not as flag
+	// defaults, so --help never prints them: ASK_API_KEY is a secret.
+	if !fs.Changed("api-key") {
+		o.apiKey = os.Getenv("ASK_API_KEY")
+	}
+	if !fs.Changed("ask-bin") {
+		o.askBin = os.Getenv("ASK_BIN")
 	}
 	if *help {
 		fmt.Fprintf(stdout, "%s\n%s\n\noptions:\n%s%s", usage, description, fs.FlagUsages(), epilog)

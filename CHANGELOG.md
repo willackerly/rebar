@@ -32,6 +32,11 @@ Fixes from field-testing v4.0.0-rc.1.
   pointed that at the 3.1.2 `bin/rebar` beside it, which has no `mcp serve`,
   so Claude Code's ASK tools stopped working. A rebar beside the old server is
   now used only if it serves MCP; otherwise the running rebar is.
+- **`rebar mcp serve --help` / `rebar ask serve --help` printed
+  `ASK_API_KEY`** (and `ASK_BIN`) as the flags' default. The environment is
+  now applied after parsing; the port and host defaults show once.
+  `rebar mcp client --help` prints its usage instead of using `--help` as
+  the URL.
 
 ## v4.0.0-rc.1 — 2026-11-19
 
