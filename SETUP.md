@@ -223,8 +223,13 @@ whatever `rebar` is on PATH, so a project script that CI runs directly should
 call the pinned wrapper (`scripts/rebar.sh run check-todos`), unless the CI
 job puts `$ROOT` on PATH. Cache `$REBAR_CACHE_DIR` between runs to skip the
 download. (Before 4.0 the binary ran the scripts of the rebar tree beside it,
-so a wrapper had to keep the whole tree of the pinned commit; such a
-wrapper keeps working with 4.0, it just no longer needs the tree.)
+so a wrapper had to keep the whole tree of the pinned commit. Such a wrapper
+works with 4.0 once its pin, commit and `.rebar-version` name a 4.0 release,
+except for one common guard: 3.x called a tree complete when it held
+`scripts/steward.sh` and `templates/project-bootstrap/`, and a 4.0 tree has
+no `scripts/steward.sh` (a 4.0 install, as in `REBAR_BIN=~/.rebar/current/bin/rebar`,
+has neither), so drop such a check. Its `REBAR_ROOT` export is harmless; the
+tree itself is no longer needed.)
 
 **Where a rebar tree still matters.** Almost nowhere: rebar is a single
 binary, and its checks never read a rebar tree. `rebar doc` resolves

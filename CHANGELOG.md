@@ -37,6 +37,10 @@ Fixes from field-testing v4.0.0-rc.1.
   now applied after parsing; the port and host defaults show once.
   `rebar mcp client --help` prints its usage instead of using `--help` as
   the URL.
+- **Docs.** SETUP.md documents the RC behavior and flags, and that a 3.x
+  pinned wrapper which refuses a tree without `scripts/steward.sh` must drop
+  that test for 4.0; UPGRADING.md's "From 3.1.x" path lists migrate, the
+  `.rebar-version`/badge bump and the CI pin.
 
 ## v4.0.0-rc.1 — 2026-11-19
 

@@ -353,7 +353,9 @@ pinned commit into a cache directory stopped working once the copies were
 gone (`rebar check` failed with `rebar: ci-check.sh not found in the project
 or a rebar install`, and `rebar check --pre-commit` skipped every check and
 exited 0). Such a wrapper keeps working with 4.0; it no longer needs the
-tree.
+tree. A 3.1 wrapper that builds the whole tree and refuses one without
+`scripts/steward.sh` (3.x's test for a complete tree) must drop that test:
+a 4.0 tree and a 4.0 install have no `scripts/steward.sh`.
 
 ## 11. Verify
 
@@ -410,8 +412,11 @@ curl -fsSL https://raw.githubusercontent.com/willackerly/rebar/v4.0.0-rc.1/setup
 
 - **From v2.0.0 or v3.0.x:** follow steps 1–11 above, with `v4.0.0-rc.1` in
   place of `v3.1.2`, then read the list below.
-- **From 3.1.x:** install the candidate, read the list below, and run
-  `rebar check` on the project with the new binary.
+- **From 3.1.x:** install the candidate, read the list below, run
+  `rebar migrate` (step 2: it also points `.mcp.json` at `rebar mcp
+  serve`), bump `.rebar-version` and the README badge together (step 4),
+  update the version your CI or pinned wrapper installs (step 10), and run
+  `rebar check` on the project with the new binary (step 11).
 
 Each item below is one of 4.0's breaking changes (CHANGELOG, `v4.0.0-rc.1`
 "Breaking changes"), with who it affects and how to fix it. A project that
