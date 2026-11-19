@@ -35,6 +35,23 @@ contains "$out" 'commit 05000' || fail "newest commit not listed: $(echo "$out" 
 contains "$out" '\.\.\. and 4980 more' || fail "commit count summary missing: $(echo "$out" | tail -5)"
 ok "refresh-context lists 20 of 5000 commits and exits 0"
 
+# A commit made on the last-synced day counts. `git log --since=<date>`
+# means that date at the current time of day, so a commit just after
+# midnight on the sync day was dropped; the day before must stay out.
+D="$TMP/sync-day"
+mkdir -p "$D"
+( cd "$D" && g init -q -b main ) || fail "git init sync-day"
+for c in "2023-06-14 23:59:00|day-before" "2023-06-15 00:00:05|sync-day-early"; do
+  ( cd "$D" && GIT_AUTHOR_DATE="${c%%|*}" GIT_COMMITTER_DATE="${c%%|*}" \
+      g commit -q --allow-empty -m "${c#*|}" ) || fail "commit ${c#*|}"
+done
+printf '# QUICKCONTEXT\n\nlast-synced: 2023-06-15\n' > "$D/QUICKCONTEXT.md"
+out=$(run_in "$D" refresh-context.sh 2>&1)
+contains "$out" 'sync-day-early' || fail "the sync day's commit was not listed: $out"
+contains "$out" 'day-before' && fail "a commit from before the sync day was listed: $out"
+contains "$out" '(1 commits' || fail "commit count should be 1: $out"
+ok "refresh-context counts commits from the whole last-synced day (local midnight)"
+
 # Outside a git repository, and in one with no commits yet, the git sections
 # are skipped with a note. They ran git log / git worktree list under set -e
 # and the script ended with git's exit 128 after "Commits since last sync:".

@@ -76,7 +76,7 @@ func TestInstallShimsSymlinks(t *testing.T) {
 	}
 }
 
-// A bin/install left by rebar before v4.0.0 (it shadows install(1) on PATH)
+// A bin/install left by rebar before v3.1.2 (it shadows install(1) on PATH)
 // is removed once rebar-install is written; anyone else's install is kept.
 func TestInstallShimsRemovesLegacyInstall(t *testing.T) {
 	legacy := "#!/usr/bin/env bash\n" + legacyInstallMarker + " and optionally configure ASK_SERVER.\n"

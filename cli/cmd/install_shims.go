@@ -24,7 +24,7 @@ var installShimsCmd = &cobra.Command{
 into it: the ask, ask-agent-loop, ask-mcp-server and ask-server shims (they
 run this binary; adopters' PATH ` + "`ask`" + ` and .mcp.json files name them),
 rebar-install (puts the directory on PATH and wires the completions) and
-completions/. An install file left there by rebar before v4.0.0 (now
+completions/. An install file left there by rebar before v3.1.2 (now
 rebar-install: a file named install on PATH shadows install(1)) is removed.
 
 setup-rebar.sh runs it for a binary release. After downloading the binary by

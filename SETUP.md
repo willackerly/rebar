@@ -16,25 +16,28 @@ parts to adopt.
 ## Install rebar
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/willackerly/rebar/v3.1.1/setup-rebar.sh | bash -s -- v3.1.1
+curl -fsSL https://raw.githubusercontent.com/willackerly/rebar/v3.1.2/setup-rebar.sh | bash -s -- v3.1.2
 ```
 
-That installs v3.1.1 and puts `~/.rebar/current/bin` (`rebar`, `ask`,
+That installs v3.1.2 and puts `~/.rebar/current/bin` (`rebar`, `ask`,
 `ask-mcp-server`) on your PATH via your shell RC; open a new terminal (or
 source the RC) and check with `rebar version`. Fetch `setup-rebar.sh` from the
 tag you install, as above: the copy on `main` is whatever `main` holds. With no
-version argument the installer takes the latest stable release (the highest
-`vX.Y.Z` tag, ignoring pre-releases such as `v3.2.0-rc.1`; if no stable tag
-exists yet, the highest pre-release). Variants (`…` is the `curl` part):
+version argument the installer takes the latest stable release: the highest
+published GitHub Release that is not a pre-release such as `v3.2.0-rc.1`,
+looked up through GitHub's API (unauthenticated, 60 requests/hour per IP; past
+that it says so; name the version instead). A tag that is pushed but not yet
+published as a Release, and draft Releases, never count. Variants (`…` is the
+`curl` part):
 
 | Command | Installs |
 |---------|----------|
-| `… \| bash -s -- v3.1.1` | that release |
+| `… \| bash -s -- v3.1.2` | that release |
 | `… \| bash -s -- --pre` | the newest published release, pre-releases included |
 | `… \| bash -s -- main` | a branch, built from source; `rebar version` says `main@<sha>` |
-| `… \| bash -s -- v3.1.1 --no-switch` | side by side, without changing the active version |
-| `… \| bash -s -- v3.1.1 --source` | from source with your Go (needed for a tag without prebuilt assets) |
-| `… \| bash -s -- v3.1.1 --dir /opt/rebar` | under `/opt/rebar` instead of `~/.rebar` (CI) |
+| `… \| bash -s -- v3.1.2 --no-switch` | side by side, without changing the active version |
+| `… \| bash -s -- v3.1.2 --source` | from source with your Go (needed for a tag without prebuilt assets) |
+| `… \| bash -s -- v3.1.2 --dir /opt/rebar` | under `/opt/rebar` instead of `~/.rebar` (CI) |
 
 Each version lives in `~/.rebar/versions/<version>/`; `~/.rebar/current` is
 a symlink to the active one, so switching never edits your RC again
@@ -44,7 +47,7 @@ self-contained binary per platform, `rebar_<ver>_<os>_<arch>`: the installer
 verifies it against the release's SHA-256 checksums (a mismatch aborts), puts
 it at `versions/<version>/bin/rebar` and runs `rebar install-shims`, which
 writes the `ask*` shims, `rebar-install` (the PATH setup; `bin/install`
-before 4.0, renamed because a file named `install` on PATH shadows
+before 3.1.2, renamed because a file named `install` on PATH shadows
 install(1)) and the shell completions beside it. Releases v3.1.0-rc.1 to
 v3.1.x published a tarball of the whole tree instead, which the installer
 still unpacks. "latest" is the newest published GitHub Release (not a tag
@@ -332,7 +335,7 @@ The universal first-read. Every agent, every session, no exceptions.
 
 1. **Rebar badge** — First line after `# Title` MUST be the rebar badge:
    ```markdown
-   > **rebar v3.1.1** | **Tier 2: ADOPTED**
+   > **rebar v3.1.2** | **Tier 2: ADOPTED**
    ```
    This is validated by `check-compliance` (part of `rebar check`) against
    `.rebar-version`. Update both when you upgrade rebar
@@ -446,6 +449,13 @@ Reload Claude Code in this directory and the tools appear automatically.
 If you prefer user-level config (available in all projects, not just
 adopted ones), or if your layout needs a non-default `--repos-dir`,
 see **[docs/MCP-SETUP.md](docs/MCP-SETUP.md)**.
+
+The generated config runs `ask-mcp-server --stdio`, which opens no network
+port. To share agents over HTTP (`ask serve` / `ask-mcp-server --port`),
+note that the servers bind `127.0.0.1` by default and refuse a public
+`--host` without an API key (`--api-key` / `ASK_API_KEY`; or
+`--insecure-no-auth` on a trusted network) — see
+[docs/MCP-SETUP.md § Security considerations](docs/MCP-SETUP.md#security-considerations).
 
 **Commit `.mcp.json`?** It contains absolute paths specific to the
 machine that ran `rebar init`. Solo devs: commit. Team projects with
