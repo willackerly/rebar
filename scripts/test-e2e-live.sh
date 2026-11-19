@@ -108,6 +108,18 @@ else
   record SKIP "LMStudio reachable" "not up at $LMSTUDIO_URL — only matters for \`rebar adopt --local\`"
 fi
 
+# ─── Build: bin/rebar from the cli/ source ───────────────────────────────
+# bin/rebar is not tracked (rebar 4.0): build it from this checkout so the
+# checks below test the current source.
+section "Build"
+if ! command -v go >/dev/null 2>&1; then
+  record FAIL "go on PATH" "needed to build bin/rebar (cd cli && go build -o ../bin/rebar .)"
+elif build_err="$(cd "$PROJECT_ROOT/cli" && go build -o ../bin/rebar . 2>&1)"; then
+  record PASS "bin/rebar built from cli/ source" "$(go env GOVERSION)"
+else
+  record FAIL "bin/rebar built from cli/ source" "$(printf '%s' "$build_err" | head -3 | tr '\n' ' ')"
+fi
+
 # ─── Version triple-check ─────────────────────────────────────────────────
 section "Version triple-check"
 
@@ -123,15 +135,6 @@ if [ "$binary_version" = "$file_version" ] && [ "$binary_version" = "$tag_versio
   record PASS "Version coherent across binary, .rebar-version, latest tag" "$binary_version"
 else
   record FAIL "Version mismatch" "binary=$binary_version file=$file_version tag=$tag_version"
-fi
-
-# ─── Build freshness: is bin/rebar built from current source? ──────────────
-binary_mtime="$(stat -f %m "$PROJECT_ROOT/bin/rebar" 2>/dev/null || stat -c %Y "$PROJECT_ROOT/bin/rebar" 2>/dev/null)"
-source_mtime="$(find "$PROJECT_ROOT/cli" -name '*.go' -newer "$PROJECT_ROOT/bin/rebar" -print -quit 2>/dev/null)"
-if [ -n "$source_mtime" ]; then
-  record FAIL "bin/rebar fresher than cli/ source" "rebuild needed: cd cli && go build -o ../bin/rebar ."
-else
-  record PASS "bin/rebar built from current source" ""
 fi
 
 # ─── Repo presence + agent discovery (per repo, gated) ─────────────────────

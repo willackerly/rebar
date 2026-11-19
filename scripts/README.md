@@ -22,7 +22,7 @@ a rebar checkout.
 In this repository:
 
 ```bash
-cd cli && go build -o ../bin/rebar .   # bin/rebar is tracked; rebuild it with the source
+cd cli && go build -o ../bin/rebar .   # bin/rebar is git-ignored (not tracked since 4.0): build it
 bin/rebar check                        # the full suite, including the two steps above
 ```
 

@@ -10,7 +10,9 @@ cd cli
 go build -o ../bin/rebar .
 ```
 
-Requires Go 1.22+.
+`bin/rebar` is git-ignored: the repository does not track a prebuilt binary
+(since 4.0; releases publish one per platform), so build it after cloning and
+after pulling. Requires the Go version in `go.mod` or newer.
 
 ## Quick Start
 

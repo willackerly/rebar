@@ -39,8 +39,8 @@ printf '#!/bin/sh\necho "{\\"result\\":\\"FAKE-ANSWER\\",\\"session_id\\":\\"s1\
 chmod +x "$FX/evil/x.sh" "$FX/repos/proj/agents/architect/commands/hello.sh" "$FX/fakebin/claude"
 
 # The bin/ shims run the rebar beside them. Test the binary under test
-# (lib.sh's $REBAR, which run.sh builds), not the committed bin/rebar, which
-# is built for one platform: copies of the shims next to it.
+# (lib.sh's $REBAR, which run.sh builds), not a bin/rebar a contributor may
+# have built (stale, or absent: it is not tracked): copies of the shims next to it.
 if [ -z "${ASK_SEC_BIN:-}" ]; then
   mkdir -p "$FX/bin"
   cp "$BIN/ask" "$BIN/ask-server" "$BIN/ask-mcp-server" "$FX/bin/"

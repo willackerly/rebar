@@ -161,6 +161,7 @@ an events ledger in the peer lane (the inbox *is* the trail).
 
 ```bash
 git log --oneline -15                 # cluster commits + review fixes + merge
+(cd cli && go build -o ../bin/rebar .)   # bin/rebar is not tracked (4.0): build it first
 scripts/ci-check.sh                   # 15 checks, all pass expected
 bin/rebar audit                       # 10/10 expected (9/10 if this file is >7d old)
 scripts/cold-start-checks.sh          # the hook's block, on demand

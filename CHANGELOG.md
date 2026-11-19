@@ -189,7 +189,7 @@ replaces.
   appended meanwhile kept, and the old `memory.md` is merged into the new
   summary instead of discarded.
 - **`bin/ask*` shims skip a `bin/rebar` that does not run on this machine**
-  (the tracked binary is one platform's build) for `REBAR_BIN`, then PATH,
+  (the then-tracked binary was one platform's build) for `REBAR_BIN`, then PATH,
   instead of failing with "exec format error". `bin/rebar` rebuilt with
   go1.27.4 (govulncheck clean).
 
