@@ -1,11 +1,14 @@
 package migrate
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/willackerly/rebar/cli/internal/jqjson"
 )
@@ -41,7 +44,9 @@ func commandLine(cmd string, args []any) string {
 
 // PlanMCP plans the .mcp.json rewrite of the project (nil when there is
 // nothing to rewrite). rebarBin is the rebar to point at when the old
-// command has no rebar beside it ("" for "rebar" on PATH).
+// command has no rebar beside it that serves MCP ("" for "rebar" on PATH):
+// a 3.x install's bin/rebar (versions/v3.1.2/bin, which `rebar new` wrote
+// into .mcp.json) has no `mcp serve`.
 func PlanMCP(project, rebarBin string) (*MCPEdit, error) {
 	file := filepath.Join(project, ".mcp.json")
 	data, err := os.ReadFile(file)
@@ -89,7 +94,7 @@ func PlanMCP(project, rebarBin string) (*MCPEdit, error) {
 			continue
 		}
 		rebar := rebarBin
-		if sibling := filepath.Join(filepath.Dir(old), "rebar"); filepath.IsAbs(old) && isExecutableFile(sibling) {
+		if sibling := filepath.Join(filepath.Dir(old), "rebar"); filepath.IsAbs(old) && isExecutableFile(sibling) && servesMCP(sibling) {
 			rebar = sibling
 		}
 		if rebar == "" {
@@ -105,6 +110,16 @@ func PlanMCP(project, rebarBin string) (*MCPEdit, error) {
 	}
 	edit.New = []byte(jqjson.Pretty(root))
 	return edit, nil
+}
+
+// servesMCP reports whether the rebar at path has `rebar mcp serve` (4.0
+// and later; 3.x answers "unknown command" with exit 1, and a binary built
+// for another platform does not run).
+func servesMCP(path string) bool {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, path, "mcp", "serve", "--help")
+	return cmd.Run() == nil
 }
 
 func isExecutableFile(p string) bool {

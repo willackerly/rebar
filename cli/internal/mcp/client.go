@@ -16,9 +16,12 @@ import (
 // first tool and a resources/read of the first resource, printing what it
 // gets.
 func ClientMain(args []string, stdout, stderr io.Writer) int {
-	if len(args) != 1 {
+	if len(args) != 1 || strings.HasPrefix(args[0], "-") {
 		fmt.Fprintln(stdout, "Usage: test-mcp-client <server-url>")
 		fmt.Fprintln(stdout, "Example: test-mcp-client http://localhost:7232")
+		if len(args) == 1 && (args[0] == "-h" || args[0] == "--help") {
+			return 0
+		}
 		return 1
 	}
 	url := strings.TrimRight(args[0], "/")

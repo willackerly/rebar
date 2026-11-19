@@ -10,7 +10,10 @@
 #
 # and puts ~/.rebar/current/bin on PATH (via that version's bin/rebar-install;
 # older versions' bin/install is renamed to that on install), so switching
-# versions never touches your shell RC again.
+# versions never touches your shell RC again. With --dir (or REBAR_DIR) the
+# shell RC is left alone unless --modify-rc is given; --no-modify-rc leaves
+# it alone for ~/.rebar too. An RC that already puts current/bin on PATH is
+# never given a second copy.
 #
 #   Release tag   download the self-contained binary rebar_<ver>_<os>_<arch>
 #                 from the GitHub Release, verify it against the release's
@@ -34,6 +37,7 @@
 # Usage (local):
 #   ./setup-rebar.sh [<version>|latest|<branch>|<full-sha>] [--pre] [--source]
 #                    [--no-switch] [--server HOST:PORT] [--dir PATH]
+#                    [--modify-rc | --no-modify-rc]
 #
 # "latest" (the default) is the highest published stable GitHub Release
 # (drafts and bare tags never count); --pre includes pre-releases.
@@ -58,6 +62,7 @@ rebar installer (versioned)
 
 Usage:
   $0 [<version>] [--pre] [--source] [--no-switch] [--server HOST:PORT] [--dir PATH]
+     [--modify-rc | --no-modify-rc]
   $0 --help
 
   <version>     a release tag (v3.0.0), "latest" (the default: the highest
@@ -72,7 +77,17 @@ Usage:
                 which are built from source
   --no-switch   install side by side but leave ~/.rebar/current where it is
   --server H:P  remote ASK server, written to your shell RC by bin/rebar-install
-  --dir PATH    install base (default: ~/.rebar)
+  --dir PATH    install base (default: ~/.rebar). Your shell RC is not
+                edited: the PATH line to add is printed instead
+  --modify-rc   add \$REBAR_DIR/current/bin to your shell RC even with --dir
+                (or REBAR_DIR)
+  --no-modify-rc  never edit your shell RC; print the PATH line instead
+
+Shell RC: without --dir/REBAR_DIR (or with --modify-rc) the installer runs
+the version's bin/rebar-install, which adds \$REBAR_DIR/current/bin (and the
+completions) to the RC \$SHELL names (~/.zshrc, ~/.bashrc, else ~/.profile).
+An RC that already has that directory on PATH, in any spelling (\$HOME/…,
+~/…), is left as it is.
 
 Layout:
   \$REBAR_DIR/versions/<version>/   one install per version (bin/rebar and
@@ -88,7 +103,7 @@ anything still pointing at the clone (.mcp.json files, REBAR_ROOT) keeps
 working. Remove the clone's files by hand once nothing uses them.
 
 Env vars:
-  REBAR_DIR          install base               (default: ~/.rebar)
+  REBAR_DIR          install base, like --dir   (default: ~/.rebar)
   REBAR_REPO         git remote for tags/builds (default: github.com/willackerly/rebar)
   REBAR_REF          version when no <version> argument is given
   REBAR_RELEASE_URL  base URL for release assets, <url>/<tag>/<asset>
@@ -447,6 +462,31 @@ switch_current() {
   ln -sfn "versions/$1" "$REBAR_DIR/current"
 }
 
+# rc_file — the RC bin/rebar-install edits: chosen by $SHELL, like it.
+rc_file() {
+  case "$(basename "${SHELL:-/bin/sh}")" in
+    zsh)  printf '%s\n' "$HOME/.zshrc" ;;
+    bash) printf '%s\n' "$HOME/.bashrc" ;;
+    *)    printf '%s\n' "$HOME/.profile" ;;
+  esac
+}
+
+# rc_has_other_spelling <rc> <dir> — whether a non-comment line of <rc>
+# names <dir> (under $HOME) only as $HOME/…, ${HOME}/… or ~/…: rebar-install
+# looks for the path as written, so it would add a second PATH block.
+rc_has_other_spelling() {
+  local rc="$1" dir="$2" rest spelling lines
+  [[ -f "$rc" ]] || return 1
+  case "$dir" in "$HOME"/*) ;; *) return 1 ;; esac
+  lines="$(grep -v '^[[:space:]]*#' "$rc" || true)"
+  grep -qF -- "$dir" <<<"$lines" && return 1
+  rest="${dir#"$HOME"/}"
+  for spelling in "\$HOME/$rest" "\${HOME}/$rest" "~/$rest"; do
+    grep -qF -- "$spelling" <<<"$lines" && return 0
+  done
+  return 1
+}
+
 # EXIT trap. A version moved aside for replacement ($REPLACED) is deleted
 # only once its successor is in place; if the swap never completed (mv
 # failed, or a signal landed between the two moves) it goes back.
@@ -475,6 +515,9 @@ cleanup() {
 main() {
   REBAR_REPO="${REBAR_REPO:-https://github.com/willackerly/rebar.git}"
   REBAR_DIR="${REBAR_DIR:-}"
+  # Edit the shell RC? "" = only for the default install base.
+  MODIFY_RC=""
+  [[ -n "$REBAR_DIR" ]] && DIR_GIVEN=1 || DIR_GIVEN=0
   ASK_SERVER="${ASK_SERVER:-}"
   VERSION="${REBAR_REF:-}"
   FROM_SOURCE=0
@@ -494,8 +537,10 @@ main() {
     case "$1" in
       --server)    [[ $# -ge 2 ]] || die "--server needs a value"; ASK_SERVER="$2"; shift 2 ;;
       --server=*)  ASK_SERVER="${1#--server=}"; shift ;;
-      --dir)       [[ $# -ge 2 ]] || die "--dir needs a value"; REBAR_DIR="$2"; shift 2 ;;
-      --dir=*)     REBAR_DIR="${1#--dir=}"; shift ;;
+      --dir)       [[ $# -ge 2 ]] || die "--dir needs a value"; REBAR_DIR="$2"; DIR_GIVEN=1; shift 2 ;;
+      --dir=*)     REBAR_DIR="${1#--dir=}"; DIR_GIVEN=1; shift ;;
+      --modify-rc) MODIFY_RC=1; shift ;;
+      --no-modify-rc) MODIFY_RC=0; shift ;;
       --ref)       [[ $# -ge 2 ]] || die "--ref needs a value"; VERSION="$2"; shift 2 ;;
       --ref=*)     VERSION="${1#--ref=}"; shift ;;
       --source)    FROM_SOURCE=1; shift ;;
@@ -513,6 +558,9 @@ main() {
   if [[ -z "$REBAR_DIR" ]]; then
     [[ -n "${HOME:-}" ]] || die "HOME is not set; pass --dir PATH (or set REBAR_DIR)"
     REBAR_DIR="$HOME/.rebar"
+  fi
+  if [[ -z "$MODIFY_RC" ]]; then
+    [[ "$DIR_GIVEN" -eq 1 ]] && MODIFY_RC=0 || MODIFY_RC=1
   fi
   REPO_SHOWN="$(redact "$REBAR_REPO")"
 
@@ -688,18 +736,26 @@ EOF
   # Run through the symlink so bin/rebar-install records $REBAR_DIR/current/bin
   # (it uses the logical `pwd`), which stays valid across version switches.
 
+  BIN="$REBAR_DIR/current/bin"
+  RC_WIRED=0
   if [[ "$SWITCHED" -eq 0 && -n "$ASK_SERVER" ]]; then
-    warn "--server was not applied: --no-switch skips bin/rebar-install. Apply it with: $REBAR_DIR/current/bin/rebar-install --server $ASK_SERVER"
+    warn "--server was not applied: --no-switch skips bin/rebar-install. Apply it with: $BIN/rebar-install --server $ASK_SERVER"
   elif [[ "$SWITCHED" -eq 1 && -z "${HOME:-}" ]]; then
-    warn "HOME is not set, so PATH was not wired; add $REBAR_DIR/current/bin to PATH yourself"
-  elif [[ "$SWITCHED" -eq 1 && -x "$REBAR_DIR/current/bin/rebar-install" ]]; then
+    warn "HOME is not set, so PATH was not wired; add $BIN to PATH yourself"
+  elif [[ "$SWITCHED" -eq 1 && "$MODIFY_RC" -eq 0 ]]; then
+    :   # reported below
+  elif [[ "$SWITCHED" -eq 1 && -z "$ASK_SERVER" ]] && rc_has_other_spelling "$(rc_file)" "$BIN"; then
+    log "$(rc_file) already puts $BIN on PATH; not editing it"
+    RC_WIRED=1
+  elif [[ "$SWITCHED" -eq 1 && -x "$BIN/rebar-install" ]]; then
     install_args=()
     [[ -n "$ASK_SERVER" ]] && install_args+=(--server "$ASK_SERVER")
-    log "Running $REBAR_DIR/current/bin/rebar-install ${install_args[*]:-}"
+    log "Running $BIN/rebar-install ${install_args[*]:-}"
     # ${arr[@]+...}: bash 3.2 treats an empty "${arr[@]}" as unbound under set -u.
     # bin/rebar-install picks the RC file from $SHELL, which `env -i` and some CI
     # shells leave unset.
-    SHELL="${SHELL:-/bin/sh}" "$REBAR_DIR/current/bin/rebar-install" ${install_args[@]+"${install_args[@]}"}
+    SHELL="${SHELL:-/bin/sh}" "$BIN/rebar-install" ${install_args[@]+"${install_args[@]}"}
+    RC_WIRED=1
   fi
 
   # ── Report ───────────────────────────────────────────────────────────────────
@@ -716,18 +772,33 @@ EOF
   fi
   log "Installed versions: $(cd "$REBAR_DIR/versions" && ls -1 | tr '\n' ' ')"
 
+  if [[ "$SWITCHED" -eq 1 && "$MODIFY_RC" -eq 0 && -n "${HOME:-}" ]]; then
+    if [[ "$DIR_GIVEN" -eq 1 ]]; then
+      log "Shell RC not edited (--dir; pass --modify-rc to add the line). To use this install, run:"
+    else
+      log "Shell RC not edited (--no-modify-rc). To use this install, run:"
+    fi
+    printf '\n  export PATH="%s:$PATH"\n' "$BIN"
+    [[ -n "$ASK_SERVER" ]] && printf '  export ASK_SERVER=%s\n' "$ASK_SERVER"
+    printf '\n'
+  fi
   on_path="$(command -v rebar 2>/dev/null || true)"
-  if [[ -n "$on_path" && "$on_path" != "$REBAR_DIR/current/bin/rebar" ]]; then
-    warn "this shell runs rebar from $on_path; open a new terminal (or source your RC) to pick up $REBAR_DIR/current/bin"
+  if [[ "$RC_WIRED" -eq 1 && -n "$on_path" && "$on_path" != "$BIN/rebar" ]]; then
+    warn "this shell runs rebar from $on_path; open a new terminal (or source your RC) to pick up $BIN"
   fi
   if [[ -n "${REBAR_ROOT:-}" ]]; then
     warn "REBAR_ROOT=$REBAR_ROOT is set; rebar doc and rebar migrate (for release history) read that tree"
   fi
 
+  if [[ "$RC_WIRED" -eq 1 ]]; then
+    PATH_STEP="Open a new terminal (or source your shell RC) so PATH picks up rebar"
+  else
+    PATH_STEP="Put $BIN on PATH so your shell finds rebar"
+  fi
   cat <<EOF
 
 ${BLUE}Next steps:${NC}
-  • Open a new terminal (or source your shell RC) so PATH picks up rebar
+  • $PATH_STEP
   • ${GREEN}rebar new my-project -d "what it does"${NC}   # new project
   • ${GREEN}rebar adopt${NC}                              # adopt rebar in an existing repo
 

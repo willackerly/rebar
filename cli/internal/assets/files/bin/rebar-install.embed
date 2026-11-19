@@ -21,6 +21,26 @@ case "$SHELL_NAME" in
   *)    RC_FILE="$HOME/.profile" ;;
 esac
 
+# rc_mentions TEXT — whether a non-comment line of the RC file holds TEXT,
+# as written or, under $HOME, spelled $HOME/..., ${HOME}/... or ~/..., so a
+# line written by hand (or by an older installer) is not added twice.
+rc_mentions() {
+  [ -f "$RC_FILE" ] || return 1
+  for spelling in "$1" ${HOME:+"$(rc_home_form "$1" '$HOME')"} \
+      ${HOME:+"$(rc_home_form "$1" '${HOME}')"} ${HOME:+"$(rc_home_form "$1" '~')"}; do
+    [ -n "$spelling" ] || continue
+    grep -v '^[[:space:]]*#' "$RC_FILE" | grep -qF -- "$spelling" && return 0
+  done
+  return 1
+}
+# rc_home_form TEXT PREFIX — TEXT with a leading $HOME/ replaced by PREFIX/
+# (empty if TEXT is not under $HOME).
+rc_home_form() {
+  case "$1" in
+    "$HOME"/*) printf '%s/%s\n' "$2" "${1#"$HOME"/}" ;;
+  esac
+}
+
 # Parse args
 ASK_SERVER_VAL=""
 while [ $# -gt 0 ]; do
@@ -45,7 +65,7 @@ echo ""
 # --- PATH ---
 PATH_LINE="export PATH=\"$BIN_DIR:\$PATH\""
 
-if grep -qF "$BIN_DIR" "$RC_FILE" 2>/dev/null; then
+if rc_mentions "$BIN_DIR"; then
   echo "[ok] PATH already includes $BIN_DIR"
 else
   echo "" >> "$RC_FILE"
@@ -63,7 +83,7 @@ COMPLETION_DIR="$BIN_DIR/completions"
 if [ -d "$COMPLETION_DIR" ]; then
   case "$SHELL_NAME" in
     bash)
-      if ! grep -qF "$COMPLETION_DIR/ask.bash" "$RC_FILE" 2>/dev/null; then
+      if ! rc_mentions "$COMPLETION_DIR/ask.bash"; then
         echo "" >> "$RC_FILE"
         echo "# rebar tab completions (bash)" >> "$RC_FILE"
         echo "[ -f \"$COMPLETION_DIR/ask.bash\" ] && source \"$COMPLETION_DIR/ask.bash\"" >> "$RC_FILE"
@@ -74,7 +94,7 @@ if [ -d "$COMPLETION_DIR" ]; then
       fi
       ;;
     zsh)
-      if ! grep -qF "$COMPLETION_DIR" "$RC_FILE" 2>/dev/null; then
+      if ! rc_mentions "$COMPLETION_DIR"; then
         echo "" >> "$RC_FILE"
         echo "# rebar tab completions (zsh)" >> "$RC_FILE"
         echo "fpath=(\"$COMPLETION_DIR\" \$fpath)" >> "$RC_FILE"
