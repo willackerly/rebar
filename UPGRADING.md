@@ -2,7 +2,7 @@
 
 How to move an adopting project to rebar 3.1 from v2.0.0 or v3.0.x. Follow
 the steps in order; each one says what to run and how to tell it worked.
-Moving to 4.0 (release candidate `v4.0.0-rc.2`)? Read
+Moving to 4.0 (`v4.0.0`, the current release)? Read
 [Upgrading from 3.x to 4.0](#upgrading-from-3x-to-40): it lists 4.0's
 breaking changes and the fix for each.
 
@@ -53,8 +53,9 @@ built in) and, finding no `bin/install`, does not touch your shell RC,
 which already has `~/.rebar/current/bin` if you installed 3.1 with it.
 
 In the commands below, `v3.1.2` is the release you are moving to (the
-latest stable release until v4.0.0 is final). Use the tag you are actually
-installing, such as `v4.0.0-rc.2`.
+latest 3.1 release, for projects staying on 3.1). Use the tag you are
+actually installing: for 4.0, `v4.0.0` (see
+[Upgrading from 3.x to 4.0](#upgrading-from-3x-to-40)).
 
 | You are on | Steps |
 |------------|-------|
@@ -400,25 +401,23 @@ that is all a project already on 3.1 needs. Changes to know about:
 
 ## Upgrading from 3.x to 4.0
 
-4.0 is at release candidate `v4.0.0-rc.2`. Until v4.0.0 is
-final, the stable examples in this file, README.md and SETUP.md stay on
-v3.1.2. Try the candidate beside your current version:
+4.0.0 is the current release. Install it beside your current version:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/willackerly/rebar/v4.0.0-rc.2/setup-rebar.sh \
-  | bash -s -- v4.0.0-rc.2 --no-switch
-~/.rebar/versions/v4.0.0-rc.2/bin/rebar version     # rebar v4.0.0-rc.2
+curl -fsSL https://raw.githubusercontent.com/willackerly/rebar/v4.0.0/setup-rebar.sh \
+  | bash -s -- v4.0.0 --no-switch
+~/.rebar/versions/v4.0.0/bin/rebar version     # rebar v4.0.0
 ```
 
-- **From v2.0.0 or v3.0.x:** follow steps 1–11 above, with `v4.0.0-rc.2` in
+- **From v2.0.0 or v3.0.x:** follow steps 1–11 above, with `v4.0.0` in
   place of `v3.1.2`, then read the list below.
-- **From 3.1.x:** install the candidate, read the list below, run
+- **From 3.1.x:** install 4.0.0, read the list below, run
   `rebar migrate` (step 2: it also points `.mcp.json` at `rebar mcp
   serve`), bump `.rebar-version` and the README badge together (step 4),
   update the version your CI or pinned wrapper installs (step 10), and run
   `rebar check` on the project with the new binary (step 11).
 
-Each item below is one of 4.0's breaking changes (CHANGELOG, `v4.0.0-rc.1`
+Each item below is one of 4.0's breaking changes (CHANGELOG, `v4.0.0`
 "Breaking changes"), with who it affects and how to fix it. A project that
 uses only `rebar check`, the thin `scripts/ci-check.sh` / `pre-commit.sh`,
 and an `.mcp.json` that runs `ask-mcp-server` or `rebar mcp serve --stdio`
