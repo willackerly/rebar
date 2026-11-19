@@ -44,9 +44,21 @@ See the [root README](../README.md) for how ASK fits into the overall system.
 This adds `bin/` to your PATH (in `.zshrc`/`.bashrc`/`.profile`), optionally
 sets `ASK_SERVER`, and checks dependencies. Idempotent — safe to run again.
 
+The shims (`ask`, `ask-agent-loop`, `ask-mcp-server`, `ask-server`),
+`install` and `completions/` are also compiled into the `rebar` binary:
+`rebar install-shims` writes them beside it (setup-rebar.sh does this for a
+release binary; `--dir DIR` writes them elsewhere, `--force` overwrites
+files that differ). After editing them here, run
+`scripts/sync-bootstrap.sh` to refresh the embedded copy.
+
 Then apply with `source ~/.zshrc` (or open a new terminal).
 
-**Dependencies:** bash 4.0+, jq, claude CLI, python3 (for ask-server).
+**Dependencies:** the `rebar` binary and the claude CLI. ASK is built into
+`rebar` (`rebar ask …`); `bin/ask`, `bin/ask-agent-loop`, `bin/ask-server`
+and `bin/ask-mcp-server` are small sh shims that run the `rebar` beside them
+(else `REBAR_BIN`, else the one on `PATH`), so the two spellings behave the
+same. No bash implementation, jq, uuidgen or python is needed (rebar 4.0
+removed them; `rebar mcp client` replaces `bin/test-mcp-client`).
 
 ## Commands
 
@@ -58,7 +70,6 @@ Then apply with `source ~/.zshrc` (or open a new terminal).
 | `ask -w <agent> "<question>"` | Ask with write access (agent can edit files) |
 | `ask <agent>` | Run default command (if configured) |
 | `ask <agent> <command> [args]` | Run a named command |
-| `ask --question <agent> "<question>"` | Always a question, even if it matches a command name |
 
 ### Management
 
@@ -93,19 +104,17 @@ ask architect "What are the system boundaries?"
 ```
 
 **Unquoted = command.** A single word matching a script in
-`agents/<role>/commands/` runs that script directly:
+`agents/<role>/commands/` runs that script directly. Only plain names count
+(letters, digits, `.`, `_`, `-`; no `..`; not starting with `.` or `-`), and
+the script must be an executable file directly in `commands/`; anything else
+(`../x`, `-x`, `two words`) is a question. `ask --question <role> "<q>"` is
+always a question — the MCP server and `ask serve` ask that way, so text from
+the network never runs a script:
 
 ```bash
 ask steward summary      # runs agents/steward/commands/summary.sh
 ask architect audit      # runs agents/architect/commands/audit.sh
 ```
-
-A command word is a plain name — letters, digits, `.`, `_`, `-`, not
-starting with `.` or `-`, no `..` — naming an executable file directly in
-`commands/`. Anything else (`../x`, `a/b`) is a question, never a script.
-`ask --question <agent> "<text>"` always asks, so `ask --question steward
-summary` asks the question "summary"; the servers use this mode. Agent
-names are likewise plain directory names under `agents/`.
 
 ### Adding Commands
 
@@ -235,7 +244,7 @@ any repo's agents over HTTP.
 ### Start the server
 
 ```bash
-# Serve all repos in a directory (this machine only: 127.0.0.1)
+# Serve all repos in a directory
 ask serve --port 7232 --repos-dir /srv/repos
 
 # Serve specific repos
@@ -245,17 +254,14 @@ ask serve --port 7232 --repos /srv/repos/billing,/srv/repos/auth
 ask serve --host 0.0.0.0 --port 7232 --repos-dir /srv/repos --api-key SECRET
 ```
 
-**Network defaults (since v3.1.2).** The server binds `127.0.0.1` unless
-you pass `--host`. Binding any other address without an API key
-(`--api-key` or `ASK_API_KEY`) is refused at startup; `--insecure-no-auth`
-overrides that for a trusted, isolated network. While bound to loopback the
-server answers only requests whose `Host` header is `localhost`,
-`127.0.0.1` or `[::1]` (blocks DNS rebinding); a reverse proxy in front of a
-loopback-bound server must send `Host: localhost`. POST bodies must be
-`Content-Type: application/json` and at most 1 MiB (else 415 / 413). The
-same rules apply to `ask-mcp-server` in HTTP mode; `--stdio` opens no
-listener. Up to v3.1.1 both servers listened on `0.0.0.0` with no key by
-default — see [SECURITY.md](../SECURITY.md).
+`ask serve` (like `rebar mcp serve` in HTTP mode) listens on 127.0.0.1 by
+default and then answers only requests whose `Host` is a loopback name. A
+non-loopback `--host` without `--api-key`/`ASK_API_KEY` is refused (exit 2)
+unless `--insecure-no-auth`. POST bodies must be `Content-Type:
+application/json`, at most 1 MiB (413; `/v1/ask` also needs a
+`Content-Length`, 411), sent within 60 s; at most `--max-asks` (default 8)
+asks run at once (503 beyond). Repos with `.rebar-skip-mcp` are not served.
+A failed ask returns its last error line; the details are in the server log.
 
 ### Query from any machine
 
@@ -291,27 +297,26 @@ ask reset billing:architect
 
 ### How it works
 
-The server is a thin HTTP wrapper around the `ask` CLI. Each request
-invokes `ask --question -- <role> <question>` with `cwd` set to the target
-repo — all existing logic (sessions, memory, context loading) works
-unchanged. Agents spin up on demand, not ahead of time. `--question` means a
-question received over the network is only ever asked: it never selects an
-agent command script. `repo` must be a served repo and `role` one of its
-agents (`GET /v1/agents`); other names get 404.
+The server (`rebar ask serve`; `bin/ask-server` runs it) is a thin HTTP
+wrapper around the `ask` CLI. Each request invokes `rebar ask` (or
+`--ask-bin` / `ASK_BIN`) with `cwd` set to the target repo — all existing logic
+(sessions, memory, context loading) works unchanged. Agents spin up
+on demand, not ahead of time.
 
 Local agents (no `:` prefix) always run locally. The `ASK_SERVER`
 variable only affects `repo:agent` cross-project queries.
 
-**Dependencies:** Python 3.7+ (zero external packages), plus the
-standard `ask` dependencies (bash 4.0+, jq, claude CLI).
+**Dependencies:** the `rebar` binary and the claude CLI.
 
 ### MCP server
 
-`ask-mcp-server` exposes every registered ASK agent as an MCP tool
+`rebar mcp serve` (`bin/ask-mcp-server` runs it) exposes every registered ASK agent as an MCP tool
 (`ask_<repo>_<role>`) plus resources (`ask://memory/...`,
 `ask://log/...`, `ask://agent/...`) via stdio or HTTP transport.
 
 - `rebar init` / `rebar adopt` auto-write `.mcp.json` for Claude Code
+  (`rebar mcp serve --stdio`); `rebar migrate` points older ones that run
+  `bin/ask-mcp-server` at it
 - User-level wiring (available in all projects) via `~/.claude.json`
 - Full setup + troubleshooting: **[docs/MCP-SETUP.md](../docs/MCP-SETUP.md)**
 - Protocol-level implementation: [docs/MCP-IMPLEMENTATION.md](../docs/MCP-IMPLEMENTATION.md)

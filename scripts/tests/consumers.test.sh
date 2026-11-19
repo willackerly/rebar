@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Regression test: the federation scripts (scan-consumers.sh,
-# flush-notifications.sh) and CONSUMES.md sections with optional fields left out.
+# Regression test: the federation checks (rebar's scan-consumers and
+# flush-notifications) and CONSUMES.md sections with optional fields left out.
 #
 #   T1  scan-consumers reports a consumer whose section has only the required
 #       version_pinned (it exited 1 at the first absent optional field, so
@@ -68,7 +68,7 @@ out=$(REBAR_REPOS="$TMP/full,$TMP/minimal" run_in "$OWNER" flush-notifications.s
 contains "$out" 'DRY: ask_full_featurerequest' || fail "T3: full consumer not dispatched: $out"
 contains "$out" 'DRY: ask_minimal_featurerequest' || fail "T3: minimal consumer not dispatched: $out"
 
-# Without jq: a PATH holding only the tools the two scripts use.
+# Without jq: a PATH holding only basic tools (rebar needs no jq).
 NOJQ="$TMP/nojq-bin"
 mkdir -p "$NOJQ"
 for t in bash git dirname basename cat cut tr grep sed awk mktemp mv rm head wc; do

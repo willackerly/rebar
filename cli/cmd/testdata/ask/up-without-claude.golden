@@ -1,0 +1,9 @@
+--- stdout ---
+--- stderr ---
+ask: error: claude CLI is required but not found. See: https://docs.anthropic.com/en/docs/claude-code
+--- changes ---
+--- made home/.config/ ---
+--- made home/.config/ask/ ---
+--- wrote home/.config/ask/projects ---
+proj = $BASE/proj
+--- exit 4 ---

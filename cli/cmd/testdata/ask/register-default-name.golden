@@ -1,0 +1,12 @@
+--- stdout ---
+Registered 'proj' → $BASE/proj
+
+Now from any directory:
+  ask proj:architect "What is the architecture?"
+--- stderr ---
+--- changes ---
+--- made home/.config/ ---
+--- made home/.config/ask/ ---
+--- wrote home/.config/ask/projects ---
+proj = $BASE/proj
+--- exit 0 ---

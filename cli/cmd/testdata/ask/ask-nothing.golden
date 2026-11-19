@@ -1,0 +1,19 @@
+--- stdout ---
+--- stderr ---
+ask: error: question or command required
+
+Usage:
+  ask steward "<question>"     — ask a question
+  ask steward <command>          — run a command
+
+Available commands for steward:
+  ask steward fail
+  ask steward notexec
+  ask steward plain
+  ask steward    summary      — Print a health summary
+--- changes ---
+--- made home/.config/ ---
+--- made home/.config/ask/ ---
+--- wrote home/.config/ask/projects ---
+proj = $BASE/proj
+--- exit 4 ---

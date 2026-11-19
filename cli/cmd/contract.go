@@ -3,6 +3,7 @@ package cmd
 import (
 	"bufio"
 	"fmt"
+	"github.com/willackerly/rebar/cli/internal/ask"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -37,7 +38,7 @@ var contractVerifyCmd = &cobra.Command{
 				return err
 			}
 			if !found {
-				return fmt.Errorf("%s not found in the project or a rebar install (set REBAR_ROOT)", step.script)
+				return fmt.Errorf("%s is not built into this rebar", step.script)
 			}
 			if exitCode != 0 {
 				os.Exit(exitCode)
@@ -440,18 +441,18 @@ func runUpstream(cmd *cobra.Command, args []string) error {
 	}
 	owner := strings.SplitN(upstream, "/", 2)[0]
 
-	askBin := findAskBinForUpstream()
-	if askBin == "" {
-		return fmt.Errorf("ask CLI not found; run bin/rebar-install or set ASK_BIN")
-	}
-
 	target := owner + ":featurerequest"
 	fmt.Printf("Dispatching upstream proposal to %s ...\n", target)
-	c := exec.Command(askBin, target, msg.String())
-	c.Stdout = os.Stdout
-	c.Stderr = os.Stderr
-	if err := c.Run(); err != nil {
-		return fmt.Errorf("ask invocation failed: %w", err)
+	// ASK_BIN names another ask to run; by default rebar's own ASK answers.
+	if askBin := os.Getenv("ASK_BIN"); askBin != "" {
+		c := exec.Command(askBin, target, msg.String())
+		c.Stdout = os.Stdout
+		c.Stderr = os.Stderr
+		if err := c.Run(); err != nil {
+			return fmt.Errorf("ask invocation failed: %w", err)
+		}
+	} else if code := ask.Main([]string{target, msg.String()}); code != 0 {
+		return fmt.Errorf("ask invocation failed: exit status %d", code)
 	}
 	fmt.Println("\nDone. Owner will triage on their schedule (CHARTER §1.6 — owner-pulled reconciliation).")
 	return nil
@@ -527,26 +528,3 @@ func extractFirstParagraph(s string) string {
 	}
 	return out
 }
-
-// findAskBinForUpstream — same lookup chain used by ensureAgentsScaffolding
-// in init.go, copied here to avoid coupling. (If a refactor shared a single
-// helper across cmd/, this would deduplicate.)
-func findAskBinForUpstream() string {
-	if exe, err := os.Executable(); err == nil {
-		candidate := filepath.Join(filepath.Dir(exe), "ask")
-		if _, err := os.Stat(candidate); err == nil {
-			return candidate
-		}
-	}
-	if rebarRoot := findRebarRoot(); rebarRoot != "" {
-		candidate := filepath.Join(rebarRoot, "bin", "ask")
-		if _, err := os.Stat(candidate); err == nil {
-			return candidate
-		}
-	}
-	if p, err := exec.LookPath("ask"); err == nil {
-		return p
-	}
-	return ""
-}
-

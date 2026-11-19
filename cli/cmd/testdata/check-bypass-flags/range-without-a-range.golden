@@ -1,0 +1,2 @@
+check-bypass-flags: --range needs a revision range (<sha>..<sha>)
+--- exit 1 ---

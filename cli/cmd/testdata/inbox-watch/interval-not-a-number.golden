@@ -1,0 +1,2 @@
+inbox-watch: interval must be a positive integer, got '1s'
+--- exit 2 ---

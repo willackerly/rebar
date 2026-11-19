@@ -196,7 +196,7 @@ func printPendingNotifications(repoRoot string) {
 		return
 	}
 	fmt.Println("\n  Federation:")
-	fmt.Printf("    %d pending consumer notification(s) — run scripts/flush-notifications.sh\n", pending)
+	fmt.Printf("    %d pending consumer notification(s) — run `rebar run flush-notifications`\n", pending)
 }
 
 func gitOutput(args ...string) string {

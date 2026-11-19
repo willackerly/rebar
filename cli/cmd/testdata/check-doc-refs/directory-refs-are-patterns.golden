@@ -1,0 +1,8 @@
+check-doc-refs: 2 broken ref(s) — referenced file is not tracked in git
+
+README.md:1:do*s/
+README.md:1:doc+/
+
+Each line: <source.md>:<lineno>:<target>
+Either `git add` the target, fix the link, or allowlist it via .rebar/doc-refs-allow.txt
+--- exit 1 ---

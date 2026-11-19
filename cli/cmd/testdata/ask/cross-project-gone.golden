@@ -1,0 +1,10 @@
+--- stdout ---
+--- stderr ---
+ask: error: registered path for 'gone' no longer exists: $BASE/nowhere
+--- changes ---
+--- wrote home/.config/ask/projects ---
+Other = $BASE/other
+gone = $BASE/nowhere
+# comment = x
+proj = $BASE/proj
+--- exit 4 ---

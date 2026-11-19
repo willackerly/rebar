@@ -1,0 +1,17 @@
+=== Rebar compliance check ===
+
+OK: .rebar-version = v3.1.0-rc.2
+OK: .rebarrc tier = 2 (ADOPTED)
+OK: README.md badge found on line 7
+    Version: v3.1.0-rc.2 | Tier: 2 (ADOPTED)
+WARN: Badge is on line 7 — should be within the first 3 lines (right after # Title)
+
+=== AGENTS.md required sections ===
+OK: Cold Start / Read Before Coding — agents must know the reading order
+OK: Contract-Driven Development — the 4 rules that make contracts operational
+OK: Testing expectations — cascade tiers or scout rule
+OK: TODO Tracking — two-tag system prevents invisible debt
+OK: AGENTS.md mentions ASK CLI
+
+OK: Rebar compliance verified.
+--- exit 0 ---

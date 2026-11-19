@@ -1,0 +1,30 @@
+--- stdout ---
+From the running agent.
+--- stderr ---
+--- changes ---
+--- made home/.config/ ---
+--- made home/.config/ask/ ---
+--- wrote home/.config/ask/projects ---
+proj = $BASE/proj
+--- made proj/agents/architect/inbox/ ---
+--- wrote proj/agents/architect/inbox/<MSGID>.json ---
+{
+  "id": "<MSGID>",
+  "from": "human",
+  "type": "question",
+  "timestamp": "<TS>",
+  "body": "Through the inbox?\n"
+}
+--- made proj/agents/architect/outbox/ ---
+--- made proj/shared/ ---
+--- made proj/shared/messages/ ---
+--- wrote proj/shared/messages/events.jsonl ---
+{
+  "id": "<MSGID>",
+  "from": "human",
+  "to": "architect",
+  "type": "question",
+  "timestamp": "<TS>",
+  "body": "Through the inbox?"
+}
+--- exit 0 ---

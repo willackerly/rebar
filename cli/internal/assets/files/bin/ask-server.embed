@@ -1,0 +1,28 @@
+#!/bin/sh
+# ask-server — the enterprise ASK HTTP server, built into the rebar binary.
+# CONTRACT:S2-ASK-CLI.1.0
+#
+# Shim: runs `rebar ask serve` with the same arguments — the rebar beside this
+# script (through symlinks) if it runs on this machine, else REBAR_BIN, else
+# the one on PATH — so PATH entries, .mcp.json files and scripts naming bin/ask-server keep working.
+self=$0
+while [ -L "$self" ]; do
+  link=$(readlink "$self")
+  case $link in
+    /*) self=$link ;;
+    *) self=$(dirname "$self")/$link ;;
+  esac
+done
+rebar=$(dirname "$self")/rebar
+# The rebar beside this script may be built for another platform (a git
+# checkout's bin/rebar is one platform's build): use it only if it runs.
+if [ ! -x "$rebar" ] || ! "$rebar" --version >/dev/null 2>&1; then
+  rebar=${REBAR_BIN:-}
+fi
+if [ -z "$rebar" ] || [ ! -x "$rebar" ]; then
+  rebar=$(command -v rebar 2>/dev/null) || {
+    echo "ask-server: the rebar binary was not found (beside this script, REBAR_BIN or PATH)" >&2
+    exit 127
+  }
+fi
+exec "$rebar" ask serve "$@"

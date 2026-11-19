@@ -3,11 +3,14 @@ package cmd
 import (
 	"crypto/rand"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/willackerly/rebar/cli/internal/ask"
 
 	"github.com/google/uuid"
 	"github.com/spf13/cobra"
@@ -242,39 +245,14 @@ _None currently._
 		}
 	}
 
-	// scripts/ — the thin entry points from rebar's
-	// templates/project-bootstrap/scripts/ (identical to what the
-	// `cp -r templates/project-bootstrap/. <target>/` adoption path
-	// delivers); the checks themselves run from the rebar install.
+	// scripts/ — the thin entry points of rebar's bootstrap template
+	// (templates/project-bootstrap/scripts/, compiled into the binary; the
+	// same files the `cp -r templates/project-bootstrap/. <target>/`
+	// adoption path delivers); the checks themselves run in the binary.
 	// Never overwrites existing files.
-	scriptsDir := filepath.Join(root, "scripts")
-	if rebarRoot := findRebarRoot(); rebarRoot == "" {
-		fmt.Println("  ⚠ Skipped scripts/ and .claude/ — rebar checkout not found (set REBAR_ROOT to your rebar clone)")
-	} else {
-		srcScripts := filepath.Join(rebarRoot, "templates", "project-bootstrap", "scripts")
-		copiedScripts := 0
-		if entries, err := os.ReadDir(srcScripts); err == nil {
-			for _, e := range entries {
-				if e.IsDir() {
-					continue
-				}
-				dst := filepath.Join(scriptsDir, e.Name())
-				if _, err := os.Stat(dst); err == nil {
-					continue
-				}
-				data, readErr := os.ReadFile(filepath.Join(srcScripts, e.Name()))
-				if readErr != nil {
-					continue
-				}
-				os.MkdirAll(scriptsDir, 0755)
-				os.WriteFile(dst, data, 0755)
-				copiedScripts++
-			}
-		}
-		if copiedScripts > 0 {
-			fmt.Printf("  Created scripts/ (%d files: ci-check.sh + pre-commit.sh entry points; checks run from the rebar install)\n", copiedScripts)
-			created++
-		}
+	if n := len(copyBootstrap("scripts", root)); n > 0 {
+		fmt.Printf("  Created scripts/ (%d files: ci-check.sh + pre-commit.sh entry points; checks run in the rebar binary)\n", n)
+		created++
 	}
 
 	// contracts directory (architecture/ unless .rebarrc contracts_dir says otherwise)
@@ -282,21 +260,9 @@ _None currently._
 	archDir := filepath.Join(root, contractsDir)
 	if _, err := os.Stat(archDir); os.IsNotExist(err) {
 		os.MkdirAll(archDir, 0755)
-		// Copy contract template
-		rebarRoot := findRebarRoot()
-		if rebarRoot != "" {
-			src := filepath.Join(rebarRoot, "architecture", "CONTRACT-TEMPLATE.md")
-			dst := filepath.Join(archDir, "CONTRACT-TEMPLATE.md")
-			if data, err := os.ReadFile(src); err == nil {
-				os.WriteFile(dst, data, 0644)
-				fmt.Printf("  Created %s/ with contract template\n", contractsDir)
-				created++
-			}
-		} else {
-			os.WriteFile(filepath.Join(archDir, ".gitkeep"), []byte(""), 0644)
-			fmt.Printf("  Created %s/\n", contractsDir)
-			created++
-		}
+		writeContractTemplate(archDir)
+		fmt.Printf("  Created %s/ with contract template\n", contractsDir)
+		created++
 	}
 
 	// .mcp.json — Claude Code MCP config for ASK
@@ -312,10 +278,9 @@ _None currently._
 		created++
 	}
 
-	// .claude/ — SessionStart cold-start hook + rebar skills (v3).
-	// Copied from rebar's templates/project-bootstrap/.claude/ so the
-	// canonical content lives in one place; skipped silently when the
-	// rebar checkout can't be located (same contract as refresh-context).
+	// .claude/ — SessionStart cold-start hook + rebar skills (v3), from
+	// rebar's templates/project-bootstrap/.claude/ (compiled into the
+	// binary), so the canonical content lives in one place.
 	if ensureClaudeAssets(root) {
 		created++
 	}
@@ -327,65 +292,36 @@ _None currently._
 // with the SessionStart hook, skills/*/SKILL.md) into the project. Existing
 // files are never overwritten.
 func ensureClaudeAssets(root string) bool {
-	rebarRoot := findRebarRoot()
-	if rebarRoot == "" {
+	copied := copyBootstrap(".claude", root)
+	if len(copied) == 0 {
 		return false
 	}
-	srcDir := filepath.Join(rebarRoot, "templates", "project-bootstrap", ".claude")
-	if _, err := os.Stat(srcDir); err != nil {
-		return false
-	}
-	dstDir := filepath.Join(root, ".claude")
-	copied := 0
 	hookInstalled := false
-	filepath.Walk(srcDir, func(path string, info os.FileInfo, err error) error {
-		if err != nil || info.IsDir() {
-			return nil
+	for _, p := range copied {
+		if p == ".claude/settings.json" {
+			hookInstalled = true
 		}
-		rel, relErr := filepath.Rel(srcDir, path)
-		if relErr != nil {
-			return nil
-		}
-		dst := filepath.Join(dstDir, rel)
-		if _, statErr := os.Stat(dst); statErr == nil {
-			return nil // never overwrite
-		}
-		data, readErr := os.ReadFile(path)
-		if readErr != nil {
-			return nil
-		}
-		os.MkdirAll(filepath.Dir(dst), 0755)
-		if os.WriteFile(dst, data, 0644) == nil {
-			copied++
-			if rel == "settings.json" {
-				hookInstalled = true
-			}
-		}
-		return nil
-	})
-	if copied > 0 {
-		if hookInstalled {
-			fmt.Printf("  Created .claude/ (%d files: SessionStart hook + rebar skills)\n", copied)
-		} else {
-			fmt.Printf("  Created .claude/skills (%d files; existing settings.json preserved — merge the SessionStart hook manually from templates/project-bootstrap/.claude/settings.json)\n", copied)
-		}
-		return true
 	}
-	return false
+	if hookInstalled {
+		fmt.Printf("  Created .claude/ (%d files: SessionStart hook + rebar skills)\n", len(copied))
+	} else {
+		fmt.Printf("  Created .claude/skills (%d files; existing settings.json preserved — merge the SessionStart hook manually from templates/project-bootstrap/.claude/settings.json)\n", len(copied))
+	}
+	return true
 }
 
-// ensureMCPConfig writes a project-local .mcp.json that registers the rebar
-// ASK MCP server with Claude Code. Skipped silently if the file already exists.
-// Skipped with a message if ask-mcp-server can't be located.
+// ensureMCPConfig writes a project-local .mcp.json that registers rebar's
+// ASK MCP server (`rebar mcp serve --stdio`) with Claude Code. Skipped
+// silently if the file already exists.
 func ensureMCPConfig(root string) bool {
 	mcpPath := filepath.Join(root, ".mcp.json")
 	if _, err := os.Stat(mcpPath); err == nil {
 		return false
 	}
 
-	serverPath := findMCPServerPath()
-	if serverPath == "" {
-		fmt.Println("  Skipped .mcp.json — ask-mcp-server not found; see SETUP.md §MCP to configure manually")
+	rebar := findRebarCommand()
+	if rebar == "" {
+		fmt.Println("  Skipped .mcp.json — the rebar binary's path is unknown; see docs/MCP-SETUP.md to configure manually")
 		return false
 	}
 
@@ -396,11 +332,11 @@ func ensureMCPConfig(root string) bool {
   "mcpServers": {
     "rebar-ask": {
       "command": %q,
-      "args": ["--stdio", "--repos-dir", %q]
+      "args": ["mcp", "serve", "--stdio", "--repos-dir", %q]
     }
   }
 }
-`, serverPath, reposDir)
+`, rebar, reposDir)
 
 	if err := os.WriteFile(mcpPath, []byte(content), 0644); err != nil {
 		fmt.Printf("  Warning: could not write .mcp.json: %v\n", err)
@@ -410,11 +346,12 @@ func ensureMCPConfig(root string) bool {
 	return true
 }
 
-// findMCPServerPath locates the ask-mcp-server executable.
-// Tries: same bin/ as this rebar CLI, then findRebarRoot()/bin/, then PATH.
-func findMCPServerPath() string {
+// findRebarCommand is the rebar binary .mcp.json runs: this one (through
+// ~/.rebar/current when that is the active version), else the install's
+// bin/rebar, else rebar on PATH.
+func findRebarCommand() string {
 	exe, _ := os.Executable()
-	return mcpServerPathFrom(exe)
+	return rebarCommandFrom(exe)
 }
 
 // stableBinDir maps <base>/versions/<v>/bin to <base>/current/bin when
@@ -439,69 +376,40 @@ func stableBinDir(dir string) string {
 	return filepath.Join(current, "bin")
 }
 
-// mcpServerPathFrom is findMCPServerPath for a given rebar executable path
-// ("" if unknown).
-func mcpServerPathFrom(exe string) string {
-	if exe != "" {
-		candidate := filepath.Join(stableBinDir(filepath.Dir(exe)), "ask-mcp-server")
+// rebarCommandFrom is findRebarCommand for a given executable path ("" if
+// unknown).
+func rebarCommandFrom(exe string) string {
+	if exe != "" && filepath.Base(exe) == "rebar" {
+		candidate := filepath.Join(stableBinDir(filepath.Dir(exe)), "rebar")
 		if _, err := os.Stat(candidate); err == nil {
 			return candidate
 		}
+		return exe
 	}
 	if rebarRoot := findRebarRoot(); rebarRoot != "" {
-		candidate := filepath.Join(rebarRoot, "bin", "ask-mcp-server")
+		candidate := filepath.Join(rebarRoot, "bin", "rebar")
 		if _, err := os.Stat(candidate); err == nil {
 			return candidate
 		}
 	}
-	if p, err := exec.LookPath("ask-mcp-server"); err == nil {
+	if p, err := exec.LookPath("rebar"); err == nil {
 		return p
 	}
-	return ""
+	return exe
 }
 
-// findAskBin locates the ask CLI executable using the same lookup chain
-// as findMCPServerPath. Returns empty string if not found.
-func findAskBin() string {
-	if exe, err := os.Executable(); err == nil {
-		candidate := filepath.Join(filepath.Dir(exe), "ask")
-		if _, err := os.Stat(candidate); err == nil {
-			return candidate
-		}
-	}
-	if rebarRoot := findRebarRoot(); rebarRoot != "" {
-		candidate := filepath.Join(rebarRoot, "bin", "ask")
-		if _, err := os.Stat(candidate); err == nil {
-			return candidate
-		}
-	}
-	if p, err := exec.LookPath("ask"); err == nil {
-		return p
-	}
-	return ""
-}
-
-// ensureAgentsScaffolding runs `ask init` in the project root to populate
-// agents/<role>/AGENT.md skeletons. Without this step, a fresh `rebar new`
-// or `rebar adopt` produces a project with .mcp.json wired but zero ASK
-// agents — and `ask architect` will fail with "no agents directory."
-// Skipped silently when agents/ already exists or `ask` can't be located.
+// ensureAgentsScaffolding runs `ask init` (rebar's native ASK) in the
+// project root to populate agents/<role>/AGENT.md skeletons. Without this
+// step, a fresh `rebar new` or `rebar adopt` produces a project with
+// .mcp.json wired but zero ASK agents — and `ask architect` will fail with
+// "no agents directory." Skipped silently when agents/ already exists.
 func ensureAgentsScaffolding(root string) bool {
 	if _, err := os.Stat(filepath.Join(root, "agents")); err == nil {
 		return false
 	}
-
-	askBin := findAskBin()
-	if askBin == "" {
-		fmt.Println("  Skipped agents/ — ask CLI not found; run `ask init` from the project to create role agents")
-		return false
-	}
-
-	cmd := exec.Command(askBin, "init")
-	cmd.Dir = root
 	// Suppress ask init's verbose output — surface a single tidy line instead.
-	if _, err := cmd.CombinedOutput(); err != nil {
-		fmt.Printf("  ⚠ ask init failed: %v — run `ask init` manually from the project\n", err)
+	if code := ask.RunIn(root, []string{"init"}, io.Discard, io.Discard); code != 0 {
+		fmt.Printf("  ⚠ ask init failed (exit %d) — run `ask init` manually from the project\n", code)
 		return false
 	}
 	fmt.Println("  Created agents/ (architect, product, englead, steward, merger, featurerequest)")
@@ -631,11 +539,6 @@ tier = 1
 	os.WriteFile(rcPath, []byte(content), 0644)
 }
 
-// isRebarSourceDir reports whether dir is a rebar source checkout or install.
-// Shared with scripts/rebar-doc.sh, which tests the same two paths.
-func isRebarSourceDir(dir string) bool {
-	if info, err := os.Stat(filepath.Join(dir, "templates", "project-bootstrap")); err != nil || !info.IsDir() {
-		return false
-	}
-	return isFile(filepath.Join(dir, "scripts", "steward.sh"))
-}
+// isRebarSourceDir reports whether dir is a rebar source checkout or
+// install tree (config.IsRebarTree).
+func isRebarSourceDir(dir string) bool { return config.IsRebarTree(dir) }

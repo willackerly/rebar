@@ -147,7 +147,7 @@ Who does what in the contract-driven development process:
 
 QA is fully automated. No separate QA role. The Eng Lead drives this:
 
-1. **Run steward:** `scripts/steward.sh` produces health report
+1. **Run steward:** `rebar run steward` produces health report
 2. **Review action items:** Per-role items in `STEWARD_REPORT.md`
 3. **Fan out:** Assign BUGs and implementations to developers
 4. **Escalate:** DISPUTEs -> architect, DISCOVERYs -> product

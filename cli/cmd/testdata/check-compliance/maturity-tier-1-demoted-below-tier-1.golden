@@ -1,0 +1,16 @@
+=== Rebar compliance check ===
+
+OK: .rebar-version = v3.1.0-rc.2
+OK: .rebarrc tier = 1 (PARTIAL)
+OK: README.md badge found on line 2
+    Version: v3.1.0-rc.2 | Tier: 1 (PARTIAL)
+
+=== Contract maturity (declared Status:) ===
+OK: 2 of 2 live contract(s) declare maturity — 2 stub-or-draft-or-undeclared (100.0%)
+FAIL: 100.0% of live contracts are stub-or-draft (>66%) — badge demoted one tier
+  Declared: Tier 1: PARTIAL — Effective: below Tier 1 (adoption not yet real)
+  Reason: a tier claimed on top of a mostly stub/draft contract set overstates adoption.
+  Fix: mature the contracts (or lower the badge) until <=66% are stub-or-draft.
+
+FAIL: 1 compliance issue(s) found.
+--- exit 1 ---

@@ -35,7 +35,7 @@ marked. Two things are **not** supersession:
 - **Renumbering.** If two different contract IDs collide on a prefix number
   (I3-LLM-CLIENT vs I3-SCANNER), the fix is a *new ID* for the newer
   contract, not a version bump — versions belong to one continuous contract
-  identity. `scripts/check-prefix-uniqueness.sh` catches collisions.
+  identity. `rebar run check-prefix-uniqueness` catches collisions.
 
 ## The marker lines
 
@@ -66,7 +66,7 @@ SUPERSEDES: C3-CRYPTO-BRIDGE.1.0
 ```
 
 The exact token `SUPERSEDED BY:` matters: enforcement scripts key on it.
-`scripts/check-jtbd-presence.sh` exempts marked files from current template
+`rebar run check-jtbd-presence` exempts marked files from current template
 requirements — an *unmarked* old version will be held to the latest
 standards and fail the gate. That asymmetry is deliberate: forgetting the
 marker has a cost, so old versions get marked.
@@ -99,7 +99,7 @@ marker has a cost, so old versions get marked.
    mechanical; for a major bump each site is a code change that must
    actually adopt the new behavior — updating the header without updating
    the code is drift with a fresh coat of paint.
-6. **Regenerate the registry:** `./scripts/compute-registry.sh`. The
+6. **Regenerate the registry:** `rebar run compute-registry`. The
    registry is computed from the files on disk — never hand-edit it. Both
    versions will be listed; that's correct while migration is in flight.
 7. **Update the companion file** (if one exists) to reflect the new
@@ -107,7 +107,7 @@ marker has a cost, so old versions get marked.
    all versions of an ID.
 8. **Commit** with `contract(...)` type and the `SUPERSEDES:` footer.
 9. **Cross-repo consumers:** if the contract has external consumers
-   (federation), the bump is detected by `scripts/check-version-bump.sh`
+   (federation), the bump is detected by `rebar run check-version-bump`
    and queued to the notification outbox — flush on your schedule. See
    [`architecture/README.md`](../architecture/README.md) §Cross-Repo
    Contract Federation and [Federation](federation.md).
@@ -171,10 +171,10 @@ companion content.
 
 | Concern | Gate |
 |---------|------|
-| Latest version carries required JTBD sections; `SUPERSEDED BY:`-marked files exempt | `scripts/check-jtbd-presence.sh` |
-| Prefix number claimed by two different IDs | `scripts/check-prefix-uniqueness.sh` |
-| Registry stale after a bump | `scripts/compute-registry.sh --check` |
-| Version bump with external consumers → notification queued | `scripts/check-version-bump.sh` (post-commit) |
+| Latest version carries required JTBD sections; `SUPERSEDED BY:`-marked files exempt | `rebar run check-jtbd-presence` |
+| Prefix number claimed by two different IDs | `rebar run check-prefix-uniqueness` |
+| Registry stale after a bump | `rebar run compute-registry --check` |
+| Version bump with external consumers → notification queued | `rebar run check-version-bump` (post-commit) |
 | Consumer pins drifting behind upstream bumps | `rebar contract drift-check` (via CONSUMES.md, see [Federation](federation.md)) |
 
 Not yet mechanized: flagging contracts whose migration deadline has passed

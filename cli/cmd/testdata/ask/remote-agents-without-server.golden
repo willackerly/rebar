@@ -1,0 +1,5 @@
+--- stdout ---
+--- stderr ---
+ask: ASK_SERVER not set. Use 'ask who' for local agents.
+--- changes ---
+--- exit 4 ---

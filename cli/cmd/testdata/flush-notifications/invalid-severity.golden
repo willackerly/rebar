@@ -1,0 +1,2 @@
+flush-notifications: invalid severity 'huge'
+--- exit 2 ---

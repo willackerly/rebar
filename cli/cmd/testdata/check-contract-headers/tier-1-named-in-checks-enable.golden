@@ -1,0 +1,11 @@
+NOTE: tier 1 < required tier 2; running check-contract-headers because .rebarrc checks_enable names it
+MISSING: src/a.go
+
+Scanned 1 source files, 1 missing contract headers.
+
+Every source file must declare which contract it implements:
+  // CONTRACT:C1-BLOBSTORE.2.1
+  // Architecture: CONTRACT:S2-API-GATEWAY.1.0
+
+See architecture/README.md for the full convention.
+--- exit 1 ---

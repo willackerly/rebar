@@ -1,0 +1,18 @@
+--- stdout ---
+--- stderr ---
+ask: error: all servers failed for POST /v1/ask
+  tried: $SERVER1
+--- changes ---
+--- made home/.config/ ---
+--- made home/.config/ask/ ---
+--- wrote home/.config/ask/.rr-index ---
+0
+--- requests ---
+server1 POST /v1/ask auth="" type="application/json"
+{
+  "repo": "web",
+  "role": "broken",
+  "question": "q",
+  "verbose": false
+}
+--- exit 1 ---

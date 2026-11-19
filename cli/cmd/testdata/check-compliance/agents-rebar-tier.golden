@@ -1,0 +1,19 @@
+=== Rebar compliance check ===
+
+OK: .rebar-version = v3.1.0-rc.2
+OK: .rebarrc tier = 1 (PARTIAL)
+OK: README.md badge found on line 2
+    Version: v3.1.0-rc.2 | Tier: 2 (ADOPTED)
+FAIL: Badge says Tier 2 but .rebarrc says tier = 1
+
+=== AGENTS.md required sections ===
+FAIL: AGENTS.md missing required section: Cold Start / Read Before Coding — agents must know the reading order
+FAIL: AGENTS.md missing required section: Contract-Driven Development — the 4 rules that make contracts operational
+FAIL: AGENTS.md missing required section: Testing expectations — cascade tiers or scout rule
+FAIL: AGENTS.md missing required section: TODO Tracking — two-tag system prevents invisible debt
+FAIL: AGENTS.md does not mention ASK CLI
+  Agents need to know they can use 'ask <role> "question"' for focused queries.
+  Add a reference in the Cold Start or Reference section.
+
+FAIL: 6 compliance issue(s) found.
+--- exit 1 ---

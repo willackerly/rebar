@@ -1,0 +1,2 @@
+SKIP: check-jtbd-presence (SKIP_JTBD=1)
+--- exit 0 ---

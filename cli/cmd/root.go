@@ -13,7 +13,7 @@ import (
 
 // releaseVersion is the release string of this source tree. Bump it with
 // each release; the release workflow refuses a tag that disagrees with it.
-const releaseVersion = "v3.1.2"
+const releaseVersion = "v4.0.0-rc.1"
 
 // Version is what `rebar version` reports. Release builds and setup-rebar.sh
 // source builds stamp it with
@@ -75,8 +75,15 @@ var rootCmd = &cobra.Command{
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 		// Skip repo detection for commands that handle their own root
 		name := cmd.Name()
-		if name == "help" || name == "version" {
+		if name == "help" || name == "version" || name == "native" || name == "install-shims" {
+			return nil // native finds its own root (nativeRoot)
+		}
+		// ASK works in any directory, as bin/ask always did.
+		if (name == "ask" || name == "ask-agent-loop") && cmd.Parent() != nil && cmd.Parent().Name() == "rebar" {
 			return nil
+		}
+		if p := cmd.Parent(); p != nil && p.Name() == "mcp" && p.Parent() != nil && p.Parent().Name() == "rebar" {
+			return nil // the MCP server and client serve whatever repos they are given
 		}
 		// These commands handle their own repo root
 		if name == "init" || name == "new" || name == "audit" || name == "adopt" {
@@ -230,6 +237,8 @@ func init() {
 	rootCmd.AddCommand(newCmd)
 	rootCmd.AddCommand(adoptCmd)
 	rootCmd.AddCommand(initCmd)
+	installShimsCmd.GroupID = "start"
+	rootCmd.AddCommand(installShimsCmd)
 
 	// Daily Workflow
 	contextCmd.GroupID = "daily"
@@ -268,6 +277,9 @@ func init() {
 	keyCmd.GroupID = "keys"
 	rootCmd.AddCommand(signCmd)
 	rootCmd.AddCommand(keyCmd)
+
+	// Hidden, experimental: native check implementations (native.go).
+	rootCmd.AddCommand(nativeCmd)
 
 	rootCmd.AddCommand(&cobra.Command{
 		Use:   "version",

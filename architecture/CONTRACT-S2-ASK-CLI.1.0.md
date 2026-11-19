@@ -91,7 +91,10 @@ Exit codes: 0 success, 1 ask-level failure, 2 invocation error.
 | Persistent session | One per (repo, role); accumulates across calls until `ask reset <role>` |
 | Memory durability | `agents/<role>/memory.md` is the durable distillation; reloaded each call |
 | Memory log | `agents/<role>/memory.log.md` is append-only event log (gitignored) |
-| Quoted vs unquoted | Quoted arg = question for LLM; unquoted = command name resolving to `agents/<role>/commands/<name>.sh` |
+| Quoted vs unquoted | Quoted arg = question for LLM; unquoted = command name resolving to `agents/<role>/commands/<name>.sh` — only a plain name (`[A-Za-z0-9._-]`, no `..`, no leading `.`/`-`) naming an executable directly in `commands/`; anything else is a question |
+| Question only | `ask --question <role> "<q>"` is always a question (never a subcommand, command script or default command); the servers ask this way |
+| Agent names | One directory entry under `agents/`: no `/`, `\`, `..`, `:`, control characters, leading `.`/`-` — otherwise "invalid agent name", exit 2 |
+| Memory compaction | Background `ask compact` stays in the asking process's group, bounded by `ASK_TIMEOUT`, one per agent at a time; files replaced atomically, appends during compaction kept, old `memory.md` merged |
 | Default command | `ask <role>` with no args runs `agents/<role>/commands/default.sh` |
 | Cross-repo asks | `ask <repo>:<role> "..."` resolves repo via the registry the MCP server uses; `cd`s into that repo before invoking |
 | --json mode | Wraps stdout in `{"role":..., "answer":...}` JSON shape for CI/automation |
@@ -110,7 +113,7 @@ Exit codes: 0 success, 1 ask-level failure, 2 invocation error.
 
 ## Dependencies
 
-- Depends on: Python 3.10+ for `bin/ask`, `bin/ask-server`, `bin/ask-agent-loop`
+- Depends on: the `rebar` binary (ASK is native Go; `bin/ask` and `bin/ask-agent-loop` hand off to it)
 - Depends on: `claude` CLI (or other LLM endpoint) reachable for question handling
 - Optional: `ASK_SERVER` for remote-server mode (not required for local default)
 - Configuration: `agents/<role>/AGENT.md` defines the role; `agents/<role>/memory.md` seeds durable state
@@ -135,10 +138,12 @@ This is the latest version. No predecessor.
 
 ## Implementing Files
 
-- `bin/ask` — primary CLI entry point (Python, ~1900 lines)
-- `bin/ask-server` — long-running session server
-- `bin/ask-agent-loop` — agent-loop harness
-- `bin/rebar-install` — PATH installer + dependency check
+- `cli/internal/ask/` — the CLI and agent loop (native Go; `rebar ask`, `rebar ask-agent-loop`)
+- `cli/cmd/ask.go` — the `rebar ask` / `rebar ask-agent-loop` commands
+- `bin/ask` — sh shim running `rebar ask` (the bash implementation was removed in rebar 4.0)
+- `bin/ask-server` — sh shim running `rebar ask serve` (the enterprise HTTP server, `cli/internal/mcp`)
+- `bin/ask-agent-loop` — sh shim running `rebar ask-agent-loop` (agent-loop harness)
+- `bin/rebar-install` — PATH installer + dependency check (`bin/install` before v3.1.2: on PATH that name shadowed install(1))
 - `agents/<role>/AGENT.md` — per-role config, read by ASK on every call
 - `agents/<role>/commands/*.sh` — unquoted-command implementations
 

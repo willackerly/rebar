@@ -1,0 +1,13 @@
+=== Ground Truth Verification ===
+
+OK:    test_files = 2
+MISSING: sdks = 2  (not in METRICS file; metrics_strict = true)
+MISSING: agents = 2  (not in METRICS file; metrics_strict = true)
+MISSING: contract_files = 3  (not in METRICS file; metrics_strict = true)
+MISSING: contract_ids = 2  (not in METRICS file; metrics_strict = true)
+MISSING: headed = 1  (not in METRICS file; metrics_strict = true)
+MISSING: go_all = 3  (not in METRICS file; metrics_strict = true)
+MISSING: nothing = 0  (not in METRICS file; metrics_strict = true)
+
+Metric drift detected — update METRICS to match reality
+--- exit 1 ---

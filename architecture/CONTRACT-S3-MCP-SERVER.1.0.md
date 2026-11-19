@@ -75,24 +75,28 @@ ask-mcp-server [OPTIONS]
 
   --stdio              Use stdio transport (for MCP clients)
   --port PORT          Port for HTTP transport (default: 7232)
-  --host HOST          Bind host for HTTP (default: 127.0.0.1)
+  --host HOST          Bind host for HTTP (default: 127.0.0.1; another address
+                       needs --api-key unless --insecure-no-auth)
   --repos-dir DIR      Directory to scan for repos (subdirs with agents/)
   --repos PATHS        Comma-separated explicit repo paths
   --mcp-only           Only serve MCP, not classic ASK API
-  --api-key KEY        Bearer-auth key (or ASK_API_KEY); required for a non-loopback --host
+  --api-key KEY        Bearer-auth key
+  --ask-bin PATH       Path to ask CLI (default: rebar ask; must accept
+                       `--question -- <role> <question>`)
+  --max-asks N         HTTP: asks at once at most, 503 beyond (default 8)
   --insecure-no-auth   Allow a non-loopback --host without an API key
-  --ask-bin PATH       Path to ask CLI (default: alongside this script)
 ```
 
 JSON-RPC surface:
 
 | Method | Behavior |
 |--------|----------|
-| `initialize` | Standard MCP handshake; advertises capabilities |
+| `initialize` | Standard MCP handshake; negotiates the protocol version (2024-11-05 … 2025-11-25); advertises capabilities |
+| `server/discover` | 2026-07-28 sessionless discovery (Claude Code 2.1.3xx probes it first); later requests carry the version in `_meta` |
 | `tools/list` | Returns one tool per (repo, role) pair, named `ask_<repo>_<role>`, with caller-facing description |
-| `tools/call` | Routes `{ name, arguments: { question } }` to `ask <repo>:<role> "<question>"` and returns the answer |
+| `tools/call` | Routes `{ name, arguments: { question } }` to `ask [-v] --question -- <role> "<question>"` in the repo (question-only: never a command script) and returns the answer; names match case-insensitively |
 | `resources/list` | Per-role memory + log files exposed as MCP resources |
-| `resources/read` | Returns file contents (memory.md, memory.log.md) |
+| `resources/read` | Returns file contents (memory.md, memory.log.md, AGENT.md); URIs match case-insensitively |
 | Notifications (any method without `id`) | **Silently ignored** — never reply with `id: null` |
 
 ## Behavioral Contracts
@@ -103,27 +107,33 @@ JSON-RPC surface:
 | Tool descriptions | Caller-facing first-paragraph extraction from `agents/<role>/AGENT.md`, prefixed with the centralized `ROLE_DESCRIPTIONS` preamble for each role (architect/product/englead/steward/tester/merger/engineer) |
 | Discovery | `--repos-dir` recurses **depth-2** (top level + one nesting level) to find subdirs with `agents/`; skips hidden dirs and `node_modules`/`vendor`/`dist`/`build`/`target`/`out`/`.next`/`.nuxt`/`coverage`/`__pycache__` |
 | Notification handling | JSON-RPC requests without `id` are notifications and MUST NOT receive a response; replying with `id: null` triggers Claude Code's Zod validator and silently breaks the session |
-| Stdio hygiene | All status/banner output goes to stderr; stdout carries only JSON-RPC (otherwise the client can't parse the handshake) |
-| Cross-repo invocation | `tools/call` with `name=ask_<repo>_<role>` runs `cd <repo-path> && ask --question -- <role> "<question>"` (the question is never a command script); `repo` must be registered and `role` one of its listed agents |
+| Stdio hygiene | All status/banner output goes to stderr; stdout carries only JSON-RPC (otherwise the client can't parse the handshake). A malformed line is reported on stderr and skipped, never answered with `id: null` |
+| HTTP transport | MCP Streamable HTTP at `/mcp` (session per client via `Mcp-Session-Id`, JSON responses); `GET /mcp/schema` and the classic `/v1/*` API alongside |
+| Cross-repo invocation | `tools/call` with `name=ask_<repo>_<role>` runs `cd <repo-path> && ask <role> "<question>"` |
 | Tool count discipline | At most one tool per (repo, role); duplicates are deduplicated by name |
 | Authentication | If `--api-key` set, requires `Authorization: Bearer <key>` for HTTP transport (constant-time compare); stdio is trusted (subprocess-of-Claude) |
-| HTTP exposure (v3.1.2+) | Binds 127.0.0.1 by default; non-loopback bind without a key refused unless `--insecure-no-auth`; loopback-bound → non-loopback `Host` gets 403; POST requires `application/json` (415) and ≤ 1 MiB body (413) |
+| HTTP hardening | Binds 127.0.0.1 by default; a non-loopback bind without a key exits 2 unless `--insecure-no-auth`. Requests on a loopback listener need a loopback `Host` (403); browsers' cross-origin requests 403; POST needs `application/json` (415); bodies ≤ 1 MiB (413), `/v1/ask` needs `Content-Length` (411), read within 60 s; ≤ `--max-asks` asks at once (503 / isError "Server busy"); Streamable HTTP sessions close after 15 min idle, ≤ 1000 open (503) |
+| Names | A role is one of the repo's listed agents (plain name); repos with `.rebar-skip-mcp` are not served, also when named with `--repos`; resource URIs path-escape repo and role (`ask://memory/pct%25zz:architect`) |
+| Stdio limits | Lines over 16 MiB are dropped and logged; integer ids beyond ±2^53 are refused (logged: they would not survive the round trip); a request nested too deeply for the decoders gets -32700 with its id; SIGPIPE is ignored (EPIPE ends the session like end of input) |
 
 ## Error Contracts
 
 | Error | When | Behavior |
 |-------|------|----------|
 | `--repos-dir` missing | Path doesn't exist | Warn on stderr, continue (allows running with `--repos` only) |
-| `tools/call` for unknown tool | Name not in registry | JSON-RPC error code -32602, "Tool not found" |
-| `ask` subprocess fails | Underlying ASK CLI error | Forward exit code + stderr in tool result with `isError: true` |
-| `initialize` not called | Other method invoked first | Error -32002, "Not initialized — Call initialize first" |
-| Method not implemented | Unknown method (non-notification) | Error -32601, "Method not found" |
+| `tools/call` for unknown tool | Name not in registry (ignoring case) | JSON-RPC error code -32602, `unknown tool "<name>"` |
+| Invalid tool arguments | Missing/empty `question`, wrong types | Tool result with `isError: true` naming the problem |
+| `ask` subprocess fails | Underlying ASK CLI error, timeout | stdio: exit code + stderr + cmd + cwd in the tool result (`isError: true`); HTTP (remote callers): `Agent <repo>:<role> failed (exit code N): <last stderr line>`, details in the server log |
+| Duplicate `initialize` / missing params | SDK errors sent with code 0 | Rewritten to -32600 / -32602 (other code-0 errors -32603) |
+| `resources/read` unknown URI | Not a registered `ask://` resource | JSON-RPC error -32602, "Resource not found" |
+| `initialize` not called | Other method invoked first (pre-2026-07-28 protocol) | JSON-RPC error -32600, `method "<m>" is invalid during session initialization` |
+| Client goes away / server stopped | End of stdin, stdout closed; SIGINT/SIGTERM (stdio or HTTP) | Stop reading/accepting; cancel running tool calls (their answer: `isError` "Agent query cancelled"; HTTP connections close after the answers); the ask process group gets SIGTERM, SIGKILL 1 s later; exit 0 within 2 s (HTTP: request contexts are cancelled at the end of the grace), leaving no ask/LLM/git process behind — also none a finished ask left in its group (killed at exit, or 300 s after the ask) |
+| Method not implemented | Unknown method (non-notification) | Error -32601, "method not found" |
 
 ## Dependencies
 
 - Depends on: `CONTRACT:S2-ASK-CLI.1.0` (subprocess executor for every tools/call)
-- Depends on: Python 3.10+
-- Depends on: standard library only (no third-party deps — keeps install zero-friction)
+- Depends on: the `rebar` binary (native Go) and the official MCP Go SDK `github.com/modelcontextprotocol/go-sdk` (protocol, transports, schema validation)
 - Configuration: `.mcp.json` in adopted repos (auto-written by `rebar init`)
   and `~/.claude.json` (user-level, manual)
 
@@ -156,8 +166,11 @@ This is the latest version. No predecessor.
 
 ## Implementing Files
 
-- `bin/ask-mcp-server` — the entire server (Python, ~870 lines)
-- `cli/cmd/init.go` — writes `.mcp.json` referencing this server (`ensureMCPConfig`, `findMCPServerPath`)
+- `cli/internal/mcp/` — the server (native Go on the MCP Go SDK: `rebar mcp serve`; `compat.go` aliases, `stdio.go` stdio hygiene)
+- `cli/cmd/mcp.go` — the `rebar mcp serve` / `rebar mcp client` commands
+- `bin/ask-mcp-server` — sh shim running `rebar mcp serve` (the python original was removed in rebar 4.0)
+- `cli/cmd/init.go` — writes `.mcp.json` running `rebar mcp serve` (`ensureMCPConfig`, `findRebarCommand`)
+- `cli/internal/migrate/mcpjson.go` — `rebar migrate` rewrites `.mcp.json` servers from `ask-mcp-server` to `rebar mcp serve`
 - `cli/cmd/adopt.go` — same, in the adoption flow
 
 ## Test Requirements
@@ -175,3 +188,4 @@ This is the latest version. No predecessor.
 | Version | Date | Change | Migration |
 |---------|------|--------|-----------|
 | 1.0 | 2026-04-25 | Initial contract — formalizing Wave 2.5 + 2026-04-22→25 fixes | — |
+| 1.0 (amended) | 2026-11-17 | Server moved onto the official MCP Go SDK (rebar 4.0): protocol negotiation incl. 2026-07-28, Streamable HTTP, SDK error shapes; tool names, schemas and result envelope unchanged | None for Claude Code; HTTP clients must speak Streamable HTTP |

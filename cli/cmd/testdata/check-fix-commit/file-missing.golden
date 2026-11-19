@@ -1,0 +1,2 @@
+check-fix-commit: file not found: nope.txt
+--- exit 2 ---

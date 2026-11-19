@@ -1,11 +1,13 @@
 # CI for rebar itself: the same checks contributors run locally, plus a
 # govulncheck scan and a build with the oldest Go that cli/go.mod allows.
-# Runs on PRs into and pushes to main and release/* branches.
+# Runs on PRs into and pushes to main and release/* branches, and on PRs
+# into the go-native stack branches (each stacked PR's base is the previous
+# one's branch).
 name: ci
 
 on:
   pull_request:
-    branches: [main, "release/**"]
+    branches: [main, "release/**", "feat/go-native-**"]
   push:
     branches: [main, "release/**"]
   workflow_dispatch:
@@ -64,7 +66,8 @@ jobs:
 
       - name: Go tests
         working-directory: cli
-        run: go test ./...
+        # Explicit: go test's default is 10 minutes per package.
+        run: go test -timeout 20m ./...
 
       # The release workflow's go test fails on a tag whose scripts are missing
       # from released-blobs.txt. Apply the same test to the head of a release
@@ -78,16 +81,19 @@ jobs:
           git tag v0.0.0-ci-head HEAD
           go test ./internal/migrate -run '^TestReleasedManifestCoversLocalTags$' -count=1
 
-      - name: ci-check
+      # rebar's own checks, with the binary built from this commit (the
+      # script tests, part of the suite, run the same binary).
+      - name: rebar check
         run: |
           export PATH="${{ matrix.path_prefix }}$PATH"
-          scripts/ci-check.sh
+          (cd cli && go build -o "$RUNNER_TEMP/rebar" .)
+          REBAR_TEST_BIN="$RUNNER_TEMP/rebar" "$RUNNER_TEMP/rebar" check
 
       - name: Script tests
         run: |
           export PATH="${{ matrix.path_prefix }}$PATH"
           if [ -x scripts/tests/run.sh ]; then
-            echo "scripts/tests/run.sh is part of ci-check; nothing extra to run."
+            echo "scripts/tests/run.sh is part of rebar check; nothing extra to run."
             exit 0
           fi
           failed=0
@@ -109,6 +115,10 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          # A shallow checkout, unlike the checks job: migrate recognizes
+          # the legacy fixtures (released v3.1.1 blobs) from the manifest
+          # compiled into the binary, so the tests need no history, and
+          # this job covers that binary-only path.
           persist-credentials: false
 
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
@@ -121,7 +131,7 @@ jobs:
         run: |
           go version
           go build ./...
-          go test ./...
+          go test -timeout 20m ./...
 
   # Known vulnerabilities (Go vulnerability database) reachable from rebar's
   # code, in its dependencies or in the standard library of the latest Go.

@@ -1,0 +1,9 @@
+test_files=2
+sdks=2
+agents=2
+contract_files=3
+contract_ids=2
+headed=1
+go_all=3
+nothing=0
+--- exit 0 ---

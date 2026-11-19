@@ -1,0 +1,24 @@
+Running contract and documentation checks...
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SUMMARY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  SKIP  Contract Headers
+  SKIP  Contract References
+  SKIP  Doc References
+  SKIP  TODO Tracking
+  SKIP  Doc Freshness
+  SKIP  Registry Consistency
+  SKIP  JTBD Presence
+  SKIP  Prefix Uniqueness
+  SKIP  Ground Truth
+  SKIP  Rebar Compliance
+  SKIP  Decay Patterns
+  SKIP  Bootstrap Sync
+  SKIP  Script Tests
+  SKIP  Fix Commit Gate
+  SKIP  Bypass Flags Gate
+  SKIP  Steward
+
+  0 passed, 0 failed, 16 skipped
+--- exit 0 ---

@@ -1,0 +1,8 @@
+MISSING: docs/specs/CONTRACT-A.1.0.md — 'Why this exists' 'Who needs this' 'Scenarios'
+
+Checked 1 latest-version contract(s), 0 superseded skipped, 1 with missing JTBD sections.
+
+Every contract needs non-empty 'Why this exists', 'Who needs this', and
+'Scenarios' sections. An interface description is not a Job To Be Done —
+see docs/specs/CONTRACT-TEMPLATE.md for the required framing.
+--- exit 1 ---

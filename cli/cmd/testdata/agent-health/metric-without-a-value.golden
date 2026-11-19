@@ -1,0 +1,2 @@
+agent-health: 2: Usage: agent_metric "key" "value"
+--- exit 1 ---

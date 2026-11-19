@@ -32,7 +32,8 @@
 set -uo pipefail
 
 . "$(dirname "$0")/lib.sh"
-BIN="${INBOX_WATCH_BIN:-$REBAR_SCRIPTS/inbox-watch.sh}"
+# The watcher under test: rebar's, or a script copy (INBOX_WATCH_BIN).
+if [ -n "${INBOX_WATCH_BIN:-}" ]; then BIN=(bash "$INBOX_WATCH_BIN"); else BIN=("$REBAR" native inbox-watch); fi
 
 rebar_tmpdir inbox-watch-self-echo
 rebar_on_exit '[ -n "${WATCH_PID:-}" ] && kill "$WATCH_PID"'
@@ -46,7 +47,7 @@ touch "$INBOX/2026-08-01-peer-FYI-pre-existing-baseline.md"
 
 # Arm with an explicit --self so the test does not depend on the repo's
 # directory name (a checkout can be renamed).
-"$BIN" --interval 1 --self myrepo "$INBOX" > "$OUT" 2>"$TMP/err.log" &
+( exec "${BIN[@]}" --interval 1 --self myrepo "$INBOX" ) > "$OUT" 2>"$TMP/err.log" &
 WATCH_PID=$!
 sleep 2
 
@@ -93,7 +94,7 @@ fi
 # --self '' were ignored we would still be suppressing, which this cannot
 # distinguish — so also assert the arm line states suppression is off.
 OUT2="$TMP/out2.log"
-"$BIN" --interval 1 --self '' "$INBOX" > "$OUT2" 2>"$TMP/err2.log" &
+( exec "${BIN[@]}" --interval 1 --self '' "$INBOX" ) > "$OUT2" 2>"$TMP/err2.log" &
 WATCH_PID=$!
 sleep 2
 touch "$INBOX/2026-08-02-myrepo-ACK-should-appear-when-disabled.md"
@@ -115,7 +116,7 @@ fi
 # off over an UNCHANGED inbox: the two previously-suppressed memos must NOT
 # replay. This is the side-door back into the full-backlog re-emit bug.
 OUT3="$TMP/out3.log"
-"$BIN" --interval 1 --self '' "$INBOX" > "$OUT3" 2>/dev/null &
+( exec "${BIN[@]}" --interval 1 --self '' "$INBOX" ) > "$OUT3" 2>/dev/null &
 WATCH_PID=$!
 sleep 3
 kill "$WATCH_PID" 2>/dev/null; wait "$WATCH_PID" 2>/dev/null

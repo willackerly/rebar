@@ -21,21 +21,24 @@ var migrateCmd = &cobra.Command{
 	Use:   "migrate",
 	Short: "Move legacy copies of rebar scripts into .rebarrc settings",
 	Long: `Find the project's own copies of rebar scripts (the files the per-script
-override runs instead of the install's), and decide for each one by running
-it: the legacy copy and the install's script run against the project, and a
-copy whose behavior the install reproduces, with settings derived from the
-copy, can go.
+override runs instead of rebar's), and decide for each one by running it: the
+legacy copy (with bash: it is the project's code) and rebar's built-in check
+(in process) run against the project, and a copy whose behavior the built-in
+check reproduces, with settings derived from the copy, can go. No rebar
+install tree is needed.
 
   check-ground-truth.sh  each metric compute_metrics() emits is translated
                          to metric.<key>.* lines and kept only if the
-                         install computes the same value
-  compute-registry.sh    settings are kept only if the install's --stdout is
+                         built-in check computes the same value
+  compute-registry.sh    settings are kept only if rebar's --stdout is
                          byte-identical to the copy's
   other checks           same exit status and findings, on the project and
                          (for source scanners) on a probe tree
   everything else        deleted only if byte-identical to a released rebar
                          version (ci-check.sh / pre-commit.sh become the thin
                          wrappers)
+  .mcp.json              servers running bin/ask-mcp-server are pointed at
+                         'rebar mcp serve' (same arguments)
 
 Without --apply nothing changes: the proposed .rebarrc lines, the files to
 remove and the files kept (with reasons) are printed. --apply writes them,
@@ -58,10 +61,18 @@ func runMigrate(cmd *cobra.Command, args []string) error {
 }
 
 func migrateMain(cmd *cobra.Command) error {
+	// Planning and apply put this binary first on PATH for the legacy copies
+	// and wrappers they run (when it is a `rebar`, not a test binary).
+	self := ""
+	if exe, err := os.Executable(); err == nil && filepath.Base(exe) == "rebar" {
+		self = exe
+	}
 	opts := migrate.Options{
 		ProjectRoot:        cfg.RepoRoot,
 		RebarRoot:          findRebarRoot(),
 		RegenerateRegistry: migrateRegenerate,
+		RebarBin:           findRebarCommand(),
+		RebarOnPath:        self,
 		Timeout:            migrateTimeout,
 		Progress:           os.Stderr,
 	}
@@ -84,10 +95,7 @@ func migrateMain(cmd *cobra.Command) error {
 		fmt.Fprintln(out, "Nothing to migrate.")
 		return nil
 	}
-	ao := migrate.ApplyOptions{AllowDirty: migrateAllowDirty}
-	if exe, err := os.Executable(); err == nil && filepath.Base(exe) == "rebar" {
-		ao.RebarBin = exe
-	}
+	ao := migrate.ApplyOptions{AllowDirty: migrateAllowDirty, RebarBin: self}
 	res, err := migrate.Apply(plan, opts, ao)
 	if err != nil {
 		return err

@@ -15,9 +15,13 @@ import (
 func Render(w io.Writer, p *Plan, applied bool) {
 	verb := map[bool]string{false: "would", true: ""}
 	fmt.Fprintf(w, "rebar migrate — %s\n", p.Project)
-	fmt.Fprintf(w, "install: %s   tier: %d\n\n", p.Install, p.Tier)
+	if p.Install != "" {
+		fmt.Fprintf(w, "compared with: rebar's built-in checks (rebar tree: %s)   tier: %d\n\n", p.Install, p.Tier)
+	} else {
+		fmt.Fprintf(w, "compared with: rebar's built-in checks   tier: %d\n\n", p.Tier)
+	}
 	if len(p.Scripts) == 0 {
-		fmt.Fprintln(w, "No legacy script copies: the project already runs on the install.")
+		fmt.Fprintln(w, "No legacy script copies: the project already runs on rebar's built-in checks.")
 	}
 
 	if len(p.Added) > 0 {
@@ -68,6 +72,14 @@ func Render(w io.Writer, p *Plan, applied bool) {
 		}
 		fmt.Fprintln(w)
 	}
+	if p.MCP != nil {
+		fmt.Fprintf(w, ".mcp.json: %s to rebar's native MCP server (bin/ask-mcp-server only hands off to it):\n",
+			map[bool]string{false: "would point Claude Code", true: "pointed Claude Code"}[applied])
+		for _, e := range p.MCP.Servers {
+			fmt.Fprintf(w, "  %s: %s\n  %s→ %s\n", e.Name, e.From, strings.Repeat(" ", len(e.Name)), e.To)
+		}
+		fmt.Fprintln(w)
+	}
 	if p.RegenRegistry {
 		why := "with the ellipsis purpose style (--regenerate-registry)"
 		if p.RegenReason != "" {
@@ -86,7 +98,7 @@ func Render(w io.Writer, p *Plan, applied bool) {
 // CheckResult is a check run after apply.
 type CheckResult struct {
 	Name       string
-	Ran        string // "install", "legacy copy" or "wrapper"
+	Ran        string // "rebar" (the built-in check), "legacy copy" or "wrapper …"
 	Tier       int
 	BeforeCode int
 	AfterCode  int
@@ -101,8 +113,9 @@ type ApplyOptions struct {
 	// AllowDirty lets apply run on a work tree with uncommitted changes or
 	// untracked copies (whose deletion git cannot undo).
 	AllowDirty bool
-	// RebarBin is the rebar CLI the wrappers' smoke run puts on PATH ("":
-	// whatever `rebar` PATH has, else no smoke run).
+	// RebarBin is the rebar CLI apply puts first on PATH for the legacy
+	// copies it runs and the wrappers' smoke run ("": the plan's
+	// RebarOnPath, else whatever `rebar` PATH has, else no smoke run).
 	RebarBin string
 }
 
@@ -187,10 +200,7 @@ func Apply(p *Plan, opts Options, ao ApplyOptions) (*ApplyResult, error) {
 		case Replace:
 			data := s.ReplaceContent
 			if data == nil {
-				var err error
-				if data, err = os.ReadFile(s.ReplaceWith); err != nil {
-					return fail(err)
-				}
+				return fail(fmt.Errorf("no replacement content for scripts/%s", s.Name))
 			}
 			mode := os.FileMode(0o644)
 			if strings.HasSuffix(s.Name, ".sh") {
@@ -209,13 +219,38 @@ func Apply(p *Plan, opts Options, ao ApplyOptions) (*ApplyResult, error) {
 			return fail(err)
 		}
 	}
-	env := scrubbedEnv("REBAR_PROJECT_ROOT=" + p.Project)
+	if p.MCP != nil {
+		if err := save(p.MCP.File); err != nil {
+			return fail(err)
+		}
+		mode := os.FileMode(0o644)
+		if info, err := os.Stat(p.MCP.File); err == nil {
+			mode = info.Mode().Perm()
+		}
+		if err := writeAtomic(p.MCP.File, p.MCP.New, mode); err != nil {
+			return fail(err)
+		}
+	}
+	// Legacy copies and wrappers find the rebar that planning gave them.
+	bin := firstNonEmpty(ao.RebarBin, p.RebarOnPath)
+	binDir := ""
+	if bin != "" {
+		d, err := os.MkdirTemp("", "rebar-migrate-bin-")
+		if err != nil {
+			return fail(err)
+		}
+		cleanupDirs = append(cleanupDirs, d)
+		if binDir, err = linkRebar(bin, d); err != nil {
+			return fail(err)
+		}
+	}
+	env := prependPath(scrubbedEnv("REBAR_PROJECT_ROOT="+p.Project), binDir)
 	if p.RegenRegistry {
 		reg := filepath.Join(p.Project, firstNonEmpty(rcValue(p.NewRC, "contracts_dir"), "architecture"), "CONTRACT-REGISTRY.md")
 		if err := save(reg); err != nil {
 			return fail(err)
 		}
-		r := run(opts.Timeout, p.Project, env, filepath.Join(p.Install, "scripts", "compute-registry.sh"))
+		r := runNative(p.Project, "", env, "compute-registry.sh")
 		if !r.ok() {
 			return fail(fmt.Errorf("regenerating the registry failed: %s%s", r.Stdout, r.Stderr))
 		}
@@ -230,17 +265,19 @@ func Apply(p *Plan, opts Options, ao ApplyOptions) (*ApplyResult, error) {
 		if s.MinTier > tier && !s.Enabled {
 			tier = s.MinTier
 		}
-		script := filepath.Join(p.Install, "scripts", s.Name)
-		ran := "install"
-		if s.Verdict == Keep {
-			script, ran = filepath.Join(p.Project, "scripts", s.Name), "legacy copy"
-		}
 		tierEnv := append(append([]string{}, env...), fmt.Sprintf("REBAR_TIER=%d", tier))
-		r := run(opts.Timeout, p.Project, tierEnv, append([]string{script}, s.Check...)...)
+		var r runResult
+		ran := "rebar"
+		if s.Verdict == Keep {
+			ran = "legacy copy"
+			r = run(opts.Timeout, p.Project, tierEnv, append([]string{filepath.Join(p.Project, "scripts", s.Name)}, s.Check...)...)
+		} else {
+			r = runNative(p.Project, "", tierEnv, s.Name, s.Check...)
+		}
 		res.Checks = append(res.Checks, CheckResult{Name: s.Name, Ran: ran, Tier: tier, BeforeCode: s.Before.Code, AfterCode: codeOf(r), Output: r.Stdout + r.Stderr})
 		if s.Shim {
 			// The wrapper the callers will run, the way they run it.
-			if wenv, ok := wrapperEnv(ao.RebarBin, p.Install, tierEnv); ok {
+			if wenv, ok := wrapperEnv(binDir, p.Install, tierEnv); ok {
 				w := run(opts.Timeout, p.Project, wenv, append([]string{filepath.Join(p.Project, "scripts", s.Name)}, s.Check...)...)
 				res.Checks = append(res.Checks, CheckResult{Name: s.Name, Ran: "wrapper scripts/" + s.Name, Tier: tier, BeforeCode: s.Before.Code, AfterCode: codeOf(w), Output: w.Stdout + w.Stderr})
 			}
@@ -263,37 +300,66 @@ func codeOf(r runResult) int {
 	return r.Code
 }
 
-// wrapperEnv puts a `rebar` (bin, or the one on PATH) first on PATH and
-// points it at this install, for running a thin wrapper as a caller would.
-func wrapperEnv(bin, install string, env []string) ([]string, bool) {
-	if bin == "" {
-		p, err := exec.LookPath("rebar")
-		if err != nil {
+// wrapperEnv is env with a `rebar` first on PATH (binDir, else the one PATH
+// has) and pointed at this install, for running a thin wrapper as a caller
+// would (false: no rebar to run it with).
+func wrapperEnv(binDir, install string, env []string) ([]string, bool) {
+	if binDir == "" {
+		if _, err := exec.LookPath("rebar"); err != nil {
 			return nil, false
 		}
-		bin = p
 	}
-	dir, err := os.MkdirTemp("", "rebar-migrate-bin-")
-	if err != nil {
-		return nil, false
+	var out []string
+	if install != "" {
+		out = append(out, "REBAR_ROOT="+install)
 	}
-	if err := os.Symlink(bin, filepath.Join(dir, "rebar")); err != nil {
-		os.RemoveAll(dir)
-		return nil, false
-	}
-	defer func() { cleanupDirs = append(cleanupDirs, dir) }()
-	out := []string{"REBAR_ROOT=" + install}
-	for _, kv := range env {
-		if strings.HasPrefix(kv, "PATH=") {
-			out = append(out, "PATH="+dir+string(os.PathListSeparator)+strings.TrimPrefix(kv, "PATH="))
-			continue
-		}
+	for _, kv := range prependPath(env, binDir) {
 		if strings.HasPrefix(kv, "REBAR_PROJECT_ROOT=") || strings.HasPrefix(kv, "REBAR_TIER=") {
 			continue // the wrapper finds the project itself, and its tier in .rebarrc
 		}
 		out = append(out, kv)
 	}
 	return out, true
+}
+
+// linkRebar makes dir hold a `rebar` symlink to bin (an absolute path, or
+// a name looked up on PATH) and returns dir.
+func linkRebar(bin, dir string) (string, error) {
+	if !filepath.IsAbs(bin) {
+		p, err := exec.LookPath(bin)
+		if err != nil {
+			return "", err
+		}
+		if bin, err = filepath.Abs(p); err != nil {
+			return "", err
+		}
+	}
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return "", err
+	}
+	if err := os.Symlink(bin, filepath.Join(dir, "rebar")); err != nil {
+		return "", err
+	}
+	return dir, nil
+}
+
+// prependPath puts dir first on env's PATH (env unchanged when dir is "").
+func prependPath(env []string, dir string) []string {
+	if dir == "" {
+		return env
+	}
+	out := make([]string, 0, len(env)+1)
+	found := false
+	for _, kv := range env {
+		if v, ok := strings.CutPrefix(kv, "PATH="); ok {
+			kv, found = "PATH="+dir+string(os.PathListSeparator)+v, true
+		}
+		out = append(out, kv)
+	}
+	if !found {
+		out = append(out, "PATH="+dir)
+	}
+	return out
 }
 
 // cleanupDirs are removed by Cleanup.
@@ -319,6 +385,12 @@ func (p *Plan) preflight(ao ApplyOptions) error {
 	targets := []string{filepath.Join(p.Project, ".rebarrc")}
 	if p.MetricsFile != "" {
 		targets = append(targets, p.MetricsFile)
+	}
+	if p.MCP != nil {
+		if !sameBytes(p.MCP.File, p.MCP.Data) {
+			return fmt.Errorf(".mcp.json changed since the plan was made; rerun rebar migrate")
+		}
+		targets = append(targets, p.MCP.File)
 	}
 	for _, s := range p.Deletions() {
 		path := filepath.Join(p.Project, "scripts", s.Name)
@@ -373,6 +445,9 @@ func safeTarget(project, install, path string) error {
 	}
 	if !within(project, dir) {
 		return fmt.Errorf("refusing to touch %s: it resolves to %s, outside the project", path, dir)
+	}
+	if install == "" {
+		return nil
 	}
 	if inst, err := filepath.EvalSymlinks(install); err == nil && within(inst, dir) {
 		return fmt.Errorf("refusing to touch %s: it resolves into the rebar install", path)

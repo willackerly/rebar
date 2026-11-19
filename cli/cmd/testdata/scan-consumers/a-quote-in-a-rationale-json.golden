@@ -1,0 +1,2 @@
+{"contract":"001/C1-API","consumers":[{"name":"alpha","path":"$ROOT/consumers/alpha","version_pinned":"1.0","pin_date":"2026-01-01","notify_on_change":"true","rationale":"a "quoted" use"},{"name":"beta","path":"$ROOT/consumers/beta","version_pinned":"1.0","pin_date":"2026-01-01","notify_on_change":"false","rationale":"a "quoted" use"},{"name":"gamma","path":"$ROOT/consumers/gamma","version_pinned":"1.0","pin_date":"2026-01-01","notify_on_change":"sometimes","rationale":"a "quoted" use"}]}
+--- exit 0 ---

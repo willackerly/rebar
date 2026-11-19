@@ -1,0 +1,13 @@
+--- stdout ---
+api:architect  ← $SERVER2
+web:architect  ← $SERVER2
+web:product  ← $SERVER1
+--- stderr ---
+  (server $DEAD: unreachable)
+--- changes ---
+--- requests ---
+server2 GET /v1/agents auth="" type="application/json"
+
+server1 GET /v1/agents auth="" type="application/json"
+
+--- exit 0 ---

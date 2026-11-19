@@ -1,0 +1,12 @@
+=== Rebar compliance check ===
+
+FAIL: .rebar-version file not found
+  Create it with: echo 'v4.0.0-rc.1' > .rebar-version
+FAIL: .rebarrc file not found
+  Create it from .rebarrc.template
+FAIL: README.md not found
+
+FAIL: AGENTS.md not found (required at Tier 2+)
+
+FAIL: 4 compliance issue(s) found.
+--- exit 1 ---

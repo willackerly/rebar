@@ -1,0 +1,86 @@
+rebar: WARN: checks_enable names unknown check 'check-nope' (ignored; use a check script name without .sh, e.g. check-ground-truth)
+rebar: ignoring contract_namespace 'S1-BAD.1.0' (allowed: letters, digits, . _ / -; must not start like a contract ID.version)
+Running contract and documentation checks...
+
+━━━ Contract Headers ━━━
+SKIP: tier 1 < required tier 2 (set REBAR_TIER or .rebarrc to change, or name it in checks_enable)
+
+━━━ Contract References ━━━
+
+Checked 0 contract references, 0 broken.
+
+━━━ Doc References ━━━
+check-doc-refs: OK — no broken markdown links to untracked files
+
+━━━ TODO Tracking ━━━
+OK: 0 untracked TODOs. 1 tracked tasks.
+
+━━━ Doc Freshness ━━━
+SKIP: tier 1 < required tier 2 (set REBAR_TIER or .rebarrc to change, or name it in checks_enable)
+
+━━━ Registry Consistency ━━━
+FAIL: $ROOT/architecture/CONTRACT-REGISTRY.md does not exist. Generate it: rebar run compute-registry
+
+━━━ JTBD Presence ━━━
+SKIP: tier 1 < required tier 2 (set REBAR_TIER or .rebarrc to change, or name it in checks_enable)
+
+━━━ Prefix Uniqueness ━━━
+SKIP: tier 1 < required tier 2 (set REBAR_TIER or .rebarrc to change, or name it in checks_enable)
+
+━━━ Ground Truth ━━━
+NOTE: tier 1 < required tier 3; running check-ground-truth because .rebarrc checks_enable names it
+=== Ground Truth Verification ===
+
+SKIP: No METRICS file found
+  Create a METRICS file with key = value pairs and declare how
+  to compute each one as metric.<key>.* lines in .rebarrc.
+
+All documented metrics match codebase reality
+
+━━━ Rebar Compliance ━━━
+=== Rebar compliance check ===
+
+OK: .rebar-version = v3.1.0
+OK: .rebarrc tier = 1 (PARTIAL)
+OK: README.md badge found on line 3
+    Version: v3.1.0 | Tier: 1 (PARTIAL)
+
+=== Contract maturity (declared Status:) ===
+OK: no contracts found — maturity weighting not applicable
+
+OK: Rebar compliance verified.
+
+━━━ Decay Patterns ━━━
+check-decay-patterns: no files to scan.
+
+━━━ Fix Commit Gate ━━━
+check-fix-commit: OK — Gate G satisfied (no fix:/regression: commits without Reproduced on:)
+
+━━━ Bypass Flags Gate ━━━
+check-bypass-flags: OK — Gate I satisfied (no bypass mentions without Bypass tickets:)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SUMMARY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  PASS  Contract Headers
+  PASS  Contract References
+  PASS  Doc References
+  PASS  TODO Tracking
+  PASS  Doc Freshness
+  FAIL  Registry Consistency
+  PASS  JTBD Presence
+  PASS  Prefix Uniqueness
+  PASS  Ground Truth
+  PASS  Rebar Compliance
+  PASS  Decay Patterns
+  SKIP  Bootstrap Sync (rebar source repo only)
+  SKIP  Script Tests (rebar source repo only)
+  PASS  Fix Commit Gate
+  PASS  Bypass Flags Gate
+  SKIP  Steward
+
+  12 passed, 1 failed, 3 skipped
+
+CI check failed. Fix the issues above or skip individual checks
+with environment variables (e.g., SKIP_FRESHNESS=1).
+--- exit 1 ---

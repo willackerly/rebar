@@ -1,0 +1,9 @@
+--- stdout ---
+default ran
+--- stderr ---
+--- changes ---
+--- made home/.config/ ---
+--- made home/.config/ask/ ---
+--- wrote home/.config/ask/projects ---
+proj = $BASE/proj
+--- exit 5 ---

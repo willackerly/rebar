@@ -1,0 +1,13 @@
+
+check-fix-commit: VIOLATION (msg.txt)
+  subject:  fix: crlf
+  Gate G requires a line of the form:
+    Reproduced on: <SHA / deploy URL / log excerpt / screenshot path>
+
+  In the body. Without it, the fix is for a phantom — the user's
+  symptom hasn't been observed independently before fixing began.
+  Source: practices/regression-fix-protocol.md §Gate G
+
+check-fix-commit: 1 violation(s)
+Wire as commit-msg hook:  printf '#!/bin/sh\nexec rebar run check-fix-commit "$1"\n' > .git/hooks/commit-msg && chmod +x .git/hooks/commit-msg
+--- exit 0 ---

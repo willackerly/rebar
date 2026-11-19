@@ -1,0 +1,2 @@
+inbox-watch: --interval needs a value
+--- exit 2 ---

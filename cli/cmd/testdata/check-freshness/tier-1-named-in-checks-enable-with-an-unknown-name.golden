@@ -1,0 +1,10 @@
+rebar: WARN: checks_enable names unknown check 'no-such-check' (ignored; use a check script name without .sh, e.g. check-ground-truth)
+NOTE: tier 1 < required tier 2; running check-freshness because .rebarrc checks_enable names it
+STALE (80 days): ./a.md — freshness: {{ago:80}}
+
+Checked 1 docs with currency markers (freshness:/last-synced:), 1 stale (>14 days).
+0 .md file(s) carry no currency marker at all — unchecked, not verified.
+
+Stale docs may contain outdated status claims.
+Review and update the freshness date after verifying content.
+--- exit 1 ---

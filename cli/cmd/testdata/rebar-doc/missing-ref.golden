@@ -1,0 +1,17 @@
+rebar-doc.sh: missing <ref>
+Usage: rebar-doc.sh <ref> [--cat]
+       rebar-doc.sh -h|--help
+
+Resolve a rebar:<kind>/<name> cross-repo ref to a local file.
+The 'rebar:' prefix is optional.
+
+Kinds:
+  practice/<name>          script/<name>   agents/<name>   doc/<name>
+  convention[/<section>]   charter         feedback/<name>
+
+Default output is '<source>\t<path>' (source: local|REBAR_ROOT|checkout|upstream).
+--cat prints the resolved file's contents instead.
+
+Exit codes: 0 resolved, 2 usage/malformed ref, 4 unresolvable locally
+(upstream URL printed).
+--- exit 2 ---

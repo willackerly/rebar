@@ -46,14 +46,14 @@ func Load(repoRoot string) (*Config, error) {
 	c.ChecksEnable = ChecksEnableFor(repoRoot)
 
 	// REBAR_TIER env takes precedence
-	if env := os.Getenv("REBAR_TIER"); env != "" {
+	if env := Getenv("REBAR_TIER"); env != "" {
 		t, err := strconv.Atoi(env)
 		if err == nil && t >= 1 && t <= 3 {
 			c.Tier = t
 		}
 	} else {
 		// Read from .rebarrc
-		tier, err := readRebarRC(filepath.Join(repoRoot, ".rebarrc"))
+		tier, err := readRebarRC(RCFile(repoRoot))
 		if err == nil && tier >= 1 && tier <= 3 {
 			c.Tier = tier
 		}
@@ -144,7 +144,7 @@ func EnsureRebarDir(repoRoot string) error {
 // "architecture". Mirrors _rebar_contracts_dir in scripts/_rebar-config.sh.
 // A value that is absolute or leaves the repo falls back to the default.
 func ContractsDirFor(repoRoot string) string {
-	dir := os.Getenv("REBAR_CONTRACTS_DIR")
+	dir := Getenv("REBAR_CONTRACTS_DIR")
 	if dir == "" {
 		dir = RCValue(repoRoot, "contracts_dir")
 	}
@@ -155,11 +155,33 @@ func ContractsDirFor(repoRoot string) string {
 	return dir
 }
 
-// RCValue returns the value of key in repoRoot/.rebarrc ("" if absent),
-// parsed like scripts/_rebar-config.sh: the first `key = value` line wins
-// and `#` starts a comment.
+// RCFile is the .rebarrc the settings of the repo at repoRoot are read
+// from: REBAR_RCFILE when set (`rebar migrate` uses it to try settings
+// before writing them), else repoRoot/.rebarrc; under WithEnv, the
+// override's RCFile. Mirrors _rebar_rc_file in
+// scripts/_rebar-config.sh.
+func RCFile(repoRoot string) string {
+	if e := override(); e != nil && e.RCFile != "" {
+		return e.RCFile
+	}
+	if f := Getenv("REBAR_RCFILE"); f != "" {
+		return f
+	}
+	return filepath.Join(repoRoot, ".rebarrc")
+}
+
+// RCValue returns the value of key in the repo's .rebarrc (RCFile; "" if
+// absent), parsed like scripts/_rebar-config.sh: the first `key = value`
+// line wins and `#` starts a comment.
 func RCValue(repoRoot, key string) string {
-	f, err := os.Open(filepath.Join(repoRoot, ".rebarrc"))
+	return RCValueIn(RCFile(repoRoot), key)
+}
+
+// RCValueIn is RCValue for an explicit settings file, for callers that
+// must not depend on the environment (an in-process check run on settings
+// that are not written yet).
+func RCValueIn(rcFile, key string) string {
+	f, err := os.Open(rcFile)
 	if err != nil {
 		return ""
 	}
@@ -179,6 +201,22 @@ func RCValue(repoRoot, key string) string {
 	return ""
 }
 
+// RCValueOr returns a .rebarrc setting the way _rebar_config in
+// scripts/_rebar-config.sh does: the environment variable envVar when it is
+// set and non-empty (pass "" for keys without one), else the key's value in
+// the repo's .rebarrc (RCFile), else def when that is absent or empty.
+func RCValueOr(repoRoot, key, envVar, def string) string {
+	if envVar != "" {
+		if v := Getenv(envVar); v != "" {
+			return v
+		}
+	}
+	if v := RCValue(repoRoot, key); v != "" {
+		return v
+	}
+	return def
+}
+
 // KnownChecks are the names checks_enable accepts: the script basenames
 // (without .sh) of every check the suites run. Mirrors _REBAR_KNOWN_CHECKS in
 // scripts/_rebar-config.sh.
@@ -196,7 +234,7 @@ var KnownChecks = []string{
 // UnknownChecks); the scripts warn about and ignore them. Mirrors
 // _rebar_checks_enable in scripts/_rebar-config.sh.
 func ChecksEnableFor(repoRoot string) []string {
-	raw := os.Getenv("REBAR_CHECKS_ENABLE")
+	raw := Getenv("REBAR_CHECKS_ENABLE")
 	if raw == "" {
 		raw = RCValue(repoRoot, "checks_enable")
 	}
@@ -237,9 +275,9 @@ var (
 	idVersionRE         = regexp.MustCompile(`^[A-Za-z0-9_-]+\.[0-9]+\.[0-9]+`)
 )
 
-// validContractNamespace reports whether ns may be a contract namespace,
+// ValidContractNamespace reports whether ns may be a contract namespace,
 // for the configured value and for namespaces parsed from references alike.
-func validContractNamespace(ns string) bool {
+func ValidContractNamespace(ns string) bool {
 	return contractNamespaceRE.MatchString(ns) && !idVersionRE.MatchString(ns)
 }
 
@@ -254,16 +292,21 @@ var qualifiedRefRE = regexp.MustCompile(`^([A-Za-z0-9._/-]+):([A-Za-z0-9][A-Za-z
 // references qualified with another namespace belong to other repos.
 // Mirrors _rebar_contract_namespace in scripts/_rebar-config.sh.
 func ContractNamespace(repoRoot string) string {
-	ns := os.Getenv("REBAR_CONTRACT_NAMESPACE")
-	if ns == "" {
-		ns = RCValue(repoRoot, "contract_namespace")
-	}
-	ns = strings.TrimSuffix(strings.TrimSpace(ns), "/")
-	if ns != "" && !validContractNamespace(ns) {
+	ns := ContractNamespaceValue(repoRoot)
+	if ns != "" && !ValidContractNamespace(ns) {
 		fmt.Fprintf(os.Stderr, "rebar: ignoring contract_namespace '%s' (allowed: letters, digits, . _ / -; must not start like a contract ID.version)\n", ns)
 		return ""
 	}
 	return ns
+}
+
+// ContractNamespaceValue is the configured contract namespace of the repo
+// at repoRoot before validation: env REBAR_CONTRACT_NAMESPACE, then .rebarrc
+// contract_namespace, trimmed, one trailing / dropped. Mirrors
+// _rebar_contract_namespace_value in scripts/_rebar-config.sh.
+func ContractNamespaceValue(repoRoot string) string {
+	ns := RCValueOr(repoRoot, "contract_namespace", "REBAR_CONTRACT_NAMESPACE", "")
+	return strings.TrimSuffix(strings.TrimSpace(ns), "/")
 }
 
 // LocalContractRef interprets ref, the text after a "CONTRACT:" marker, for
@@ -277,11 +320,30 @@ func LocalContractRef(ref, namespace string) (string, bool) {
 		return ref, true
 	}
 	m := qualifiedRefRE.FindStringSubmatch(ref)
-	if m == nil || !validContractNamespace(m[1]) {
+	if m == nil || !ValidContractNamespace(m[1]) {
 		return ref, true
 	}
 	if m[1] != namespace {
 		return "", false
 	}
 	return m[2], true
+}
+
+// IsRebarTree reports whether dir is a rebar source checkout or a rebar
+// install tree: it has templates/project-bootstrap/ and either rebar's
+// embedded assets (cli/internal/assets, a source checkout since rebar is a
+// single binary) or scripts/steward.sh (a release tree or clone from
+// before that, v3.1.0 and earlier).
+func IsRebarTree(dir string) bool {
+	if dir == "" {
+		return false
+	}
+	if info, err := os.Stat(filepath.Join(dir, "templates", "project-bootstrap")); err != nil || !info.IsDir() {
+		return false
+	}
+	if info, err := os.Stat(filepath.Join(dir, "cli", "internal", "assets")); err == nil && info.IsDir() {
+		return true
+	}
+	info, err := os.Stat(filepath.Join(dir, "scripts", "steward.sh"))
+	return err == nil && !info.IsDir()
 }

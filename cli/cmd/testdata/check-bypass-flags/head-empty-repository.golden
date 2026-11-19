@@ -1,0 +1,2 @@
+check-bypass-flags: no commit found at HEAD
+--- exit 0 ---

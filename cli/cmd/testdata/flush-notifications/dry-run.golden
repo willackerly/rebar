@@ -1,0 +1,14 @@
+flush-notifications: 001 has 2 pending notification(s)
+
+→ C1-API: 1.0 → 2.0 (breaking)
+    DRY: ask_alpha_featurerequest ← (690 chars)
+    skip: beta (notify_on_change=false)
+    DRY: ask_gamma_featurerequest ← (690 chars)
+
+→ C2-LIB: 1.0 → 1.1 (additive)
+    DRY: ask_alpha_featurerequest ← (690 chars)
+    DRY: ask_broken_featurerequest ← (690 chars)
+
+flush-notifications: processed=4 sent=0 skipped=1 failed=0
+(dry-run — no FRs filed, no outbox state changed)
+--- exit 0 ---

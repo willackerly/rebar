@@ -14,7 +14,7 @@
 #       contract headers run at tier 1; tier 3 unset is unchanged
 #
 # Usage: bash scripts/tests/checks-enable.test.sh
-# Override the scripts under test with REBAR_SCRIPTS_DIR.
+# Runs the rebar binary under test (lib.sh: REBAR_TEST_BIN).
 # Bash 3.2 compatible (macOS default).
 
 set -uo pipefail
@@ -79,7 +79,7 @@ contains "$out" 'running check-ground-truth' || { echo "$out"; fail "T4: .sh suf
 out="$(run_in "$P" pre-commit.sh)" || { echo "$out"; fail "T4: pre-commit failed on an unknown name"; }
 [ "$(count_matches "$out" 'unknown check')" = 1 ] || { echo "$out"; fail "T4: warning not printed exactly once per suite run"; }
 rc 1
-out="$(cd "$P" && REBAR_PROJECT_ROOT="$P" REBAR_CHECKS_ENABLE=check-ground-truth "$REBAR_SCRIPTS/check-ground-truth.sh" 2>&1)" \
+out="$(REBAR_CHECKS_ENABLE=check-ground-truth run_in "$P" check-ground-truth.sh)" \
   || { echo "$out"; fail "T4: env override run failed"; }
 contains "$out" 'running check-ground-truth' || { echo "$out"; fail "T4: REBAR_CHECKS_ENABLE ignored"; }
 ok "T4: unknown names warn once and are ignored; .sh suffix and REBAR_CHECKS_ENABLE work"

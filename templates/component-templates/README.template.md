@@ -5,7 +5,7 @@
 <!-- REQUIRED: The rebar badge above MUST be the first line after the title.
      Format: > **rebar vX.Y.Z** | **Tier N: LEVEL**
      Where LEVEL is one of: PARTIAL (tier 1), ADOPTED (tier 2), ENFORCED (tier 3)
-     This is validated by scripts/check-compliance.sh and the steward.
+     This is validated by rebar run check-compliance and the steward.
      Update the version when you upgrade rebar. Update the tier when you change .rebarrc. -->
 
 <!-- One paragraph: what this project is, what problem it solves, and the

@@ -1,0 +1,13 @@
+=== Ground Truth Verification ===
+
+OK:    test_files = 2
+OK:    sdks = 2
+OK:    agents = 2
+OK:    contract_files = 3
+OK:    contract_ids = 2
+OK:    headed = 1
+OK:    go_all = 3
+OK:    nothing = 0
+
+All documented metrics match codebase reality
+--- exit 0 ---

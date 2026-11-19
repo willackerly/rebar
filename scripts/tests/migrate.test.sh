@@ -19,7 +19,9 @@
 #       nothing there touched
 #   T8  a clone of the rebar repo: refused
 #
-# Builds the CLI from this checkout, so it needs Go (SKIP otherwise).
+# Runs the rebar binary under test (lib.sh: REBAR_TEST_BIN). A legacy copy
+# of check-todos.sh is the last version before rebar 4.0 (kept in
+# cli/internal/migrate/testdata/legacy).
 # Usage: bash scripts/tests/migrate.test.sh
 # Bash 3.2 compatible (macOS default).
 
@@ -29,12 +31,8 @@ set -uo pipefail
 ROOT="$(cd "$REBAR_SCRIPTS/.." && pwd)"
 rebar_tmpdir migrate
 
-if ! command -v go >/dev/null 2>&1; then
-  echo "SKIP: go not installed (rebar migrate is a CLI command)"
-  exit 0
-fi
-( cd "$ROOT/cli" && go build -o "$TMP/rebar" . ) || fail "building the CLI"
-rebar() { REBAR_ROOT="$ROOT" "$TMP/rebar" "$@"; }
+LEGACY_TODOS="$ROOT/cli/internal/migrate/testdata/legacy/check-todos.sh.fixture"
+rebar() { REBAR_ROOT="$ROOT" "$REBAR" "$@"; }
 
 P="$TMP/project"
 mkdir -p "$P/scripts" "$P/lib" "$P/tools" "$P/src"
@@ -102,7 +100,7 @@ out=$(cd "$P" && rebar migrate --apply 2>&1) || fail "--apply exited non-zero: $
 [ ! -e "$P/scripts/check-todos.sh" ] || fail "T2: verified check-todos.sh not deleted"
 [ -f "$P/scripts/check-ground-truth.sh" ] || fail "T3: unverified ground truth copy deleted"
 contains "$(head -2 "$P/.rebarrc")" '^# our settings$' || fail "existing .rebarrc lines not kept: $(cat "$P/.rebarrc")"
-contains "$out" 'PASS  check-todos via install' || fail "T2: no post-apply check result: $out"
+contains "$out" 'PASS  check-todos via rebar' || fail "T2: no post-apply check result: $out"
 printf '#!/bin/sh\n# TODO: probe\n' > "$P/tools/y.sh"
 res=$(cd "$P" && rebar run check-todos 2>&1) && fail "T2: install's check-todos missed a TODO in tools/: $res"
 contains "$res" 'tools/y.sh' || fail "T2: TODO in tools/y.sh not reported: $res"
@@ -117,13 +115,13 @@ ok "T4 second run proposes nothing"
 
 # ── T6 callers keep working ──
 mkdir -p "$TMP/bin"
-printf '#!/bin/sh\nREBAR_ROOT="%s" exec "%s" "$@"\n' "$ROOT" "$TMP/rebar" > "$TMP/bin/rebar"
+printf '#!/bin/sh\nREBAR_ROOT="%s" exec "%s" "$@"\n' "$ROOT" "$REBAR" > "$TMP/bin/rebar"
 chmod +x "$TMP/bin/rebar"
 C="$TMP/callers"
 mkdir -p "$C/scripts" "$C/src"
 printf 'tier = 3\n' > "$C/.rebarrc"
 printf 'package a\n' > "$C/src/a.go"
-cp "$REBAR_SCRIPTS/check-todos.sh" "$C/scripts/check-todos.sh"
+cp "$LEGACY_TODOS" "$C/scripts/check-todos.sh"
 printf '# a comment migrate does not care about\n' >> "$C/scripts/check-todos.sh"
 printf '#!/usr/bin/env bash\nset -e\n"$(dirname "$0")/check-todos.sh"\n' > "$C/scripts/ci.sh"
 printf 'repos:\n  - repo: local\n    hooks:\n      - id: todos\n        entry: scripts/check-todos.sh\n        language: system\n' > "$C/.pre-commit-config.yaml"
@@ -132,7 +130,7 @@ g -C "$C" init -q && g -C "$C" add -A && g -C "$C" commit -qm init
 touch "$C/wip.txt"
 out=$(cd "$C" && PATH="$TMP/bin:$PATH" rebar migrate --apply 2>&1) && fail "T6: --apply ran on a dirty tree: $out"
 contains "$out" 'uncommitted or untracked' || fail "T6: no dirty-tree refusal: $out"
-cmp -s "$REBAR_SCRIPTS/check-todos.sh" "$C/scripts/check-todos.sh" && fail "T6: the refused apply changed the copy"
+cmp -s "$LEGACY_TODOS" "$C/scripts/check-todos.sh" && fail "T6: the refused apply changed the copy"
 rm "$C/wip.txt"
 out=$(cd "$C" && PATH="$TMP/bin:$PATH" rebar migrate --apply 2>&1) || fail "T6: --apply failed: $out"
 grep -q '^# rebar-thin-wrapper' "$C/scripts/check-todos.sh" || fail "T6: called copy not replaced by a wrapper: $out"
@@ -153,7 +151,7 @@ ok "T6 called copies become wrappers and callers still work (also when copied); 
 # ── T7 symlinked scripts/ ──
 S="$TMP/shared-scripts"
 mkdir -p "$S" "$TMP/linked"
-cp "$REBAR_SCRIPTS/check-todos.sh" "$S/"
+cp "$LEGACY_TODOS" "$S/check-todos.sh"
 printf 'tier = 3\n' > "$TMP/linked/.rebarrc"
 ln -s "$S" "$TMP/linked/scripts"
 g -C "$TMP/linked" init -q && g -C "$TMP/linked" add -A && g -C "$TMP/linked" commit -qm init

@@ -1,0 +1,88 @@
+Running contract and documentation checks...
+
+━━━ Contract Headers ━━━
+SKIP: tier 1 < required tier 2 (set REBAR_TIER or .rebarrc to change, or name it in checks_enable)
+
+━━━ Contract References ━━━
+
+Checked 0 contract references, 0 broken.
+
+━━━ Doc References ━━━
+check-doc-refs: OK — no broken markdown links to untracked files
+
+━━━ TODO Tracking ━━━
+OK: 0 untracked TODOs. 1 tracked tasks.
+
+━━━ Doc Freshness ━━━
+SKIP: tier 1 < required tier 2 (set REBAR_TIER or .rebarrc to change, or name it in checks_enable)
+
+━━━ Registry Consistency ━━━
+FAIL: $ROOT/architecture/CONTRACT-REGISTRY.md does not exist. Generate it: rebar run compute-registry
+
+━━━ JTBD Presence ━━━
+SKIP: tier 1 < required tier 2 (set REBAR_TIER or .rebarrc to change, or name it in checks_enable)
+
+━━━ Prefix Uniqueness ━━━
+SKIP: tier 1 < required tier 2 (set REBAR_TIER or .rebarrc to change, or name it in checks_enable)
+
+━━━ Ground Truth ━━━
+SKIP: tier 1 < required tier 3 (set REBAR_TIER or .rebarrc to change, or name it in checks_enable)
+
+━━━ Rebar Compliance ━━━
+=== Rebar compliance check ===
+
+OK: .rebar-version = v3.1.0
+OK: .rebarrc tier = 1 (PARTIAL)
+OK: README.md badge found on line 3
+    Version: v3.1.0 | Tier: 1 (PARTIAL)
+
+=== Contract maturity (declared Status:) ===
+OK: no contracts found — maturity weighting not applicable
+
+OK: Rebar compliance verified.
+
+━━━ Decay Patterns ━━━
+check-decay-patterns: no files to scan.
+
+━━━ Fix Commit Gate ━━━
+
+check-fix-commit: VIOLATION (HEAD)
+  subject:  fix: the widget
+  Gate G requires a line of the form:
+    Reproduced on: <SHA / deploy URL / log excerpt / screenshot path>
+
+  In the body. Without it, the fix is for a phantom — the user's
+  symptom hasn't been observed independently before fixing began.
+  Source: practices/regression-fix-protocol.md §Gate G
+
+check-fix-commit: 1 violation(s)
+Wire as commit-msg hook:  printf '#!/bin/sh\nexec rebar run check-fix-commit "$1"\n' > .git/hooks/commit-msg && chmod +x .git/hooks/commit-msg
+
+━━━ Bypass Flags Gate ━━━
+check-bypass-flags: OK — Gate I satisfied (no bypass mentions without Bypass tickets:)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SUMMARY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  PASS  Contract Headers
+  PASS  Contract References
+  PASS  Doc References
+  PASS  TODO Tracking
+  PASS  Doc Freshness
+  FAIL  Registry Consistency
+  PASS  JTBD Presence
+  PASS  Prefix Uniqueness
+  PASS  Ground Truth
+  PASS  Rebar Compliance
+  PASS  Decay Patterns
+  SKIP  Bootstrap Sync (rebar source repo only)
+  SKIP  Script Tests (rebar source repo only)
+  FAIL  Fix Commit Gate
+  PASS  Bypass Flags Gate
+  SKIP  Steward
+
+  11 passed, 2 failed, 3 skipped
+
+CI check failed. Fix the issues above or skip individual checks
+with environment variables (e.g., SKIP_FRESHNESS=1).
+--- exit 1 ---

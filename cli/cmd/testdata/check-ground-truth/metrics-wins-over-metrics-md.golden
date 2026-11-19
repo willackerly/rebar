@@ -1,0 +1,13 @@
+=== Ground Truth Verification ===
+
+OK:    test_files = 2
+NEW:   sdks = 2  (not in METRICS file)
+NEW:   agents = 2  (not in METRICS file)
+NEW:   contract_files = 3  (not in METRICS file)
+NEW:   contract_ids = 2  (not in METRICS file)
+NEW:   headed = 1  (not in METRICS file)
+NEW:   go_all = 3  (not in METRICS file)
+NEW:   nothing = 0  (not in METRICS file)
+
+All documented metrics match codebase reality
+--- exit 0 ---

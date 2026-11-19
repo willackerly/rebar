@@ -45,8 +45,8 @@ root cause was browser storage partitioning — caught only because the user
 later signed a PDF on prod and showed the actual verdict. Five minutes of
 prod reproduction at session start would have saved the five hours.
 
-**Mechanical enforcement:** [`scripts/check-fix-commit.sh`](../scripts/check-fix-commit.sh)
-is a commit-msg hook that refuses `fix:` / `regression:`-prefixed commits
+**Mechanical enforcement:** `check-fix-commit` (`rebar run check-fix-commit`,
+Gate G of `rebar check`) is a commit-msg hook that refuses `fix:` / `regression:`-prefixed commits
 whose body lacks a `Reproduced on:` line referencing a SHA, deploy URL, log
 excerpt, or screenshot link.
 
@@ -101,8 +101,8 @@ author's own change breaks tests and they bypass the gate to ship, the next
 person to touch that codepath inherits broken-baseline confusion plus the
 original regression they were trying to fix.
 
-**Mechanical enforcement:** [`scripts/check-bypass-flags.sh`](../scripts/check-bypass-flags.sh)
-is a commit-msg hook that refuses commits whose body mentions any of the
+**Mechanical enforcement:** `check-bypass-flags` (`rebar run check-bypass-flags`,
+Gate I of `rebar check`) is a commit-msg hook that refuses commits whose body mentions any of the
 bypass flag patterns unless the body also contains a `Bypass tickets:` line
 listing the broken-test IDs.
 
@@ -230,9 +230,9 @@ If any of those three is unanswered, the verify action isn't valid yet.
 
 | Gate | Universal mechanism | Project-specific mechanism |
 |------|---------------------|----------------------------|
-| G — reproduce-before-fix | `scripts/check-fix-commit.sh` (commit-msg hook) | PR template field |
+| G — reproduce-before-fix | `rebar run check-fix-commit` (commit-msg hook) | PR template field |
 | H — single-fix-isolation | doctrine in AGENTS.md | PR-size limit |
-| I — skip-stress is code-red | `scripts/check-bypass-flags.sh` (commit-msg hook) | wrapper around bypass scripts requiring env var |
+| I — skip-stress is code-red | `rebar run check-bypass-flags` (commit-msg hook) | wrapper around bypass scripts requiring env var |
 | J — test-diversity | doctrine in AGENTS.md | `tests/fixture-matrix.md` + CI gate |
 | K — trust-state-as-variable | doctrine in AGENTS.md | verifier reports trust state as separate axis |
 | L — fix-your-own-test-drift | doctrine in AGENTS.md | pre-merge hook on test-name overlap |

@@ -1,0 +1,3 @@
+--- wrote progress.jsonl ---
+{"agent":"rebar-parity-agent","ts":"<ts>","type":"metric","key":"rmse_delta","value":-0.045}
+--- exit 0 ---

@@ -255,7 +255,7 @@ source extensions (`.ts`, `.tsx`, `.go`, `.py`, `.rs`, `.js`, `.jsx`,
 `reference-implementations/`, `examples/`, or other non-standard
 locations may not be found by orphan detection. If you have contract
 implementations in unusual directories, add those paths to the search
-scope in `scripts/check-registry.sh`.
+scope in `rebar run check-registry`.
 
 **Script exclusion patterns:** All enforcement scripts (contract refs,
 headers, TODOs, ground truth) must exclude directories that contain
@@ -355,7 +355,7 @@ regardless of how many versions exist. When a contract is bumped from 1.0 to
 
 Discoveries are findings about the gap between contracts and reality. They
 live in the `## Discoveries` section of `TODO.md` and are parsed by the
-Steward (`scripts/steward.sh`).
+Steward (`rebar run steward`).
 
 ### Discovery Types
 
@@ -445,15 +445,15 @@ A near-miss format such as `*Status:* active` (one asterisk) is now parsed
 correctly rather than being mangled and silently weighted as stub-or-draft. It
 is still not the authoring form — write the bolded version.
 
-Parsers of record: `scripts/check-compliance.sh` (Check 9),
-`scripts/compute-registry.sh`, `scripts/cold-start-checks.sh`.
+Parsers of record: `rebar run check-compliance` (Check 9),
+`rebar run compute-registry`, `rebar check --cold-start`.
 
 - **No auto-detection.** Markings are declarations of honesty, not
   computations. Gates get added only when real-world failure shows the
   honor system breaking.
 - **Marking down is free; marking up is a claim.** Move an artifact to
   `verified` only when you can point at the passing test or scenario.
-- **Compliance weighting** (`scripts/check-compliance.sh`): <33% of
+- **Compliance weighting** (`rebar run check-compliance`): <33% of
   live contracts stub-or-draft → tier badge as declared; 33–66% → badge
   annotated "— IN PROGRESS"; >66% → badge demoted one tier with the
   reason printed. Repos with no `Status:` fields at all are treated as
@@ -536,7 +536,7 @@ cluster (2026-07); mechanics and watcher in `practices/inbox-watch.md`.
 
 - **Holding and arming are different costs.** Coordination **seats**
   sweep every inbox they hold at session start, then arm
-  `scripts/inbox-watch.sh` as a persistent monitor (see
+  `rebar run inbox-watch` as a persistent monitor (see
   `practices/session-lifecycle.md`). A quiet upstream sweeps at session
   start and need not arm anything. Inbox-by-default plus mandatory
   arming would conscript every silent dependency into watching a channel
@@ -545,7 +545,7 @@ cluster (2026-07); mechanics and watcher in `practices/inbox-watch.md`.
 - **A live inbox is a watched inbox** (federation Principle 5, ratified
   2026-07-11; amended 2026-08-02 for inbox-by-default): every repo
   carrying live cross-repo traffic arms the **same canonical watcher** —
-  `scripts/inbox-watch.sh`, shipped in the project bootstrap — pointed at
+  `rebar run inbox-watch`, built into rebar — pointed at
   its **own** `inbox/`, at session start. Own inbox only (a peer's inbox
   self-echoes your outbound deposits — SOP 2026-07-06). **Your own
   outbound mail is suppressed by sender**: banking the outbound copy in
@@ -610,7 +610,7 @@ rebar:<kind>/<name>
 | `rebar:feedback/<name>` | `feedback/<name>.md`, else `feedback/processed/<name>.md` |
 
 **Resolution order** (implemented identically by both resolvers of
-record — `scripts/rebar-doc.sh` and `rebar doc`):
+record — `rebar run rebar-doc` and `rebar doc`):
 
 1. the current repo (a vendored/synced copy)
 2. `$REBAR_ROOT`
@@ -630,7 +630,7 @@ ref if it lives only upstream (`practices/`, `conventions.md`,
 What a test *proves* (its fidelity rung), the UAKS tier, and the
 closed-loop demo gate live in `practices/test-fidelity.md` — including
 the `fidelity: <rung>` declaration format enforced by
-`scripts/check-decay-patterns.sh`.
+`rebar run check-decay-patterns`.
 
 ### The Scout Rule
 

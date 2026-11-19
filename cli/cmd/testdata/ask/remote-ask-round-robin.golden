@@ -1,0 +1,15 @@
+--- stdout ---
+Remote answer from server2.
+--- stderr ---
+--- changes ---
+--- wrote home/.config/ask/.rr-index ---
+0
+--- requests ---
+server2 POST /v1/ask auth="" type="application/json"
+{
+  "repo": "web",
+  "role": "architect",
+  "question": "Remote?",
+  "verbose": false
+}
+--- exit 0 ---

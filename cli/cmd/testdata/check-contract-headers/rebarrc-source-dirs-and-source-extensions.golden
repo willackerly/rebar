@@ -1,0 +1,11 @@
+MISSING: pkg/a.go
+MISSING: ./tools/b.sh
+
+Scanned 2 source files, 2 missing contract headers.
+
+Every source file must declare which contract it implements:
+  // CONTRACT:C1-BLOBSTORE.2.1
+  // Architecture: CONTRACT:S2-API-GATEWAY.1.0
+
+See architecture/README.md for the full convention.
+--- exit 1 ---

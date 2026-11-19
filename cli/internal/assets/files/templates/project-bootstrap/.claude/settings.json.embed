@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|clear",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if command -v rebar >/dev/null 2>&1; then cd \"$CLAUDE_PROJECT_DIR\" && rebar check --cold-start; elif [ -x \"$CLAUDE_PROJECT_DIR/scripts/cold-start-checks.sh\" ]; then \"$CLAUDE_PROJECT_DIR\"/scripts/cold-start-checks.sh; else printf '<rebar-cold-start>\\nrebar not found in PATH — install rebar to get cold-start checks\\n</rebar-cold-start>\\n'; fi",
+            "timeout": 30
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,6 @@
+--- stdout ---
+--- stderr ---
+usage: ask-server [-h] [--port PORT] [--host HOST] [--repos-dir REPOS_DIR] [--repos REPOS] [--api-key API_KEY] [--ask-bin ASK_BIN] [--max-asks MAX_ASKS] [--insecure-no-auth]
+ask-server: error: Provide --repos-dir or --repos
+--- changes ---
+--- exit 2 ---

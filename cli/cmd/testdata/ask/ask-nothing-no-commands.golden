@@ -1,0 +1,13 @@
+--- stdout ---
+--- stderr ---
+ask: error: question or command required
+
+Usage:
+  ask architect "<question>"     — ask a question
+  ask architect <command>          — run a command
+--- changes ---
+--- made home/.config/ ---
+--- made home/.config/ask/ ---
+--- wrote home/.config/ask/projects ---
+proj = $BASE/proj
+--- exit 4 ---

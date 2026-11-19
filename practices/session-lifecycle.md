@@ -60,7 +60,7 @@ grep -rn "TODO:" --include="*.ts" --include="*.go" --include="*.py" \
 If the `last-synced` date in QUICKCONTEXT is >1 week old, treat **all**
 claims as suspect and verify against `git log` before acting.
 
-**Automation:** Run `scripts/refresh-context.sh` if available — it does
+**Automation:** Run `rebar run refresh-context` if available — it does
 all of the above in one command.
 
 ### 3. Establish Test Baseline
@@ -70,7 +70,7 @@ all of the above in one command.
 
 ```bash
 # Run the project test suite to know what's passing NOW
-scripts/refresh-context.sh --test-baseline   # Automated (recommended)
+rebar run refresh-context --test-baseline   # Automated (recommended)
 
 # Or manually:
 pnpm test          # Node.js
@@ -104,7 +104,7 @@ on replies that aren't coming.
    as events:
 
    ```bash
-   ./scripts/inbox-watch.sh inbox/     # several HELD inboxes: list each dir (own inboxes only — never a peer's)
+   rebar run inbox-watch inbox/     # several HELD inboxes: list each dir (own inboxes only — never a peer's)
    ```
 
    Run it through the harness's persistent background-monitor facility

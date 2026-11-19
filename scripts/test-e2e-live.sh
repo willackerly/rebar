@@ -108,6 +108,18 @@ else
   record SKIP "LMStudio reachable" "not up at $LMSTUDIO_URL — only matters for \`rebar adopt --local\`"
 fi
 
+# ─── Build: bin/rebar from the cli/ source ───────────────────────────────
+# bin/rebar is not tracked (rebar 4.0): build it from this checkout so the
+# checks below test the current source.
+section "Build"
+if ! command -v go >/dev/null 2>&1; then
+  record FAIL "go on PATH" "needed to build bin/rebar (cd cli && go build -o ../bin/rebar .)"
+elif build_err="$(cd "$PROJECT_ROOT/cli" && go build -o ../bin/rebar . 2>&1)"; then
+  record PASS "bin/rebar built from cli/ source" "$(go env GOVERSION)"
+else
+  record FAIL "bin/rebar built from cli/ source" "$(printf '%s' "$build_err" | head -3 | tr '\n' ' ')"
+fi
+
 # ─── Version triple-check ─────────────────────────────────────────────────
 section "Version triple-check"
 
@@ -123,15 +135,6 @@ if [ "$binary_version" = "$file_version" ] && [ "$binary_version" = "$tag_versio
   record PASS "Version coherent across binary, .rebar-version, latest tag" "$binary_version"
 else
   record FAIL "Version mismatch" "binary=$binary_version file=$file_version tag=$tag_version"
-fi
-
-# ─── Build freshness: is bin/rebar built from current source? ──────────────
-binary_mtime="$(stat -f %m "$PROJECT_ROOT/bin/rebar" 2>/dev/null || stat -c %Y "$PROJECT_ROOT/bin/rebar" 2>/dev/null)"
-source_mtime="$(find "$PROJECT_ROOT/cli" -name '*.go' -newer "$PROJECT_ROOT/bin/rebar" -print -quit 2>/dev/null)"
-if [ -n "$source_mtime" ]; then
-  record FAIL "bin/rebar fresher than cli/ source" "rebuild needed: cd cli && go build -o ../bin/rebar ."
-else
-  record PASS "bin/rebar built from current source" ""
 fi
 
 # ─── Repo presence + agent discovery (per repo, gated) ─────────────────────
@@ -219,7 +222,7 @@ if curl -s -o /dev/null -m 2 "http://${ASK_SERVER_URL}/v1/health" 2>/dev/null; t
     record FAIL "ASK server /v1/agents lists rebar:architect" "rebar:architect missing from /v1/agents"
   fi
 else
-  record SKIP "ASK server smoke" "no listener at $ASK_SERVER_URL — start with: python3 bin/ask-server --port 7232 --repos-dir $DEV_DIR"
+  record SKIP "ASK server smoke" "no listener at $ASK_SERVER_URL — start with: rebar ask serve --port 7232 --repos-dir $DEV_DIR"
 fi
 
 # ─── Live LLM queries with keyword acceptance ──────────────────────────────
@@ -301,12 +304,18 @@ else
     # Send initialize + tools/call. Use python3 to JSON-escape the question.
     local question_json
     question_json="$(python3 -c 'import json,sys; print(json.dumps(sys.argv[1]))' "$question" 2>/dev/null)"
-    {
-      echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}'
-      printf '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"%s","arguments":{"question":%s}}}\n' \
-        "$tool" "$question_json"
-    } | "$PROJECT_ROOT/bin/ask-mcp-server" --stdio --repos-dir "$DEV_DIR" >"$mcp_out" 2>"$mcp_err" &
+    # stdin stays open (fd 9 on a FIFO) until the answer lands: the server
+    # cancels running tool calls at end of input, as when a client exits.
+    local mcp_in
+    mcp_in="$(mktemp -u)"
+    mkfifo "$mcp_in"
+    "$PROJECT_ROOT/bin/ask-mcp-server" --stdio --repos-dir "$DEV_DIR" <"$mcp_in" >"$mcp_out" 2>"$mcp_err" &
     local mcp_pid=$!
+    exec 9>"$mcp_in"
+    echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"test-e2e-live","version":"1"}}}' >&9
+    echo '{"jsonrpc":"2.0","method":"notifications/initialized"}' >&9
+    printf '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"%s","arguments":{"question":%s}}}\n' \
+      "$tool" "$question_json" >&9
 
     # Wait up to $LLM_TIMEOUT for the id=2 response to land. tools/call is
     # slower than initialize because it shells out to claude.
@@ -318,8 +327,9 @@ else
       sleep 1
       waited=$((waited + 1))
     done
-    kill "$mcp_pid" 2>/dev/null
+    exec 9>&-   # end of input: the server exits within its 2 s grace
     wait "$mcp_pid" 2>/dev/null
+    rm -f "$mcp_in"
 
     # Extract the answer text from the id=2 response.
     local text

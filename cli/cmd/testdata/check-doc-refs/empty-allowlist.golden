@@ -1,0 +1,17 @@
+README.md:4:docs/draft.md
+README.md:4:docs/missing.md
+README.md:7:missing/
+README.md:8:docs/gone.md  "a"
+README.md:9:docs/two.md
+README.md:10:docs/c.md:
+README.md:10:docs/q"x.md
+README.md:10:docs\b.md
+README.md:11:/
+crlf.md:2:docs/crlf-gone.md
+docs/guide.md:3:../../x/README.md
+docs/guide.md:4:a/././b.md
+docs/late.md:5:missing-late.md
+docs/sub/notes.md:1:../../docs/nope.md
+feedback/open.md:1:gone.md
+no-newline.md:1:docs/tail-gone.md
+--- exit 1 ---

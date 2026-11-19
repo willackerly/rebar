@@ -66,7 +66,7 @@ contract is just "writing a contract" with extra ceremony.
   correctness check on the contract's Interfaces section.
 - **JTBD sections are written at draft time, not backfilled.** Every
   spiked contract ships with non-empty Why this exists / Who needs this /
-  Scenarios sections (`scripts/check-jtbd-presence.sh` enforces this).
+  Scenarios sections (`rebar run check-jtbd-presence` enforces this).
   Prefer *composition-aware* framing over forced standalone-ness: "I5
   abstracts retrieval sources **so P5 can fan out** without knowing the
   underlying source" is an accurate composed JTBD; pretending I5 has a
@@ -74,7 +74,7 @@ contract is just "writing a contract" with extra ceremony.
 - **New prefix numbers are claimed once, up front.** Before fanning out,
   assign each planned contract its ID from the next free numbers in the
   registry — parallel agents inventing IDs independently is how prefix
-  collisions happen (`scripts/check-prefix-uniqueness.sh` catches the
+  collisions happen (`rebar run check-prefix-uniqueness` catches the
   damage, but assignment-up-front prevents it).
 
 ## Parallel fanout mechanics
@@ -87,7 +87,7 @@ contract is just "writing a contract" with extra ceremony.
   playbook lives in `agents/FANOUT_PATTERN.md`).
 - **The registry is regenerated, never hand-merged.** Registry conflicts
   after merging agent branches are resolved by running
-  `scripts/compute-registry.sh`, which re-derives the registry from the
+  `rebar run compute-registry`, which re-derives the registry from the
   contract files on disk. filedag's DP-A had additive registry conflicts
   from all three agents and regenerated them away cleanly.
 - **Personas and user stories are shared inputs.** Give every agent the
@@ -109,12 +109,12 @@ The spike closes when all of these are green:
 
 - [ ] Every planned contract file exists with all required template
       sections (including Why / Who / Scenarios —
-      `scripts/check-jtbd-presence.sh` passes)
+      `rebar run check-jtbd-presence` passes)
 - [ ] Interface stubs compile (where the language supports it)
 - [ ] Existing tests still pass (the spike must not have touched runtime
       behavior — if tests broke, scope was violated)
-- [ ] Registry regenerated and current (`scripts/compute-registry.sh --check`)
-- [ ] No prefix-number collisions (`scripts/check-prefix-uniqueness.sh`)
+- [ ] Registry regenerated and current (`rebar run compute-registry --check`)
+- [ ] No prefix-number collisions (`rebar run check-prefix-uniqueness`)
 
 ## Worked example — filedag DP-A (2026-04-24)
 

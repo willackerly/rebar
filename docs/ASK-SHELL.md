@@ -2,6 +2,14 @@
 
 ## Status: Optional Extension
 
+> **Implementation:** the `ask` command surface below is built into the
+> `rebar` binary (`rebar ask …`, package `cli/internal/ask`); `bin/ask` is a
+> thin hand-off to it, so `ask` and `rebar ask` are the same command.
+> Subcommands, flags, `ASK_*` variables, exit codes and on-disk files are
+> specified by `architecture/CONTRACT-S2-ASK-CLI.1.0.md`; `ask help` lists
+> them. (The original bash implementation was removed in rebar 4.0; its
+> behaviour is kept in the goldens of `cli/cmd/native_ask_test.go`.)
+
 This document defines a Unix-like command surface for interacting with agents.
 
 It builds on [AGENT-RUNTIME.md](AGENT-RUNTIME.md) and introduces:

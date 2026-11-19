@@ -3,25 +3,29 @@
 #
 # Installs a rebar version side by side with others:
 #
-#   ~/.rebar/versions/<version>/   one complete rebar tree per version
-#                                  (scripts/, templates/, agents/, bin/rebar, bin/ask*, …)
+#   ~/.rebar/versions/<version>/   one install per version: bin/rebar plus
+#                                  the companions beside it (bin/ask*,
+#                                  bin/rebar-install, bin/completions/)
 #   ~/.rebar/current               symlink to the active version
 #
-# and puts ~/.rebar/current/bin on PATH (via that version's bin/rebar-install), so
-# switching versions never touches your shell RC again.
+# and puts ~/.rebar/current/bin on PATH (via that version's bin/rebar-install;
+# older versions' bin/install is renamed to that on install), so switching
+# versions never touches your shell RC again.
 #
-#   Release tag   download rebar_<ver>_<os>_<arch>.tar.gz from the GitHub
-#                 Release, verify it against the release's SHA-256 checksums,
-#                 unpack. No git or Go needed. Only the release workflow
-#                 publishes these assets, after its govulncheck gate passes.
-#   Branch / SHA  build from source: git + Go.
+#   Release tag   download the self-contained binary rebar_<ver>_<os>_<arch>
+#                 from the GitHub Release, verify it against the release's
+#                 SHA-256 checksums, and let it write its companions
+#                 (`rebar install-shims`). No git or Go needed. Releases
+#                 v3.1.0-rc.1 to v3.1.x published only
+#                 rebar_<ver>_<os>_<arch>.tar.gz (the whole tree), which is
+#                 unpacked as before.
+#   Branch / SHA  build from source: git + Go (the whole tree at that ref,
+#                 plus bin/rebar).
 #
-# A tag is built from source only with --source, or when it predates
-# prebuilt assets (older than v3.1.0-rc.1, the first release that published
-# them). A tag without assets (not yet published, or its release workflow
-# failed), a download error other than "not found", and a checksum mismatch
-# are all fatal — never silently replaced by a source build with whatever Go
-# is on this machine.
+# A release tag is built from source only with --source, or when it predates
+# prebuilt releases (before v3.1.0-rc.1). A missing asset, an unreachable
+# release server or a checksum mismatch is fatal: never silently replaced
+# by a source build (which would skip the release's vulnerability gate).
 #
 # Usage (curl pipe):
 #   curl -fsSL https://raw.githubusercontent.com/willackerly/rebar/main/setup-rebar.sh | bash
@@ -71,7 +75,9 @@ Usage:
   --dir PATH    install base (default: ~/.rebar)
 
 Layout:
-  \$REBAR_DIR/versions/<version>/   one complete rebar tree per version
+  \$REBAR_DIR/versions/<version>/   one install per version (bin/rebar and
+                                   its companions; a source build keeps
+                                   the whole tree)
   \$REBAR_DIR/current               symlink to the active version; PATH
                                    points at \$REBAR_DIR/current/bin
 
@@ -319,12 +325,12 @@ no_prebuilt() {
   die "$1. Not building from source on my own: pass --source to build $VERSION with your Go toolchain (it skips the release workflow's govulncheck gate)."
 }
 
-# Installs the release's prebuilt tarball. Returns 1 only when there is
-# nothing to download and the tag predates prebuilt assets (see
-# no_prebuilt); every other failure, including a download error other than
-# "not found" and a checksum mismatch, is fatal.
+# Installs the release's prebuilt binary (v4.0.0 on) or whole-tree tarball
+# (v3.1.x). Returns 1 only when there is nothing to download and the tag
+# predates prebuilt assets (see no_prebuilt); every other failure, including
+# a download error other than "not found" and a checksum mismatch, is fatal.
 install_prebuilt() {
-  local tag="$1" plat os arch vn asset sums expected actual
+  local tag="$1" plat os arch vn bin tarball asset sums expected actual
   [[ -n "$REBAR_RELEASE_URL" ]] \
     || { no_prebuilt "no release download URL for $REPO_SHOWN (set REBAR_RELEASE_URL)"; return 1; }
   plat="$(detect_platform)"
@@ -336,7 +342,8 @@ install_prebuilt() {
     return 1
   fi
   vn="${tag#v}"
-  asset="rebar_${vn}_${os}_${arch}.tar.gz"
+  bin="rebar_${vn}_${os}_${arch}"
+  tarball="$bin.tar.gz"
   sums="rebar_${vn}_checksums.txt"
 
   log "Looking for a prebuilt $tag ($os/$arch)…"
@@ -348,7 +355,12 @@ install_prebuilt() {
   elif [[ "$st" -ne 0 ]]; then
     die "could not check $REBAR_RELEASE_URL/$tag for prebuilt assets ($FETCH_ERR). Retry, or use --source."
   fi
-  expected="$(awk -v f="$asset" '$2 == f || $2 == "*" f { print $1; exit }' "$TMP/$sums")"
+  # The binary (v4.0.0 and later), else the whole-tree tarball (v3.1.x;
+  # v4.0.x also publish a small tarball for older installers).
+  for asset in "$bin" "$tarball"; do
+    expected="$(awk -v f="$asset" '$2 == f || $2 == "*" f { print $1; exit }' "$TMP/$sums")"
+    [[ -n "$expected" ]] && break
+  done
   if [[ -z "$expected" ]]; then
     no_prebuilt "Release $tag has no $os/$arch build"
     return 1
@@ -362,10 +374,21 @@ install_prebuilt() {
   log "Checksum OK ($expected)"
 
   # Called from an `if`, where set -e is off: check each step.
-  mkdir -p "$TMP/unpack" || die "cannot create $TMP/unpack"
-  tar -xzf "$TMP/$asset" --no-same-owner -C "$TMP/unpack" || die "cannot unpack $asset"
-  [[ -d "$TMP/unpack/${asset%.tar.gz}" ]] || die "$asset does not contain ${asset%.tar.gz}/"
-  mv "$TMP/unpack/${asset%.tar.gz}" "$STAGE" || die "cannot move the unpacked tree to $STAGE"
+  if [[ "$asset" == "$bin" ]]; then
+    mkdir -p "$STAGE/bin" || die "cannot create $STAGE/bin"
+    mv "$TMP/$asset" "$STAGE/bin/rebar" || die "cannot move $asset to $STAGE/bin/rebar"
+    chmod 755 "$STAGE/bin/rebar" || die "cannot make $STAGE/bin/rebar executable"
+    "$STAGE/bin/rebar" version >/dev/null 2>&1 || die "$asset does not run on this machine"
+    "$STAGE/bin/rebar" install-shims --dir "$STAGE/bin" >/dev/null \
+      || die "$asset could not write its companions (rebar install-shims)"
+    LAYOUT=binary
+  else
+    mkdir -p "$TMP/unpack" || die "cannot create $TMP/unpack"
+    tar -xzf "$TMP/$asset" --no-same-owner -C "$TMP/unpack" || die "cannot unpack $asset"
+    [[ -d "$TMP/unpack/$bin" ]] || die "$asset does not contain $bin/"
+    mv "$TMP/unpack/$bin" "$STAGE" || die "cannot move the unpacked tree to $STAGE"
+    LAYOUT=tree
+  fi
   METHOD="prebuilt ($asset)"
   COMMIT=""
   return 0
@@ -406,6 +429,7 @@ install_source() {
       -ldflags "-s -w -X ${GO_PKG}.Version=${stamp}" -o ../bin/rebar . ) \
     || die "go build failed for $ref"
   METHOD="source ($REPO_SHOWN@${COMMIT:0:12})"
+  LAYOUT=tree
   return 0
 }
 
@@ -502,6 +526,7 @@ main() {
   fi
   REBAR_RELEASES_API="${REBAR_RELEASES_API:-}"
 
+  # Scratch space (downloads, the releases list); removed on exit.
   TMP="$(mktemp -d "${TMPDIR:-/tmp}/rebar-install.XXXXXX")"
   trap cleanup EXIT
   # Turn signals into a normal exit so the EXIT trap (and its restore) runs.
@@ -515,6 +540,7 @@ main() {
     resolve_latest
     KIND=tag
   else
+    [[ "$PRE" -eq 1 ]] && warn "--pre only applies to \"latest\"; installing the version given ($VERSION)"
     # "3.0.0" → "v3.0.0" when only the v-prefixed tag exists.
     if [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9] ]] && have git \
        && git ls-remote --tags --refs -- "$REBAR_REPO" "refs/tags/v$VERSION" | grep -q .; then
@@ -538,7 +564,7 @@ main() {
     # A pre-versioned install is a rebar clone: a git checkout with rebar's
     # markers. Any other git repo is foreign.
     if [[ -e "$REBAR_DIR/.git" && -d "$REBAR_DIR/templates/project-bootstrap" \
-          && -f "$REBAR_DIR/scripts/steward.sh" ]]; then
+          && ( -f "$REBAR_DIR/scripts/steward.sh" || -d "$REBAR_DIR/cli/internal/assets" ) ]]; then
       LEGACY=1
     elif [[ ! -d "$REBAR_DIR/versions" ]] && [[ -n "$(ls -A "$REBAR_DIR" 2>/dev/null)" ]]; then
       die "$REBAR_DIR exists but is neither a rebar install nor empty. Move it aside or use --dir."
@@ -596,6 +622,7 @@ main() {
 
   METHOD=""
   COMMIT=""
+  LAYOUT=""
   log "Installing rebar $VERSION → $REBAR_DIR/versions/$NAME"
   # A tag installs prebuilt; install_prebuilt returns 1 only for a tag that
   # predates prebuilt assets. Branches, commits and --source build here.
@@ -608,9 +635,13 @@ main() {
   [[ -x "$STAGE/bin/rebar" ]] || die "install produced no bin/rebar"
   "$STAGE/bin/rebar" version >/dev/null 2>&1 \
     || die "$STAGE/bin/rebar does not run on this machine"
-  if [[ ! -d "$STAGE/templates/project-bootstrap" || ! -f "$STAGE/scripts/steward.sh" ]]; then
+  # A tree whose binary predates the embedded assets needs its scripts and
+  # templates beside it.
+  if [[ "$LAYOUT" == tree ]] && ! "$STAGE/bin/rebar" install-shims --dir "$TMP/shims-probe" >/dev/null 2>&1 \
+     && [[ ! -d "$STAGE/templates/project-bootstrap" || ! -f "$STAGE/scripts/steward.sh" ]]; then
     warn "$VERSION lacks templates/project-bootstrap/ or scripts/steward.sh; the CLI may not find its scripts"
   fi
+
   # Versions before v3.1.2 ship the PATH helper as bin/install. current/bin
   # comes first on PATH, where that name shadows the system install(1)
   # (`install -d dir` → "Unknown option: -d", breaking `make install`), so
@@ -628,6 +659,7 @@ version=$VERSION
 kind=$KIND
 commit=$COMMIT
 method=$METHOD
+layout=$LAYOUT
 repo=$REPO_SHOWN
 installed=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 EOF
@@ -689,7 +721,7 @@ EOF
     warn "this shell runs rebar from $on_path; open a new terminal (or source your RC) to pick up $REBAR_DIR/current/bin"
   fi
   if [[ -n "${REBAR_ROOT:-}" ]]; then
-    warn "REBAR_ROOT=$REBAR_ROOT is set; the CLI runs that tree's scripts, not $REBAR_DIR/current's"
+    warn "REBAR_ROOT=$REBAR_ROOT is set; rebar doc and rebar migrate (for release history) read that tree"
   fi
 
   cat <<EOF

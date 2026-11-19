@@ -1,0 +1,18 @@
+=== Rebar compliance check ===
+
+OK: .rebar-version = v3.1.0-rc.2
+OK: .rebarrc tier = 2 (ADOPTED)
+FAIL: README.md badge is malformed on line 2
+  Found: > **rebar vX** | nope
+  Expected: > **rebar vX.Y.Z** | **Tier N: LEVEL**
+  Where LEVEL is PARTIAL (1), ADOPTED (2), or ENFORCED (3)
+
+=== AGENTS.md required sections ===
+OK: Cold Start / Read Before Coding — agents must know the reading order
+OK: Contract-Driven Development — the 4 rules that make contracts operational
+OK: Testing expectations — cascade tiers or scout rule
+OK: TODO Tracking — two-tag system prevents invisible debt
+OK: AGENTS.md mentions ASK CLI
+
+FAIL: 1 compliance issue(s) found.
+--- exit 1 ---

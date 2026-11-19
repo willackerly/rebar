@@ -1,0 +1,2 @@
+FAIL: $ROOT/architecture/CONTRACT-REGISTRY.md does not exist. Generate it: rebar run compute-registry
+--- exit 1 ---

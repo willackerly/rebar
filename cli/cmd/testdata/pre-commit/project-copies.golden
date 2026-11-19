@@ -1,0 +1,14 @@
+Pre-commit: checking TODO tracking...
+rebar: running project copy scripts/check-todos.sh (deprecated: run `rebar migrate` to replace it with the built-in check)
+custom todos
+OK: custom
+
+Pre-commit: checking contract references...
+
+Checked 0 contract references, 0 broken.
+
+Pre-commit: checking ground truth metrics...
+SKIP: tier 1 < required tier 3 (set REBAR_TIER or .rebarrc to change, or name it in checks_enable)
+
+Pre-commit checks passed.
+--- exit 0 ---

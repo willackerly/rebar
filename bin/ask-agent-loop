@@ -1,138 +1,34 @@
-#!/usr/bin/env bash
-# ask-agent-loop — ASK Scoped Knowledge: standalone agent loop for use as run.sh
+#!/bin/sh
+# ask-agent-loop — ASK's standalone agent loop, for use as an agent's run.sh, built into the rebar binary.
 # CONTRACT:S2-ASK-CLI.1.0
 #
-# This script is the agent loop that watches an inbox, processes questions
-# via claude, and writes responses to the outbox. It is invoked by `ask up`
-# but can also be run directly or symlinked as an agent's run.sh.
-#
-# Usage:
-#   ask-agent-loop <agent-dir>
-#   # or, from within an agent directory:
-#   ask-agent-loop .
-#
-# The agent directory must contain an AGENT.md file.
-
-set -euo pipefail
-
-AGENT_DIR="${1:-.}"
-AGENT_DIR="$(cd "$AGENT_DIR" && pwd)"
-AGENT_NAME="$(basename "$AGENT_DIR")"
-
-INBOX="$AGENT_DIR/inbox"
-OUTBOX="$AGENT_DIR/outbox"
-SHARED_DIR="${ASK_SHARED_DIR:-$(dirname "$(dirname "$AGENT_DIR")")/shared}"
-EVENTS_LOG="$SHARED_DIR/messages/events.jsonl"
-MODEL="${ASK_MODEL:-sonnet}"
-VERBOSE="${ASK_VERBOSE:-0}"
-
-log() {
-  if [ "$VERBOSE" = "1" ]; then
-    echo "[$AGENT_NAME] $*" >&2
-  fi
-}
-
-timestamp() {
-  date -u +%Y-%m-%dT%H:%M:%SZ
-}
-
-append_event() {
-  mkdir -p "$(dirname "$EVENTS_LOG")"
-  echo "$1" >> "$EVENTS_LOG"
-}
-
-# Preflight checks
-if [ ! -f "$AGENT_DIR/AGENT.md" ]; then
-  echo "Error: $AGENT_DIR/AGENT.md not found" >&2
-  exit 4
+# Shim: runs `rebar ask-agent-loop` with the same arguments — the rebar beside this
+# script (through symlinks) if it runs on this machine, else REBAR_BIN, else
+# the one on PATH — so PATH entries, .mcp.json files and scripts naming bin/ask-agent-loop keep working.
+# REBAR_ASK_HANDOFF is set for the rebar it runs: a rebar older than 4.0,
+# whose `rebar ask` runs this script, would otherwise loop.
+if [ -n "${REBAR_ASK_HANDOFF:-}" ]; then
+  echo "ask-agent-loop: this rebar has no built-in ASK (it ran ask-agent-loop back); install rebar 4.0 or later" >&2
+  exit 127
 fi
-
-if ! command -v claude &>/dev/null; then
-  echo "Error: claude CLI not found" >&2
-  exit 4
-fi
-
-if ! command -v jq &>/dev/null; then
-  echo "Error: jq not found" >&2
-  exit 4
-fi
-
-# Setup
-mkdir -p "$INBOX" "$OUTBOX"
-echo $$ > "$AGENT_DIR/.pid"
-trap 'rm -f "$AGENT_DIR/.pid"; echo "[$AGENT_NAME] offline"; exit 0' EXIT INT TERM
-
-echo "[$AGENT_NAME] online, watching $INBOX (pid $$)"
-
-while true; do
-  for msg in "$INBOX"/*.json; do
-    [ -f "$msg" ] || continue
-
-    MSG_ID=$(jq -r '.id' "$msg" 2>/dev/null || echo "unknown")
-    QUESTION=$(jq -r '.body' "$msg" 2>/dev/null || echo "")
-    FROM=$(jq -r '.from // "unknown"' "$msg" 2>/dev/null || echo "unknown")
-
-    echo "[$AGENT_NAME] processing ($MSG_ID): $QUESTION"
-
-    # Load context
-    CONTEXT=$(cat "$AGENT_DIR/AGENT.md" 2>/dev/null || true)
-    if [ -f "$AGENT_DIR/memory.md" ]; then
-      CONTEXT="$CONTEXT
-
---- Current Memory ---
-$(cat "$AGENT_DIR/memory.md")"
-    fi
-
-    # Invoke Claude
-    PROMPT="You are the $AGENT_NAME agent.
-
-Your role and context:
-$CONTEXT
-
-Question from $FROM: $QUESTION
-
-Respond as JSON with these fields:
-{
-  \"answer\": \"your concise answer\",
-  \"rationale\": \"your reasoning\",
-  \"refs\": [\"relevant/file.md\"]
-}
-
-Rules:
-- answer should be direct and concise
-- rationale explains your reasoning briefly
-- refs lists relevant files (empty array if none)
-- respond ONLY with the JSON object, no other text"
-
-    RESPONSE=$(claude --print --model "$MODEL" "$PROMPT" 2>/dev/null \
-      || echo '{"answer": "error", "rationale": "claude invocation failed", "refs": []}')
-
-    # Write response
-    echo "$RESPONSE" > "$OUTBOX/$MSG_ID.json"
-
-    # Log event
-    TS=$(timestamp)
-    EVENT=$(jq -n \
-      --arg id "$MSG_ID" \
-      --arg from "$AGENT_NAME" \
-      --arg to "$FROM" \
-      --arg type "answer" \
-      --arg ts "$TS" \
-      --arg body "$RESPONSE" \
-      '{id: $id, from: $from, to: $to, type: $type, timestamp: $ts, body: $body}')
-    append_event "$EVENT"
-
-    # Memory log
-    {
-      echo "---"
-      echo "**$TS** Q: $QUESTION"
-      echo "A: $(echo "$RESPONSE" | jq -r '.answer' 2>/dev/null || echo "$RESPONSE" | head -1)"
-    } >> "$AGENT_DIR/memory.log.md"
-
-    # Consume
-    rm "$msg"
-    echo "[$AGENT_NAME] answered: $MSG_ID"
-  done
-
-  sleep 2
+self=$0
+while [ -L "$self" ]; do
+  link=$(readlink "$self")
+  case $link in
+    /*) self=$link ;;
+    *) self=$(dirname "$self")/$link ;;
+  esac
 done
+rebar=$(dirname "$self")/rebar
+# The rebar beside this script may be built for another platform (a git
+# checkout's bin/rebar is one platform's build): use it only if it runs.
+if [ ! -x "$rebar" ] || ! "$rebar" --version >/dev/null 2>&1; then
+  rebar=${REBAR_BIN:-}
+fi
+if [ -z "$rebar" ] || [ ! -x "$rebar" ]; then
+  rebar=$(command -v rebar 2>/dev/null) || {
+    echo "ask-agent-loop: the rebar binary was not found (beside this script, REBAR_BIN or PATH)" >&2
+    exit 127
+  }
+fi
+REBAR_ASK_HANDOFF=1 exec "$rebar" ask-agent-loop "$@"

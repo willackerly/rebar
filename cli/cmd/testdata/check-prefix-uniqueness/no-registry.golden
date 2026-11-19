@@ -1,0 +1,2 @@
+SKIP: no architecture/CONTRACT-REGISTRY.md (run `rebar run compute-registry` to generate).
+--- exit 0 ---

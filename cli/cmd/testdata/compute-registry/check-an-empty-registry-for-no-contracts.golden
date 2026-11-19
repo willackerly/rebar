@@ -1,0 +1,2 @@
+STALE: Registry needs regeneration: rebar run compute-registry
+--- exit 1 ---

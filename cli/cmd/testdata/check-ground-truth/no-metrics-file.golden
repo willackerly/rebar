@@ -1,0 +1,8 @@
+=== Ground Truth Verification ===
+
+SKIP: No METRICS file found
+  Create a METRICS file with key = value pairs and declare how
+  to compute each one as metric.<key>.* lines in .rebarrc.
+
+All documented metrics match codebase reality
+--- exit 0 ---

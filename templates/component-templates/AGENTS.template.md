@@ -96,7 +96,7 @@ numeric claims match reality before trusting them:
 
 ```bash
 # Compare documented metrics against codebase reality
-[ -x scripts/check-ground-truth.sh ] && ./scripts/check-ground-truth.sh
+rebar run check-ground-truth
 ```
 
 If metrics have drifted, update `METRICS` BEFORE proceeding with your task.
@@ -237,8 +237,8 @@ the FIRST hypothesis is *"I broke the test's contract assumption"* —
 investigate before bypassing. If the contract change is intended, the test
 update is part of the same PR. "Test contract drift" is not a free pass.
 
-Mechanical commit-msg gates (`scripts/check-fix-commit.sh` for Gate G,
-`scripts/check-bypass-flags.sh` for Gate I) catch the related failure modes
+Mechanical commit-msg gates (`rebar run check-fix-commit` for Gate G,
+`rebar run check-bypass-flags` for Gate I) catch the related failure modes
 that ARE script-detectable. See `practices/regression-fix-protocol.md` for
 the full six-gate protocol.
 
@@ -347,7 +347,7 @@ any doc that cross-references those numbers:
 
 Every quantitative claim must trace to ONE authoritative source.
 The `METRICS` file is the canonical location for project-wide numbers.
-`scripts/check-ground-truth.sh` verifies it against code.
+`rebar run check-ground-truth` verifies it against code.
 
 | Metric | Computed From | Verified By | Referenced In |
 |--------|--------------|-------------|---------------|

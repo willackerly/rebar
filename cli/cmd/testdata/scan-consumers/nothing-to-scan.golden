@@ -1,0 +1,2 @@
+scan-consumers: no repos to scan (registry empty + REBAR_REPOS unset)
+--- exit 0 ---

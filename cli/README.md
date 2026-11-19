@@ -10,7 +10,9 @@ cd cli
 go build -o ../bin/rebar .
 ```
 
-Requires Go 1.22+.
+`bin/rebar` is git-ignored: the repository does not track a prebuilt binary
+(since 4.0; releases publish one per platform), so build it after cloning and
+after pulling. Requires the Go version in `go.mod` or newer.
 
 ## Quick Start
 
@@ -28,7 +30,7 @@ rebar context                     # Cold Start Quad in reading order
 rebar context architect           # + DESIGN.md, contracts
 rebar context session-start       # Cold Start Quad + staleness check
 
-rebar ask architect "question"  # Query agents (delegates to bin/ask)
+rebar ask architect "question"  # Query agents (native ASK; bin/ask runs this)
 
 rebar agent start --role developer "task"  # Sealed envelope execution
 rebar agent finish <id>                    # Audit agent work

@@ -2,6 +2,9 @@
 
 How to move an adopting project to rebar 3.1 from v2.0.0 or v3.0.x. Follow
 the steps in order; each one says what to run and how to tell it worked.
+Moving to 4.0 (release candidate `v4.0.0-rc.1`)? Read
+[Upgrading from 3.x to 4.0](#upgrading-from-3x-to-40): it lists 4.0's
+breaking changes and the fix for each.
 
 **What changes in 3.1.** rebar's checks now run from the rebar install. A
 project keeps only configuration (`.rebarrc`, `METRICS`, its contracts) and
@@ -14,8 +17,44 @@ Design notes: [self-contained install](feedback/2026-11-14-self-contained-instal
 [rebar migrate](feedback/2026-11-14-rebar-migrate.md),
 [versioned installer](feedback/2026-11-14-versioned-installer.md).
 
-In the commands below, `v3.1.2` is the release you are moving to. Use the
-tag you are actually installing.
+**What changes in 4.0.** The `rebar` binary is self-contained: the checks,
+the suites, ASK, the MCP server and the bootstrap templates are built in. A
+release is one binary per platform (`rebar_<ver>_<os>_<arch>`, verified by
+the installer), not a tarball of the rebar tree, and the checks never read a
+rebar tree. The bash implementations are gone: rebar no longer ships
+`scripts/*.sh`, `scripts/_rebar-config.sh`, the bash `ask` or the python MCP
+and ASK servers (`bin/ask`, `bin/ask-agent-loop`, `bin/ask-mcp-server` and
+`bin/ask-server` remain as shims that run `rebar`, so `.mcp.json` files and
+PATH entries keep working), and `REBAR_CHECK_IMPL` is ignored. Your
+project's own copies of rebar's old scripts still run, with the deprecation
+notice: they are your code, and rebar never runs them except as `rebar run`
+or the suites find them. `rebar migrate` compares your copies with the
+built-in checks, and also turns a `ci-check.sh` / `pre-commit.sh` copy that
+only adds calls to your own scripts into `checks_extra` /
+`checks_extra_pre_commit` lines (only for plain calls whose failure fails
+the suite: a copy that runs a script with `|| true`, only in CI, or only to
+warn is kept for you to review). The steps below apply unchanged; step 10
+(CI) gets simpler.
+
+**Installer changes in 3.1.2 and 4.0.** `bin/install` (the PATH setup beside the
+binary) is now `rebar-install`: on PATH, a file named `install` shadowed
+install(1) and broke `install -d` / `make install`. `rebar install-shims`
+removes rebar's old `install` from the directory it writes; a pre-versioned
+`~/.rebar` clone still has one in `~/.rebar/bin`, so drop that directory's
+old PATH line from your shell RC. "latest" now means the newest published
+GitHub Release, and a release tag is no longer built from source when its
+download is missing or fails: the installer stops, and `--source` builds it
+on purpose. Use the installer from the tag you install (step 1). The
+installer of a 3.1.x tag still works for 4.0.x releases, which also ship a
+small `rebar_<ver>_<os>_<arch>.tar.gz` for it (the binary and its
+companions; dropped in 4.1). It warns that the version "lacks
+templates/project-bootstrap/ or scripts/steward.sh" (harmless: they are
+built in) and, finding no `bin/install`, does not touch your shell RC,
+which already has `~/.rebar/current/bin` if you installed 3.1 with it.
+
+In the commands below, `v3.1.2` is the release you are moving to (the
+latest stable release until v4.0.0 is final). Use the tag you are actually
+installing, such as `v4.0.0-rc.1`.
 
 | You are on | Steps |
 |------------|-------|
@@ -34,8 +73,8 @@ Fetch the installer from the tag you install: until 3.1 is on `main`,
 `main`'s `setup-rebar.sh` is the old installer and has no version argument
 (see [Testing a release candidate](SETUP.md#testing-a-release-candidate)).
 
-The new version lands in `~/.rebar/versions/v3.1.2/`, a complete rebar
-tree. `--no-switch` leaves `~/.rebar/current` (the version on your PATH)
+The new version lands in `~/.rebar/versions/v3.1.2/` (a complete rebar
+tree for 3.1; from 4.0, the binary with its `ask` shims and completions). `--no-switch` leaves `~/.rebar/current` (the version on your PATH)
 alone, so other projects are unaffected while you try this one. The
 exception is a machine with **no versioned install yet**, including a
 `~/.rebar` that is a plain git clone from the old installer: the first version
@@ -45,7 +84,7 @@ not touched; `.mcp.json` files and `REBAR_ROOT` values that name it keep
 working.
 
 To run a version that is not `current`, call it by path; each version runs
-its own scripts:
+its own checks:
 
 ```bash
 ~/.rebar/versions/v3.1.2/bin/rebar version
@@ -55,8 +94,9 @@ Switch for good with `ln -sfn versions/v3.1.2 ~/.rebar/current` (or
 re-run the installer without `--no-switch`). The rest of this runbook writes
 plain `rebar` for the 3.1 CLI.
 
-If `REBAR_ROOT` is set in your shell, the CLI runs that tree's scripts rather
-than the installed version's; unset it unless you mean it.
+If `REBAR_ROOT` is set in your shell, a 3.1 CLI runs that tree's scripts
+rather than the installed version's; unset it unless you mean it. From 4.0 the
+checks ignore it.
 
 ## 2. Migrate copied scripts: `rebar migrate`
 
@@ -74,8 +114,10 @@ rebar migrate
 ```
 
 It takes seconds on a small project and a few minutes on a large one
-(virtru-analyze: about 3 minutes). For every copy of a rebar script in
-`scripts/` it runs the copy and the install's script and prints:
+(virtru-analyze: about 3 minutes with 3.1; from 4.0 the reference side runs
+in process, so the time is mostly your copies' own). For every copy of a
+rebar script in `scripts/` it runs the copy (with bash) and rebar's check (the
+install's script in 3.1, the built-in check from 4.0) and prints:
 
 - **`.rebarrc` additions**, between `# --- rebar migrate … ---` markers and
   grouped by the script they came from: `metric.<key>.*` lines translated
@@ -94,7 +136,11 @@ It takes seconds on a small project and a few minutes on a large one
   (`steward.sh`, `inbox-watch.sh`, …) go when they are byte-identical to a
   released version; the CLI carries the list, so this works on any install.
   `ci-check.sh`, `pre-commit.sh` and `scripts/README.md` are replaced by the
-  template's files. A verified copy that another project file calls is not
+  template's files. From 4.0, a `ci-check.sh` or `pre-commit.sh` copy that is
+  a released version plus calls to your own scripts is replaced too, those
+  scripts moving to `checks_extra` / `checks_extra_pre_commit` (rebar's
+  suite runs them after its own checks), when rebar's suite with them exits
+  as the copy does on the project; otherwise it is kept with the reason. A verified copy that another project file calls is not
   deleted but **wrapped** (see step 3).
 - **keep**, with the reason: a customized copy the install does not
   reproduce keeps running as before, and so does any copy a kept copy calls.
@@ -137,7 +183,7 @@ convenient, then delete the wrapper:
 | `scripts/cold-start-checks.sh` | `rebar check --cold-start` |
 | `scripts/ci-check.sh`, `scripts/pre-commit.sh` | unchanged: they are the thin entry points |
 
-`rebar run` with no arguments lists every script the install provides.
+`rebar run` with no arguments lists the built-in checks and the project's own scripts.
 
 A file that *sources* a copy for its functions keeps the copy: the wrapper
 cannot provide them. The one exception is `check-ground-truth.sh` sourced for
@@ -156,6 +202,7 @@ the caller read the values from `rebar run check-ground-truth --print`
 
   ```bash
   T=~/.rebar/versions/v3.1.2/templates/project-bootstrap
+  # 4.0 installs have no template tree: T="$(mktemp -d)/template" && rebar new "$T" >/dev/null
   diff .claude/settings.json $T/.claude/settings.json
   # unmodified: copy it; customized: replace the SessionStart "command" by hand
   cp $T/.claude/settings.json .claude/settings.json
@@ -295,14 +342,18 @@ that edit is the same on every branch and merges cleanly.
 
 ## 10. CI
 
-Under 3.1 a project's checks run the install's `scripts/`, so CI needs a
-whole rebar tree at the pinned version, not just a `rebar` binary. A CI step
-that only builds the CLI from a pinned commit into a cache directory stops
-working once the copies are gone: the binary finds no `scripts/` next to it,
-`rebar check` fails with `rebar: ci-check.sh not found in the project or a
-rebar install`, and `rebar check --pre-commit` skips every check and exits 0.
-[SETUP.md § Run rebar in CI](SETUP.md#run-rebar-in-ci) has a GitHub Actions
-step and a pinned wrapper that keeps the full tree.
+From 4.0, CI needs only the `rebar` binary of the version you pin: install it
+with `setup-rebar.sh`, or download the release binary in a pinned wrapper
+([SETUP.md § Run rebar in CI](SETUP.md#run-rebar-in-ci) has both). No rebar
+tree, no `REBAR_ROOT`.
+
+Under 3.1 a project's checks ran the install's `scripts/`, so CI needed a
+whole rebar tree at the pinned version: a step that only built the CLI from a
+pinned commit into a cache directory stopped working once the copies were
+gone (`rebar check` failed with `rebar: ci-check.sh not found in the project
+or a rebar install`, and `rebar check --pre-commit` skipped every check and
+exited 0). Such a wrapper keeps working with 4.0; it no longer needs the
+tree.
 
 ## 11. Verify
 
@@ -344,6 +395,172 @@ that is all a project already on 3.1 needs. Changes to know about:
   you mean to build it with your own Go (CI that relied on the fallback needs
   `--source` and `actions/setup-go`). Tags older than v3.1.0-rc.1 still build
   from source without it.
+
+## Upgrading from 3.x to 4.0
+
+4.0 is at its first release candidate, `v4.0.0-rc.1`. Until v4.0.0 is
+final, the stable examples in this file, README.md and SETUP.md stay on
+v3.1.2. Try the candidate beside your current version:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/willackerly/rebar/v4.0.0-rc.1/setup-rebar.sh \
+  | bash -s -- v4.0.0-rc.1 --no-switch
+~/.rebar/versions/v4.0.0-rc.1/bin/rebar version     # rebar v4.0.0-rc.1
+```
+
+- **From v2.0.0 or v3.0.x:** follow steps 1–11 above, with `v4.0.0-rc.1` in
+  place of `v3.1.2`, then read the list below.
+- **From 3.1.x:** install the candidate, read the list below, and run
+  `rebar check` on the project with the new binary.
+
+Each item below is one of 4.0's breaking changes (CHANGELOG, `v4.0.0-rc.1`
+"Breaking changes"), with who it affects and how to fix it. A project that
+uses only `rebar check`, the thin `scripts/ci-check.sh` / `pre-commit.sh`,
+and an `.mcp.json` that runs `ask-mcp-server` or `rebar mcp serve --stdio`
+needs no changes. To find the callers in a project:
+
+```bash
+grep -rnE '\.rebar[^ ]*/scripts/|REBAR_ROOT[^ ]*/scripts/|_rebar-config\.sh|REBAR_CHECK_IMPL|test-mcp-client|bin/install\b|--ask-bin|/mcp\b' \
+  --exclude-dir=.git --exclude-dir=node_modules .
+ls -l "$(git rev-parse --git-path hooks)"; git config core.hooksPath
+```
+
+1. **rebar's scripts are gone from the install.** A 4.0 install has no
+   `scripts/` directory, so anything that ran an install's script by path
+   fails, for example `~/.rebar/current/scripts/check-todos.sh` or
+   `$REBAR_ROOT/scripts/ci-check.sh` in CI, a Makefile or a hook. Run the
+   built-in version instead. It takes the same arguments and gives the same
+   output and exit codes:
+
+   | Was | Now |
+   |-----|-----|
+   | `<install>/scripts/check-<name>.sh [args]` (any check or utility) | `rebar run check-<name> [args]` |
+   | `<install>/scripts/ci-check.sh` | `rebar check` |
+   | `<install>/scripts/pre-commit.sh` | `rebar check --pre-commit` |
+   | `<install>/scripts/cold-start-checks.sh` | `rebar check --cold-start` |
+   | `<install>/scripts/compute-registry.sh [--check]` | `rebar run compute-registry [--check]` |
+
+   `rebar run` with no arguments lists them. Your project's own copies in
+   `scripts/` are your code and still run, with a deprecation notice; `rebar
+   migrate` (step 2) removes the ones the built-in checks reproduce.
+2. **Custom scripts that source `_rebar-config.sh`.** A script of yours that
+   sources the install's `scripts/_rebar-config.sh` (for `_rebar_config` or
+   `_rebar_source_exclude_dirs`) fails, because the file is gone. Keep a copy
+   in the project, which makes it your code:
+
+   ```bash
+   curl -fsSL https://raw.githubusercontent.com/willackerly/rebar/v3.1.2/scripts/_rebar-config.sh \
+     -o scripts/_rebar-config.sh
+   ```
+
+   Or read `.rebarrc` directly (`key = value` lines). To have `rebar check`
+   run the script, list it in `checks_extra` (or `checks_extra_pre_commit`)
+   in `.rebarrc` ([docs/CONFIGURATION.md](docs/CONFIGURATION.md)).
+3. **The bash and python ASK tools are gone.** `bin/ask`, `bin/ask-agent-loop`,
+   `bin/ask-mcp-server` and `bin/ask-server` are now sh shims that run
+   `rebar ask`, `rebar mcp serve` and `rebar ask serve`, so `.mcp.json` files
+   and PATH entries that name them keep working (`rebar migrate` offers to
+   point `.mcp.json` at `rebar mcp serve` directly). `bin/test-mcp-client`
+   is gone: use `rebar mcp client http://127.0.0.1:7232`. A shim that finds
+   only a rebar older than 4.0 says "install rebar 4.0 or later". Run
+   `rebar install-shims` to write the shims next to a binary you installed
+   by hand.
+4. **`REBAR_CHECK_IMPL` is ignored.** There is no `shell` fallback. Remove
+   the variable from CI and shell RCs. If a check behaves differently from
+   3.1 on your project, report it.
+5. **Suite summaries count differently.** Outside the rebar repository,
+   `rebar check` lists Bootstrap Sync and Script Tests as `SKIP … (rebar
+   source repo only)` and counts them as skipped (3.1 ran them, they did
+   nothing, and they counted as passed). `16 passed, 0 failed, 0 skipped`
+   becomes, for example, `14 passed, 0 failed, 2 skipped`. Hints say `rebar
+   run <name>` instead of naming scripts, and a new registry's header says
+   "AUTO-GENERATED by rebar run compute-registry" (`--check` accepts the old
+   header). If a script or dashboard parses the summary, match the exit
+   code or the `failed` count instead.
+6. **Git hooks linked to deleted copies.** A hook that is a symlink to a
+   copy you deleted, such as `.git/hooks/commit-msg →
+   ../../scripts/check-fix-commit.sh`, is skipped by git without a word, so
+   the gate silently stops. `rebar migrate` counts hooks (the git
+   directory's `hooks/` and `core.hooksPath`) as callers and leaves a thin
+   wrapper, and `rebar check` warns about a dangling hook, a hook that calls
+   a deleted check, and a hook that runs a suite copy that would skip
+   checks. If you already deleted the copies, rewrite the hook to call the
+   binary:
+
+   ```bash
+   H="$(git rev-parse --git-path hooks)"
+   printf '#!/bin/sh\nexec rebar check --pre-commit\n' > "$H/pre-commit" && chmod +x "$H/pre-commit"
+   printf '#!/bin/sh\nexec rebar run check-fix-commit "$1"\n' > "$H/commit-msg" && chmod +x "$H/commit-msg"
+   ```
+
+   Check the `ln -sf` form of step 3 as well: `.git/hooks/pre-commit →
+   ../../scripts/pre-commit.sh` still works, because that file is the thin
+   entry point.
+7. **MCP over HTTP is Streamable HTTP.** `rebar mcp serve --port` (and the
+   `ask-mcp-server` shim) serves `/mcp` with MCP's Streamable HTTP transport.
+   A client sends `Accept: application/json, text/event-stream`, takes the
+   `Mcp-Session-Id` header from the `initialize` response, and sends it on
+   every later request; `DELETE /mcp` ends the session. A script that POSTed
+   single JSON-RPC requests to `/mcp` and read one JSON reply breaks; use an
+   MCP client library, `rebar mcp client`, or the classic `/v1/*` API, which
+   is unchanged. Claude Code `"type": "http"` servers work. stdio is
+   unaffected for Claude Code.
+8. **MCP error shapes.** A failing ask, a timeout, an empty `question` and
+   arguments that break the schema now return a result with `isError: true`
+   and the reason as text (they were JSON-RPC errors -32603 / -32602). An
+   unknown tool is error -32602, an unknown resource -32602 "Resource not
+   found", and a request before `initialize` is -32600 (was -32002). The
+   protocol version is negotiated rather than always 2024-11-05, and
+   `serverInfo.version` is rebar's version. A client that matched error
+   codes or messages should check `result.isError`.
+9. **HTTP server defaults** (`rebar mcp serve --port`, `rebar ask serve`
+   and the `bin/ask-mcp-server` / `bin/ask-server` shims). The servers bind
+   127.0.0.1. Another `--host` needs `--api-key` (or `ASK_API_KEY`); without
+   one they exit 2, unless `--insecure-no-auth` is given. On loopback,
+   requests need a loopback `Host` header (403 otherwise), and browser
+   cross-origin requests are refused. POST bodies must be
+   `application/json` and at most 1 MiB, `/v1/ask` needs a `Content-Length`,
+   and at most 8 asks run at once (`--max-asks N`; 0 means no limit).
+   These are v3.1.2's rules, so a 3.1.2 setup carries over. From 3.1.0 or
+   3.1.1, a server meant for other machines needs `--host 0.0.0.0 --api-key
+   "$KEY"`, and its clients need to send the key.
+10. **A custom `--ask-bin`.** The servers run `<ask-bin> [-v] --question --
+    <role> <question>`, so the question is never taken for a command. A
+    wrapper passed as `--ask-bin` must accept that form; `bin/ask` from
+    v3.1.2 and `rebar ask` do.
+11. **Releases are binaries.** A release publishes `rebar_<ver>_<os>_<arch>`
+    plus `rebar_<ver>_checksums.txt`, and the installer lays out
+    `versions/<ver>/bin/` with the binary, its shims, `rebar-install` and the
+    completions. There is no rebar tree in the install: no `scripts/`,
+    `templates/`, `agents/` or `practices/`. For v4.0.x only, a small
+    `rebar_<ver>_<os>_<arch>.tar.gz` with that `bin/` lets 3.1.x installers
+    install 4.0; it is dropped in 4.1. If you downloaded the tarball for its
+    files, download the binary (SETUP.md's pinned wrapper does), or use the
+    git tag for rebar's documents. The bootstrap template is built in: to
+    compare your files with it (step 3), write a scratch project instead of
+    reading `~/.rebar/versions/<ver>/templates/project-bootstrap`:
+
+    ```bash
+    T="$(mktemp -d)/template" && rebar new "$T" >/dev/null
+    diff .claude/settings.json "$T/.claude/settings.json"
+    ```
+
+    `REBAR_ROOT` is no longer needed by the checks; `rebar doc` and `rebar
+    migrate` still use a rebar checkout when they find one.
+12. **`bin/install` is `bin/rebar-install`**, as in v3.1.2 (on PATH,
+    `install` shadowed install(1)). Replace calls to
+    `~/.rebar/current/bin/install`, and see
+    [Upgrading from v3.1.0 or v3.1.2](#upgrading-from-v310-or-v312) for the
+    old PATH line.
+13. **rebar contributors: `bin/rebar` is not tracked any more.** A rebar
+    checkout has no prebuilt binary. Build it with `(cd cli && go build -o
+    ../bin/rebar .)`; it is git-ignored. `scripts/tests/run.sh` and CI build
+    their own, and the `ask` shims and agent commands fall back to `rebar` on
+    PATH. Adopting projects are unaffected.
+
+Rolling back works as for 3.1 (see [Rolling back](#rolling-back)): point
+`current` back at the 3.1 version. The 4.0 changes need no edit to
+`.rebarrc` or `METRICS`.
 
 ## Notes for v2.0.0
 

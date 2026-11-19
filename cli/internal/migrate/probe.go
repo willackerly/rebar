@@ -199,6 +199,9 @@ func releasedSource(rebarRoot, blob string) []byte {
 	if data, err := releasedSources.ReadFile("released/" + blob); err == nil {
 		return data
 	}
+	if rebarRoot == "" {
+		return nil
+	}
 	if data, err := exec.Command("git", "-C", rebarRoot, "cat-file", "blob", blob).Output(); err == nil && gitBlobHash(data) == blob {
 		return data
 	}
@@ -221,6 +224,13 @@ func manifestBlobs() map[string]map[string]bool {
 	return out
 }
 
+// IsReleasedScript reports whether data is byte-identical to a released
+// version of rebar's scripts/<name>, by the manifest embedded in the CLI
+// (no install or git history needed).
+func IsReleasedScript(name string, data []byte) bool {
+	return manifestBlobs()[name][gitBlobHash(data)]
+}
+
 // releasedBlobs returns the blob ids of every released version of a
 // bootstrap file (scripts/<name>, templates/project-bootstrap/scripts/<name>):
 // the manifest embedded in the CLI (scripts/gen-released-blobs.sh; works for
@@ -232,6 +242,12 @@ func releasedBlobs(rebarRoot, name string) map[string]bool {
 	out := map[string]bool{}
 	for h := range manifestBlobs()[name] {
 		out[h] = true
+	}
+	if data := templateScript(name); data != nil {
+		out[gitBlobHash(data)] = true // this rebar's own template file
+	}
+	if rebarRoot == "" {
+		return out // ("git -C ''" would read the working directory's history)
 	}
 	args := []string{"-C", rebarRoot, "log", "--format=", "--raw", "--no-abbrev", "--no-renames",
 		"--tags", "--branches=main", "--branches=release/*", "--remotes=origin/main", "--remotes=origin/release/*", "HEAD",

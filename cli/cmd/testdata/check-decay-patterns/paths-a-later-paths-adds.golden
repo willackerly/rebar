@@ -1,0 +1,16 @@
+check-decay-patterns: 3 finding(s) in scan set
+
+Each line: <file>:<line>:<pattern-id>:<guidance>
+
+pkg/a_test.go:1:P4-keep-in-sync:Pattern 4 (silent drift on upgrade): a comment saying 'keep in sync' is a wish. Read the source of truth at runtime and throw on parse failure, instead of hand-copying.
+pkg/a_test.go:2:P7-plausible-env-name:Pattern 7 (too-plausible-to-refuse): this env var name reads like normal infrastructure config — a deploy script copy-paste won't be flagged. Make the name long and obviously test-only (e.g., FOO_PLAYWRIGHT_REAL_CHROME_LOOSENING) and require a second test-only env var to activate.
+spec/user_spec.rb:1:P7-plausible-env-name:Pattern 7 (too-plausible-to-refuse): this env var name reads like normal infrastructure config — a deploy script copy-paste won't be flagged. Make the name long and obviously test-only (e.g., FOO_PLAYWRIGHT_REAL_CHROME_LOOSENING) and require a second test-only env var to activate.
+
+If a finding is intentional + reviewed, allowlist by adding
+  <file>:<line>:<pattern-id>
+to .rebar/decay-patterns-allow.txt (one per line, # for comments).
+
+References: feedback/2026-04-24-fidelity-decay-soft-hardening-patterns.md
+            feedback/processed/2026-04-27-e2e-test-bypass-closed-loop-verification-drift.md (P8)
+            practices/test-fidelity.md (fidelity ladder + gates)
+--- exit 1 ---

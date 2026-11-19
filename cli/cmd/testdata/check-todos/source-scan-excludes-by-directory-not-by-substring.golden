@@ -1,0 +1,13 @@
+FAIL: 4 untracked TODO(s) found:
+
+src/a.sh:1:# TODO: move this into TODO.md
+src/c.sh:1:# TODO: see the check-todos docs
+src/distance.sh:1:# TODO: one
+src/words.sh:1:# TODO: two — see vendor docs
+
+Before committing, you must either:
+  1. Fix the TODO immediately (remove it), OR
+  2. Add it to TODO.md and convert to: TRACKED-TASK: description
+
+Also found 0 tracked tasks (OK).
+--- exit 1 ---

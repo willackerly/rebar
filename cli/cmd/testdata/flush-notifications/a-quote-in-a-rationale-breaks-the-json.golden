@@ -1,0 +1,10 @@
+flush-notifications: 001 has 2 pending notification(s)
+
+→ C1-API: 1.0 → 2.0 (breaking)
+    (no consumers found — nothing to dispatch)
+
+→ C2-LIB: 1.0 → 1.1 (additive)
+    (no consumers found — nothing to dispatch)
+
+flush-notifications: processed=0 sent=0 skipped=0 failed=0
+--- exit 0 ---

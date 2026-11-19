@@ -1,0 +1,6 @@
+=== Ground Truth Verification ===
+
+OK:    only = 1
+
+All documented metrics match codebase reality
+--- exit 0 ---

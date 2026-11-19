@@ -1,0 +1,2 @@
+flush-notifications: no outbox at architecture/.state/pending-notifications.md — nothing to flush
+--- exit 0 ---

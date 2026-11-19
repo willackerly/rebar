@@ -59,3 +59,24 @@ func TestIsolateGitConfig(t *testing.T) {
 		t.Fatalf("author = %q, want the isolated identity", got)
 	}
 }
+
+func TestIsolatedEnvAndRunEnv(t *testing.T) {
+	t.Setenv("REBAR_TIER", "1")
+	t.Setenv("_REBAR_CHECKS_VALIDATED", "1")
+	t.Setenv("REBAR_TESTUTIL_KEEP", "")
+	env := IsolatedEnv("REBAR_RCFILE=/x.rc")
+	out, code := RunEnv(t, t.TempDir(), env, "sh", "-c", `echo "${REBAR_TIER-unset} ${_REBAR_CHECKS_VALIDATED-unset} $REBAR_RCFILE"; exit 3`)
+	if code != 3 || out != "unset unset /x.rc\n" {
+		t.Fatalf("RunEnv = %q, exit %d", out, code)
+	}
+}
+
+func TestRebarSource(t *testing.T) {
+	root := RebarSource(t)
+	if _, err := os.Stat(filepath.Join(root, "cli", "go.mod")); err != nil {
+		t.Fatalf("RebarSource = %s, which has no cli/go.mod: %v", root, err)
+	}
+	if got := Tags.Replace("@todo x @tracked y @contract:S1-X.1.0"); got != "TO"+"DO: x TRACKED"+"-TASK: y CONTRACT"+":S1-X.1.0" {
+		t.Fatalf("Tags = %q", got)
+	}
+}
