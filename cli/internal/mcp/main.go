@@ -18,6 +18,7 @@ import (
 // options are the flags both servers take (argparse in the originals).
 type options struct {
 	stdio, mcpOnly        bool
+	insecureNoAuth        bool
 	port                  int
 	host, reposDir, repos string
 	apiKey, askBin        string
@@ -33,21 +34,21 @@ func parse(prog, description, epilog string, mcp bool, args []string, stdout, st
 	if mcp {
 		fs.BoolVar(&o.stdio, "stdio", false, "Use stdio transport (for MCP clients)")
 		fs.IntVar(&o.port, "port", 7232, "Port for HTTP transport (default: 7232)")
-		fs.StringVar(&o.host, "host", "0.0.0.0", "Host to bind for HTTP (default: 0.0.0.0)")
+		fs.StringVar(&o.host, "host", "127.0.0.1", "Address to bind for HTTP (default: 127.0.0.1; use 0.0.0.0 with --api-key to serve other machines)")
 	} else {
 		fs.IntVar(&o.port, "port", 7232, "Port to listen on (default: 7232)")
-		fs.StringVar(&o.host, "host", "0.0.0.0", "Host to bind (default: 0.0.0.0)")
+		fs.StringVar(&o.host, "host", "127.0.0.1", "Address to bind (default: 127.0.0.1; use 0.0.0.0 with --api-key to serve other machines)")
 	}
 	fs.StringVar(&o.reposDir, "repos-dir", "", "Directory containing repos (each subdir with agents/)")
 	fs.StringVar(&o.repos, "repos", "", "Comma-separated paths to specific repos")
 	if mcp {
 		fs.BoolVar(&o.mcpOnly, "mcp-only", false, "Only serve MCP endpoints, not classic ASK API")
-		fs.StringVar(&o.apiKey, "api-key", os.Getenv("ASK_API_KEY"), "API key for auth")
-		fs.StringVar(&o.askBin, "ask-bin", os.Getenv("ASK_BIN"), "Path to ask CLI (default: rebar ask)")
+		fs.StringVar(&o.apiKey, "api-key", os.Getenv("ASK_API_KEY"), "API key for HTTP auth (or set ASK_API_KEY)")
 	} else {
 		fs.StringVar(&o.apiKey, "api-key", os.Getenv("ASK_API_KEY"), "API key for auth (or set ASK_API_KEY)")
-		fs.StringVar(&o.askBin, "ask-bin", os.Getenv("ASK_BIN"), "Path to ask CLI (default: rebar ask)")
 	}
+	fs.BoolVar(&o.insecureNoAuth, "insecure-no-auth", false, "Allow a non-loopback --host without an API key (trusted networks only)")
+	fs.StringVar(&o.askBin, "ask-bin", os.Getenv("ASK_BIN"), "Path to ask CLI (default: rebar ask)")
 	fs.SortFlags = false
 	usage := "usage: " + prog + " [-h] " + strings.Join(usageFlags(fs), " ") + "\n"
 	err := fs.Parse(args)
@@ -86,6 +87,37 @@ func usageFlags(fs *pflag.FlagSet) []string {
 	return out
 }
 
+// checkBindSafety is check_bind_safety: serving on a non-loopback address
+// needs an API key, unless --insecure-no-auth (warned). False: exit 2.
+func checkBindSafety(prog string, o *options, stderr io.Writer) bool {
+	if isLoopbackHost(o.host) || o.apiKey != "" {
+		return true
+	}
+	host := o.host
+	if host == "" {
+		host = "0.0.0.0"
+	}
+	if o.insecureNoAuth {
+		fmt.Fprintf(stderr, "%s: WARNING: listening on %s with no API key (--insecure-no-auth): anyone who can reach this port can query every agent\n", prog, host)
+		return true
+	}
+	fmt.Fprintf(stderr, "%s: error: refusing to listen on non-loopback address '%s' without an API key.\n"+
+		"  Set --api-key KEY (or ASK_API_KEY), or bind --host 127.0.0.1, or pass\n"+
+		"  --insecure-no-auth to serve unauthenticated on a trusted network.\n", prog, host)
+	return false
+}
+
+// askArgs is ask_command without the binary: [-v] --question -- ROLE
+// QUESTION. --question makes ask treat the question as a question only,
+// never a command script, subcommand or flag, whatever text it holds.
+func askArgs(role, question string, verbose bool) []string {
+	var args []string
+	if verbose {
+		args = append(args, "-v")
+	}
+	return append(args, "--question", "--", role, question)
+}
+
 // askCmd is the ask command tools/call and /v1/ask run: --ask-bin
 // (ASK_BIN), else this binary's `ask`.
 func askCmd(askBin, self string) []string {
@@ -110,9 +142,10 @@ func listen(o *options) (net.Listener, error) {
 	return net.Listen("tcp", net.JoinHostPort(o.host, strconv.Itoa(o.port)))
 }
 
-// serveUntilSignal serves h on l until SIGINT/SIGTERM.
+// serveUntilSignal serves h on l until SIGINT/SIGTERM. A client has
+// RequestTimeout to send its headers (readJSON bounds the body).
 func serveUntilSignal(l net.Listener, h http.Handler, onStop func()) error {
-	srv := &http.Server{Handler: h}
+	srv := &http.Server{Handler: h, ReadHeaderTimeout: RequestTimeout}
 	sigs := make(chan os.Signal, 1)
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
 	defer signal.Stop(sigs)
@@ -140,9 +173,16 @@ Examples:
   ask-mcp-server --port 7232 --repos-dir /srv/repos
   ask-mcp-server --stdio
   ask-mcp-server --port 7232 --repos-dir /srv/repos --mcp-only
+  ask-mcp-server --host 0.0.0.0 --port 7232 --repos-dir /srv/repos --api-key SECRET
+
+HTTP mode binds 127.0.0.1 by default. Binding any other address requires an
+API key (--api-key / ASK_API_KEY) unless --insecure-no-auth is given.
 `, true, args, stdout, stderr)
 	if done {
 		return code
+	}
+	if !o.stdio && !checkBindSafety(prog, o, stderr) {
+		return 2
 	}
 	reg := NewRegistry(prog, stderr, stderr, true)
 	if v := os.Getenv("ASK_SERVER"); v != "" {
@@ -182,7 +222,7 @@ Examples:
 		fmt.Fprintf(stdout, "ask-mcp-server: classic API: http://localhost:%d/v1/agents\n", o.port)
 	}
 	fmt.Fprintln(stdout)
-	h := &MCPHandler{Server: server, APIKey: o.apiKey, MCPOnly: o.mcpOnly, Log: stderr}
+	h := &MCPHandler{Server: server, APIKey: o.apiKey, MCPOnly: o.mcpOnly, LoopbackOnly: isLoopbackHost(o.host), Log: stderr}
 	if err := serveUntilSignal(l, h, func() { fmt.Fprintln(stdout, "\nask-mcp-server: shutting down") }); err != nil {
 		fmt.Fprintf(stderr, "ask-mcp-server: %v\n", err)
 		return 1
@@ -197,13 +237,19 @@ func AskServerMain(args []string, self string, stdout, stderr io.Writer) int {
 Examples:
   ask-server --port 7232 --repos-dir /srv/repos
   ask-server --port 7232 --repos /srv/repos/billing,/srv/repos/auth
-  ask-server --port 7232 --repos-dir /srv/repos --api-key SECRET
+  ask-server --host 0.0.0.0 --port 7232 --repos-dir /srv/repos --api-key SECRET
 
-Then from any machine:
+The default bind is 127.0.0.1. Binding any other address requires an API key
+(--api-key / ASK_API_KEY) unless --insecure-no-auth is given.
+
+Then from any machine (with ASK_API_KEY=SECRET):
   ASK_SERVER=host:7232 ask billing:architect "What contracts exist?"
 `, false, args, stdout, stderr)
 	if done {
 		return code
+	}
+	if !checkBindSafety(prog, o, stderr) {
+		return 2
 	}
 	reg := NewRegistry(prog, stdout, stderr, false)
 	fmt.Fprintln(stdout, "ask-server: scanning repos...")
@@ -224,7 +270,7 @@ Then from any machine:
 	}
 	fmt.Fprintf(stdout, "ask-server: listening on %s:%d (%s)\n", o.host, o.port, auth)
 	fmt.Fprintf(stdout, "ask-server: try: curl http://localhost:%d/v1/agents\n\n", o.port)
-	h := &AskServer{Registry: reg, APIKey: o.apiKey, AskCmd: askCmd(o.askBin, self), Log: stdout}
+	h := &AskServer{Registry: reg, APIKey: o.apiKey, AskCmd: askCmd(o.askBin, self), LoopbackOnly: isLoopbackHost(o.host), Log: stdout}
 	if err := serveUntilSignal(l, h, func() { fmt.Fprintln(stdout, "\nask-server: shutting down") }); err != nil {
 		fmt.Fprintf(stderr, "ask-server: %v\n", err)
 		return 1

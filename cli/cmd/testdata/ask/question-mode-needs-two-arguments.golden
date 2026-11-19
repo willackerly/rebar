@@ -1,0 +1,9 @@
+--- stdout ---
+--- stderr ---
+ask: error: --question takes exactly two arguments: <agent> "<question>"
+--- changes ---
+--- made home/.config/ ---
+--- made home/.config/ask/ ---
+--- wrote home/.config/ask/projects ---
+proj = $BASE/proj
+--- exit 4 ---

@@ -81,7 +81,7 @@ rebar key revoke <key-id>           # Revoke a trusted key
 alias ask='rebar ask'
 ```
 
-The `bin/rebar-install` script (`bin/install` before v4.0.0) sets this up. Existing `ask` usage is unaffected.
+The `bin/rebar-install` script (`bin/install` before v3.1.2) sets this up. Existing `ask` usage is unaffected.
 
 ---
 

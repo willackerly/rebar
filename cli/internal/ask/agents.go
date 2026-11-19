@@ -51,7 +51,7 @@ func (a *App) requireAgentName(name string) {
 // canonicalize is _canonicalize_agent: the agent directory matching input,
 // ignoring case ("" when none does).
 func (a *App) canonicalize(input string) string {
-	if input == "" {
+	if !ValidAgentName(input) {
 		return ""
 	}
 	// The directory's own spelling, also on a case-insensitive file system
@@ -68,8 +68,8 @@ func (a *App) canonicalize(input string) string {
 			return name
 		}
 	}
-	if isDir(a.agentsDir+"/"+input) && isFile(a.agentsDir+"/"+input+"/AGENT.md") {
-		return input // a hidden agent directory, named exactly
+	if ValidAgentName(input) && isDir(a.agentsDir+"/"+input) && isFile(a.agentsDir+"/"+input+"/AGENT.md") {
+		return input
 	}
 	return ""
 }
@@ -77,6 +77,10 @@ func (a *App) canonicalize(input string) string {
 // requireAgentExists is require_agent_exists: it sets canonicalAgent or
 // reports the missing agent, with a suggestion and the list, and exits 2.
 func (a *App) requireAgentExists(agent string) {
+	if !ValidAgentName(agent) {
+		a.errf("ask: error: invalid agent name '%s' (must be a directory name under %s)\n", agent, a.agentsDir)
+		a.exit(2)
+	}
 	if canonical := a.canonicalize(agent); canonical != "" {
 		a.canonicalAgent = canonical
 		if canonical != agent {

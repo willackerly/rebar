@@ -251,6 +251,10 @@ var askCases = []askCase{
 	{name: "default command", files: withAsk(map[string]string{"agents/steward/commands/default.sh": "#!/bin/sh\necho default ran\nexit 5\n"}), setup: func(t *testing.T, base string) {
 		os.Chmod(filepath.Join(base, "proj/agents/steward/commands/default.sh"), 0o755)
 	}, args: []string{"steward"}},
+	{name: "command word that is a path is a question", files: stewardCommands, setup: commandModes, args: []string{"steward", "../commands/summary"}},
+	{name: "question mode never runs a command", files: stewardCommands, setup: commandModes, args: []string{"--question", "steward", "summary"}},
+	{name: "question mode needs two arguments", files: stewardCommands, setup: commandModes, args: []string{"--question", "steward"}},
+	{name: "agent name that is a path", files: askAgents, args: []string{"../agents/architect", "q"}},
 
 	// cross-project
 	{name: "cross project", files: otherProject, home: askRegistry, args: []string{"other:architect", "How?"}},

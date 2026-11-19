@@ -75,11 +75,12 @@ ask-mcp-server [OPTIONS]
 
   --stdio              Use stdio transport (for MCP clients)
   --port PORT          Port for HTTP transport (default: 7232)
-  --host HOST          Bind host for HTTP (default: 0.0.0.0)
+  --host HOST          Bind host for HTTP (default: 127.0.0.1)
   --repos-dir DIR      Directory to scan for repos (subdirs with agents/)
   --repos PATHS        Comma-separated explicit repo paths
   --mcp-only           Only serve MCP, not classic ASK API
-  --api-key KEY        Bearer-auth key
+  --api-key KEY        Bearer-auth key (or ASK_API_KEY); required for a non-loopback --host
+  --insecure-no-auth   Allow a non-loopback --host without an API key
   --ask-bin PATH       Path to ask CLI (default: alongside this script)
 ```
 
@@ -103,9 +104,10 @@ JSON-RPC surface:
 | Discovery | `--repos-dir` recurses **depth-2** (top level + one nesting level) to find subdirs with `agents/`; skips hidden dirs and `node_modules`/`vendor`/`dist`/`build`/`target`/`out`/`.next`/`.nuxt`/`coverage`/`__pycache__` |
 | Notification handling | JSON-RPC requests without `id` are notifications and MUST NOT receive a response; replying with `id: null` triggers Claude Code's Zod validator and silently breaks the session |
 | Stdio hygiene | All status/banner output goes to stderr; stdout carries only JSON-RPC (otherwise the client can't parse the handshake) |
-| Cross-repo invocation | `tools/call` with `name=ask_<repo>_<role>` runs `cd <repo-path> && ask <role> "<question>"` |
+| Cross-repo invocation | `tools/call` with `name=ask_<repo>_<role>` runs `cd <repo-path> && ask --question -- <role> "<question>"` (the question is never a command script); `repo` must be registered and `role` one of its listed agents |
 | Tool count discipline | At most one tool per (repo, role); duplicates are deduplicated by name |
-| Authentication | If `--api-key` set, requires `Authorization: Bearer <key>` for HTTP transport; stdio is trusted (subprocess-of-Claude) |
+| Authentication | If `--api-key` set, requires `Authorization: Bearer <key>` for HTTP transport (constant-time compare); stdio is trusted (subprocess-of-Claude) |
+| HTTP exposure (v3.1.2+) | Binds 127.0.0.1 by default; non-loopback bind without a key refused unless `--insecure-no-auth`; loopback-bound → non-loopback `Host` gets 403; POST requires `application/json` (415) and ≤ 1 MiB body (413) |
 
 ## Error Contracts
 

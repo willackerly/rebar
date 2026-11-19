@@ -100,7 +100,7 @@ POST /v1/ask {"repo":"web","role":"architect","question":"Why?"}
 200 {
   "repo": "web",
   "role": "architect",
-  "answer": "answer from web: architect Why?",
+  "answer": "answer from web: --question -- architect Why?",
   "exit_code": 0,
   "error": null
 }
@@ -108,7 +108,7 @@ POST /v1/ask {"repo":"web","role":"product","question":"Who?","verbose":1}
 200 {
   "repo": "web",
   "role": "product",
-  "answer": "answer from web: -v product Who?",
+  "answer": "answer from web: --question -- product Who?",
   "exit_code": 0,
   "error": null
 }
@@ -129,15 +129,29 @@ POST /v1/ask {"repo":"web","role":"architect","question":"  "}
 POST /v1/ask {bad
 400 {"error": "Invalid JSON: invalid character 'b' looking for beginning of object key string"}
 POST /v1/reset/web/architect 
+415 {"error": "Content-Type must be application/json"}
+POST /v1/reset/web/architect {}
 200 {
   "repo": "web",
   "role": "architect",
   "message": "Session cleared for architect (was: abc)"
 }
-POST /v1/reset/web 
+POST /v1/reset/web {}
 404 {"error": "Expected /v1/reset/<repo>/<role>"}
+POST /v1/reset/web 
+415 {"error": "Content-Type must be application/json"}
 POST /v1/nothing 
-404 {"error": "Not found"}
+415 {"error": "Content-Type must be application/json"}
+POST /v1/ask {"repo":"web","role":"../web/agents/architect","question":"q"}
+404 {"error": "Agent '../web/agents/architect' not found in repo 'web'. Use GET /v1/agents to list available agents."}
+POST /v1/ask {"repo":"../repos/web","role":"architect","question":"q"}
+404 {"error": "Repo '../repos/web' not found. Use GET /v1/repos to list available repos."}
+POST /v1/ask {"repo":"web","role":1,"question":"q"}
+400 {"error": "Field 'role' must be a string"}
+POST /v1/ask "just a string"
+400 {"error": "Request body must be a JSON object"}
+GET /v1/log/web/.. 
+404 {"error": "Agent '..' not found in repo 'web'"}
 GET /elsewhere 
 404 {"error": "Not found"}
 --- exit 0 ---

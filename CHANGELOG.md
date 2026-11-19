@@ -105,8 +105,12 @@ All notable changes to rebar. Versioned with [semver](https://semver.org/).
   Code sees. `rebar ask serve` is the enterprise server (was the python
   `bin/ask-server`): the same `/v1/*` endpoints, statuses and bodies.
   `rebar mcp client` replaces `bin/test-mcp-client` (no `requests` module
-  needed). tools/call and `/v1/ask` run `rebar ask` (or `--ask-bin` /
-  `ASK_BIN`) in the repo. No python is needed any more: `bin/ask-mcp-server`,
+  needed). tools/call and `/v1/ask` run `rebar ask --question` (or
+  `--ask-bin` / `ASK_BIN`) in the repo. Both servers have v3.1.2's
+  defaults: `--host 127.0.0.1`, a non-loopback bind needs an API key unless
+  `--insecure-no-auth`, loopback Host only (403), JSON POSTs only (415),
+  bodies up to 1 MiB (413; 411 without a Content-Length), constant-time key
+  check, and roles must be listed agents (never paths). No python is needed any more: `bin/ask-mcp-server`,
   `bin/ask-server` and `bin/test-mcp-client` are POSIX sh hand-offs to the
   binary, so adopters' `.mcp.json` files keep working; the python originals
   moved to `bin/legacy/*.py` and run under `REBAR_CHECK_IMPL=shell` until
@@ -134,7 +138,10 @@ All notable changes to rebar. Versioned with [semver](https://semver.org/).
   `shared/messages/events.jsonl`, `~/.config/ask/projects`,
   `.rr-index`), and the inbox loop (`ask up`, `bin/ask-agent-loop`, now
   also `rebar ask-agent-loop`). It works in any directory, as `bin/ask`
-  did, and needs no jq (it writes jq's bytes itself). `bin/ask` and
+  did, and needs no jq (it writes jq's bytes itself). It has v3.1.2's
+  safety rules: a command word runs only a plain-named executable directly
+  in the agent's `commands/`, agent names cannot be paths ("invalid agent
+  name", exit 2), and `ask --question` never runs a command. `bin/ask` and
   `bin/ask-agent-loop` hand off to the `rebar` beside them (else
   `REBAR_BIN`, else `PATH`), so scripts and `run.sh` files that call them
   keep working; `REBAR_CHECK_IMPL=shell` runs the bash. `rebar init/new`
@@ -177,7 +184,9 @@ All notable changes to rebar. Versioned with [semver](https://semver.org/).
   only `version_pinned` (other fields default, a trailing `# comment` is
   dropped; a section without it is reported and left out, the rest still
   listed, exit 1); flush-notifications exits 0 after a successful flush and
-  1 when a dispatch failed, and its summary counts `failed=`. Kept for
+  1 when a dispatch failed, and its summary counts `failed=`; and v3.1.2's
+  refresh-context counts commits from midnight of the last-synced day
+  (`--since="<date> 00:00"`). Kept for
   parity: the TODO counts print `0<newline>0` when there are none.
   Platform choices: dates are read as GNU date reads them (a date that does
   not exist gives no staleness line; BSD rolled it over), binary source
@@ -330,6 +339,83 @@ All notable changes to rebar. Versioned with [semver](https://semver.org/).
   is binary when its first 32 KiB hold a NUL, as macOS grep decides, also on
   Linux (GNU grep checked a larger first block and stopped at a later NUL). `config.RCValue` now honors
   `REBAR_RCFILE`, as the scripts do.
+
+---
+
+## v3.1.2 — 2026-11-18
+
+**A security release — upgrade if you run `ask-server` or `ask-mcp-server` in
+HTTP mode.** In v3.1.1 and earlier, those servers listened on all interfaces
+by default with an optional API key, and a question could be interpreted as
+an agent command or name a path outside the agent's directory, so anyone who
+could reach the port could run scripts on the host. v3.1.2 binds to
+127.0.0.1 by default (a public bind needs an API key or an explicit
+`--insecure-no-auth`), always passes questions as questions, validates agent
+names, and hardens the HTTP handling. stdio MCP — what Claude Code uses — was
+only reachable by local clients. See [SECURITY.md](SECURITY.md).
+
+Also: the `bin/install` helper is renamed `bin/rebar-install` (it shadowed
+the system `install` on PATH), the installer resolves `latest` from published
+Releases and no longer falls back to a source build silently, and
+`refresh-context` / `rebar status` no longer miss commits made on the
+last-synced day.
+
+- **Security: ASK servers and `ask` command dispatch.** Affected: the HTTP
+  mode of `ask-server` (`ask serve`) and `ask-mcp-server` in rebar ≤ v3.1.1,
+  which listened on all interfaces with no API key by default and passed
+  request text to `ask` in a way that could run existing `*.sh` files
+  outside an agent's `commands/` directory or reach agents outside the
+  served repos — remote code execution as the server user for anyone who
+  could reach the port, or a web page via DNS rebinding / cross-site POST.
+  `ask-mcp-server --stdio` (what `rebar init` configures) opens no port and
+  was exposed only to local MCP clients. Upgrade if you run either server
+  over HTTP. See [SECURITY.md](SECURITY.md#ask-servers-ask-server-ask-mcp-server).
+  - `ask <agent> <word>` runs `commands/<word>.sh` only when the word is a
+    plain name (letters, digits, `.`, `_`, `-`; no `..`, no leading `.` or
+    `-`) naming an executable file directly in `commands/`; anything else
+    is a question. Agent names must be plain directory names under
+    `agents/` (no `/`, `..`, `:`). `ask <agent> <command> [args]` works as
+    before.
+  - New `ask --question <agent> "<question>"`: always a question, never a
+    command script, subcommand, or default command. The servers use it.
+  - Servers accept only registered repos and their listed agents.
+  - **Compatibility:** `--host` now defaults to `127.0.0.1` (was
+    `0.0.0.0`). To serve other machines pass `--host 0.0.0.0` **and**
+    `--api-key KEY` (or `ASK_API_KEY`); a non-loopback bind without a key
+    exits with an error unless `--insecure-no-auth` is given. A
+    loopback-bound server answers only `Host: localhost` / `127.0.0.1` /
+    `[::1]` (reverse proxies must send one of these). POSTs (including
+    `/v1/reset`) must be `Content-Type: application/json` (415 otherwise;
+    `ask`'s remote mode already sends it) with a body ≤ 1 MiB (413) and a
+    `Content-Length`. API keys are compared in constant time; clients get
+    60 s to send a request.
+- **`bin/install` is now `bin/rebar-install`.** The installer puts
+  `~/.rebar/current/bin` first on PATH, where a file named `install` shadowed
+  the system `install(1)`: `install -d dir` failed with "Unknown option: -d",
+  breaking `make install`. `setup-rebar.sh` runs `bin/rebar-install`, and
+  renames the old `bin/install` when it installs an older version, so nothing
+  called `install` lands in `current/bin`. For a pre-versioned `~/.rebar`
+  clone it warns that the clone's `bin/install` still shadows `install(1)` if
+  your RC keeps `~/.rebar/bin` on PATH. See
+  [UPGRADING.md](UPGRADING.md#upgrading-from-v310-or-v311).
+- **`setup-rebar.sh` installs only published, gated releases.** "latest" (and
+  `--pre`) is now the highest published GitHub Release, looked up through
+  GitHub's API (drafts skipped; pre-releases only with `--pre`; a used-up
+  unauthenticated rate limit is reported as such), not the highest git tag,
+  which exists before the release workflow has built, scanned and published
+  anything. A release tag whose assets are missing, or whose checksums or
+  tarball fail to download with anything but "not found", is now an error
+  instead of a silent source build with your own Go, which skipped the
+  workflow's `govulncheck` gate. Build from source with `--source`; tags
+  older than v3.1.0-rc.1 (before prebuilt assets) still build from source on
+  their own. Checksum verification is unchanged. `REBAR_RELEASES_API`
+  overrides the API URL (mirrors, tests).
+- **Commits on the last-synced day count as "since last sync".**
+  `refresh-context.sh`, `rebar status` and `rebar commit`'s checkpoint nudge
+  passed the QUICKCONTEXT date to `git --since` bare, which git reads as that
+  day at the current time of day, so commits made earlier on the sync day
+  were dropped (and the count depended on when you ran it). They now count
+  from local midnight.
 
 ---
 
