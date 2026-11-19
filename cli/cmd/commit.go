@@ -202,7 +202,7 @@ func checkSessionCheckpoint(repoRoot string) {
 	}
 
 	// Count commits since last sync
-	countStr := strings.TrimSpace(string(mustGitOutput(repoRoot, "rev-list", "--count", "--since="+lastSynced, "HEAD")))
+	countStr := commitsSince(repoRoot, lastSynced)
 	if countStr == "" {
 		return
 	}
@@ -215,6 +215,14 @@ func checkSessionCheckpoint(repoRoot string) {
 		fmt.Println("   Consider: update QUICKCONTEXT.md, run 'rebar context session-start'")
 		fmt.Println("   See: practices/session-lifecycle.md")
 	}
+}
+
+// commitsSince returns `git rev-list --count` of HEAD's commits since local
+// midnight starting date (YYYY-MM-DD), or "" if git fails. A bare date means
+// that day at the current time of day to git, which dropped commits made
+// earlier on the day itself.
+func commitsSince(repoRoot, date string) string {
+	return strings.TrimSpace(string(mustGitOutput(repoRoot, "rev-list", "--count", "--since="+date+" 00:00", "HEAD")))
 }
 
 // extractQCDate finds the last-synced or freshness date in QUICKCONTEXT content.

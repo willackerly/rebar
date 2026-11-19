@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # rebar-install — Add rebar's bin/ to PATH and optionally configure ASK_SERVER.
-# (Called bin/install before v4.0.0; renamed because a file named install on
+# (Called bin/install before v3.1.2; renamed because a file named install on
 # PATH shadows install(1).)
 #
 # Usage:
@@ -38,7 +38,7 @@ while [ $# -gt 0 ]; do
   esac
 done
 
-echo "rebar install"
+echo "rebar-install"
 echo "============="
 echo ""
 

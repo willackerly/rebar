@@ -70,6 +70,7 @@ removed them; `rebar mcp client` replaces `bin/test-mcp-client`).
 | `ask -w <agent> "<question>"` | Ask with write access (agent can edit files) |
 | `ask <agent>` | Run default command (if configured) |
 | `ask <agent> <command> [args]` | Run a named command |
+| `ask --question <agent> "<question>"` | Always a question, even if it matches a command name |
 
 ### Management
 
@@ -110,6 +111,13 @@ ask architect "What are the system boundaries?"
 ask steward summary      # runs agents/steward/commands/summary.sh
 ask architect audit      # runs agents/architect/commands/audit.sh
 ```
+
+A command word is a plain name — letters, digits, `.`, `_`, `-`, not
+starting with `.` or `-`, no `..` — naming an executable file directly in
+`commands/`. Anything else (`../x`, `a/b`) is a question, never a script.
+`ask --question <agent> "<text>"` always asks, so `ask --question steward
+summary` asks the question "summary"; the servers use this mode. Agent
+names are likewise plain directory names under `agents/`.
 
 ### Adding Commands
 
@@ -239,15 +247,27 @@ any repo's agents over HTTP.
 ### Start the server
 
 ```bash
-# Serve all repos in a directory
+# Serve all repos in a directory (this machine only: 127.0.0.1)
 ask serve --port 7232 --repos-dir /srv/repos
 
 # Serve specific repos
 ask serve --port 7232 --repos /srv/repos/billing,/srv/repos/auth
 
-# With API key auth
-ask serve --port 7232 --repos-dir /srv/repos --api-key SECRET
+# Serve other machines: bind a public address AND set an API key
+ask serve --host 0.0.0.0 --port 7232 --repos-dir /srv/repos --api-key SECRET
 ```
+
+**Network defaults (since v3.1.2).** The server binds `127.0.0.1` unless
+you pass `--host`. Binding any other address without an API key
+(`--api-key` or `ASK_API_KEY`) is refused at startup; `--insecure-no-auth`
+overrides that for a trusted, isolated network. While bound to loopback the
+server answers only requests whose `Host` header is `localhost`,
+`127.0.0.1` or `[::1]` (blocks DNS rebinding); a reverse proxy in front of a
+loopback-bound server must send `Host: localhost`. POST bodies must be
+`Content-Type: application/json` and at most 1 MiB (else 415 / 413). The
+same rules apply to `ask-mcp-server` in HTTP mode; `--stdio` opens no
+listener. Up to v3.1.1 both servers listened on `0.0.0.0` with no key by
+default — see [SECURITY.md](../SECURITY.md).
 
 ### Query from any machine
 
@@ -284,10 +304,13 @@ ask reset billing:architect
 ### How it works
 
 The server (`rebar ask serve`; `bin/ask-server` runs it) is a thin HTTP
-wrapper around the `ask` CLI. Each request invokes `rebar ask` (or
-`--ask-bin` / `ASK_BIN`) with `cwd` set to the target repo — all existing logic
-(sessions, memory, context loading) works unchanged. Agents spin up
-on demand, not ahead of time.
+wrapper around the `ask` CLI. Each request invokes
+`rebar ask --question -- <role> <question>` (or `--ask-bin` / `ASK_BIN`)
+with `cwd` set to the target repo — all existing logic (sessions, memory,
+context loading) works unchanged. Agents spin up on demand, not ahead of
+time. `--question` means a question received over the network is only ever
+asked: it never selects an agent command script. `repo` must be a served
+repo and `role` one of its agents (`GET /v1/agents`); other names get 404.
 
 Local agents (no `:` prefix) always run locally. The `ASK_SERVER`
 variable only affects `repo:agent` cross-project queries.

@@ -23,7 +23,7 @@ keep working; 'rebar migrate' proposes pointing them at rebar directly.`,
 }
 
 var mcpServeCmd = &cobra.Command{
-	Use:                "serve [--stdio] [--port N] [--host H] [--repos-dir DIR] [--repos PATHS] [--mcp-only] [--api-key KEY] [--ask-bin PATH]",
+	Use:                "serve [--stdio] [--port N] [--host H] [--repos-dir DIR] [--repos PATHS] [--mcp-only] [--api-key KEY] [--insecure-no-auth] [--ask-bin PATH]",
 	Short:              "Run the MCP server (bin/ask-mcp-server)",
 	DisableFlagParsing: true,
 	RunE: func(cmd *cobra.Command, args []string) error {

@@ -33,7 +33,7 @@ the suite: a copy that runs a script with `|| true`, only in CI, or only to
 warn is kept for you to review). The steps below apply unchanged; step 10
 (CI) gets simpler.
 
-**Installer changes in 4.0.** `bin/install` (the PATH setup beside the
+**Installer changes in 3.1.2 and 4.0.** `bin/install` (the PATH setup beside the
 binary) is now `rebar-install`: on PATH, a file named `install` shadowed
 install(1) and broke `install -d` / `make install`. `rebar install-shims`
 removes rebar's old `install` from the directory it writes; a pre-versioned
@@ -49,7 +49,7 @@ templates/project-bootstrap/ or scripts/steward.sh" (harmless: they are
 built in) and, finding no `bin/install`, does not touch your shell RC,
 which already has `~/.rebar/current/bin` if you installed 3.1 with it.
 
-In the commands below, `v3.1.1` is the release you are moving to. Use the
+In the commands below, `v3.1.2` is the release you are moving to. Use the
 tag you are actually installing.
 
 | You are on | Steps |
@@ -61,15 +61,15 @@ tag you are actually installing.
 ## 1. Install the new version next to the old one
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/willackerly/rebar/v3.1.1/setup-rebar.sh \
-  | bash -s -- v3.1.1 --no-switch
+curl -fsSL https://raw.githubusercontent.com/willackerly/rebar/v3.1.2/setup-rebar.sh \
+  | bash -s -- v3.1.2 --no-switch
 ```
 
 Fetch the installer from the tag you install: until 3.1 is on `main`,
 `main`'s `setup-rebar.sh` is the old installer and has no version argument
 (see [Testing a release candidate](SETUP.md#testing-a-release-candidate)).
 
-The new version lands in `~/.rebar/versions/v3.1.1/` (a complete rebar
+The new version lands in `~/.rebar/versions/v3.1.2/` (a complete rebar
 tree for 3.1; from 3.2, the binary with its `ask` shims and completions). `--no-switch` leaves `~/.rebar/current` (the version on your PATH)
 alone, so other projects are unaffected while you try this one. The
 exception is a machine with **no versioned install yet**, including a
@@ -83,10 +83,10 @@ To run a version that is not `current`, call it by path; each version runs
 its own checks:
 
 ```bash
-~/.rebar/versions/v3.1.1/bin/rebar version
+~/.rebar/versions/v3.1.2/bin/rebar version
 ```
 
-Switch for good with `ln -sfn versions/v3.1.1 ~/.rebar/current` (or
+Switch for good with `ln -sfn versions/v3.1.2 ~/.rebar/current` (or
 re-run the installer without `--no-switch`). The rest of this runbook writes
 plain `rebar` for the 3.1 CLI.
 
@@ -197,7 +197,7 @@ the caller read the values from `rebar run check-ground-truth --print`
   it for that reason). The 3.1 hook runs `rebar check --cold-start` instead:
 
   ```bash
-  T=~/.rebar/versions/v3.1.1/templates/project-bootstrap
+  T=~/.rebar/versions/v3.1.2/templates/project-bootstrap
   diff .claude/settings.json $T/.claude/settings.json
   # unmodified: copy it; customized: replace the SessionStart "command" by hand
   cp $T/.claude/settings.json .claude/settings.json
@@ -221,9 +221,9 @@ the caller read the values from `rebar run check-ground-truth --print`
 `check-compliance` fails when the two disagree, so change both together:
 
 ```bash
-echo v3.1.1 > .rebar-version
-sed -i.bak 's/^> \*\*rebar v[^*]*\*\*/> **rebar v3.1.1**/' README.md && rm README.md.bak
-sed -n 3p README.md   # > **rebar v3.1.1** | **Tier 1: PARTIAL**
+echo v3.1.2 > .rebar-version
+sed -i.bak 's/^> \*\*rebar v[^*]*\*\*/> **rebar v3.1.2**/' README.md && rm README.md.bak
+sed -n 3p README.md   # > **rebar v3.1.2** | **Tier 1: PARTIAL**
 ```
 
 The badge is the first line after the title. Keep its tier as it was; it must
@@ -327,7 +327,7 @@ staged deletions (the removed copies).
 
 ```bash
 git add -A
-rebar commit -m "chore(rebar): upgrade to v3.1.1"
+rebar commit -m "chore(rebar): upgrade to v3.1.2"
 rebar verify --strict      # RESULT: Integrity verified ✓
 ```
 
@@ -366,6 +366,30 @@ findings, not upgrade breakage; fix them, or run the checks you need
 individually with `rebar run <check>`.
 
 Then switch for good if you used `--no-switch` (step 1).
+
+## Upgrading from v3.1.0 or v3.1.2
+
+Install the new version with the installer from its own tag, as in step 1;
+that is all a project already on 3.1 needs. Changes to know about:
+
+- **The PATH helper is `bin/rebar-install`** (it was `bin/install`, which,
+  first on PATH, shadowed the system `install(1)`: `install -d dir` failed
+  with "Unknown option: -d"). Once `current` points at the new version,
+  `~/.rebar/current/bin` has no `install`; the old name stays only inside
+  `versions/v3.1.0/` or `versions/v3.1.2/`, which are not on PATH. Switching
+  `current` back to one of those brings it back (re-run the new installer for
+  that version instead: it renames the helper). An older `setup-rebar.sh`
+  looks for `bin/install`, so it does not wire PATH or `--server` for a
+  version that has only `bin/rebar-install`; use the installer from the tag
+  you install. If your RC still puts a pre-versioned clone's `~/.rebar/bin`
+  on PATH, its `bin/install` shadows `install(1)` too; remove that line once
+  nothing uses the clone.
+- **The installer no longer builds release tags from source on its own.**
+  "latest" is the newest published GitHub Release (not the newest tag), and
+  a tag without downloadable prebuilt assets is an error; pass `--source` if
+  you mean to build it with your own Go (CI that relied on the fallback needs
+  `--source` and `actions/setup-go`). Tags older than v3.1.0-rc.1 still build
+  from source without it.
 
 ## Notes for v2.0.0
 

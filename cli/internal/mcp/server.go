@@ -286,19 +286,16 @@ func (s *Server) toolsCall(params any, id json.RawMessage) object {
 	}
 	p, ok := params.(map[string]any)
 	if !ok {
-		return rpcError(-32603, "Internal error", noGet(params), id)
+		return rpcError(-32602, "Invalid params", "params must be an object", id)
 	}
 	nameV := p["name"]
 	var arguments any = map[string]any{}
 	if v, ok := p["arguments"]; ok {
 		arguments = v
 	}
-	if !truthy(nameV) {
-		return rpcError(-32602, "Invalid params", "Tool name required", id)
-	}
 	name, ok := nameV.(string)
-	if !ok {
-		return rpcError(-32603, "Internal error", fmt.Sprintf("'%s' object has no attribute 'startswith'", pyType(nameV)), id)
+	if !ok || name == "" {
+		return rpcError(-32602, "Invalid params", "Tool name required", id)
 	}
 	if !strings.HasPrefix(name, "ask_") {
 		return rpcError(-32602, "Invalid params", "Invalid tool name format", id)
@@ -317,14 +314,14 @@ func (s *Server) toolsCall(params any, id json.RawMessage) object {
 	}
 	args, ok := arguments.(map[string]any)
 	if !ok {
-		return rpcError(-32603, "Internal error", noGet(arguments), id)
+		return rpcError(-32602, "Invalid params", "arguments must be an object", id)
 	}
-	question := args["question"]
-	verbose := args["verbose"]
-	if !truthy(question) {
+	question, ok := args["question"].(string)
+	if !ok || question == "" {
 		return rpcError(-32602, "Invalid params", "Question required", id)
 	}
-	answer, errText := s.ExecuteAsk(canonRepo, canonRole, question, truthy(verbose))
+	verbose, _ := args["verbose"].(bool)
+	answer, errText := s.ExecuteAsk(canonRepo, canonRole, question, verbose)
 	if errText != "" {
 		return rpcError(-32603, "Tool execution failed", errText, id)
 	}
@@ -376,11 +373,16 @@ func (s *Server) resourcesRead(params any, id json.RawMessage) object {
 	if !ok {
 		return rpcError(-32603, "Resource read failed", "not enough values to unpack (expected 2, got 1)", id)
 	}
-	if canon := s.Registry.ResolveRepo(repo); canon != "" {
-		if r := s.Registry.ResolveRole(canon, role); r != "" {
-			repo, role = canon, r
-		}
+	// Only registered repos and their listed agents are readable.
+	canon := s.Registry.ResolveRepo(repo)
+	if canon == "" {
+		return rpcError(-32603, "Resource read failed", "Repository "+repo+" not found", id)
 	}
+	canonRole := s.Registry.ResolveRole(canon, role)
+	if canonRole == "" {
+		return rpcError(-32603, "Resource read failed", "Role "+role+" not found in "+canon, id)
+	}
+	repo, role = canon, canonRole
 	content, err := s.resource(typ, repo, role)
 	if err != nil {
 		return rpcError(-32603, "Resource read failed", err.Error(), id)
@@ -520,10 +522,10 @@ func (s *Server) description(repo, role string) string {
 // pyStrip is str.strip().
 func pyStrip(s string) string { return strings.TrimSpace(s) }
 
-// ExecuteAsk runs `ask [-v] <role> <question>` in the repo (ASK_SERVER
+// ExecuteAsk runs `ask [-v] --question -- <role> <question>` in the repo (ASK_SERVER
 // cleared, so the call never routes to a remote server) and returns the
 // answer, or the error text the python server reported.
-func (s *Server) ExecuteAsk(repo, role string, question any, verbose bool) (string, string) {
+func (s *Server) ExecuteAsk(repo, role, question string, verbose bool) (string, string) {
 	path := s.Registry.Path(repo)
 	if path == "" {
 		return "", "Repository " + repo + " not found"
@@ -531,15 +533,7 @@ func (s *Server) ExecuteAsk(repo, role string, question any, verbose bool) (stri
 	if !s.Registry.HasAgent(repo, role) {
 		return "", "Agent " + role + " not found in repository " + repo
 	}
-	q, ok := question.(string)
-	if !ok {
-		return "", fmt.Sprintf("Execution error: TypeError('expected str, bytes or os.PathLike object, not %s')", pyType(question))
-	}
-	argv := append([]string{}, s.AskCmd...)
-	if verbose {
-		argv = append(argv, "-v")
-	}
-	argv = append(argv, role, q)
+	argv := append(append([]string{}, s.AskCmd...), askArgs(role, question, verbose)...)
 	shown := strings.Join(argv, " ")
 	stdout, stderr, code, err := runAsk(argv, path, AskTimeout)
 	switch {

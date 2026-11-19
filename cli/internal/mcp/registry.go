@@ -172,6 +172,9 @@ func (r *Registry) reposJSON() []any {
 
 // Path is the path of repo ("" when unknown).
 func (r *Registry) Path(repo string) string {
+	if !validName(repo) {
+		return ""
+	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	return r.repos[repo]
@@ -179,6 +182,9 @@ func (r *Registry) Path(repo string) string {
 
 // ResolveRepo is the registered name matching repo, ignoring case.
 func (r *Registry) ResolveRepo(repo string) string {
+	if !validName(repo) {
+		return ""
+	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if _, ok := r.repos[repo]; ok {
@@ -201,7 +207,7 @@ func (r *Registry) insertionOrder() []string { return r.names() }
 // ResolveRole is the agent of repo matching role, ignoring case.
 func (r *Registry) ResolveRole(repo, role string) string {
 	path := r.Path(repo)
-	if path == "" {
+	if path == "" || !validName(role) {
 		return ""
 	}
 	roles := agentsFor(path)
@@ -220,9 +226,19 @@ func (r *Registry) ResolveRole(repo, role string) string {
 }
 
 // HasAgent reports whether repo has agents/<role>/AGENT.md.
+// HasAgent: role is one of the repo's listed agents (a plain directory
+// name under agents/ with an AGENT.md), never a path.
 func (r *Registry) HasAgent(repo, role string) bool {
 	path := r.Path(repo)
-	return path != "" && isFile(filepath.Join(path, "agents", role, "AGENT.md"))
+	if path == "" || !validName(role) {
+		return false
+	}
+	for _, a := range agentsFor(path) {
+		if a == role {
+			return true
+		}
+	}
+	return false
 }
 
 // agentsFor lists the agents of the repo at path.
