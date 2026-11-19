@@ -16,6 +16,18 @@ All notable changes to rebar. Versioned with [semver](https://semver.org/).
 
 ---
 
+## Unreleased
+
+Fixes from field-testing v4.0.0-rc.1.
+
+- **Installer: the shell RC.** `setup-rebar.sh --dir PATH` (or `REBAR_DIR`)
+  no longer edits your shell RC; it prints the `export PATH=…` line instead
+  (`--modify-rc` restores the old behavior). `--no-modify-rc` does the same
+  for the default `~/.rebar`. An RC that already puts `current/bin` on PATH
+  as `$HOME/…`, `${HOME}/…` or `~/…` no longer gets a second block, from the
+  installer or from `bin/rebar-install`. Every rc.1 install with `--dir`
+  (CI, tests) appended a PATH and completions block per directory.
+
 ## v4.0.0-rc.1 — 2026-11-19
 
 First release candidate of **rebar 4.0**, a major release (planned as 3.2):

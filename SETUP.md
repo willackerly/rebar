@@ -37,7 +37,24 @@ published as a Release, and draft Releases, never count. Variants (`…` is the
 | `… \| bash -s -- main` | a branch, built from source; `rebar version` says `main@<sha>` |
 | `… \| bash -s -- v3.1.2 --no-switch` | side by side, without changing the active version |
 | `… \| bash -s -- v3.1.2 --source` | from source with your Go (needed for a tag without prebuilt assets) |
-| `… \| bash -s -- v3.1.2 --dir /opt/rebar` | under `/opt/rebar` instead of `~/.rebar` (CI) |
+| `… \| bash -s -- v3.1.2 --dir /opt/rebar` | under `/opt/rebar` instead of `~/.rebar` (CI); from 4.0 your shell RC is left alone |
+| `… \| bash -s -- v4.0.0-rc.1 --no-modify-rc` | in `~/.rebar` without editing your shell RC |
+
+**Your shell RC.** The installer runs the version's `rebar-install`, which
+adds `~/.rebar/current/bin` (and the shell completions) to the RC file your
+`$SHELL` reads: `~/.zshrc`, `~/.bashrc`, else `~/.profile`. From 4.0 the
+installer:
+
+- leaves the RC alone when you pass `--dir` (or set `REBAR_DIR`), and prints
+  the `export PATH=…` line to add instead; `--modify-rc` adds it anyway;
+- leaves it alone with `--no-modify-rc` for the default `~/.rebar` too;
+- never adds a second PATH block: re-running it, or an RC that already has
+  the directory as `$HOME/.rebar/current/bin` or `~/.rebar/current/bin`,
+  leaves the RC as it is.
+
+The 3.1.x installers wrote the RC on every switched install, also with
+`--dir`; remove stale `rebar CLI tools` blocks naming old directories by
+hand.
 
 Each version lives in `~/.rebar/versions/<version>/`; `~/.rebar/current` is
 a symlink to the active one, so switching never edits your RC again
@@ -131,8 +148,10 @@ installer verifies it against the release's checksums and writes the `ask`
 shims and `rebar-install` beside it. A tag without prebuilt assets is an
 error unless you pass `--source` (needs `git` and Go: add
 `actions/setup-go`). The checks
-themselves need `git`. The installer also appends a PATH line to the runner's
-shell RC, which is harmless there.
+themselves need `git`. With `--dir` the 4.0 installer does not touch the
+runner's shell RC (it prints the PATH line instead), so the `$GITHUB_PATH`
+line is what puts rebar on PATH; the 3.1.x installers also appended a line to
+the RC, which is harmless on a runner.
 
 **Pinned wrapper.** To run the version a repository pins without an install
 step, download the release binary for the platform once, verify it against a

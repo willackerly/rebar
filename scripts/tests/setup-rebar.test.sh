@@ -60,6 +60,11 @@
 #   T31 the v3.1.1 installer (tarballs only) installs a new release from
 #       its compatibility tarball, not from source
 #   T10 without Go: a prebuilt tag installs; a pre-asset tag explains Go is needed
+#   T32 shell RC: --dir (or REBAR_DIR) leaves it byte-for-byte unchanged and
+#       prints the PATH line, also on a re-run; --dir --modify-rc adds one
+#       line, once; --no-modify-rc leaves it alone for ~/.rebar too; repeated
+#       default runs keep a single PATH block; an RC that already has
+#       current/bin as $HOME/... or ~/... gets no second copy
 #
 # Usage: bash scripts/tests/setup-rebar.test.sh
 # Needs git, go, curl, tar and shasum or sha256sum; skips without go/curl.
@@ -599,5 +604,56 @@ if OLD="$(g -C "$ROOT" show v3.1.1:setup-rebar.sh 2>/dev/null)"; then
 else
   echo "skip T31: no v3.1.1 tag in this clone"
 fi
+
+# T32 — the shell RC. rc_lines <rc> <dir>: lines of <rc> naming <dir>.
+rc_lines() { grep -cF "$2" "$1" 2>/dev/null || true; }
+H32="$TMP/h-rc"
+mkdir -p "$H32"
+printf '# my bashrc\nalias ll="ls -l"\n' > "$H32/.bashrc"
+rc_before="$(cksum < "$H32/.bashrc")"
+for run in 1 2; do
+  out="$(inst "$H32" bash v9.1.0 --dir "$H32/opt-rebar")" || { echo "$out" | tail -20 >&2; fail "T32 --dir run $run failed"; }
+  [ "$(cksum < "$H32/.bashrc")" = "$rc_before" ] || fail "T32 --dir run $run edited the RC: $(cat "$H32/.bashrc")"
+  has "$out" "export PATH=\"$H32/opt-rebar/current/bin:\$PATH\"" "T32 --dir run $run"
+  has "$out" "pass --modify-rc" "T32 --dir run $run"
+  case "$out" in *"Running "*rebar-install*) fail "T32 --dir run $run ran rebar-install" ;; esac
+done
+[ -x "$H32/opt-rebar/current/bin/rebar" ] || fail "T32 --dir installed nothing"
+# REBAR_DIR from the environment counts as --dir.
+out="$(env -i HOME="$H32" PATH="$TPATH" SHELL=/bin/bash TMPDIR="$TMP" REBAR_DIR="$H32/env-rebar" \
+  REBAR_REPO="$O" REBAR_RELEASE_URL="$RELURL" bash "$INSTALLER" v9.1.0 2>&1)" \
+  || { echo "$out" | tail -20 >&2; fail "T32 REBAR_DIR install failed"; }
+[ "$(cksum < "$H32/.bashrc")" = "$rc_before" ] || fail "T32 REBAR_DIR edited the RC"
+has "$out" "export PATH=\"$H32/env-rebar/current/bin:\$PATH\"" "T32 REBAR_DIR"
+for run in 1 2; do
+  out="$(inst "$H32" bash v9.1.0 --dir "$H32/opt-rebar" --modify-rc)" || { echo "$out" | tail -20 >&2; fail "T32 --modify-rc run $run failed"; }
+done
+[ "$(rc_lines "$H32/.bashrc" "export PATH=\"$H32/opt-rebar/current/bin:")" = "1" ] \
+  || fail "T32 --dir --modify-rc: want one PATH line, got: $(cat "$H32/.bashrc")"
+H32b="$TMP/h-rc-default"
+mkdir -p "$H32b" && printf 'alias ll="ls -l"\n' > "$H32b/.bashrc"
+rc_before="$(cksum < "$H32b/.bashrc")"
+out="$(inst "$H32b" bash v9.1.0 --no-modify-rc)" || { echo "$out" | tail -20 >&2; fail "T32 --no-modify-rc failed"; }
+[ "$(cksum < "$H32b/.bashrc")" = "$rc_before" ] || fail "T32 --no-modify-rc edited the RC"
+has "$out" "Shell RC not edited (--no-modify-rc)" "T32 --no-modify-rc"
+for run in 1 2 3; do
+  out="$(inst "$H32b" bash v9.1.0)" || { echo "$out" | tail -20 >&2; fail "T32 default run $run failed"; }
+done
+[ "$(rc_lines "$H32b/.bashrc" "$H32b/.rebar/current/bin:")" = "1" ] \
+  || fail "T32 repeated default runs: want one PATH line, got: $(cat "$H32b/.bashrc")"
+[ "$(rc_lines "$H32b/.bashrc" "# rebar CLI tools")" = "1" ] || fail "T32 repeated default runs duplicated the block"
+H32c="$TMP/h-rc-spelled"
+mkdir -p "$H32c"
+# shellcheck disable=SC2016 # literal $HOME, as a user writes it
+printf 'export PATH="$HOME/.rebar/current/bin:$PATH"\n' > "$H32c/.bashrc"
+rc_before="$(cksum < "$H32c/.bashrc")"
+out="$(inst "$H32c" bash v9.1.0)" || { echo "$out" | tail -20 >&2; fail "T32 spelled RC install failed"; }
+[ "$(cksum < "$H32c/.bashrc")" = "$rc_before" ] || fail "T32 \$HOME-spelled PATH line got a second copy: $(cat "$H32c/.bashrc")"
+has "$out" "already puts $H32c/.rebar/current/bin on PATH" "T32 spelled"
+printf 'export PATH=~/.rebar/current/bin:$PATH\n' > "$H32c/.bashrc"
+rc_before="$(cksum < "$H32c/.bashrc")"
+SHELL=/bin/bash HOME="$H32c" "$H32c/.rebar/current/bin/rebar-install" >/dev/null || fail "T32 rebar-install failed"
+[ "$(cksum < "$H32c/.bashrc")" = "$rc_before" ] || fail "T32 rebar-install duplicated a ~/ PATH line: $(cat "$H32c/.bashrc")"
+ok "T32 --dir/REBAR_DIR/--no-modify-rc leave the RC alone; --modify-rc and default runs add one block, never two"
 
 echo "PASS: setup-rebar.sh"
