@@ -116,6 +116,11 @@ Ordered roughly by cost.
 
 ## What's Next — proposed go-forward
 
+**Next — `v4.0.0-rc.1`** (the Go-native stack #23 → #53, plus rc prep:
+4.0 naming, CHANGELOG breaking changes, UPGRADING "3.x → 4.0", `bin/rebar`
+untracked). Merge plan: `release/v4.0.0-rc` from `main`, stack merged
+top-down, tag `v4.0.0-rc.1`, field-test, then `main` and `v4.0.0`.
+
 **Now — `v3.1.2` is out.** Install it (`… | bash -s -- v3.1.2`),
 run UPGRADING.md on adopters; 3.1.x fixes go to `main`, the Go-native stack ships as 4.0.0 (v4.0.0-rc.1 first).
 

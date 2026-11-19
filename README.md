@@ -1,8 +1,8 @@
 # rebar
 
-> **rebar v3.1.2** | **Tier 3: ENFORCED**
+> **rebar v4.0.0-rc.1** | **Tier 3: ENFORCED**
 
-[![rebar v3.1.2](https://img.shields.io/badge/rebar-v3.1.0-green)](DESIGN.md)
+[![rebar v4.0.0-rc.1](https://img.shields.io/badge/rebar-v4.0.0--rc.1-orange)](DESIGN.md)
 [![Tier 3: Enforced](https://img.shields.io/badge/tier-3_enforced-brightgreen)](DESIGN.md)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
@@ -341,7 +341,7 @@ later. See `feedback/2026-04-21-...`, `2026-04-22-...`, and
 Every rebar repo declares its version and tier at the top of README.md:
 
 ```markdown
-> **rebar v3.1.2** | **Tier 2: ADOPTED**
+> **rebar v4.0.0-rc.1** | **Tier 2: ADOPTED**
 ```
 
 This is validated by `check-compliance` (run by `rebar check`) against the
