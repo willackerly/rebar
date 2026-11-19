@@ -1,0 +1,22 @@
+
+check-fix-commit: VIOLATION (79e8bc84e223c5df3bdda8458faa3cf218a9f152)
+  subject:  fix: merge side
+  Gate G requires a line of the form:
+    Reproduced on: <SHA / deploy URL / log excerpt / screenshot path>
+
+  In the body. Without it, the fix is for a phantom — the user's
+  symptom hasn't been observed independently before fixing began.
+  Source: practices/regression-fix-protocol.md §Gate G
+
+check-fix-commit: VIOLATION (2eb5febd436fc3360e66b641c74c97f31646ea58)
+  subject:  fix: on the side
+  Gate G requires a line of the form:
+    Reproduced on: <SHA / deploy URL / log excerpt / screenshot path>
+
+  In the body. Without it, the fix is for a phantom — the user's
+  symptom hasn't been observed independently before fixing began.
+  Source: practices/regression-fix-protocol.md §Gate G
+
+check-fix-commit: 2 violation(s)
+Wire as commit-msg hook:  printf '#!/bin/sh\nexec rebar run check-fix-commit "$1"\n' > .git/hooks/commit-msg && chmod +x .git/hooks/commit-msg
+--- exit 1 ---

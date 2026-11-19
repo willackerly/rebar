@@ -1,0 +1,10 @@
+--- stdout ---
+--- stderr ---
+ask: error: all servers failed for POST /v1/reset/web/architect
+  tried: $DEAD
+--- changes ---
+--- made home/.config/ ---
+--- made home/.config/ask/ ---
+--- wrote home/.config/ask/.rr-index ---
+0
+--- exit 1 ---

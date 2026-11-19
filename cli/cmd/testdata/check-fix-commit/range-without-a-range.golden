@@ -1,0 +1,2 @@
+check-fix-commit: --range needs a revision range (<sha>..<sha>)
+--- exit 1 ---

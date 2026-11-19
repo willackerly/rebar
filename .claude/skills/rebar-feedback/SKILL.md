@@ -6,7 +6,7 @@ description: Use when you hit a gap, anti-pattern, bug, or missing guidance in r
 # rebar-feedback — file a feedback item correctly
 
 Canonical reference: `rebar:feedback/README` (template, processing rules,
-disposition lifecycle) — resolve with `scripts/rebar-doc.sh
+disposition lifecycle) — resolve with `rebar run rebar-doc
 rebar:feedback/README --cat` (or `rebar doc` if the CLI is installed).
 Reference it; do not restate it.
 

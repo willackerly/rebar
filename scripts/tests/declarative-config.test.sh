@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Regression test: repo-specific settings live in .rebarrc, and the scripts of
-# a rebar install check a project that carries no copies of them
+# Regression test: repo-specific settings live in .rebarrc, and rebar's
+# built-in checks check a project that carries no copies of rebar's scripts
 # (REBAR_PROJECT_ROOT).
 #
 #   T1  declared metrics: files, dirs, depth, exclude_names, exclude_dirs,
@@ -20,16 +20,15 @@
 #   T7  check-ground-truth colours only on a terminal, never with NO_COLOR
 #
 # Usage: bash scripts/tests/declarative-config.test.sh
-# Override the scripts under test with REBAR_SCRIPTS_DIR.
+# Runs the rebar binary under test (lib.sh: REBAR_TEST_BIN).
 # Bash 3.2 compatible (macOS default).
 
 set -uo pipefail
 
 . "$(dirname "$0")/lib.sh"
-SRC="$REBAR_SCRIPTS"
 rebar_tmpdir declarative
 
-# The project has no scripts/ at all: everything runs from $SRC.
+# The project has no scripts/ at all: everything is built into rebar.
 P="$TMP/project"
 mkdir -p "$P/architecture" "$P/api/a" "$P/api/node_modules/x" "$P/sdk/go-sdk" \
   "$P/sdk/web-sdk" "$P/sdk/other" "$P/agents/architect" "$P/agents/steward"
@@ -79,7 +78,7 @@ metric.nothing.paths = no-such-dir
 EOF
 ( cd "$P" && g init -q -b main && g add . && g commit -q -m init ) || fail "setup"
 
-gt() { ( cd / && REBAR_PROJECT_ROOT="$P" "$SRC/check-ground-truth.sh" ) 2>&1; }
+gt() { run_from / "$P" check-ground-truth.sh; }
 
 # T1 — every metric computes the expected value.
 printf 'test_files = 2\nsdks = 2\nagents = 2\ncontract_files = 3\ncontract_ids = 2\nheaded_sources = 1\nnothing = 0\n' \
@@ -118,7 +117,7 @@ metric.tracked_names.names    = *.sh
 metric.tracked_names.distinct = ^(.*)$
 metric.tracked_names.tracked  = true
 RC
-out="$( cd / && REBAR_RCFILE="$TMP/tracked.rc" REBAR_PROJECT_ROOT="$P" "$SRC/check-ground-truth.sh" --print 2>&1 )"
+out="$(REBAR_RCFILE="$TMP/tracked.rc" run_from / "$P" check-ground-truth.sh --print)"
 want='all_sh=4
 tracked_sh=2
 tracked_dirs=1
@@ -127,7 +126,7 @@ tracked_names=2'
 [ "$out" = "$want" ] || { echo "$out"; fail "T1b: tracked counts"; }
 NG="$TMP/nogit"
 mkdir -p "$NG" && cp -R "$P/ops" "$NG/ops"
-out="$( cd / && REBAR_RCFILE="$TMP/tracked.rc" REBAR_PROJECT_ROOT="$NG" "$SRC/check-ground-truth.sh" --print 2>"$TMP/err" )"
+out="$( cd / && REBAR_RCFILE="$TMP/tracked.rc" REBAR_PROJECT_ROOT="$NG" "$REBAR" native check-ground-truth --print 2>"$TMP/err" )"
 contains "$out" -x 'tracked_sh=4' || { echo "$out"; fail "T1b: outside git, tracked should count every file"; }
 grep -q 'not a git work tree' "$TMP/err" || { cat "$TMP/err"; fail "T1b: no note outside git"; }
 ( cd "$P" && g rm -rq ops && g commit -q -m "drop ops" ) || fail "T1b: cleanup"
@@ -169,7 +168,7 @@ out="$(REBAR_METRICS_STRICT=false gt)" || fail "T2b: REBAR_METRICS_STRICT=false 
 printf "$FULL" > "$P/METRICS"
 # No metric.* lines at all: passes by default, fails strict (not as drift).
 printf 'tier = 3\n' > "$TMP/nometrics.rc"
-gtrc() { ( cd / && REBAR_RCFILE="$TMP/nometrics.rc" REBAR_PROJECT_ROOT="$P" "$SRC/check-ground-truth.sh" ) 2>&1; }
+gtrc() { REBAR_RCFILE="$TMP/nometrics.rc" run_from / "$P" check-ground-truth.sh; }
 out="$(gtrc)" || { echo "$out"; fail "T2b: no metric declarations should pass by default"; }
 contains "$out" 'No metrics declared' || { echo "$out"; fail "T2b: no-declarations note missing"; }
 printf 'metrics_strict = true\n' >> "$TMP/nometrics.rc"
@@ -179,7 +178,7 @@ contains "$out" 'drift' && { echo "$out"; fail "T2b: no declarations is not drif
 ok "T2b: metrics_strict fails a missing METRICS, keys missing from it, and no declarations"
 
 # T3 — registry classification and purpose rendering come from .rebarrc.
-reg() { ( cd / && REBAR_PROJECT_ROOT="$P" "$SRC/compute-registry.sh" --stdout ); }
+reg() { run_from / "$P" compute-registry.sh --stdout; }
 out="$(reg)"
 # Unscoped, SDK-C2-BAR starts with S and lands in Services.
 contains "$(grep -A6 '^## Services' <<<"$out")" 'SDK-C2-BAR' \
@@ -204,9 +203,9 @@ ok "T3: registry scope prefixes and purpose settings apply (ellipsis default, by
 # T4 — source_dirs and source_extensions drive check-todos.
 mkdir -p "$P/tools"
 printf '#!/bin/sh\n# TODO: untracked\n' > "$P/tools/x.sh"
-( cd "$P" && REBAR_PROJECT_ROOT="$P" "$SRC/check-todos.sh" ) >/dev/null || fail "T4: tools/ is not a default source dir"
+run_in "$P" check-todos.sh >/dev/null || fail "T4: tools/ is not a default source dir"
 printf 'source_dirs = tools\nsource_extensions = sh\n' >> "$P/.rebarrc"
-( cd "$P" && REBAR_PROJECT_ROOT="$P" "$SRC/check-todos.sh" ) >/dev/null && fail "T4: configured source dir not scanned"
+run_in "$P" check-todos.sh >/dev/null && fail "T4: configured source dir not scanned"
 rm -rf "$P/tools"
 ok "T4: source_dirs / source_extensions reach check-todos"
 
@@ -214,23 +213,24 @@ ok "T4: source_dirs / source_extensions reach check-todos"
 mkdir -p "$P/scripts"
 printf '#!/usr/bin/env bash\necho LOCAL-COPY\n' > "$P/scripts/check-ground-truth.sh"
 chmod +x "$P/scripts/check-ground-truth.sh"
-out="$( cd / && REBAR_PROJECT_ROOT="$P" bash -c "source '$SRC/_rebar-config.sh'; \"\$(_rebar_script check-ground-truth.sh)\"" 2>&1 )"
+out="$( cd "$P" && "$REBAR" run check-ground-truth 2>&1 )"
 contains "$out" LOCAL-COPY || { echo "$out"; fail "T5: project copy not used"; }
 contains "$out" deprecated || { echo "$out"; fail "T5: no deprecation notice"; }
 printf '#!/usr/bin/env bash\n# rebar-thin-wrapper\nexec rebar check\n' > "$P/scripts/ci-check.sh"
-path="$( cd / && REBAR_PROJECT_ROOT="$P" bash -c "source '$SRC/_rebar-config.sh'; _rebar_script ci-check.sh" 2>/dev/null )"
-[ "$path" = "$(cd "$SRC" && pwd -P)/ci-check.sh" ] || fail "T5: thin wrapper picked ($path)"
+out="$( cd "$P" && "$REBAR" run 2>&1 )"
+contains "$out" 'check-ground-truth  (legacy copy' || { echo "$out"; fail "T5: project copy not listed as legacy"; }
+printf '%s\n' "$out" | sed -n '/^Project scripts/,$p' | grep -q 'ci-check' && { echo "$out"; fail "T5: thin wrapper listed as a project script"; }
 ok "T5: project copies run with a deprecation notice; thin wrappers are skipped"
 
 # T6 — --print and REBAR_RCFILE, as rebar migrate uses them.
 rm -f "$P/scripts/check-ground-truth.sh" "$P/scripts/ci-check.sh"
 mv "$P/METRICS" "$P/METRICS.off"
-out="$( cd / && REBAR_TIER=1 REBAR_PROJECT_ROOT="$P" "$SRC/check-ground-truth.sh" --print 2>&1 )" \
+out="$(REBAR_TIER=1 run_from / "$P" check-ground-truth.sh --print)" \
   || { echo "$out"; fail "T6: --print exited non-zero"; }
 contains "$out" -x 'test_files=2' || { echo "$out"; fail "T6: --print lacks test_files=2"; }
 contains "$out" -x 'sdks=2' || { echo "$out"; fail "T6: --print lacks sdks=2"; }
 printf 'metric.only_this.paths = api\nmetric.only_this.names = main.go\n' > "$TMP/alt.rc"
-out="$( cd / && REBAR_RCFILE="$TMP/alt.rc" REBAR_PROJECT_ROOT="$P" "$SRC/check-ground-truth.sh" --print 2>&1 )"
+out="$(REBAR_RCFILE="$TMP/alt.rc" run_from / "$P" check-ground-truth.sh --print)"
 [ "$out" = "only_this=1" ] || { echo "$out"; fail "T6: REBAR_RCFILE not used instead of .rebarrc"; }
 mv "$P/METRICS.off" "$P/METRICS"
 ok "T6: --print ignores tier and METRICS; REBAR_RCFILE replaces .rebarrc"
@@ -239,13 +239,13 @@ ok "T6: --print ignores tier and METRICS; REBAR_RCFILE replaces .rebarrc"
 ESC=$(printf '\033')
 out="$(gt)"
 case "$out" in *"$ESC"*) fail "T7: colour codes in piped output" ;; esac
-tty_out="$(cd / && REBAR_PROJECT_ROOT="$P" run_tty "$SRC/check-ground-truth.sh" 2>&1)"
+tty_out="$(cd / && REBAR_PROJECT_ROOT="$P" run_tty "$REBAR" native check-ground-truth 2>&1)"
 rc=$?
 if [ "$rc" -eq 77 ]; then
   ok "T7: piped output has no colour (no script(1) for the terminal case)"
 else
   case "$tty_out" in *"$ESC["*) ;; *) echo "$tty_out"; fail "T7: no colour on a terminal" ;; esac
-  tty_out="$(cd / && NO_COLOR=1 REBAR_PROJECT_ROOT="$P" run_tty "$SRC/check-ground-truth.sh" 2>&1)"
+  tty_out="$(cd / && NO_COLOR=1 REBAR_PROJECT_ROOT="$P" run_tty "$REBAR" native check-ground-truth 2>&1)"
   case "$tty_out" in *"$ESC["*) echo "$tty_out"; fail "T7: colour despite NO_COLOR" ;; esac
   ok "T7: colour on a terminal only, and not with NO_COLOR"
 fi

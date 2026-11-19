@@ -1,0 +1,14 @@
+check-decay-patterns: 1 finding(s) in scan set
+
+Each line: <file>:<line>:<pattern-id>:<guidance>
+
+ok.spec.ts:1:P1-silenced-failure:Pattern 1 (silenced failure): use a real failing assertion + CI continue-on-error instead — silencing the test makes the bug invisible to anyone glancing at the dashboard.
+
+If a finding is intentional + reviewed, allowlist by adding
+  <file>:<line>:<pattern-id>
+to .rebar/decay-patterns-allow.txt (one per line, # for comments).
+
+References: feedback/2026-04-24-fidelity-decay-soft-hardening-patterns.md
+            feedback/processed/2026-04-27-e2e-test-bypass-closed-loop-verification-drift.md (P8)
+            practices/test-fidelity.md (fidelity ladder + gates)
+--- exit 1 ---

@@ -20,11 +20,7 @@ import (
 
 func installRoot(t *testing.T) string {
 	t.Helper()
-	root, err := filepath.Abs("../../..")
-	if err != nil || !isFile(filepath.Join(root, "scripts", "check-ground-truth.sh")) {
-		t.Skip("rebar scripts not found next to the CLI source")
-	}
-	return root
+	return testutil.RebarSource(t)
 }
 
 const legacyGroundTruth = `#!/usr/bin/env bash
@@ -233,10 +229,7 @@ func TestRefusesTheInstallItself(t *testing.T) {
 // byte cut instead.
 func TestRegistrySettingsAreDerived(t *testing.T) {
 	install := installRoot(t)
-	src, err := os.ReadFile(filepath.Join(install, "scripts", "compute-registry.sh"))
-	if err != nil {
-		t.Fatal(err)
-	}
+	src := installScript(t, install, "compute-registry.sh")
 	legacy := string(src)
 	for old, repl := range map[string]string{
 		"\nPURPOSE_STYLE=ellipsis\n":          "\nPURPOSE_STYLE=bytes\n",
@@ -326,10 +319,7 @@ git grep -l "CONTRACT:${id}" -- '*.go' '*.ts' '*.sh' | grep -v "^architecture/"
 // unless the project set registry_impl_counts = true itself.
 func TestRegistryImplCountsFollowNewDefault(t *testing.T) {
 	install := installRoot(t)
-	src, err := os.ReadFile(filepath.Join(install, "scripts", "compute-registry.sh"))
-	if err != nil {
-		t.Fatal(err)
-	}
+	src := installScript(t, install, "compute-registry.sh")
 	legacy := string(src)
 	for old, repl := range map[string]string{
 		"\nIMPL_COUNTS=false\n": "\nIMPL_COUNTS=true\n",
@@ -417,7 +407,7 @@ func TestGroundTruthStrictness(t *testing.T) {
 		}
 		// The install now fails where the copy did.
 		testutil.WriteFile(t, p, "METRICS", "go_files = 2\n")
-		r := run(time.Minute, p, scrubbedEnv("REBAR_PROJECT_ROOT="+p, "REBAR_TIER=3"), filepath.Join(install, "scripts", "check-ground-truth.sh"))
+		r := runNative(p, "", scrubbedEnv("REBAR_PROJECT_ROOT="+p, "REBAR_TIER=3"), "check-ground-truth.sh")
 		if r.Code == 0 || !strings.Contains(r.Stdout, "MISSING") {
 			t.Fatalf("after migration a key missing from METRICS passes:\n%s", r.Stdout)
 		}

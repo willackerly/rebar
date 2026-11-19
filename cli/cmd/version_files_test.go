@@ -7,6 +7,8 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+
+	"github.com/willackerly/rebar/cli/internal/checks"
 )
 
 // isolateGit points git at a throwaway global config (identity, no signing,
@@ -106,11 +108,10 @@ func TestNewWritesCurrentRegistry(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(root, "architecture", "CONTRACT-REGISTRY.md")); err != nil {
 		t.Fatalf("rebar new wrote no registry: %v", err)
 	}
-	check := exec.Command("bash", filepath.Join(src, "scripts", "compute-registry.sh"), "--check")
-	check.Env = append(os.Environ(), "REBAR_PROJECT_ROOT="+root)
-	check.Dir = root
-	if out, err := check.CombinedOutput(); err != nil {
-		t.Fatalf("compute-registry --check on a new project: %v\n%s", err, out)
+	c, _ := checks.Lookup("compute-registry")
+	var out strings.Builder
+	if code := c.Run(&checks.Context{Root: root, Stdout: &out, Stderr: &out}, []string{"--check"}); code != 0 {
+		t.Fatalf("compute-registry --check on a new project: exit %d\n%s", code, out.String())
 	}
 	if out, err := exec.Command("git", "-C", root, "status", "--porcelain").Output(); err != nil || len(out) != 0 {
 		t.Fatalf("registry not in the initial commit: %q %v", out, err)

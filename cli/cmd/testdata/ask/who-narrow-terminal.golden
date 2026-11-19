@@ -1,0 +1,18 @@
+--- stdout ---
+
+  proj — Available Agents
+
+  Mixed          Mixed-case agent.
+  architect      Answer questions about system…
+  englead        Coordinates the build and the…
+  product        Owns personas and priorities…
+  steward        Reports project health,…
+  tester
+
+--- stderr ---
+--- changes ---
+--- made home/.config/ ---
+--- made home/.config/ask/ ---
+--- wrote home/.config/ask/projects ---
+proj = $BASE/proj
+--- exit 0 ---

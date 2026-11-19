@@ -1,0 +1,2 @@
+agent-health: 1: Usage: agent_checkpoint "commit message"
+--- exit 1 ---

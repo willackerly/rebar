@@ -1,0 +1,18 @@
+all=18
+dirs_all=4
+twice=12
+git_file=1
+excluded_start=0
+shallow_prune=6
+bad_depth=0
+neg_depth=0
+brackets=1
+contains_dirs=0
+contains_bad=0
+contains_line=1
+distinct_optional=2
+symlinks=1
+symlinked_start=0
+trailing_slash=1
+dot_names=3
+--- exit 0 ---

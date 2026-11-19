@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Regression test for the per-inbox lock in scripts/inbox-watch.sh.
+# Regression test for the per-inbox lock of inbox-watch (`rebar run inbox-watch`).
 #
 # The lock replaced a process-global `pgrep inbox-watch` stale-watcher check
 # that false-positived on every legitimate sibling seat in a single-machine,
@@ -16,9 +16,9 @@
 set -uo pipefail
 
 . "$(dirname "$0")/lib.sh"
-WATCH="${INBOX_WATCH_BIN:-$REBAR_SCRIPTS/inbox-watch.sh}"
+# The watcher under test: rebar's, or a script copy (INBOX_WATCH_BIN).
+if [ -n "${INBOX_WATCH_BIN:-}" ]; then WATCH=(bash "$INBOX_WATCH_BIN"); else WATCH=("$REBAR" native inbox-watch); fi
 LOCK=".inbox-watch.lock"
-[ -f "$WATCH" ] || fail "watcher not found at $WATCH"
 
 rebar_tmpdir inbox-watch-lock
 PIDS=""
@@ -35,7 +35,8 @@ arm() { # arm a watcher on $INBOX, redirecting out/err to given files; echo pid
   # (The watcher warns that $INBOX is outside $PWD — harmless here; the
   # assertions grep for "already holds", a different line.)
   local out="$1" err="$2"
-  bash "$WATCH" -i 1 "$INBOX" > "$out" 2> "$err" &
+  # The subshell only execs, so `$!` is still the watcher's PID.
+  ( exec "${WATCH[@]}" -i 1 "$INBOX" ) > "$out" 2> "$err" &
   echo "$!"
 }
 settle() { sleep 2; }

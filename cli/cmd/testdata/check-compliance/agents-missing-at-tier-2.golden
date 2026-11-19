@@ -1,0 +1,11 @@
+=== Rebar compliance check ===
+
+OK: .rebar-version = v3.1.0-rc.2
+OK: .rebarrc tier = 2 (ADOPTED)
+OK: README.md badge found on line 2
+    Version: v3.1.0-rc.2 | Tier: 2 (ADOPTED)
+
+FAIL: AGENTS.md not found (required at Tier 2+)
+
+FAIL: 1 compliance issue(s) found.
+--- exit 1 ---

@@ -1,6 +1,6 @@
 # Project Metrics — Single source of truth for quantitative claims
 #
-# Verified by: scripts/check-ground-truth.sh
+# Verified by: rebar run check-ground-truth
 # Updated by: agents, CI, developers (anyone who changes a counted thing)
 #
 # Format: key = value

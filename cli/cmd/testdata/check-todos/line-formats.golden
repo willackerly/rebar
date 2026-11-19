@@ -1,0 +1,15 @@
+FAIL: 6 untracked TODO(s) found:
+
+src/crlf.go:2:// TODO: crlf
+src/escapes.go:1:// TODO: 100% \n \t -e $HOME `x` 'q' "d"
+src/many.go:10:// TODO: line 10 after line 9
+src/only.go:1:TODO:
+src/tail.go:2:// TODO: no trailing newline
+src/utf8.go:1:// café TODO: ünïcode ✓
+
+Before committing, you must either:
+  1. Fix the TODO immediately (remove it), OR
+  2. Add it to TODO.md and convert to: TRACKED-TASK: description
+
+Also found 0 tracked tasks (OK).
+--- exit 1 ---

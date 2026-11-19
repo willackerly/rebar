@@ -1,0 +1,10 @@
+--- stdout ---
+summary: 2 args: a b c
+cwd: $BASE/proj
+--- stderr ---
+--- changes ---
+--- made home/.config/ ---
+--- made home/.config/ask/ ---
+--- wrote home/.config/ask/projects ---
+proj = $BASE/proj
+--- exit 0 ---

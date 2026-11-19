@@ -1,0 +1,151 @@
+#!/usr/bin/env bash
+# rebar-install — Add rebar's bin/ to PATH and optionally configure ASK_SERVER.
+# (Called bin/install before v3.1.2; renamed because a file named install on
+# PATH shadows install(1).)
+#
+# Usage:
+#   ./bin/rebar-install              # interactive
+#   ./bin/rebar-install --server IP:PORT  # also set ASK_SERVER
+#
+# Idempotent — safe to run multiple times.
+
+set -euo pipefail
+
+BIN_DIR="$(cd "$(dirname "$0")" && pwd)"
+SHELL_NAME="$(basename "$SHELL")"
+
+# Detect RC file
+case "$SHELL_NAME" in
+  zsh)  RC_FILE="$HOME/.zshrc" ;;
+  bash) RC_FILE="$HOME/.bashrc" ;;
+  *)    RC_FILE="$HOME/.profile" ;;
+esac
+
+# rc_mentions TEXT — whether a non-comment line of the RC file holds TEXT,
+# as written or, under $HOME, spelled $HOME/..., ${HOME}/... or ~/..., so a
+# line written by hand (or by an older installer) is not added twice.
+rc_mentions() {
+  [ -f "$RC_FILE" ] || return 1
+  for spelling in "$1" ${HOME:+"$(rc_home_form "$1" '$HOME')"} \
+      ${HOME:+"$(rc_home_form "$1" '${HOME}')"} ${HOME:+"$(rc_home_form "$1" '~')"}; do
+    [ -n "$spelling" ] || continue
+    grep -v '^[[:space:]]*#' "$RC_FILE" | grep -qF -- "$spelling" && return 0
+  done
+  return 1
+}
+# rc_home_form TEXT PREFIX — TEXT with a leading $HOME/ replaced by PREFIX/
+# (empty if TEXT is not under $HOME).
+rc_home_form() {
+  case "$1" in
+    "$HOME"/*) printf '%s/%s\n' "$2" "${1#"$HOME"/}" ;;
+  esac
+}
+
+# Parse args
+ASK_SERVER_VAL=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --server) ASK_SERVER_VAL="$2"; shift 2 ;;
+    --server=*) ASK_SERVER_VAL="${1#--server=}"; shift ;;
+    -h|--help)
+      echo "Usage: ./bin/rebar-install [--server HOST:PORT]"
+      echo ""
+      echo "Adds rebar bin/ to PATH in your shell RC file."
+      echo "With --server, also sets ASK_SERVER for remote agent queries."
+      exit 0
+      ;;
+    *) echo "Unknown option: $1"; exit 1 ;;
+  esac
+done
+
+echo "rebar-install"
+echo "============="
+echo ""
+
+# --- PATH ---
+PATH_LINE="export PATH=\"$BIN_DIR:\$PATH\""
+
+if rc_mentions "$BIN_DIR"; then
+  echo "[ok] PATH already includes $BIN_DIR"
+else
+  echo "" >> "$RC_FILE"
+  echo "# rebar CLI tools (rebar, ask, ask-server)" >> "$RC_FILE"
+  echo "$PATH_LINE" >> "$RC_FILE"
+  echo "[added] PATH → $RC_FILE"
+fi
+
+# --- Tab completions ---
+# Source the completion files from the RC file so `ask` and `rebar` get
+# tab completion automatically. Idempotent: only adds if not already
+# referenced. Bash and zsh have separate completion formats; we source
+# whichever fits the user's shell.
+COMPLETION_DIR="$BIN_DIR/completions"
+if [ -d "$COMPLETION_DIR" ]; then
+  case "$SHELL_NAME" in
+    bash)
+      if ! rc_mentions "$COMPLETION_DIR/ask.bash"; then
+        echo "" >> "$RC_FILE"
+        echo "# rebar tab completions (bash)" >> "$RC_FILE"
+        echo "[ -f \"$COMPLETION_DIR/ask.bash\" ] && source \"$COMPLETION_DIR/ask.bash\"" >> "$RC_FILE"
+        echo "[ -f \"$COMPLETION_DIR/rebar.bash\" ] && source \"$COMPLETION_DIR/rebar.bash\"" >> "$RC_FILE"
+        echo "[added] tab completion (bash) → $RC_FILE"
+      else
+        echo "[ok] tab completion already wired"
+      fi
+      ;;
+    zsh)
+      if ! rc_mentions "$COMPLETION_DIR"; then
+        echo "" >> "$RC_FILE"
+        echo "# rebar tab completions (zsh)" >> "$RC_FILE"
+        echo "fpath=(\"$COMPLETION_DIR\" \$fpath)" >> "$RC_FILE"
+        echo "autoload -Uz compinit && compinit -u" >> "$RC_FILE"
+        echo "[added] tab completion (zsh) → $RC_FILE"
+      else
+        echo "[ok] tab completion already wired"
+      fi
+      ;;
+  esac
+fi
+
+# --- ASK_SERVER ---
+if [ -n "$ASK_SERVER_VAL" ]; then
+  if grep -qF "ASK_SERVER" "$RC_FILE" 2>/dev/null; then
+    # Update existing value
+    sed -i.bak "s|export ASK_SERVER=.*|export ASK_SERVER=$ASK_SERVER_VAL|" "$RC_FILE"
+    rm -f "$RC_FILE.bak"
+    echo "[updated] ASK_SERVER=$ASK_SERVER_VAL in $RC_FILE"
+  else
+    echo "export ASK_SERVER=$ASK_SERVER_VAL" >> "$RC_FILE"
+    echo "[added] ASK_SERVER=$ASK_SERVER_VAL → $RC_FILE"
+  fi
+fi
+
+echo ""
+echo "Run this to apply now:"
+echo ""
+echo "  source $RC_FILE"
+echo ""
+
+# Verify dependencies. The checks and ASK are built into the rebar binary;
+# `ask <agent>` sessions run Claude Code's CLI.
+echo "Checking dependencies..."
+ok=true
+if [ -x "$BIN_DIR/rebar" ] || command -v rebar &>/dev/null; then
+  echo "  [ok] rebar"
+else
+  echo "  [missing] rebar (expected at $BIN_DIR/rebar)"
+  ok=false
+fi
+if command -v claude &>/dev/null; then
+  echo "  [ok] claude"
+else
+  echo "  [missing] claude (Claude Code CLI, for ask)"
+  ok=false
+fi
+
+echo ""
+if [ "$ok" = true ]; then
+  echo "Ready! Try: ask who"
+else
+  echo "Install missing dependencies above, then try: ask who"
+fi

@@ -1,0 +1,11 @@
+--- stdout ---
+Session cleared for architect (was: abc-123)
+Next question will establish a fresh session.
+--- stderr ---
+--- changes ---
+--- made home/.config/ ---
+--- made home/.config/ask/ ---
+--- wrote home/.config/ask/projects ---
+proj = $BASE/proj
+--- removed proj/agents/architect/.session-id ---
+--- exit 0 ---

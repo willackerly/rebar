@@ -1,0 +1,2 @@
+SKIP: tier 1 < required tier 2 (set REBAR_TIER or .rebarrc to change, or name it in checks_enable)
+--- exit 0 ---

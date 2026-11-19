@@ -1,0 +1,8 @@
+[main df87c61] fix: the "thing"
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+[agent-health] checkpoint: df87c61 fix: the "thing"
+--- progress
+{"agent":"rebar-parity-agent","ts":"<ts>","type":"checkpoint","commit":"df87c61","message":"fix: the "thing""}
+--- status
+?? progress.jsonl
+?? untracked.txt

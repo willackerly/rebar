@@ -1,0 +1,20 @@
+check-fix-commit — Gate G enforcement: fix:/regression: commits must
+document where the symptom was reproduced.
+
+Source: feedback/processed/2026-04-24-process-gates-G-through-L.md §Gate G.
+
+Rule: any commit prefixed `fix:`, `fix(...)`, or `regression:` /
+`regression(...)` MUST contain a `Reproduced on:` line in the body
+referencing a SHA, deploy URL, log excerpt, or screenshot link. Without
+this, the author is fixing a phantom — the user-reported symptom hasn't
+been observed independently before fixing began.
+
+Modes:
+  rebar run check-fix-commit                       # check HEAD's commit msg
+  rebar run check-fix-commit <commit-msg-file>     # check given file (commit-msg hook usage)
+  rebar run check-fix-commit --range <sha>..<sha>  # audit a range of commits
+  rebar run check-fix-commit --warn                # flag but don't fail
+
+Exit code: 0 if all qualifying commits are clean, 1 if any violations.
+
+--- exit 0 ---

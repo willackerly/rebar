@@ -1,0 +1,15 @@
+--- stdout ---
+# ask architect — <TS>
+# Q: q
+---
+[1] Read x
+---
+# status: done — <TS>
+
+--- stderr ---
+--- changes ---
+--- made home/.config/ ---
+--- made home/.config/ask/ ---
+--- wrote home/.config/ask/projects ---
+proj = $BASE/proj
+--- exit 0 ---

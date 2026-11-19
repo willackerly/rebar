@@ -101,7 +101,7 @@ printf 'contracts_dir = ./docs/specs/\n' > "$R/.rebarrc"
 out=$(run_in "$R" check-registry.sh) || true
 contains "$out" 'ORPHAN.*S5-SPEC' || fail "check-registry counted a reference inside the contracts dir (./docs/specs/): $out"
 rm "$R/.rebarrc"
-out=$(cd "$R" && REBAR_PROJECT_ROOT="$R" "$REBAR_SCRIPTS/check-registry.sh" ./docs/specs/ 2>&1) || true
+out=$(run_in "$R" check-registry.sh ./docs/specs/) || true
 contains "$out" 'ORPHAN.*S5-SPEC' || fail "check-registry ./docs/specs/ (argument) counted a reference inside the contracts dir: $out"
 ok "contracts_dir is normalised (./docs/specs/ → docs/specs) before excluding it"
 

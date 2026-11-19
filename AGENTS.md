@@ -1,6 +1,6 @@
 # AGENTS.md — working on rebar itself
 
-> **rebar v3.1.2** | **Tier 3: ENFORCED** — this repo dogfoods its own methodology.
+> **rebar v4.0.0** | **Tier 3: ENFORCED** — this repo dogfoods its own methodology.
 
 ## Read Before Coding
 
@@ -48,7 +48,7 @@ for routine work.
 | Modifying a contract (breaking) | **Plan mode** |
 | Modifying a contract (non-breaking minor bump) | Full |
 | Removing or deprecating a contract | **Plan mode** |
-| Touching `bin/ask-mcp-server` protocol behavior | **Plan mode** (Claude Code clients depend on it) |
+| Touching the MCP server's protocol behavior (`cli/internal/mcp`) | **Plan mode** (Claude Code clients depend on it) |
 
 Rule of thumb: if your change is reversible and follows existing patterns,
 just do it. If it establishes new patterns or affects MCP-connected clients,
@@ -70,9 +70,9 @@ The rebar source repo has contracts for its own load-bearing components:
 
 | Contract | Component | Source location |
 |----------|-----------|-----------------|
-| `CONTRACT:S1-STEWARD.2.0` | Quality scanner (steward.sh + companion infra) | `scripts/steward.sh`, `agents/steward/` |
-| `CONTRACT:S2-ASK-CLI.1.0` | Persistent role-agent CLI | `bin/ask`, `bin/ask-server`, `bin/ask-agent-loop` |
-| `CONTRACT:S3-MCP-SERVER.1.0` | MCP bridge exposing ASK as Claude-Code-native tools | `bin/ask-mcp-server` |
+| `CONTRACT:S1-STEWARD.2.0` | Quality scanner (steward.sh + companion infra) | `rebar run steward`, `agents/steward/` |
+| `CONTRACT:S2-ASK-CLI.1.0` | Persistent role-agent CLI | `cli/internal/ask`, `bin/ask`, `bin/ask-server`, `bin/ask-agent-loop` |
+| `CONTRACT:S3-MCP-SERVER.1.0` | MCP bridge exposing ASK as Claude-Code-native tools | `cli/internal/mcp`, `bin/ask-mcp-server` |
 
 **Rules:**
 1. Don't modify these without checking the contract first.
@@ -84,11 +84,11 @@ The rebar source repo has contracts for its own load-bearing components:
 
 | Tier | Target | Speed | Command |
 |------|--------|-------|---------|
-| **T0** | Bash syntax | <2s | `for f in scripts/*.sh; do bash -n "$f"; done` |
-| **T0.5** | Shell regression tests | ~15s | `scripts/tests/run.sh [pattern]` (also in ci-check) |
+| **T0** | Bash syntax | <2s | `for f in scripts/*.sh scripts/tests/*.sh setup-rebar.sh; do bash -n "$f"; done` |
+| **T0.5** | Shell regression tests | ~15s | `scripts/tests/run.sh [pattern]` (builds rebar from cli/; also in `rebar check`) |
 | **T1** | Single Go test file | <10s | `cd cli && go test ./cmd/<file>_test.go` |
-| **T2** | All Go tests | <30s | `cd cli && go test ./...` |
-| **T3** | Full ci-check (rebar enforces itself) | <30s | `scripts/ci-check.sh` |
+| **T2** | All Go tests | ~1 min | `cd cli && go test -timeout 20m ./...` (golden cases run in parallel; `-update-golden` rewrites goldens after a deliberate change) |
+| **T3** | Full `rebar check` (rebar enforces itself) | <30s | `cd cli && go build -o ../bin/rebar . && cd .. && bin/rebar check` |
 | **T4** | MCP smoke test | <10s | `echo '{"jsonrpc":"2.0",...}' | bin/ask-mcp-server --stdio --repos-dir ~/dev` |
 | **T5** | Cross-repo audit | <30s | `rebar audit --all ~/dev` |
 
@@ -108,7 +108,7 @@ The rebar source repo has contracts for its own load-bearing components:
 - `TODO:` — untracked work (blocks commit)
 - `TRACKED-TASK:` — already in TODO.md or INVENTORY.md (commit allowed)
 
-Run `scripts/check-todos.sh` before every commit. Pre-commit hook handles this.
+Run `rebar run check-todos` before every commit. Pre-commit hook handles this.
 
 ## Multi-Agent Orchestration
 
@@ -123,7 +123,7 @@ After any code change, walk the doc tree and update:
 - README.md if it changed how rebar describes itself
 - QUICKCONTEXT.md What's Next + last-synced
 - INVENTORY.md if a feedback item was implemented or rejected
-- METRICS file if counts shifted (run `scripts/check-ground-truth.sh`)
+- METRICS file if counts shifted (run `rebar run check-ground-truth`)
 - Practice docs if a new pattern was codified
 
 ## Commit & PR Guidelines

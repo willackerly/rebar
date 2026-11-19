@@ -1,0 +1,13 @@
+Pre-commit: checking TODO tracking...
+OK: 0 untracked TODOs. 1 tracked tasks.
+
+Pre-commit: checking contract references...
+
+Checked 0 contract references, 0 broken.
+rebar: running project copy scripts/check-ground-truth.sh (deprecated: run `rebar migrate` to replace it with the built-in check)
+
+Pre-commit: checking ground truth metrics...
+never
+
+Pre-commit checks passed.
+--- exit 0 ---

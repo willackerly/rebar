@@ -1,0 +1,36 @@
+GET /mcp/schema 
+401 {"error": "Bearer token required"}
+GET /mcp/schema 
+200 {
+  "protocol": "mcp",
+  "version": "2026-07-28",
+  "protocolVersions": [
+    "2026-07-28",
+    "2025-11-25",
+    "2025-06-18",
+    "2025-03-26",
+    "2024-11-05"
+  ],
+  "capabilities": {
+    "tools": {},
+    "resources": {}
+  },
+  "serverInfo": {
+    "name": "ask-mcp-server",
+    "version": "$VERSION",
+    "description": "MCP server for ASK agent coordination platform"
+  }
+}
+GET /v1/health 
+403 {"error": "Invalid API key"}
+GET /v1/health 
+401 {"error": "Bearer token required"}
+GET /v1/health 
+404 {"error": "Only MCP endpoints available in --mcp-only mode"}
+POST /v1/ask {"repo":"web","role":"product","question":"q"}
+404 {"error": "Only MCP endpoints available in --mcp-only mode"}
+POST /mcp {"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"t","version":"1"}},"id":1}
+401 [application/json] {"error": "Bearer token required"}
+POST /mcp {"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"t","version":"1"}},"id":1}
+200 [application/json] [Mcp-Session-Id: $SESSION] {"jsonrpc":"2.0","id":1,"result":{"capabilities":{"resources":{},"tools":{}},"protocolVersion":"2025-11-25","serverInfo":{"name":"ask-mcp-server","description":"MCP server for ASK agent coordination platform","version":"$VERSION"}}}
+--- exit 0 ---

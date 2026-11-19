@@ -1,0 +1,19 @@
+BROKEN: ./.github/g.js:1 references CONTRACT:S6-GITHUB.1.0
+        Expected: architecture/CONTRACT-S6-GITHUB.1.0.md
+BROKEN: ./distance.go:1 references CONTRACT:S7-DIST.1.0
+        Expected: architecture/CONTRACT-S7-DIST.1.0.md
+BROKEN: ./src/b/b.ts:3 references CONTRACT:S2-MISSING.2.1
+        Expected: architecture/CONTRACT-S2-MISSING.2.1.md
+BROKEN: ./src/crlf.rs:1 references CONTRACT:S3-CRLF.1.0
+        Expected: architecture/CONTRACT-S3-CRLF.1.0.md
+BROKEN: ./src/dots.py:1 references CONTRACT:..
+        Expected: architecture/CONTRACT-...md
+BROKEN: ./src/two.go:2 references CONTRACT:S9-OTHER.1.0
+        Expected: architecture/CONTRACT-S9-OTHER.1.0.md
+
+Checked 9 contract references, 6 broken.
+
+Fix by either:
+  1. Creating the missing contract in architecture/
+  2. Updating the code reference to the correct contract version
+--- exit 1 ---

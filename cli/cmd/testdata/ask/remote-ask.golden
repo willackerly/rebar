@@ -1,0 +1,19 @@
+--- stdout ---
+Remote answer from server1.
+--- stderr ---
+--- changes ---
+--- made home/.config/ ---
+--- made home/.config/ask/ ---
+--- wrote home/.config/ask/.rr-index ---
+0
+--- wrote home/.config/ask/projects ---
+proj = $BASE/proj
+--- requests ---
+server1 POST /v1/ask auth="Bearer k3y" type="application/json"
+{
+  "repo": "web",
+  "role": "architect",
+  "question": "Remote?",
+  "verbose": false
+}
+--- exit 0 ---

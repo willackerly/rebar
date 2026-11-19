@@ -1,0 +1,13 @@
+FAIL: 2 prefix number(s) claimed by more than one contract ID:
+
+  C12: C12-A, C12-B
+  I3: I3, I3-CRLF.1.0.md, I3-LLM-CLIENT, I3-SCANNER, I3-ZED
+
+Each prefix number (S1, I3, ...) must map to exactly one contract ID.
+Versions of the same ID are fine; two different IDs sharing a number
+overload the prefix. Renumber the newer contract to the next free number,
+update its implementing-file headers (grep -rn "CONTRACT:<old-id>"), and
+regenerate the registry with `rebar run compute-registry`.
+
+WARN: advisory at Tier x; blocking at Tier 3.
+--- exit 0 ---

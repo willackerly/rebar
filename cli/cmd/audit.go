@@ -10,12 +10,13 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+	rebarchecks "github.com/willackerly/rebar/cli/internal/checks"
 	"github.com/willackerly/rebar/cli/internal/config"
 )
 
 var (
-	auditAll  string // directory to scan for repos
-	auditFix  bool   // auto-fix quick wins
+	auditAll string // directory to scan for repos
+	auditFix bool   // auto-fix quick wins
 )
 
 var auditCmd = &cobra.Command{
@@ -246,14 +247,14 @@ func auditContracts(root string) auditResult {
 func auditEnforcement(root string) auditResult {
 	checks := []checkResult{hookInstalled(root)}
 
-	// The checks run from the rebar install; a project's own copy also counts.
-	rebarRoot := findRebarRoot()
+	// The checks are built into rebar (named after the scripts they
+	// replaced), so they are always available.
 	for _, script := range []string{"ci-check.sh", "check-contract-refs.sh", "check-todos.sh", "refresh-context.sh"} {
-		_, ok := resolveScript(root, rebarRoot, script)
+		_, builtIn := rebarchecks.Lookup(script)
 		checks = append(checks, checkResult{
 			Name:   script + " available",
-			Pass:   ok,
-			Detail: "project scripts/ or the rebar install",
+			Pass:   builtIn,
+			Detail: "built into rebar",
 		})
 	}
 
@@ -548,13 +549,7 @@ func applyFixes(root string) int {
 	archDir := filepath.Join(root, contractsDir)
 	if _, err := os.Stat(archDir); os.IsNotExist(err) {
 		os.MkdirAll(archDir, 0755)
-		rebarRoot := findRebarRoot()
-		if rebarRoot != "" {
-			src := filepath.Join(rebarRoot, "architecture", "CONTRACT-TEMPLATE.md")
-			if data, err := os.ReadFile(src); err == nil {
-				os.WriteFile(filepath.Join(archDir, "CONTRACT-TEMPLATE.md"), data, 0644)
-			}
-		}
+		writeContractTemplate(archDir)
 		fmt.Printf("  ✓ Created %s/ with contract template\n", contractsDir)
 		fixed++
 	}

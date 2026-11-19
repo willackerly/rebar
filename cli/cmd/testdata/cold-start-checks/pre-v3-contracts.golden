@@ -1,0 +1,10 @@
+<rebar-cold-start>
+rebar cold-start health — advisory (this hook always exits 0)
+[PASS] check-contract-refs — Checked 0 contract references, 0 broken.
+[PASS] check-todos — OK: 0 untracked TODOs. 1 tracked tasks.
+[SKIP] check-freshness — SKIP: tier 1 < required tier 2 (set REBAR_TIER or .rebarrc to change, or name it in checks_enable)
+[SKIP] check-ground-truth — SKIP: tier 1 < required tier 3 (set REBAR_TIER or .rebarrc to change, or name it in checks_enable)
+maturity: pre-v3 (no Status fields)
+all 4 checks passing (Ns).
+</rebar-cold-start>
+--- exit 0 ---

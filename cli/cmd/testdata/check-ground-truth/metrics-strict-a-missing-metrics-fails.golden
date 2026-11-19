@@ -1,0 +1,8 @@
+=== Ground Truth Verification ===
+
+FAIL: No METRICS file found (metrics_strict = true)
+  Create a METRICS file with key = value pairs and declare how
+  to compute each one as metric.<key>.* lines in .rebarrc.
+
+Ground truth not verified — metrics_strict = true needs a METRICS file and metric declarations
+--- exit 1 ---

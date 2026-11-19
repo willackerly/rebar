@@ -1,0 +1,2 @@
+inbox-watch: --self needs a value (use --self '' to disable)
+--- exit 2 ---

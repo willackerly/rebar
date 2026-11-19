@@ -1,0 +1,9 @@
+--- stdout ---
+web:architect
+web:product
+--- stderr ---
+--- changes ---
+--- requests ---
+server1 GET /v1/agents auth="" type="application/json"
+
+--- exit 0 ---

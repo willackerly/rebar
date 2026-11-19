@@ -1,0 +1,11 @@
+BROKEN: ./node_modules/c.go:1 references CONTRACT:S5-NODE.1.0
+        Expected: architecture/CONTRACT-S5-NODE.1.0.md
+BROKEN: ./tools/x.sh:1 references CONTRACT:S2-SH.1.0
+        Expected: architecture/CONTRACT-S2-SH.1.0.md
+
+Checked 2 contract references, 2 broken.
+
+Fix by either:
+  1. Creating the missing contract in architecture/
+  2. Updating the code reference to the correct contract version
+--- exit 1 ---

@@ -3,8 +3,8 @@
 > Format identifier: `rebar-pending-notifications-v1`
 
 The federation outbox at `architecture/.state/pending-notifications.md`
-is auto-populated by `scripts/check-version-bump.sh` (post-commit hook)
-and consumed by `scripts/flush-notifications.sh` (manual flush).
+is auto-populated by `rebar run check-version-bump` (post-commit hook)
+and consumed by `rebar run flush-notifications` (manual flush).
 
 ## File structure
 
@@ -31,21 +31,21 @@ and consumed by `scripts/flush-notifications.sh` (manual flush).
 
 | Field | Required | Set by | Notes |
 |-------|----------|--------|-------|
-| `detected` | yes | `check-version-bump.sh` | When the rename was observed |
-| `status` | yes | `check-version-bump.sh` (init `pending`); `flush-notifications.sh` (`sent`/`dropped`) | Lifecycle state |
-| `commit` | yes | `check-version-bump.sh` | The commit that introduced the bump |
-| `old_path` | yes | `check-version-bump.sh` | For audit trail; not used for dispatch |
-| `new_path` | yes | `check-version-bump.sh` | Same |
-| `severity` | yes | `check-version-bump.sh` (init `auto`); `flush-notifications.sh` may classify | `auto` defers to flush-time inference |
+| `detected` | yes | `rebar run check-version-bump` | When the rename was observed |
+| `status` | yes | `rebar run check-version-bump` (init `pending`); `rebar run flush-notifications` (`sent`/`dropped`) | Lifecycle state |
+| `commit` | yes | `rebar run check-version-bump` | The commit that introduced the bump |
+| `old_path` | yes | `rebar run check-version-bump` | For audit trail; not used for dispatch |
+| `new_path` | yes | `rebar run check-version-bump` | Same |
+| `severity` | yes | `rebar run check-version-bump` (init `auto`); `rebar run flush-notifications` may classify | `auto` defers to flush-time inference |
 
 ## Status lifecycle
 
 ```
-[bump detected]                       [flush succeeds]
-       ↓                                      ↓
-   pending  ────  flush-notifications.sh  ──→  sent
-       │                                      ↑
-       └──  manually edited to "dropped"  ────┘
+[bump detected]                                  [flush succeeds]
+       ↓                                                 ↓
+   pending  ────  rebar run flush-notifications  ──→   sent
+       │                                                 ↑
+       └──  manually edited to "dropped"  ───────────────┘
             (when owner decides not to notify)
 ```
 
@@ -56,7 +56,7 @@ and consumed by `scripts/flush-notifications.sh` (manual flush).
 ## Coalescence
 
 When multiple bumps queue before flushing (e.g., 1.0 → 2.0 then 2.0 → 2.1
-in quick succession), `flush-notifications.sh` does NOT auto-coalesce in
+in quick succession), `rebar run flush-notifications` does NOT auto-coalesce in
 the v1 implementation — each bump becomes a separate FR per consumer.
 This is intentionally simple. If notification fatigue surfaces, a future
 revision may add `--coalesce` mode that emits one FR per (contract,
@@ -70,7 +70,7 @@ Owners may edit this file by hand to:
   to override the flush-time classifier
 - Delete entries entirely (treated as dropped)
 
-`check-version-bump.sh` is append-only and never rewrites existing
+`rebar run check-version-bump` is append-only and never rewrites existing
 entries, so manual edits are safe.
 
 ## Why this format
@@ -80,5 +80,5 @@ entries, so manual edits are safe.
   garbage-collect
 - **No JSON** because the substrate is plain-text + grep + jq (CHARTER
   §1.3); markdown with structured fields is the rebar idiom
-- **Append-only writes** from `check-version-bump.sh` avoid race conditions
+- **Append-only writes** from `rebar run check-version-bump` avoid race conditions
   with concurrent commits (no full-file rewrites)

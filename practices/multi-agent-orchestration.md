@@ -185,15 +185,13 @@ git gc --prune=now
 
 ## Agent Health Infrastructure
 
-Source `scripts/agent-health.sh` in agent prompts for structured health signals:
+Run `rebar run agent-health` in agent prompts for structured health signals:
 
 ```bash
-source scripts/agent-health.sh
-
-agent_checkpoint "fix: correct font ascender metric"  # stage + commit tracked files
-agent_heartbeat                                        # write timestamp to /tmp/agent-<id>.heartbeat
-agent_metric "tests_fixed" "3"                         # key-value to shared progress
-agent_rmse "gradient-heavy" 0.301 0.180                # fidelity-specific metric
+rebar run agent-health checkpoint "fix: correct font ascender metric"  # stage + commit tracked files
+rebar run agent-health heartbeat                                        # write timestamp to /tmp/agent-<id>.heartbeat
+rebar run agent-health metric "tests_fixed" "3"                         # key-value to shared progress
+rebar run agent-health rmse "gradient-heavy" 0.301 0.180                # fidelity-specific metric
 ```
 
 All agents append to a shared JSONL progress file. The parent can

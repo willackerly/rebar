@@ -1,0 +1,17 @@
+FAIL: 8 untracked TODO(s) found:
+
+src/a/b.go:1:// TODO: a directory sorts before a.go
+src/a.go:2:// TODO: first
+src/a.go:4:// TODO: second TODO: twice
+src/distance_vendor_dist.go:1:// TODO: names are not directories
+src/nested/deep/b.ts:1:// TODO: deep
+internal/c.rs:2:// TODO: untracked
+cmd/d.jsx:1:{/* TODO: jsx */}
+client/.github/i.js:1:// TODO: hidden but scanned
+
+Before committing, you must either:
+  1. Fix the TODO immediately (remove it), OR
+  2. Add it to TODO.md and convert to: TRACKED-TASK: description
+
+Also found 1 tracked tasks (OK).
+--- exit 1 ---

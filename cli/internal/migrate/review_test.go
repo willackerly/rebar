@@ -19,9 +19,15 @@ func commitAll(t *testing.T, p string) {
 	testutil.Git(t, p, "commit", "-q", "-m", "update")
 }
 
+// installScript is one of rebar's scripts as released in v3.1.1, the last
+// release that shipped them (testdata/legacy, byte-identical to
+// `git show v3.1.1:scripts/<name>`): the copy an adopter would have. Being
+// a released blob, migrate recognizes it from the manifest embedded in the
+// CLI, without the rebar tree's git history. install is unused (rebar's
+// tree has no scripts now).
 func installScript(t *testing.T, install, name string) string {
 	t.Helper()
-	data, err := os.ReadFile(filepath.Join(install, "scripts", name))
+	data, err := os.ReadFile(filepath.Join("testdata", "legacy", name+".fixture"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -632,5 +638,76 @@ func TestSourcedForOtherFunctionsKeepsGroundTruth(t *testing.T) {
 	}
 	if sp := scriptPlan(plan, "check-ground-truth.sh"); sp.Verdict != Replace || !sp.Shim {
 		t.Fatalf("caller of compute_metrics() alone: want the wrapper:\n%s", render(plan))
+	}
+}
+
+// Review S8-2: a git hook linked to a copy (or calling it) is a caller: the
+// copy becomes a thin wrapper instead of being deleted, since git skips a
+// hook whose target is gone without a word. Hooks are found in the git dir
+// and in core.hooksPath.
+func TestGitHooksAreCallers(t *testing.T) {
+	install := installRoot(t)
+	todos := installScript(t, install, "check-todos.sh")
+	for _, tc := range []struct {
+		name, hook string
+		setup      func(t *testing.T, p string)
+	}{
+		{"symlink in .git/hooks", ".git/hooks/pre-push:1", func(t *testing.T, p string) {
+			if err := os.Symlink("../../scripts/check-todos.sh", filepath.Join(p, ".git", "hooks", "pre-push")); err != nil {
+				t.Skip("symlinks unsupported:", err)
+			}
+		}},
+		{"hook file in .git/hooks", ".git/hooks/commit-msg:2", func(t *testing.T, p string) {
+			testutil.WriteExecutable(t, p, ".git/hooks/commit-msg", "#!/bin/sh\nexec ./scripts/check-todos.sh\n")
+		}},
+		{"symlink in core.hooksPath", ".githooks/pre-commit:1", func(t *testing.T, p string) {
+			if err := os.MkdirAll(filepath.Join(p, ".githooks"), 0o755); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.Symlink("../scripts/check-todos.sh", filepath.Join(p, ".githooks", "pre-commit")); err != nil {
+				t.Skip("symlinks unsupported:", err)
+			}
+			testutil.Git(t, p, "config", "core.hooksPath", ".githooks")
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			p := testutil.InitRepo(t)
+			testutil.WriteFile(t, p, ".rebarrc", "tier = 1\n")
+			testutil.WriteFile(t, p, "src/a.go", "package a\n")
+			testutil.WriteExecutable(t, p, "scripts/check-todos.sh", todos)
+			tc.setup(t, p)
+			commitAll(t, p)
+			plan, err := BuildPlan(opts(p, install))
+			if err != nil {
+				t.Fatal(err)
+			}
+			sp := scriptPlan(plan, "check-todos.sh")
+			if sp == nil || sp.Verdict != Replace || !sp.Shim {
+				t.Fatalf("hooked copy not wrapped:\n%s", render(plan))
+			}
+			if !strings.Contains(render(plan), "because "+tc.hook+" call it") {
+				t.Errorf("plan does not name the hook %s:\n%s", tc.hook, render(plan))
+			}
+		})
+	}
+}
+
+// The wrapper migrate leaves finds its project through a symlink (a git
+// hook linked to it), not the directory of the link.
+func TestShimThroughSymlinkedHook(t *testing.T) {
+	if _, err := exec.LookPath("bash"); err != nil {
+		t.Skip("bash not installed")
+	}
+	p := testutil.InitRepo(t)
+	testutil.WriteExecutable(t, p, "scripts/check-fix-commit.sh", string(shimScript("check-fix-commit")))
+	hook := filepath.Join(p, ".git", "hooks", "commit-msg")
+	if err := os.Symlink("../../scripts/check-fix-commit.sh", hook); err != nil {
+		t.Skip("symlinks unsupported:", err)
+	}
+	bin := t.TempDir()
+	testutil.WriteExecutable(t, bin, "rebar", "#!/bin/sh\necho \"root=$REBAR_PROJECT_ROOT args=$*\"\n")
+	out, err := exec.Command("bash", "-c", `PATH="$1:$PATH" "$2" .git/COMMIT_EDITMSG`, "-", bin, hook).CombinedOutput()
+	if err != nil || strings.TrimSpace(string(out)) != "root="+p+" args=run check-fix-commit .git/COMMIT_EDITMSG" {
+		t.Fatalf("hook through the wrapper: %v\n%s", err, out)
 	}
 }

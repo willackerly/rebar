@@ -1,0 +1,10 @@
+--- stdout ---
+STATUS: stopped
+--- stderr ---
+--- changes ---
+--- made home/.config/ ---
+--- made home/.config/ask/ ---
+--- wrote home/.config/ask/projects ---
+proj = $BASE/proj
+--- removed proj/agents/architect/.pid ---
+--- exit 0 ---

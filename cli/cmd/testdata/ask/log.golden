@@ -1,0 +1,14 @@
+--- stdout ---
+---
+**<TS>** Q: question 1
+A: answer 1
+---
+**<TS>** Q: question 2
+A: answer 2
+--- stderr ---
+--- changes ---
+--- made home/.config/ ---
+--- made home/.config/ask/ ---
+--- wrote home/.config/ask/projects ---
+proj = $BASE/proj
+--- exit 0 ---

@@ -1,0 +1,12 @@
+FAIL: 3 untracked TODO(s) found:
+
+./a.go:1:// TODO: top level
+./node_modules/n/x.go:1:// TODO: no longer excluded
+./notes/plan.md:1:TODO: in markdown
+
+Before committing, you must either:
+  1. Fix the TODO immediately (remove it), OR
+  2. Add it to TODO.md and convert to: TRACKED-TASK: description
+
+Also found 0 tracked tasks (OK).
+--- exit 1 ---

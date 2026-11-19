@@ -1,0 +1,16 @@
+Usage: flush-notifications.sh [--dry-run] [--severity LEVEL]
+
+Reads architecture/.state/pending-notifications.md and dispatches pending notifications to consumers via
+ask_<consumer>_featurerequest. Marks entries "sent" on success.
+
+  --dry-run                   show what would be sent, don't dispatch
+  --severity breaking|additive|patch|doc-only
+                              override auto-classification
+
+Environment:
+  REBAR_OUTBOX               outbox file path (default: architecture/.state/pending-notifications.md)
+  REBAR_NOTIFY_DEFAULT       behavior when notify_on_change absent in
+                             consumer's CONSUMES.md: "notify" or "skip"
+                             (default: notify)
+  ASK_BIN                    path to ask CLI (default: ask)
+--- exit 0 ---

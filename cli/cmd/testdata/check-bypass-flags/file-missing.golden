@@ -1,0 +1,2 @@
+check-bypass-flags: file not found: nope
+--- exit 2 ---

@@ -1,0 +1,9 @@
+--- stdout ---
+architect memory: 3 entries, 0KB — no compaction needed.
+--- stderr ---
+--- changes ---
+--- made home/.config/ ---
+--- made home/.config/ask/ ---
+--- wrote home/.config/ask/projects ---
+proj = $BASE/proj
+--- exit 0 ---

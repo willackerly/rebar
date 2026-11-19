@@ -7,7 +7,10 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/willackerly/rebar/cli/internal/checks"
+	"github.com/willackerly/rebar/cli/internal/config"
 	"github.com/willackerly/rebar/cli/internal/scripts"
+	"github.com/willackerly/rebar/cli/internal/suite"
 )
 
 // thinWrapperMarker tags a project script that only hands off to the rebar
@@ -30,41 +33,60 @@ func isThinWrapper(path string) bool {
 	return false
 }
 
-// resolvedScript is the script the CLI runs for a name.
+// resolvedScript is a project's own script that `rebar run` (and the
+// commands built on it) runs for a name.
 type resolvedScript struct {
 	Path string
-	// Legacy is true for a project's own copy of a rebar script, kept
-	// working for adopters who have not moved to the thin wrappers yet.
+	// Legacy is true for a project's own copy of one of rebar's scripts (a
+	// built-in check has its name): it is the adopter's code, so it still
+	// runs instead of the built-in check, with a deprecation notice. In a
+	// rebar source checkout nothing is legacy.
 	Legacy bool
 }
 
-// resolveScript finds the script to run for name (with or without .sh). A
-// project's own scripts/<name> wins unless it is a thin wrapper; otherwise
-// the rebar install's scripts/<name> runs. In the rebar source repo the
-// two are the same file and nothing is legacy.
-func resolveScript(projectRoot, rebarRoot, name string) (resolvedScript, bool) {
+// resolveScript finds the project's own scripts/<name> (name with or
+// without .sh), unless it is a thin wrapper, which hands off to the CLI
+// and would loop.
+func resolveScript(projectRoot, name string) (resolvedScript, bool) {
 	if !strings.HasSuffix(name, ".sh") {
 		name += ".sh"
 	}
 	local := filepath.Join(projectRoot, "scripts", name)
-	if isFile(local) && !isThinWrapper(local) {
-		return resolvedScript{Path: local, Legacy: !samePath(projectRoot, rebarRoot)}, true
+	if !isFile(local) || isThinWrapper(local) {
+		return resolvedScript{}, false
 	}
-	if rebarRoot != "" {
-		installed := filepath.Join(rebarRoot, "scripts", name)
-		if isFile(installed) {
-			return resolvedScript{Path: installed}, true
-		}
-	}
-	return resolvedScript{}, false
+	_, builtIn := checks.Lookup(name)
+	return resolvedScript{Path: local, Legacy: builtIn && !config.IsRebarTree(projectRoot)}, true
 }
 
-// runRebarScript resolves name for the current project and runs it there.
-// found is false when neither the project nor a rebar install has it.
+// runRebarScript runs what name stands for in the current project, in the
+// project root, and returns its exit code; found is false when there is
+// nothing of that name. In order: the project's own copy of one of rebar's
+// scripts (Legacy, with the deprecation notice), the built-in check, an
+// extra check the project lists in .rebarrc checks_extra (or
+// checks_extra_pre_commit), found by its name and run as the suites run
+// it, and any other script in the project's scripts/.
 func runRebarScript(name string, args ...string) (exitCode int, found bool, err error) {
-	s, ok := resolveScript(cfg.RepoRoot, findRebarRoot(), name)
+	s, ok := resolveScript(cfg.RepoRoot, name)
+	if c, builtIn := checks.Lookup(name); builtIn && !s.Legacy {
+		return runNativeCheck(c, cfg.RepoRoot, cfg.RepoRoot, args), true, nil
+	}
+	if e, extra := suite.FindExtra(cfg.RepoRoot, name); extra && !s.Legacy {
+		if !e.Runnable(cfg.RepoRoot) {
+			return 0, false, fmt.Errorf("extra check %s (.rebarrc checks_extra) is not an executable file", e.Path)
+		}
+		ctx := &checks.Context{Root: cfg.RepoRoot, Dir: cfg.RepoRoot, Stdout: os.Stdout, Stderr: os.Stderr}
+		return e.Run(ctx, args), true, nil
+	}
 	if !ok {
 		return 0, false, nil
+	}
+	switch decideLegacySuite(os.Stderr, s) {
+	case runBuiltIn:
+		c, _ := checks.Lookup(name)
+		return runNativeCheck(c, cfg.RepoRoot, cfg.RepoRoot, args), true, nil
+	case refuseCopy:
+		return 1, true, nil
 	}
 	warnLegacy(s)
 	code, err := scripts.RunInProject(s.Path, cfg.RepoRoot, args...)
@@ -73,7 +95,7 @@ func runRebarScript(name string, args ...string) (exitCode int, found bool, err 
 
 func warnLegacy(s resolvedScript) {
 	if s.Legacy {
-		fmt.Fprintf(os.Stderr, "rebar: running the project's own %s (deprecated: rebar runs its checks from the install; move customizations to .rebarrc and delete the copy)\n",
+		fmt.Fprintf(os.Stderr, "rebar: running the project's own %s (deprecated: rebar's checks are built in; run `rebar migrate` to move its customizations to .rebarrc and replace it)\n",
 			filepath.Join("scripts", filepath.Base(s.Path)))
 	}
 }
@@ -81,16 +103,4 @@ func warnLegacy(s resolvedScript) {
 func isFile(path string) bool {
 	info, err := os.Stat(path)
 	return err == nil && !info.IsDir()
-}
-
-func samePath(a, b string) bool {
-	if a == "" || b == "" {
-		return false
-	}
-	ra, errA := filepath.EvalSymlinks(a)
-	rb, errB := filepath.EvalSymlinks(b)
-	if errA != nil || errB != nil {
-		return filepath.Clean(a) == filepath.Clean(b)
-	}
-	return ra == rb
 }

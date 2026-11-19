@@ -1,0 +1,35 @@
+=== Rebar compliance check ===
+
+OK: .rebar-version = v3.1.0-rc.2
+OK: .rebarrc tier = 2 (ADOPTED)
+OK: README.md badge found on line 2
+    Version: v3.1.0-rc.2 | Tier: 2 (ADOPTED)
+
+=== AGENTS.md required sections ===
+OK: Cold Start / Read Before Coding — agents must know the reading order
+OK: Contract-Driven Development — the 4 rules that make contracts operational
+OK: Testing expectations — cascade tiers or scout rule
+OK: TODO Tracking — two-tag system prevents invisible debt
+OK: AGENTS.md mentions ASK CLI
+
+=== Contract maturity (declared Status:) ===
+WARN: CONTRACT-S1-A.1.0.md declares Status: 'stable' — not in the maturity vocabulary (stub|draft|in-progress|active|verified); counted as stub-or-draft
+  source line: **Status:** stable
+WARN: CONTRACT-S7-G.1.0.md declares Status: 'active' — not in the maturity vocabulary (stub|draft|in-progress|active|verified); counted as stub-or-draft
+  source line: **Status:** active
+WARN: CONTRACT-S8-H.1.0.md declares Status: 'éééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé' — not in the maturity vocabulary (stub|draft|in-progress|active|verified); counted as stub-or-draft
+  source line: **Status:** éééééééééééééééééééééééééééééééééééééééééééééééééééééé
+WARN: CONTRACT-S9-I.1.0.md declares Status: ''quoted'' — not in the maturity vocabulary (stub|draft|in-progress|active|verified); counted as stub-or-draft
+  source line: **Status:**	'quoted' x
+WARN: CONTRACT-S2-B.1.0.md has no Status: line — add one (see architecture/CONTRACT-TEMPLATE.md header)
+WARN: CONTRACT-S4-D.1.0.md has no Status: line — add one (see architecture/CONTRACT-TEMPLATE.md header)
+WARN: CONTRACT-S5-E.1.0.md has no Status: line — add one (see architecture/CONTRACT-TEMPLATE.md header)
+WARN: CONTRACT-S6-F.1.0.md has no Status: line — add one (see architecture/CONTRACT-TEMPLATE.md header)
+OK: 1 of 9 live contract(s) declare maturity — 12 stub-or-draft-or-undeclared (133.3%)
+FAIL: 133.3% of live contracts are stub-or-draft (>66%) — badge demoted one tier
+  Declared: Tier 2: ADOPTED — Effective: Tier 1: PARTIAL
+  Reason: a tier claimed on top of a mostly stub/draft contract set overstates adoption.
+  Fix: mature the contracts (or lower the badge) until <=66% are stub-or-draft.
+
+FAIL: 1 compliance issue(s) found.
+--- exit 1 ---

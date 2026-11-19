@@ -1,0 +1,74 @@
+# Rebar configuration for this project
+# Reference for every key: https://github.com/willackerly/rebar/blob/main/docs/CONFIGURATION.md
+#
+# Tier controls which checks are enforced:
+#   1 = Partial  — contract refs + TODOs only (solo dev / early adoption)
+#   2 = Adopted  — + headers, freshness, compliance (small team)
+#   3 = Enforced — + ground truth, strict steward (department / production)
+# The registry check runs at every tier.
+
+tier = 1
+# (legacy alias, kept for older scripts that read REBAR_TIER)
+REBAR_TIER=1
+
+# Run named checks even below their tier, each as it would run at tier 3.
+# Names are the check scripts without .sh; unknown names are warned about
+# and ignored. Env override: REBAR_CHECKS_ENABLE.
+# checks_enable = check-ground-truth check-contract-headers
+
+# Your own checks (any language, executable), run after rebar's by
+# `rebar check` (checks_extra) and `rebar check --pre-commit`
+# (checks_extra_pre_commit); listed in the summary as `extra: <name>`.
+# A non-zero exit, or a missing file, fails the suite.
+# checks_extra = scripts/check-openapi.sh
+# checks_extra_pre_commit = scripts/check-openapi.sh
+
+# ── Repo-specific settings ───────────────────────────────────────────────
+# rebar's checks run from the rebar install (`rebar check`); this file is
+# where a project tailors them. Everything below is optional and shown with
+# an example value. `#` starts a comment, so values cannot contain it.
+
+# Where the contracts live (CONTRACT-*.md, CONTRACT-REGISTRY.md, the steward's
+# .state/). Names the contracts location only; architecture/ can keep other
+# design docs either way.
+# contracts_dir = architecture
+
+# This repo's contract namespace (letters, digits, . _ / -; not shaped like
+# an ID.version such as acme.1.2). When set, source
+# may cite a contract here as CONTRACT:<namespace>:<ID>.<v> as well as the
+# short CONTRACT:<ID>.<v>; a ref qualified with another namespace points at
+# another repo and is not checked here. Filenames stay unnamespaced. Leave
+# unset until references travel across repos.
+# contract_namespace = github.com/myorg/myrepo
+
+# Source roots and file types for check-todos / contract headers / refs.
+# source_dirs       = src internal cmd client packages lib app
+# source_extensions = go ts tsx js jsx py rs
+# Directory names those scanners skip anywhere (matched by name; .git and
+# .claude/ agent worktrees are always skipped).
+# source_exclude_dirs = node_modules vendor dist
+
+# Days before a freshness:/last-synced: marker counts as stale.
+# freshness_max_days = 14
+
+# Contract registry (architecture/CONTRACT-REGISTRY.md).
+# registry_impl_counts     = true               # add Impl Files + Contract Health (off by default: they churn)
+# registry_scope_prefixes  = SDK- MCP-           # strip before Services/Components/... classification
+# registry_purpose_heading = Purpose|Why this exists
+# registry_purpose_style   = ellipsis           # escape | and cut to 77 chars + ...
+# registry_impl_globs      = *.go *.ts *.py bin/ # where CONTRACT: headers are counted
+# registry_exclude_dirs    = node_modules vendor dist
+
+# METRICS ground truth: declare how each METRICS key is computed.
+# Fields: type (files|dirs), paths, names, exclude_names, exclude_dirs,
+# min_depth, max_depth, contains (ERE on content), distinct (ERE, one group),
+# tracked (true: only files git tracks).
+# METRICS then holds `key = N` (exact) or `key >= N` (floor).
+# metrics_strict = true     # fail on a missing METRICS, a key missing from it, or no metric.* lines
+# metric.test_files.paths        = src tests
+# metric.test_files.names        = *_test.go *.test.ts
+# metric.test_files.exclude_dirs = node_modules vendor dist
+# metric.contracts.paths         = architecture
+# metric.contracts.max_depth     = 1
+# metric.contracts.names         = CONTRACT-*.md
+# metric.contracts.exclude_names = CONTRACT-TEMPLATE.md CONTRACT-REGISTRY.md *.impl.md

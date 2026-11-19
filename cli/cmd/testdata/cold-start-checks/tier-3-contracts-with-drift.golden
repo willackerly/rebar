@@ -1,0 +1,10 @@
+<rebar-cold-start>
+rebar cold-start health — advisory (this hook always exits 0)
+[PASS] check-contract-refs — Checked 1 contract references, 0 broken.
+[PASS] check-todos — OK: 0 untracked TODOs. 0 tracked tasks.
+[PASS] check-freshness — Checked 1 docs with currency markers (freshness:/last-synced:), 0 stale (>14 days).
+[PASS] check-ground-truth — All documented metrics match codebase reality
+maturity: 1 draft, 1 active (2 of 2 contracts declare Status)
+all 4 checks passing (Ns).
+</rebar-cold-start>
+--- exit 0 ---

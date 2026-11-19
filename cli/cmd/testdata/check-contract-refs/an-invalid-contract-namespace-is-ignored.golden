@@ -1,0 +1,4 @@
+rebar: ignoring contract_namespace 'S1-FOO.1.0' (allowed: letters, digits, . _ / -; must not start like a contract ID.version)
+
+Checked 1 contract references, 0 broken.
+--- exit 0 ---

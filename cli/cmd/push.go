@@ -1,21 +1,23 @@
 package cmd
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"os/exec"
 	"strings"
 
 	"github.com/spf13/cobra"
+	"github.com/willackerly/rebar/cli/internal/checks"
 	"github.com/willackerly/rebar/cli/internal/integrity"
 	"github.com/willackerly/rebar/cli/internal/scripts"
 )
 
 var pushCmd = &cobra.Command{
-	Use:   "push [args...]",
-	Short: "Verified push — checks integrity before pushing",
-	Long:  `Runs rebar verify --strict and rebar check, then pushes if clean.`,
-	RunE:  runPush,
+	Use:                "push [args...]",
+	Short:              "Verified push — checks integrity before pushing",
+	Long:               `Runs rebar verify --strict and rebar check, then pushes if clean.`,
+	RunE:               runPush,
 	DisableFlagParsing: true,
 }
 
@@ -48,21 +50,41 @@ func runPush(cmd *cobra.Command, args []string) error {
 	}
 	fmt.Println("Integrity verified ✓")
 
-	// 2. Run checks (if scripts exist)
-	if s, ok := resolveScript(cfg.RepoRoot, findRebarRoot(), "ci-check.sh"); ok {
-		fmt.Println("Running checks...")
-		warnLegacy(s)
-		// Run checks but don't block on missing scripts
-		checkOut, code, err := scripts.OutputInProject(s.Path, cfg.RepoRoot)
-		if err != nil || code != 0 {
-			fmt.Println(string(checkOut))
-			// Only fail if it's a real check failure, not a missing dependency
-			if code == 1 {
-				return fmt.Errorf("checks failed — fix before pushing")
-			}
-		} else {
-			fmt.Println("Checks passed ✓")
+	// 2. Run the checks: the built-in suite, or the project's own copy of
+	// scripts/ci-check.sh (deprecated).
+	fmt.Println("Running checks...")
+	var checkOut []byte
+	var code int
+	s, ok := resolveScript(cfg.RepoRoot, "ci-check.sh")
+	legacy := ok && s.Legacy
+	var notice bytes.Buffer
+	if legacy {
+		switch decideLegacySuite(&notice, s) {
+		case runBuiltIn:
+			legacy = false
+		case refuseCopy:
+			fmt.Print(notice.String())
+			return fmt.Errorf("checks failed — fix before pushing")
 		}
+		fmt.Print(notice.String())
+	}
+	if legacy {
+		warnLegacy(s)
+		checkOut, code, err = scripts.OutputInProject(s.Path, cfg.RepoRoot)
+	} else {
+		c, _ := checks.Lookup("ci-check")
+		var buf bytes.Buffer
+		code = c.Run(&checks.Context{Root: cfg.RepoRoot, Dir: cfg.RepoRoot, Stdout: &buf, Stderr: &buf}, nil)
+		checkOut = buf.Bytes()
+	}
+	if err != nil || code != 0 {
+		fmt.Println(string(checkOut))
+		// Only fail if it's a real check failure, not a missing dependency
+		if code == 1 {
+			return fmt.Errorf("checks failed — fix before pushing")
+		}
+	} else {
+		fmt.Println("Checks passed ✓")
 	}
 
 	// 3. Push

@@ -1,0 +1,10 @@
+--- stdout ---
+--- stderr ---
+ask: error: malformed cross-repo spec ':architect' — expected '<project>:<agent>'
+--- changes ---
+--- wrote home/.config/ask/projects ---
+Other = $BASE/other
+gone = $BASE/nowhere
+# comment = x
+proj = $BASE/proj
+--- exit 2 ---

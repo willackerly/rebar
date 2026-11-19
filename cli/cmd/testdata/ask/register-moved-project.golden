@@ -1,0 +1,12 @@
+--- stdout ---
+Registered 'demo' → $BASE/proj
+
+Now from any directory:
+  ask demo:architect "What is the architecture?"
+--- stderr ---
+--- changes ---
+--- wrote home/.config/ask/projects ---
+a = /a
+b = /b
+demo = $BASE/proj
+--- exit 0 ---

@@ -263,6 +263,8 @@ it: setup-rebar.sh <v> --no-switch`. ~40 lines of Go plus tests. See Q3.
    (`cd cli && go build -o ../bin/rebar .`) and `.gitignore` it.
    [Lean: yes, in the release after the first one with assets — relaxation:
    keep it until then so existing clone users don't lose a working binary.]
+   **Resolved (owner, 2026-11-18):** untracked from v4.0.0 (`.gitignore`d;
+   contributors build it, CI and the script tests build their own).
 2. **Strip more dev-only files from the tarball?** `.gitattributes` now
    export-ignores `/.mcp.json` (a maintainer's absolute paths), `/inbox/`
    and `/.claude/`. `feedback/` and `docs/` stay (`rebar doc

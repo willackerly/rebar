@@ -1,0 +1,145 @@
+GET /mcp/schema 
+200 {
+  "protocol": "mcp",
+  "version": "2026-07-28",
+  "protocolVersions": [
+    "2026-07-28",
+    "2025-11-25",
+    "2025-06-18",
+    "2025-03-26",
+    "2024-11-05"
+  ],
+  "capabilities": {
+    "tools": {},
+    "resources": {}
+  },
+  "serverInfo": {
+    "name": "ask-mcp-server",
+    "version": "$VERSION",
+    "description": "MCP server for ASK agent coordination platform"
+  }
+}
+GET /v1/health 
+200 {
+  "status": "ok",
+  "repos": 2,
+  "mcp_enabled": true
+}
+GET /v1/agents/ 
+200 [
+  {
+    "repo": "dsp_2_8",
+    "role": "steward",
+    "id": "dsp_2_8:steward"
+  },
+  {
+    "repo": "web",
+    "role": "architect",
+    "id": "web:architect"
+  },
+  {
+    "repo": "web",
+    "role": "broken",
+    "id": "web:broken"
+  },
+  {
+    "repo": "web",
+    "role": "custom",
+    "id": "web:custom"
+  },
+  {
+    "repo": "web",
+    "role": "empty",
+    "id": "web:empty"
+  },
+  {
+    "repo": "web",
+    "role": "product",
+    "id": "web:product"
+  }
+]
+GET /v1/repos?x=1 
+200 [
+  {
+    "repo": "dsp_2_8",
+    "path": "$REPOS/group/dsp_2_8",
+    "agents": [
+      "steward"
+    ]
+  },
+  {
+    "repo": "web",
+    "path": "$REPOS/web",
+    "agents": [
+      "architect",
+      "broken",
+      "custom",
+      "empty",
+      "product"
+    ]
+  }
+]
+GET /v1/status/web/architect 
+404 {"error": "Not found"}
+POST /mcp {"jsonrpc":"2.0","method":"tools/list","id":9}
+200 [application/json] {"jsonrpc":"2.0","id":9,"error":{"code":-32600,"message":"method \"tools/list\" is invalid during session initialization"}}
+POST /mcp {"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"t","version":"1"}},"id":1}
+200 [application/json] [Mcp-Session-Id: $SESSION] {"jsonrpc":"2.0","id":1,"result":{"capabilities":{"resources":{},"tools":{}},"protocolVersion":"2025-11-25","serverInfo":{"name":"ask-mcp-server","description":"MCP server for ASK agent coordination platform","version":"$VERSION"}}}
+POST /mcp {"jsonrpc":"2.0","method":"notifications/initialized"}
+202 [] 
+POST /mcp {"jsonrpc":"2.0","method":"tools/call","params":{"name":"ask_web_architect","arguments":{"question":"Why?"}},"id":2}
+200 [application/json] {"jsonrpc":"2.0","id":2,"result":{"content":[{"type":"text","text":"answer from web: --question -- architect Why?"}]}}
+POST /mcp {"jsonrpc":"2.0","method":"tools/call","params":{"name":"ask_WEB_ARCHITECT","arguments":{"question":"Why?"}},"id":3}
+200 [application/json] {"jsonrpc":"2.0","id":3,"result":{"content":[{"type":"text","text":"answer from web: --question -- architect Why?"}]}}
+POST /mcp {"jsonrpc":"2.0","method":"tools/call","params":{"name":"ask_web_broken","arguments":{"question":"Why?"}},"id":4}
+200 [application/json] {"jsonrpc":"2.0","id":4,"result":{"content":[{"type":"text","text":"Agent web:broken failed (exit code 3): ask: error: claude invocation failed"}],"isError":true}}
+POST /mcp {"jsonrpc":"2.0","method":"tools/call","params":{"name":"ask_web_ghost","arguments":{"question":"Why?"}},"id":5}
+200 [application/json] {"jsonrpc":"2.0","id":5,"error":{"code":-32602,"message":"unknown tool \"ask_web_ghost\""}}
+POST /mcp not json
+400 [text/plain; charset=utf-8] malformed payload: unmarshaling jsonrpc message: json: expected 'null' but found invalid token: not json
+POST /mcp 
+400 [text/plain; charset=utf-8] POST requires a non-empty body
+POST /mcp {"jsonrpc":"2.0","method":"tools/list","id":9}
+  (Accept: application/json)
+400 [text/plain; charset=utf-8] Accept must contain both 'application/json' and 'text/event-stream'
+POST /mcp {"jsonrpc":"2.0","method":"tools/list","id":9}
+  (Mcp-Session-Id: no-such-session)
+404 [text/plain; charset=utf-8] session not found
+POST /v1/ask {"repo":"web","role":"product","question":" Who? ","verbose":true}
+200 {
+  "repo": "web",
+  "role": "product",
+  "answer": "answer from web: -v --question -- product Who?",
+  "exit_code": 0,
+  "error": null
+}
+POST /v1/ask {"repo":"web","role":"broken","question":"q"}
+500 {"error": "Agent web:broken failed (exit code 3): ask: error: claude invocation failed"}
+POST /v1/ask {"repo":"WEB","role":"product","question":"q"}
+500 {"error": "Repository WEB not found"}
+POST /v1/ask {"repo":"web","question":"q"}
+400 {"error": "Required fields: repo, role, question"}
+POST /v1/reset/web/architect 
+404 {"error": "Not found"}
+PUT /mcp {}
+405 [text/plain; charset=utf-8] Method Not Allowed
+PUT /v1/health {}
+501 <!DOCTYPE HTML>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <title>Error response</title>
+    </head>
+    <body>
+        <h1>Error response</h1>
+        <p>Error code: 501</p>
+        <p>Message: Unsupported method ('PUT').</p>
+        <p>Error code explanation: 501 - Server does not support this operation.</p>
+    </body>
+</html>
+
+DELETE /mcp 
+204 [] 
+POST /mcp {"jsonrpc":"2.0","method":"tools/list","id":9}
+404 [text/plain; charset=utf-8] session not found
+--- exit 0 ---

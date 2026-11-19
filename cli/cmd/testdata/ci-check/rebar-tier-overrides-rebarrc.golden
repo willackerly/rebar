@@ -1,0 +1,96 @@
+Running contract and documentation checks...
+
+━━━ Contract Headers ━━━
+SKIP: tier 1 < required tier 2 (set REBAR_TIER or .rebarrc to change, or name it in checks_enable)
+
+━━━ Contract References ━━━
+BROKEN: ./src/b.go:3 references CONTRACT:S9-GONE.1.0
+        Expected: architecture/CONTRACT-S9-GONE.1.0.md
+
+Checked 1 contract references, 1 broken.
+
+Fix by either:
+  1. Creating the missing contract in architecture/
+  2. Updating the code reference to the correct contract version
+
+━━━ Doc References ━━━
+check-doc-refs: 1 broken ref(s) — referenced file is not tracked in git
+
+README.md:5:docs/gone.md
+
+Each line: <source.md>:<lineno>:<target>
+Either `git add` the target, fix the link, or allowlist it via .rebar/doc-refs-allow.txt
+
+━━━ TODO Tracking ━━━
+FAIL: 1 untracked TODO(s) found:
+
+src/b.go:2:// TODO: untracked
+
+Before committing, you must either:
+  1. Fix the TODO immediately (remove it), OR
+  2. Add it to TODO.md and convert to: TRACKED-TASK: description
+
+Also found 1 tracked tasks (OK).
+
+━━━ Doc Freshness ━━━
+SKIP: tier 1 < required tier 2 (set REBAR_TIER or .rebarrc to change, or name it in checks_enable)
+
+━━━ Registry Consistency ━━━
+FAIL: $ROOT/architecture/CONTRACT-REGISTRY.md does not exist. Generate it: rebar run compute-registry
+
+━━━ JTBD Presence ━━━
+SKIP: tier 1 < required tier 2 (set REBAR_TIER or .rebarrc to change, or name it in checks_enable)
+
+━━━ Prefix Uniqueness ━━━
+SKIP: tier 1 < required tier 2 (set REBAR_TIER or .rebarrc to change, or name it in checks_enable)
+
+━━━ Ground Truth ━━━
+SKIP: tier 1 < required tier 3 (set REBAR_TIER or .rebarrc to change, or name it in checks_enable)
+
+━━━ Rebar Compliance ━━━
+=== Rebar compliance check ===
+
+OK: .rebar-version = v3.1.0
+OK: .rebarrc tier = 2 (ADOPTED)
+OK: README.md badge found on line 3
+    Version: v3.1.0 | Tier: 2 (ADOPTED)
+
+=== Contract maturity (declared Status:) ===
+OK: no contracts found — maturity weighting not applicable
+
+OK: Rebar compliance verified.
+
+━━━ Decay Patterns ━━━
+check-decay-patterns: no files to scan.
+
+━━━ Fix Commit Gate ━━━
+check-fix-commit: OK — Gate G satisfied (no fix:/regression: commits without Reproduced on:)
+
+━━━ Bypass Flags Gate ━━━
+check-bypass-flags: OK — Gate I satisfied (no bypass mentions without Bypass tickets:)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SUMMARY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  PASS  Contract Headers
+  FAIL  Contract References
+  FAIL  Doc References
+  FAIL  TODO Tracking
+  PASS  Doc Freshness
+  FAIL  Registry Consistency
+  PASS  JTBD Presence
+  PASS  Prefix Uniqueness
+  PASS  Ground Truth
+  PASS  Rebar Compliance
+  PASS  Decay Patterns
+  SKIP  Bootstrap Sync (rebar source repo only)
+  SKIP  Script Tests (rebar source repo only)
+  PASS  Fix Commit Gate
+  PASS  Bypass Flags Gate
+  SKIP  Steward
+
+  9 passed, 4 failed, 3 skipped
+
+CI check failed. Fix the issues above or skip individual checks
+with environment variables (e.g., SKIP_FRESHNESS=1).
+--- exit 1 ---

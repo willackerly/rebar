@@ -1,0 +1,2 @@
+inbox-watch: interval must be >= 1 second, got '00'
+--- exit 2 ---

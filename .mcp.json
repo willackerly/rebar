@@ -1,8 +1,8 @@
 {
   "mcpServers": {
     "rebar-ask": {
-      "command": "/Users/will/dev/rebar/bin/ask-mcp-server",
-      "args": ["--stdio", "--repos-dir", "/Users/will/dev"]
+      "command": "/Users/will/dev/rebar/bin/rebar",
+      "args": ["mcp", "serve", "--stdio", "--repos-dir", "/Users/will/dev"]
     }
   }
 }

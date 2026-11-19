@@ -31,7 +31,7 @@ means "active + passing tests/scenarios prove it."
 
 ## Who needs this
 
-- **Every adopter's CI pipeline** — invokes `scripts/steward.sh` to gate merges
+- **Every adopter's CI pipeline** — invokes the Steward (`rebar check`, `rebar run steward`) to gate merges
 - **Every adopter's developers** — invoke `ask steward summary` interactively
   to see one-line health and `ask steward check <ID>` to drill into a single
   contract
@@ -77,17 +77,21 @@ runs `ask architect ...`, `ask product ...` next.
 
 ```bash
 # Full scan → JSON + markdown report
-scripts/steward.sh
+rebar run steward
 
 # Aggregate JSON to stdout
-scripts/steward.sh --json
+rebar run steward --json
 
 # One-line health summary
-scripts/steward.sh --summary
+rebar run steward --summary
 
 # Single contract scan
-scripts/steward.sh --check C1
+rebar run steward --check C1
 ```
+
+(`scripts/steward.sh` until rebar 4.0, with the same arguments, output, exit
+codes and report files; a project's own copy of that script still runs
+through `rebar run steward`, with a deprecation notice.)
 
 ASK CLI mirrors the surface:
 
@@ -186,10 +190,10 @@ Migration for downstream parsers:
 
 ## Implementing Files
 
-- `scripts/steward.sh` — main scanner
-- `scripts/_rebar-config.sh` — tier resolution helper
-- `scripts/check-*.sh` — individual checks orchestrated by `ci-check.sh`
-- `scripts/ci-check.sh` — composite runner that invokes Steward + checks
+- `cli/internal/steward/` — main scanner (`rebar run steward`; `scripts/steward.sh` until rebar 4.0)
+- `cli/internal/config/`, `cli/internal/checks/gate.go` — tier resolution
+- `cli/internal/checks/` — individual checks orchestrated by the full suite
+- `cli/internal/suite/` — the suites (`rebar check`), whose last step runs the Steward
 - `agents/steward/AGENT.md` — reader-role definition for ASK
 - `agents/steward/commands/*.sh` — ask-steward subcommand executables
 - `agents/architect/commands/default.sh` — parses `summary.contracts.impl_present`

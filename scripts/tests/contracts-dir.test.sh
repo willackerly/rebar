@@ -14,7 +14,7 @@
 #   T5  with no setting, architecture/ is still the default
 #
 # Usage: bash scripts/tests/contracts-dir.test.sh
-# Override the scripts under test with REBAR_SCRIPTS_DIR.
+# Runs the rebar binary under test (lib.sh: REBAR_TEST_BIN).
 # Bash 3.2 compatible (macOS default).
 
 set -uo pipefail

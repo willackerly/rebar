@@ -32,3 +32,7 @@ bin/__pycache__/
 
 # Local agent tooling
 .codex/
+
+# The rebar binary: built from cli/ (cd cli && go build -o ../bin/rebar .),
+# not tracked since 4.0 (releases publish one per platform)
+/bin/rebar

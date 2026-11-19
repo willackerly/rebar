@@ -1,0 +1,9 @@
+STALE (301 days): ./c.md — freshness: {{ago:301}}
+STALE (365 days): ./d.md — freshness: {{ago:365}}
+
+Checked 6 docs with currency markers (freshness:/last-synced:), 2 stale (>300 days).
+0 .md file(s) carry no currency marker at all — unchecked, not verified.
+
+Stale docs may contain outdated status claims.
+Review and update the freshness date after verifying content.
+--- exit 1 ---

@@ -1,0 +1,13 @@
+rebar: WARN: checks_enable names unknown check 'nope' (ignored; use a check script name without .sh, e.g. check-ground-truth)
+Pre-commit: checking TODO tracking...
+OK: 0 untracked TODOs. 1 tracked tasks.
+
+Pre-commit: checking contract references...
+
+Checked 0 contract references, 0 broken.
+
+Pre-commit: checking ground truth metrics...
+SKIP: tier 1 < required tier 3 (set REBAR_TIER or .rebarrc to change, or name it in checks_enable)
+
+Pre-commit checks passed.
+--- exit 0 ---

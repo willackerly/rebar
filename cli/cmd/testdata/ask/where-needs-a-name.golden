@@ -1,0 +1,10 @@
+--- stdout ---
+--- stderr ---
+ask: error: agent name required
+Usage: ask <command> <agent>
+--- changes ---
+--- made home/.config/ ---
+--- made home/.config/ask/ ---
+--- wrote home/.config/ask/projects ---
+proj = $BASE/proj
+--- exit 4 ---

@@ -1,0 +1,23 @@
+--- stdout ---
+--- stderr ---
+ask: error: agent 'archtect' not found (no directory at ./agents/archtect)
+
+Did you mean: architect?
+
+Available agents:
+
+  proj — Available Agents
+
+  Mixed          Mixed-case agent.
+  architect      Answer questions about system architecture
+  englead        Coordinates the build and the release train.
+  product        Owns personas and priorities for the demo. Second line of the…
+  steward        Reports project health, contract lifecycle, drift and every…
+  tester
+
+--- changes ---
+--- made home/.config/ ---
+--- made home/.config/ask/ ---
+--- wrote home/.config/ask/projects ---
+proj = $BASE/proj
+--- exit 2 ---

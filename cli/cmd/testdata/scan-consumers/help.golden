@@ -1,0 +1,10 @@
+Usage: scan-consumers.sh <contract-id> [--json]
+
+  scan-consumers.sh C1-AGENTS         # text output
+  scan-consumers.sh C1-AGENTS --json  # machine-readable
+
+Looks for CONSUMES.md across registered repos (per ~/.config/ask/projects)
+and reports any that declare a dep on <owner>/<contract-id>.<*>.
+
+Override search set: REBAR_REPOS=path1,path2,... scan-consumers.sh ID
+--- exit 0 ---

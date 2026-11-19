@@ -1,0 +1,19 @@
+=== Contract files vs registry ===
+NOT IN REGISTRY: architecture/CONTRACT-A-B.1.0.md
+NOT IN REGISTRY: architecture/CONTRACT-A.1.0.md
+NOT IN REGISTRY: architecture/CONTRACT-I3-BAZ.2.0.md
+
+=== Orphaned contracts (no implementing code) ===
+ORPHAN (untracked): architecture/CONTRACT-A-B.1.0.md — 0 implementing files
+  Either add implementing code with CONTRACT:A-B.1.0 header,
+  or track in TODO.md if implementation is planned.
+ORPHAN (untracked): architecture/CONTRACT-A.1.0.md — 0 implementing files
+  Either add implementing code with CONTRACT:A.1.0 header,
+  or track in TODO.md if implementation is planned.
+ORPHAN (tracked in TODO.md): architecture/CONTRACT-C2-BAR.1.0.md
+ORPHAN (untracked): architecture/CONTRACT-I3-BAZ.2.0.md — 0 implementing files
+  Either add implementing code with CONTRACT:I3-BAZ.2.0 header,
+  or track in TODO.md if implementation is planned.
+
+FAIL: 6 inconsistencies found.
+--- exit 1 ---

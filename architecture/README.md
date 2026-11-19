@@ -19,7 +19,7 @@ head -10 path/to/file.go
 
 # Run a quality scan across all contracts
 ask steward
-# or: ./scripts/steward.sh
+# or: rebar run steward
 
 # Check a single contract
 ask steward check C1
@@ -86,7 +86,7 @@ for no functional gain — the exact cost that made numbering painful. Rebar's o
 
 ## Contract Lifecycle
 
-Computed by the [Steward](../scripts/steward.sh), never declared manually:
+Computed by the Steward (`rebar run steward`; [CONTRACT-S1-STEWARD.2.0](CONTRACT-S1-STEWARD.2.0.md)), never declared manually:
 
 | Status | Criteria |
 |--------|----------|
@@ -161,12 +161,12 @@ discipline applies (CHARTER §1.6):
 - **Mandatory semver** for any contract that has external consumers.
   File renames `CONTRACT-<id>.<v>.md → CONTRACT-<id>.<v+1>.md` are the
   bump signal.
-- The post-commit hook `scripts/check-version-bump.sh` detects bumps
+- The post-commit hook `rebar run check-version-bump` detects bumps
   and queues a notification to `architecture/.state/pending-notifications.md`.
-- Run `scripts/scan-consumers.sh <contract-id>` to see who declares
+- Run `rebar run scan-consumers <contract-id>` to see who declares
   consumption of your contract (greps `CONSUMES.md` across registered
   sibling repos).
-- Run `scripts/flush-notifications.sh` to dispatch queued notifications
+- Run `rebar run flush-notifications` to dispatch queued notifications
   via the existing `ask_<consumer>_featurerequest` gate. Manually flush
   on your schedule — non-blocking by design (CHARTER §2.8).
 
@@ -178,7 +178,7 @@ discipline applies (CHARTER §1.6):
   `notify_on_change: true` opts in to upstream notification dispatch.
 - Run `rebar contract drift-check` to compare your pins against current
   upstream. **Required in CI** when CONSUMES.md exists with at least
-  one entry — `scripts/check-compliance.sh` enforces this.
+  one entry — `rebar run check-compliance` enforces this.
 - For local extensions of upstream contracts, write a *new* local
   contract (e.g., `CONTRACT-C2-AGENTS-MYAUDIT.1.0.md`) that documents
   in prose how it relates to the upstream. **Composition over
@@ -200,7 +200,7 @@ discipline applies (CHARTER §1.6):
 | Owner-side scripts | `scripts/{scan-consumers,flush-notifications,check-version-bump}.sh` |
 | Consumer-side commands | `rebar contract drift-check`, `rebar contract upstream` |
 | Status surfacing | `rebar status` shows pending notifications |
-| Compliance gating | `scripts/check-compliance.sh` requires drift-check in CI when CONSUMES.md present |
+| Compliance gating | `rebar run check-compliance` requires drift-check in CI when CONSUMES.md present |
 
 This is "federation as discipline, not infrastructure" — no daemon, no
 server, no central registry. Consumer self-declaration + owner-pulled

@@ -1,0 +1,17 @@
+--- stdout ---
+--- stderr ---
+ask: error: agent 'nobody' not found (no directory at $BASE/other/agents/nobody)
+
+Available agents:
+
+  proj — Available Agents
+
+  architect      Knows the other project.
+
+--- changes ---
+--- wrote home/.config/ask/projects ---
+Other = $BASE/other
+gone = $BASE/nowhere
+# comment = x
+proj = $BASE/proj
+--- exit 2 ---

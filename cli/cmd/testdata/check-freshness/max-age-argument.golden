@@ -1,0 +1,8 @@
+STALE (31 days): ./b.md — freshness: {{ago:31}}
+
+Checked 2 docs with currency markers (freshness:/last-synced:), 1 stale (>30 days).
+0 .md file(s) carry no currency marker at all — unchecked, not verified.
+
+Stale docs may contain outdated status claims.
+Review and update the freshness date after verifying content.
+--- exit 1 ---

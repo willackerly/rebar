@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/willackerly/rebar/cli/internal/checks"
 	"github.com/willackerly/rebar/cli/internal/testutil"
 )
 
@@ -41,21 +42,18 @@ func TestNewThenCheckLeavesTreeClean(t *testing.T) {
 	}
 	root, _ := filepath.Abs("probe")
 
-	// What `rebar check` runs.
-	check := exec.Command("bash", filepath.Join(src, "scripts", "ci-check.sh"), "--strict")
-	check.Env = append(os.Environ(), "REBAR_PROJECT_ROOT="+root)
-	check.Dir = root
-	if out, err := check.CombinedOutput(); err != nil {
-		t.Fatalf("rebar check on a new project: %v\n%s", err, out)
+	// What `rebar check` runs (the built-in suite; the steward needs no jq).
+	c, _ := checks.Lookup("ci-check")
+	var out strings.Builder
+	if code := c.Run(&checks.Context{Root: root, Stdout: &out, Stderr: &out}, []string{"--strict"}); code != 0 {
+		t.Fatalf("rebar check on a new project: exit %d\n%s", code, out.String())
 	}
-	if _, err := exec.LookPath("jq"); err == nil {
-		if _, err := os.Stat(filepath.Join(root, "STEWARD_REPORT.md")); err != nil {
-			t.Fatalf("the steward did not run (no STEWARD_REPORT.md), so this test proves nothing: %v", err)
-		}
+	if _, err := os.Stat(filepath.Join(root, "STEWARD_REPORT.md")); err != nil {
+		t.Fatalf("the steward did not run (no STEWARD_REPORT.md), so this test proves nothing: %v", err)
 	}
-	out, err := exec.Command("git", "-C", root, "status", "--porcelain").Output()
-	if err != nil || len(out) != 0 {
-		t.Fatalf("rebar check left the tree dirty: %q %v", out, err)
+	status, err := exec.Command("git", "-C", root, "status", "--porcelain").Output()
+	if err != nil || len(status) != 0 {
+		t.Fatalf("rebar check left the tree dirty: %q %v", status, err)
 	}
 }
 

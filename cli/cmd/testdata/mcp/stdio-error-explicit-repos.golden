@@ -1,0 +1,8 @@
+--- stderr ---
+ask-mcp-server: scanning repos...
+  registered: web → $REPOS/web (5 agents: architect, broken, custom, empty, product)
+ask-mcp-server: warning: skipping $REPOS/plain (no agents/ dir)
+
+ask-mcp-server: 1 repos, 5 agents
+ask-mcp-server: starting MCP stdio transport
+--- exit 0 ---

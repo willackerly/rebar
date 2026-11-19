@@ -113,7 +113,7 @@ files an FR via the owner's featurerequest gate. **Never auto-merged.**
 ## Principle 3 — Self-selecting compliance
 
 Adopters opt into the federation by adding a `CONSUMES.md`. Once they
-add it (with at least one real entry), `scripts/check-compliance.sh`
+add it (with at least one real entry), `rebar run check-compliance`
 requires `rebar contract drift-check` in CI. Single-repo adopters who
 don't need federation see no change.
 
@@ -170,7 +170,7 @@ confidence** that something happened when it didn't.
 ### What this looks like in practice
 
 - ✅ Post-commit hook auto-detects version bumps → falls back: owner
-  can run `scripts/check-version-bump.sh` manually, or just maintain
+  can run `rebar run check-version-bump` manually, or just maintain
   outbox by hand
 - ✅ `rebar contract drift-check` runs in CI → falls back: maintainer
   runs it locally, or accepts pin staleness with eyes open
@@ -269,8 +269,8 @@ later cannot replay them as a backlog burst. Regression:
 
 ### The rules
 
-1. **Same script everywhere.** The watcher is `scripts/inbox-watch.sh`
-   (shipped in the project bootstrap; upstream `rebar:script/inbox-watch`).
+1. **Same watcher everywhere.** The watcher is `rebar run inbox-watch`
+   (built into rebar; upstream `rebar:script/inbox-watch`).
    Repos do not write their own variants — one implementation, pointed
    at each repo's own `inbox/`, is what keeps the emitted
    `NEW INBOX DEPOSIT:` lines a uniform signal every seat understands.

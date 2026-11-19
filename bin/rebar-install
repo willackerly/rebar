@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 # rebar-install — Add rebar's bin/ to PATH and optionally configure ASK_SERVER.
+# (Called bin/install before v3.1.2; renamed because a file named install on
+# PATH shadows install(1).)
 #
 # Usage:
 #   ./bin/rebar-install              # interactive
@@ -18,6 +20,26 @@ case "$SHELL_NAME" in
   bash) RC_FILE="$HOME/.bashrc" ;;
   *)    RC_FILE="$HOME/.profile" ;;
 esac
+
+# rc_mentions TEXT — whether a non-comment line of the RC file holds TEXT,
+# as written or, under $HOME, spelled $HOME/..., ${HOME}/... or ~/..., so a
+# line written by hand (or by an older installer) is not added twice.
+rc_mentions() {
+  [ -f "$RC_FILE" ] || return 1
+  for spelling in "$1" ${HOME:+"$(rc_home_form "$1" '$HOME')"} \
+      ${HOME:+"$(rc_home_form "$1" '${HOME}')"} ${HOME:+"$(rc_home_form "$1" '~')"}; do
+    [ -n "$spelling" ] || continue
+    grep -v '^[[:space:]]*#' "$RC_FILE" | grep -qF -- "$spelling" && return 0
+  done
+  return 1
+}
+# rc_home_form TEXT PREFIX — TEXT with a leading $HOME/ replaced by PREFIX/
+# (empty if TEXT is not under $HOME).
+rc_home_form() {
+  case "$1" in
+    "$HOME"/*) printf '%s/%s\n' "$2" "${1#"$HOME"/}" ;;
+  esac
+}
 
 # Parse args
 ASK_SERVER_VAL=""
@@ -43,11 +65,11 @@ echo ""
 # --- PATH ---
 PATH_LINE="export PATH=\"$BIN_DIR:\$PATH\""
 
-if grep -qF "$BIN_DIR" "$RC_FILE" 2>/dev/null; then
+if rc_mentions "$BIN_DIR"; then
   echo "[ok] PATH already includes $BIN_DIR"
 else
   echo "" >> "$RC_FILE"
-  echo "# rebar CLI tools (ask, ask-server)" >> "$RC_FILE"
+  echo "# rebar CLI tools (rebar, ask, ask-server)" >> "$RC_FILE"
   echo "$PATH_LINE" >> "$RC_FILE"
   echo "[added] PATH → $RC_FILE"
 fi
@@ -61,7 +83,7 @@ COMPLETION_DIR="$BIN_DIR/completions"
 if [ -d "$COMPLETION_DIR" ]; then
   case "$SHELL_NAME" in
     bash)
-      if ! grep -qF "$COMPLETION_DIR/ask.bash" "$RC_FILE" 2>/dev/null; then
+      if ! rc_mentions "$COMPLETION_DIR/ask.bash"; then
         echo "" >> "$RC_FILE"
         echo "# rebar tab completions (bash)" >> "$RC_FILE"
         echo "[ -f \"$COMPLETION_DIR/ask.bash\" ] && source \"$COMPLETION_DIR/ask.bash\"" >> "$RC_FILE"
@@ -72,7 +94,7 @@ if [ -d "$COMPLETION_DIR" ]; then
       fi
       ;;
     zsh)
-      if ! grep -qF "$COMPLETION_DIR" "$RC_FILE" 2>/dev/null; then
+      if ! rc_mentions "$COMPLETION_DIR"; then
         echo "" >> "$RC_FILE"
         echo "# rebar tab completions (zsh)" >> "$RC_FILE"
         echo "fpath=(\"$COMPLETION_DIR\" \$fpath)" >> "$RC_FILE"
@@ -104,32 +126,20 @@ echo ""
 echo "  source $RC_FILE"
 echo ""
 
-# Verify dependencies
+# Verify dependencies. The checks and ASK are built into the rebar binary;
+# `ask <agent>` sessions run Claude Code's CLI.
 echo "Checking dependencies..."
 ok=true
-for dep in jq claude; do
-  if command -v "$dep" &>/dev/null; then
-    echo "  [ok] $dep"
-  else
-    echo "  [missing] $dep"
-    ok=false
-  fi
-done
-
-if command -v bash &>/dev/null; then
-  bash_version=$(bash -c 'echo ${BASH_VERSINFO[0]}')
-  if [ "$bash_version" -ge 3 ] 2>/dev/null; then
-    echo "  [ok] bash $bash_version.x"
-  else
-    echo "  [warn] bash $bash_version.x (need 3.2+ — macOS default is fine)"
-    ok=false
-  fi
-fi
-
-if command -v python3 &>/dev/null; then
-  echo "  [ok] python3 (for ask-server)"
+if [ -x "$BIN_DIR/rebar" ] || command -v rebar &>/dev/null; then
+  echo "  [ok] rebar"
 else
-  echo "  [missing] python3 (needed for ask-server)"
+  echo "  [missing] rebar (expected at $BIN_DIR/rebar)"
+  ok=false
+fi
+if command -v claude &>/dev/null; then
+  echo "  [ok] claude"
+else
+  echo "  [missing] claude (Claude Code CLI, for ask)"
   ok=false
 fi
 

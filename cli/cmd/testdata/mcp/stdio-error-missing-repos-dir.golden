@@ -1,0 +1,5 @@
+--- stderr ---
+ask-mcp-server: scanning repos...
+ask-mcp-server: warning: repos-dir not found: $REPOS/missing
+ask-mcp-server: error: no repos found with agents/ directories
+--- exit 1 ---

@@ -156,7 +156,7 @@ mismatches live). The 7-letter taxonomy survived contact at filedag
 
 ### Contract Lifecycle Status
 
-Lifecycle is **computed, never declared**. The Steward (`scripts/steward.sh`)
+Lifecycle is **computed, never declared**. The Steward (`rebar run steward`)
 derives status from what exists in the codebase:
 
 | Status | Criteria | What It Means |
@@ -513,7 +513,7 @@ doesn't break anything — it just makes documentation fictional.
    no fragile grep-against-docs. One file, one format, machine-verifiable.
    **This is a Tier 2 requirement** — structural compliance without content
    accuracy is ceremony, not methodology.
-2. **Ground truth script** — `scripts/check-ground-truth.sh` computes
+2. **Ground truth script** — `rebar run check-ground-truth` computes
    metrics from code and compares against the `METRICS` file. Fails on drift.
    **Also Tier 2** — if ground truth is only enforced at Tier 3, projects
    can claim Tier 2 compliance while QUICKCONTEXT lies about test counts.
@@ -681,10 +681,10 @@ the contract system and produces per-role action items — facts, not opinions.
 ### What It Does
 
 ```bash
-scripts/steward.sh             # full scan → JSON + markdown report
-scripts/steward.sh --json      # aggregate JSON to stdout
-scripts/steward.sh --summary   # one-line summary
-scripts/steward.sh --check C1  # single contract
+rebar run steward             # full scan → JSON + markdown report
+rebar run steward --json      # aggregate JSON to stdout
+rebar run steward --summary   # one-line summary
+rebar run steward --check C1  # single contract
 ```
 
 ### What It Checks
@@ -723,7 +723,7 @@ The JSON schema is designed for a future single-file HTML dashboard that
 
 QA is fully automated — no separate QA agent:
 
-1. Eng Lead runs `scripts/steward.sh`
+1. Eng Lead runs `rebar run steward`
 2. Reviews action items per role
 3. Fans out work to developers (BUGs, implementations)
 4. Escalates to architect (DISPUTEs, missing contracts)
@@ -862,7 +862,7 @@ companion docs, discovery taxonomy.
 | Code philosophy | "Code is disposable, specs are permanent" | Code and contracts are co-equal | Contracts become stale when not grounded in implementation |
 | Repo structure | Git submodules | Flat vendoring (proposed) | Submodules add complexity small teams can't absorb |
 | Dashboard | Required web UI | JSON-first, dashboard optional | `jq` should answer what a dashboard can |
-| Tooling | Purpose-built CLI | bash + jq + grep | Zero dependencies beyond a Unix shell |
+| Tooling | Purpose-built CLI | One prebuilt `rebar` binary over markdown + grep + git | Download one checksum-verified file, nothing to build; the knowledge stays plain text (CHARTER §1.7) |
 
 **What we adopted and adapted:**
 - Computed lifecycle status (derived from code, never declared)

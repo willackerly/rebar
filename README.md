@@ -1,8 +1,8 @@
 # rebar
 
-> **rebar v3.1.2** | **Tier 3: ENFORCED**
+> **rebar v4.0.0** | **Tier 3: ENFORCED**
 
-[![rebar v3.1.2](https://img.shields.io/badge/rebar-v3.1.0-green)](DESIGN.md)
+[![rebar v4.0.0](https://img.shields.io/badge/rebar-v4.0.0-green)](DESIGN.md)
 [![Tier 3: Enforced](https://img.shields.io/badge/tier-3_enforced-brightgreen)](DESIGN.md)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
@@ -86,12 +86,20 @@ contract; everything else is opt-in.
 ## Installation
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/willackerly/rebar/v3.1.2/setup-rebar.sh | bash -s -- v3.1.2
+curl -fsSL https://raw.githubusercontent.com/willackerly/rebar/v4.0.0/setup-rebar.sh | bash -s -- v4.0.0
 ```
 
-Installs rebar under `~/.rebar/versions/v3.1.2/` and puts
+Installs rebar under `~/.rebar/versions/v4.0.0/` and puts
 `~/.rebar/current/bin` (`rebar`, `ask`) on your PATH; open a new terminal
-afterwards. Versions live side by side; options, CI, and release candidates:
+afterwards. v4.0.0 is the current release: a single self-contained binary per
+platform (checksum-verified by the installer) with every check, ASK and the
+MCP server built in. Coming from 3.x? 4.0's breaking changes and their fixes:
+[UPGRADING.md § Upgrading from 3.x to 4.0](UPGRADING.md#upgrading-from-3x-to-40)
+(v3.1.2 remains installable the same way, with `v3.1.2` in place of
+`v4.0.0`). The binary alone runs everything, so you can also download
+`rebar_<ver>_<os>_<arch>` from the GitHub Release, put it on your PATH as
+`rebar`, and run `rebar install-shims`
+for the `ask` command and completions. Versions live side by side; options, CI, and release candidates:
 [SETUP.md § Install rebar](SETUP.md#install-rebar),
 [§ Testing a release candidate](SETUP.md#testing-a-release-candidate),
 [§ Run rebar in CI](SETUP.md#run-rebar-in-ci). Upgrading a project that
@@ -181,7 +189,7 @@ tests to write. No guessing. No assumptions.
 ### 3. Automated scans catch drift
 
 ```bash
-$ scripts/steward.sh --summary
+$ rebar run steward --summary
 Steward: 12 contracts (0d/2a/3t/7ip), 1 discovery, 6/6 enforcement passing
 ```
 
@@ -282,7 +290,7 @@ The swarm gets smarter over time. What one agent discovers, all agents benefit f
 Automated quality scanner that produces per-contract health reports:
 
 ```bash
-scripts/steward.sh --summary # One-line health check
+rebar run steward --summary # One-line health check
 ask steward summary          # Same via ASK CLI
 ```
 
@@ -290,17 +298,17 @@ Routes action items by role: draft contracts → architect, testing gaps → eng
 
 ### Enforcement (Progressive by Tier)
 
-| Tier | What's Enforced | Scripts |
+| Tier | What's Enforced | Checks (`rebar run <name>`) |
 |------|----------------|---------|
-| **1 - Partial** | Contract refs + TODOs | `check-contract-refs.sh`, `check-todos.sh` |
-| **2 - Adopted** | + headers, freshness, ground truth, compliance, doc-refs, soft-hardening decay | + `check-contract-headers.sh`, `check-freshness.sh`, `check-ground-truth.sh`, `check-compliance.sh`, `check-doc-refs.sh`, `check-decay-patterns.sh` |
+| **1 - Partial** | Contract refs + TODOs | `check-contract-refs`, `check-todos` |
+| **2 - Adopted** | + headers, freshness, ground truth, compliance, doc-refs, soft-hardening decay | + `check-contract-headers`, `check-freshness`, `check-ground-truth`, `check-compliance`, `check-doc-refs`, `check-decay-patterns` |
 | **3 - Enforced** | + strict steward, full lifecycle | + full Steward with computed lifecycles |
 
-*Run all: `scripts/ci-check.sh` | Pre-commit: `scripts/pre-commit.sh`*
+*Run all: `rebar check` | Pre-commit: `rebar check --pre-commit` (the checks are built into the `rebar` binary; [docs/CONFIGURATION.md](docs/CONFIGURATION.md#what-rebar-check-runs))*
 
-`check-doc-refs.sh` catches the class of drift where a doc cites a file
+`check-doc-refs` catches the class of drift where a doc cites a file
 that's never `git add`-ed — green on the author's machine, broken on a
-fresh clone. `check-decay-patterns.sh` flags soft-hardening patterns
+fresh clone. `check-decay-patterns` flags soft-hardening patterns
 (silenced failures, inverted assertions, magic-string project gating,
 "keep in sync" comments) that survive code review and decay six months
 later. See `feedback/2026-04-21-...`, `2026-04-22-...`, and
@@ -329,7 +337,7 @@ later. See `feedback/2026-04-21-...`, `2026-04-22-...`, and
 Every rebar repo declares its version and tier at the top of README.md:
 
 ```markdown
-> **rebar v3.1.2** | **Tier 2: ADOPTED**
+> **rebar v4.0.0** | **Tier 2: ADOPTED**
 ```
 
 This is validated by `check-compliance` (run by `rebar check`) against the
@@ -363,7 +371,7 @@ rebar/
 ├── architecture/                # Contract system + CONTRACT-TEMPLATE.md
 ├── agents/                      # Role agents (architect/product/englead/steward/tester/merger)
 │                                #   + subagent prompt templates
-├── bin/                         # ASK CLI (Python) + ask-mcp-server
+├── bin/                         # rebar binary + ASK hand-offs (ask, ask-mcp-server, …)
 ├── cli/                         # rebar CLI (Go binary — init, commit, verify, audit)
 ├── scripts/                     # Enforcement + quality scanning (canonical bash)
 ├── practices/                   # Session lifecycle, orchestration, red team, fidelity

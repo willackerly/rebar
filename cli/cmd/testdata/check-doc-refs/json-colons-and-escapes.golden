@@ -1,0 +1,2 @@
+{"checked":"markdown-link-targets","broken":4,"findings":[{"file":"README.md","line":1,"target":"tail.md:x:"},{"file":"a","line":b.md,"target":"1:docs/x.md:"},{"file":"a","line":b.md,"target":"2:y:z.md"},{"file":"a","line":b.md,"target":"3:\"q\\\\.md"}]}
+--- exit 1 ---

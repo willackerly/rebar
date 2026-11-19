@@ -1,0 +1,5 @@
+--- stdout ---
+--- stderr ---
+ask: no agents directory at ./agents
+--- changes ---
+--- exit 2 ---

@@ -1,0 +1,15 @@
+MISSING: src/b/c.go
+MISSING: src/b.go
+MISSING: src/empty.go
+MISSING: cmd/.hidden.go
+MISSING: cmd/f.rs
+MISSING: client/i.jsx
+
+Scanned 11 source files, 6 missing contract headers.
+
+Every source file must declare which contract it implements:
+  // CONTRACT:C1-BLOBSTORE.2.1
+  // Architecture: CONTRACT:S2-API-GATEWAY.1.0
+
+See architecture/README.md for the full convention.
+--- exit 1 ---

@@ -38,6 +38,17 @@ printf '#!/bin/sh\necho HELLO-CMD "$@"\n' > "$FX/repos/proj/agents/architect/com
 printf '#!/bin/sh\necho "{\\"result\\":\\"FAKE-ANSWER\\",\\"session_id\\":\\"s1\\"}"\n' > "$FX/fakebin/claude"
 chmod +x "$FX/evil/x.sh" "$FX/repos/proj/agents/architect/commands/hello.sh" "$FX/fakebin/claude"
 
+# The bin/ shims run the rebar beside them. Test the binary under test
+# (lib.sh's $REBAR, which run.sh builds), not a bin/rebar a contributor may
+# have built (stale, or absent: it is not tracked): copies of the shims next to it.
+if [ -z "${ASK_SEC_BIN:-}" ]; then
+  mkdir -p "$FX/bin"
+  cp "$BIN/ask" "$BIN/ask-server" "$BIN/ask-mcp-server" "$FX/bin/"
+  ln -s "$(cd "$(dirname "$REBAR")" && pwd)/$(basename "$REBAR")" "$FX/bin/rebar"
+  BIN="$FX/bin"
+  ASK="$BIN/ask"
+fi
+
 export PATH="$FX/fakebin:$PATH" ASK_REGISTRY="$FX/registry" NO_COLOR=1
 unset ASK_SERVER ASK_API_KEY ASK_AGENTS_DIR ASK_SHARED_DIR
 

@@ -243,30 +243,28 @@ func findBranchContracts() []string {
 }
 
 func runSessionStart() error {
-	// First, try to run refresh-context.sh
-	if _, ok := resolveScript(cfg.RepoRoot, findRebarRoot(), "refresh-context.sh"); ok {
-		fmt.Println("═══ Freshness Check ═══")
-		fmt.Println()
-		out := gitOutput("log", "--since=7 days", "--oneline")
-		if out != "" {
-			fmt.Println("Recent commits (last 7 days):")
-			fmt.Println(out)
-		} else {
-			fmt.Println("No commits in the last 7 days.")
-		}
-		fmt.Println()
-
-		// Check for worktrees
-		worktrees := gitOutput("worktree", "list")
-		wlines := strings.Split(worktrees, "\n")
-		if len(wlines) > 1 {
-			fmt.Printf("WARNING: %d worktree(s) exist — verify they're active:\n", len(wlines)-1)
-			fmt.Println(worktrees)
-		} else {
-			fmt.Println("Worktrees: clean (main only)")
-		}
-		fmt.Println()
+	// First, the freshness summary (refresh-context is built in).
+	fmt.Println("═══ Freshness Check ═══")
+	fmt.Println()
+	out := gitOutput("log", "--since=7 days", "--oneline")
+	if out != "" {
+		fmt.Println("Recent commits (last 7 days):")
+		fmt.Println(out)
+	} else {
+		fmt.Println("No commits in the last 7 days.")
 	}
+	fmt.Println()
+
+	// Check for worktrees
+	worktrees := gitOutput("worktree", "list")
+	wlines := strings.Split(worktrees, "\n")
+	if len(wlines) > 1 {
+		fmt.Printf("WARNING: %d worktree(s) exist — verify they're active:\n", len(wlines)-1)
+		fmt.Println(worktrees)
+	} else {
+		fmt.Println("Worktrees: clean (main only)")
+	}
+	fmt.Println()
 
 	// Then print the Cold Start Quad
 	return runContext(&cobra.Command{}, []string{})

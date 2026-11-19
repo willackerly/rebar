@@ -56,21 +56,34 @@ jobs:
           echo "Latest release: $tag"
           echo "### govulncheck: $tag binaries" >> "$GITHUB_STEP_SUMMARY"
           mkdir dist
-          gh release download "$tag" --repo "$GITHUB_REPOSITORY" --dir dist \
-            --pattern '*.tar.gz' --pattern '*_checksums.txt'
+          gh release download "$tag" --repo "$GITHUB_REPOSITORY" --dir dist --pattern 'rebar_*'
           (cd dist && sha256sum -c ./*_checksums.txt)
 
+      # Bare binaries (v4.0.0 on), else the bin/rebar in each tarball
+      # (v3.1.x); the v4.0.x compatibility tarballs hold the same binaries.
       - name: govulncheck
         run: |
           go install golang.org/x/vuln/cmd/govulncheck@v1.9.0
           scan="$RUNNER_TEMP/vulncheck"
+          mkdir -p "$scan"
+          bins=""
+          for f in dist/rebar_*; do
+            case "$f" in *_checksums.txt|*.tar.gz) continue ;; esac
+            bins="$bins $f"
+          done
+          if [ -z "$bins" ]; then
+            for tarball in dist/*.tar.gz; do
+              name="$(basename "$tarball" .tar.gz)"
+              tar -xzf "$tarball" -C "$scan" "$name/bin/rebar"
+              mv "$scan/$name/bin/rebar" "$scan/$name.bin"
+              bins="$bins $scan/$name.bin"
+            done
+          fi
           failed=0
-          for tarball in dist/*.tar.gz; do
-            name="$(basename "$tarball" .tar.gz)"
-            mkdir -p "$scan"
-            tar -xzf "$tarball" -C "$scan" "$name/bin/rebar"
+          for bin in $bins; do
+            name="$(basename "$bin" .bin)"
             echo "::group::govulncheck $name"
-            if "$(go env GOPATH)/bin/govulncheck" -mode=binary "$scan/$name/bin/rebar"; then
+            if "$(go env GOPATH)/bin/govulncheck" -mode=binary "$bin"; then
               echo "- $name: no known vulnerabilities" >> "$GITHUB_STEP_SUMMARY"
             else
               echo "- $name: **vulnerabilities found** (see log)" >> "$GITHUB_STEP_SUMMARY"

@@ -1,0 +1,80 @@
+Running contract and documentation checks...
+
+━━━ Contract Headers ━━━
+SKIP: tier 1 < required tier 2 (set REBAR_TIER or .rebarrc to change, or name it in checks_enable)
+
+━━━ Contract References ━━━
+
+Checked 0 contract references, 0 broken.
+rebar: running project copy scripts/check-doc-refs.sh (deprecated: run `rebar migrate` to replace it with the built-in check)
+
+━━━ Doc References ━━━
+not executable
+rebar: running project copy scripts/check-todos.sh (deprecated: run `rebar migrate` to replace it with the built-in check)
+
+━━━ TODO Tracking ━━━
+custom todos
+OK: custom
+
+━━━ Doc Freshness ━━━
+SKIP: tier 1 < required tier 2 (set REBAR_TIER or .rebarrc to change, or name it in checks_enable)
+
+━━━ Registry Consistency ━━━
+FAIL: $ROOT/architecture/CONTRACT-REGISTRY.md does not exist. Generate it: rebar run compute-registry
+
+━━━ JTBD Presence ━━━
+SKIP: tier 1 < required tier 2 (set REBAR_TIER or .rebarrc to change, or name it in checks_enable)
+
+━━━ Prefix Uniqueness ━━━
+SKIP: tier 1 < required tier 2 (set REBAR_TIER or .rebarrc to change, or name it in checks_enable)
+
+━━━ Ground Truth ━━━
+SKIP: tier 1 < required tier 3 (set REBAR_TIER or .rebarrc to change, or name it in checks_enable)
+
+━━━ Rebar Compliance ━━━
+=== Rebar compliance check ===
+
+OK: .rebar-version = v3.1.0
+OK: .rebarrc tier = 1 (PARTIAL)
+OK: README.md badge found on line 3
+    Version: v3.1.0 | Tier: 1 (PARTIAL)
+
+=== Contract maturity (declared Status:) ===
+OK: no contracts found — maturity weighting not applicable
+
+OK: Rebar compliance verified.
+
+━━━ Decay Patterns ━━━
+check-decay-patterns: no files to scan.
+
+━━━ Fix Commit Gate ━━━
+check-fix-commit: OK — Gate G satisfied (no fix:/regression: commits without Reproduced on:)
+
+━━━ Bypass Flags Gate ━━━
+check-bypass-flags: OK — Gate I satisfied (no bypass mentions without Bypass tickets:)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SUMMARY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  PASS  Contract Headers
+  PASS  Contract References
+  PASS  Doc References
+  PASS  TODO Tracking
+  PASS  Doc Freshness
+  FAIL  Registry Consistency
+  PASS  JTBD Presence
+  PASS  Prefix Uniqueness
+  PASS  Ground Truth
+  PASS  Rebar Compliance
+  PASS  Decay Patterns
+  SKIP  Bootstrap Sync (rebar source repo only)
+  SKIP  Script Tests (rebar source repo only)
+  PASS  Fix Commit Gate
+  PASS  Bypass Flags Gate
+  SKIP  Steward
+
+  12 passed, 1 failed, 3 skipped
+
+CI check failed. Fix the issues above or skip individual checks
+with environment variables (e.g., SKIP_FRESHNESS=1).
+--- exit 1 ---

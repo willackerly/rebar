@@ -1,0 +1,5 @@
+inbox-watch: WARN — missing resolves outside the current repo ($ROOT). Watch your OWN inbox only; a peer's inbox self-echoes your outbound deposits (Principle 5 / SOP 2026-07-06). Proceeding — make sure this is a seat you hold.
+inbox-watch: WARN — missing does not exist yet; watching for it to appear
+inbox-watch: armed — watching inbox missing every 1s (pre-existing files not reported; own-sender deposits suppressed: <root's name>)
+NEW INBOX DEPOSIT: inbox/2026-07-12-peer-ASK-new.md — Subject: hello
+NEW INBOX DEPOSIT: missing/late.md

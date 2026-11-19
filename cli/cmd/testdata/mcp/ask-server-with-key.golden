@@ -1,0 +1,10 @@
+GET /v1/health 
+401 {"error": "Unauthorized. Provide Authorization: Bearer <key>"}
+GET /v1/health 
+200 {
+  "status": "ok",
+  "repos": 2
+}
+GET /v1/health 
+401 {"error": "Unauthorized. Provide Authorization: Bearer <key>"}
+--- exit 0 ---

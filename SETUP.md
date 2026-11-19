@@ -11,21 +11,20 @@ parts to adopt.
 - A git repository
 - Claude Code (or another AI coding agent that reads markdown context files)
 - 30 minutes for initial setup
-- `jq` (for steward quality scanning — `brew install jq` / `apt install jq`)
-- The rebar install — see [Install rebar](#install-rebar)
+- The `rebar` binary — see [Install rebar](#install-rebar)
 
 ## Install rebar
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/willackerly/rebar/v3.1.2/setup-rebar.sh | bash -s -- v3.1.2
+curl -fsSL https://raw.githubusercontent.com/willackerly/rebar/v4.0.0/setup-rebar.sh | bash -s -- v4.0.0
 ```
 
-That installs v3.1.2 and puts `~/.rebar/current/bin` (`rebar`, `ask`,
+That installs v4.0.0, the latest stable release, and puts `~/.rebar/current/bin` (`rebar`, `ask`,
 `ask-mcp-server`) on your PATH via your shell RC; open a new terminal (or
 source the RC) and check with `rebar version`. Fetch `setup-rebar.sh` from the
 tag you install, as above: the copy on `main` is whatever `main` holds. With no
 version argument the installer takes the latest stable release: the highest
-published GitHub Release that is not a pre-release such as `v3.2.0-rc.1`,
+published GitHub Release that is not a pre-release such as `v4.1.0-rc.1`,
 looked up through GitHub's API (unauthenticated, 60 requests/hour per IP; past
 that it says so; name the version instead). A tag that is pushed but not yet
 published as a Release, and draft Releases, never count. Variants (`…` is the
@@ -33,73 +32,100 @@ published as a Release, and draft Releases, never count. Variants (`…` is the
 
 | Command | Installs |
 |---------|----------|
-| `… \| bash -s -- v3.1.2` | that release |
-| `… \| bash -s -- --pre` | the newest published Release, pre-releases included |
+| `… \| bash -s -- v4.0.0` | that release (`v3.1.2` for the 3.1 line) |
+| `… \| bash -s -- --pre` | the newest published release, pre-releases included |
 | `… \| bash -s -- main` | a branch, built from source; `rebar version` says `main@<sha>` |
-| `… \| bash -s -- v3.1.2 --no-switch` | side by side, without changing the active version |
-| `… \| bash -s -- v3.1.2 --source` | built from source with your Go instead of the prebuilt download |
-| `… \| bash -s -- v3.1.2 --dir /opt/rebar` | under `/opt/rebar` instead of `~/.rebar` (CI) |
+| `… \| bash -s -- v4.0.0 --no-switch` | side by side, without changing the active version |
+| `… \| bash -s -- v4.0.0 --source` | from source with your Go (needed for a tag without prebuilt assets) |
+| `… \| bash -s -- v4.0.0 --dir /opt/rebar` | under `/opt/rebar` instead of `~/.rebar` (CI); your shell RC is left alone |
+| `… \| bash -s -- v4.0.0 --no-modify-rc` | in `~/.rebar` without editing your shell RC |
 
-Each version is a complete rebar tree in `~/.rebar/versions/<version>/`;
-`~/.rebar/current` is a symlink to the active one, so switching never edits
-your RC again (`ln -sfn versions/<version> ~/.rebar/current` switches by
-hand; `rm -rf ~/.rebar/versions/<version>` removes one). A release downloads
-as a prebuilt tarball verified against the release's SHA-256 checksums (a
-mismatch aborts). Only the release workflow publishes those assets, after
-every binary passes `govulncheck`, so a release tag never silently turns into
-a build with whatever Go is on your machine: if its assets are missing (the
-release is not published yet, or its workflow failed) or cannot be downloaded,
-the installer stops, and `--source` builds it anyway. Tags older than
-`v3.1.0-rc.1`, published before there were prebuilt assets, build from source
-without `--source`. Source builds (those, `--source`, branches and commits by
-full 40-character SHA) need `git` and Go 1.25 or newer (use a
-[supported release](https://go.dev/doc/devel/release#policy): the binary
-includes its standard library; see [SECURITY.md](SECURITY.md)). Branch
+**Your shell RC.** The installer runs the version's `rebar-install`, which
+adds `~/.rebar/current/bin` (and the shell completions) to the RC file your
+`$SHELL` reads: `~/.zshrc`, `~/.bashrc`, else `~/.profile`. From 4.0 the
+installer:
+
+- leaves the RC alone when you pass `--dir` (or set `REBAR_DIR`), and prints
+  the `export PATH=…` line to add instead; `--modify-rc` adds it anyway;
+- leaves it alone with `--no-modify-rc` for the default `~/.rebar` too;
+- never adds a second PATH block: re-running it, or an RC that already has
+  the directory as `$HOME/.rebar/current/bin` or `~/.rebar/current/bin`,
+  leaves the RC as it is.
+
+The 3.1.x installers wrote the RC on every switched install, also with
+`--dir`; remove stale `rebar CLI tools` blocks naming old directories by
+hand.
+
+Each version lives in `~/.rebar/versions/<version>/`; `~/.rebar/current` is
+a symlink to the active one, so switching never edits your RC again
+(`ln -sfn versions/<version> ~/.rebar/current` switches by hand;
+`rm -rf ~/.rebar/versions/<version>` removes one). From 4.0 a release is one
+self-contained binary per platform, `rebar_<ver>_<os>_<arch>`: the installer
+verifies it against the release's SHA-256 checksums (a mismatch aborts), puts
+it at `versions/<version>/bin/rebar` and runs `rebar install-shims`, which
+writes the `ask*` shims, `rebar-install` (the PATH setup; `bin/install`
+before 3.1.2, renamed because a file named `install` on PATH shadows
+install(1)) and the shell completions beside it. Releases v3.1.0-rc.1 to
+v3.1.x published a tarball of the whole tree instead, which the installer
+still unpacks. "latest" is the newest published GitHub Release (not a tag
+whose release is missing or still building). A release tag is never built
+from source behind your back: if its assets are missing or the download
+fails, the installer stops; `--source` builds it with your Go (tags before
+v3.1.0-rc.1, which have no assets, build from source by themselves).
+Branches and commits (by full 40-character SHA) build from source, which
+needs `git` and Go 1.25 or
+newer (use a [supported release](https://go.dev/doc/devel/release#policy):
+the binary includes its standard library; see [SECURITY.md](SECURITY.md)) and
+keeps the whole tree of that ref. Branch
 names are made path-safe for the directory (`feat/x` → `versions/feat-x`); if
 two refs map to the same name, the second install is refused rather than
 replacing the first. `./setup-rebar.sh --help` lists every option.
 
-The CLI runs the scripts of the tree it belongs to, so `rebar check` always
-uses the checks of the version you run. Upgrading a project that already uses
-rebar: [UPGRADING.md](UPGRADING.md).
+The checks are built into the binary, so `rebar check` always uses the
+checks of the version you run. Downloaded the binary by hand (or built it
+with `go build`)? It works on its own; run `rebar install-shims` once if you
+want the `ask` command and the completions next to it. Upgrading a project
+that already uses rebar: [UPGRADING.md](UPGRADING.md).
 
 ### Testing a release candidate
 
-Release candidates are tags like `v3.2.0-rc.1`, published as GitHub
-pre-releases; the default "latest" install skips them. Use the installer from
-the candidate's own tag (or `--pre` for the newest pre-release):
+Release candidates are tags like `v4.1.0-rc.1` (4.0's were `v4.0.0-rc.1`
+and `-rc.2`), published as GitHub pre-releases; the default "latest" install
+skips them. There is no open candidate now: v4.0.0 is the current release.
+For a future one, use the installer from the candidate's own tag (or `--pre`
+for the newest pre-release), for example:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/willackerly/rebar/v3.2.0-rc.1/setup-rebar.sh \
-  | bash -s -- v3.2.0-rc.1 --no-switch
-~/.rebar/versions/v3.2.0-rc.1/bin/rebar version     # rebar v3.2.0-rc.1
+curl -fsSL https://raw.githubusercontent.com/willackerly/rebar/v4.1.0-rc.1/setup-rebar.sh \
+  | bash -s -- v4.1.0-rc.1 --no-switch
+~/.rebar/versions/v4.1.0-rc.1/bin/rebar version     # rebar v4.1.0-rc.1
 ```
 
 `--no-switch` keeps your current version active (except on a first versioned
 install, which always becomes current), so you can try the candidate by path
 on one project, then switch with
-`ln -sfn versions/v3.2.0-rc.1 ~/.rebar/current`. Then follow
+`ln -sfn versions/v4.1.0-rc.1 ~/.rebar/current`. Then follow
 [QUICKSTART.md](QUICKSTART.md) for a new project or
 [UPGRADING.md](UPGRADING.md) for an existing one, and report problems as
 issues on the repository.
 
 Name the candidate explicitly: without a version the installer takes the latest
 *stable* release, so a candidate is only picked by `--pre` (the newest
-published Release, pre-releases included).
+published release, pre-releases included).
 
 **Upgrading from a `~/.rebar` clone** (what the installer made before versioned installs): the
 installer leaves the clone as it is — not moved, not updated — and adds
 `versions/` and `current` inside it (git-excluded). The new PATH entry comes
 later in your RC, so it wins; `.mcp.json` files and `REBAR_ROOT` that point at
-the clone keep working until you re-run `rebar init` or change them. If
-`REBAR_ROOT` is set, the CLI runs that tree's scripts, not
-`~/.rebar/current`'s; unset it to use the installed version.
+the clone keep working until you re-run `rebar init` or change them.
+`REBAR_ROOT` is no longer needed (see "Where a rebar tree still matters"
+below).
 
 ## Run rebar in CI
 
-A project's checks run from the rebar install (`rebar check` executes the
-install's `scripts/` against the project), so CI needs a complete rebar tree
-at the version you pin, not just the `rebar` binary.
+From 4.0 the `rebar` binary is self-contained: the checks, the suites, ASK,
+the MCP server and the bootstrap templates are built in, so CI needs only the
+binary of the version you pin, no rebar tree and no `REBAR_ROOT`.
 
 **GitHub Actions, with the installer:**
 
@@ -107,7 +133,7 @@ at the version you pin, not just the `rebar` binary.
       - uses: actions/checkout@v4
       - name: Install rebar
         env:
-          REBAR_VERSION: v3.1.2
+          REBAR_VERSION: v4.0.0   # the release this repository pins
         run: |
           curl -fsSL "https://raw.githubusercontent.com/willackerly/rebar/${REBAR_VERSION}/setup-rebar.sh" \
             | bash -s -- "$REBAR_VERSION" --dir "$RUNNER_TEMP/rebar"
@@ -116,79 +142,102 @@ at the version you pin, not just the `rebar` binary.
         run: rebar check            # or ./scripts/ci-check.sh
 ```
 
-The release's prebuilt tarball needs only `curl`, `tar` and `shasum` or
-`sha256sum`. A tag without prebuilt assets is an error unless you pass
-`--source`, which needs `git` and Go (add `actions/setup-go`). The checks themselves need `jq`
-and `git`. The installer also appends a PATH line to the runner's shell RC,
-which is harmless there.
+The release binary needs only `curl` and `shasum` or `sha256sum`; the
+installer verifies it against the release's checksums and writes the `ask`
+shims and `rebar-install` beside it. A tag without prebuilt assets is an
+error unless you pass `--source` (needs `git` and Go: add
+`actions/setup-go`). The checks
+themselves need `git`. With `--dir` the 4.0 installer does not touch the
+runner's shell RC (it prints the PATH line instead), so the `$GITHUB_PATH`
+line is what puts rebar on PATH; the 3.1.x installers also appended a line to
+the RC, which is harmless on a runner.
 
-**How the CLI finds its scripts.** In order (`findRebarRoot` in
-`cli/cmd/init.go`), the first directory that holds both
-`templates/project-bootstrap/` and `scripts/steward.sh` wins:
-
-1. `$REBAR_ROOT`
-2. the directory above the running binary, after resolving symlinks
-   (`~/.rebar/current/bin/rebar` → `~/.rebar/versions/<v>/`)
-3. the current directory (working on rebar itself)
-4. `~/.rebar/current`, `~/.rebar`, `~/dev/rebar`, `~/src/rebar`, `~/code/rebar`
-
-If none matches, `rebar check` fails (`rebar: ci-check.sh not found in the
-project or a rebar install`) and `rebar check --pre-commit` prints
-`pre-commit.sh not found … skipping` and **exits 0** (a commit hook must not
-block on a missing install). A CI step that runs `--pre-commit` without an
-install therefore passes without checking anything.
-
-**The trap: pinned binary, no tree.** A wrapper that builds only the `rebar`
-binary from a pinned commit into a cache directory (virtru-analyze's
-`scripts/rebar.sh` did) worked while the project carried copies of rebar's
-scripts. Under 3.1 that binary finds no `scripts/` beside it; it falls through
-to `~/.rebar/current` (a different version on a laptop, nothing on a CI
-runner). Keep the whole tree of the pinned commit and build the binary into
-it:
+**Pinned wrapper.** To run the version a repository pins without an install
+step, download the release binary for the platform once, verify it against a
+SHA-256 *committed in the repository*, cache it and run it; nothing else is
+needed. Pinning the hash (not just checking the release's own checksums file)
+means a release asset replaced later cannot reach your CI.
 
 ```bash
 #!/usr/bin/env bash
-# scripts/rebar.sh — run the rebar version this repository pins, with that
-# version's own scripts. Usage: scripts/rebar.sh check | run <script> | ...
+# scripts/rebar.sh — run the rebar version this repository pins.
+# Usage: scripts/rebar.sh check | run <check> | ...
 set -euo pipefail
 
-REBAR_PIN="v3.1.2"                          # a release tag
-REBAR_PIN_COMMIT="<commit the tag points at>" # git rev-parse 'v3.1.2^{commit}' in a clone
-REBAR_REPOSITORY="${REBAR_REPOSITORY:-https://github.com/willackerly/rebar.git}"
+REBAR_PIN="v4.0.0"   # a release from 4.0 on (self-contained binary)
+# The pinned release's rebar_<ver>_checksums.txt (at least this platform's
+# binary line); a download that does not match is refused.
+REBAR_SHA256="
+paste-the-lines-of-rebar_4.0.0_checksums.txt-here  rebar_4.0.0_linux_amd64
+"
+REBAR_RELEASES="${REBAR_RELEASES:-https://github.com/willackerly/rebar/releases/download}"
 ROOT="${REBAR_CACHE_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/rebar}/$REBAR_PIN"
 
-if [ ! -x "$ROOT/bin/rebar" ] || [ "$(cat "$ROOT/.pinned-commit" 2>/dev/null)" != "$REBAR_PIN_COMMIT" ]; then
+if [ ! -x "$ROOT/rebar" ]; then
+  os="$(uname -s | tr '[:upper:]' '[:lower:]')"
+  case "$(uname -m)" in
+    x86_64|amd64)  arch=amd64 ;;
+    arm64|aarch64) arch=arm64 ;;
+    *) echo "rebar: no release binary for $(uname -m)" >&2; exit 1 ;;
+  esac
+  asset="rebar_${REBAR_PIN#v}_${os}_${arch}"
+  want="$(printf '%s\n' "$REBAR_SHA256" | awk -v f="$asset" '$2 == f || $2 == "*" f { print $1; exit }')"
+  case "$want" in
+    [0-9a-f][0-9a-f][0-9a-f][0-9a-f]*) ;;
+    *) echo "rebar $REBAR_PIN: no SHA-256 pinned for $asset in REBAR_SHA256" >&2; exit 1 ;;
+  esac
   tmp="$(mktemp -d "${TMPDIR:-/tmp}/rebar-pin.XXXXXX")"
-  trap 'rm -rf "$tmp"' EXIT
-  git -C "$tmp" init -q src
-  git -C "$tmp/src" fetch -q --depth 1 "$REBAR_REPOSITORY" "refs/tags/$REBAR_PIN"
-  [ "$(git -C "$tmp/src" rev-parse 'FETCH_HEAD^{commit}')" = "$REBAR_PIN_COMMIT" ] \
-    || { echo "rebar $REBAR_PIN does not point at $REBAR_PIN_COMMIT" >&2; exit 1; }
-  # The whole tree, not just the CLI: rebar check runs the tree's scripts/.
-  mkdir "$tmp/tree"
-  git -C "$tmp/src" archive FETCH_HEAD | tar -x -C "$tmp/tree"
-  (cd "$tmp/tree/cli" && CGO_ENABLED=0 go build -trimpath -o ../bin/rebar .)
-  echo "$REBAR_PIN_COMMIT" > "$tmp/tree/.pinned-commit"
-  mkdir -p "$(dirname "$ROOT")" && rm -rf "$ROOT" && mv "$tmp/tree" "$ROOT"
-  rm -rf "$tmp"; trap - EXIT   # exec below replaces the shell: no EXIT trap runs
+  curl -fsSL -o "$tmp/$asset" "$REBAR_RELEASES/$REBAR_PIN/$asset"
+  got="$( (sha256sum "$tmp/$asset" 2>/dev/null || shasum -a 256 "$tmp/$asset") | awk '{ print $1 }')"
+  if [ "$want" != "$got" ]; then
+    rm -rf "$tmp"
+    echo "rebar $REBAR_PIN: checksum mismatch for $asset (pinned $want, got $got)" >&2
+    exit 1
+  fi
+  mkdir "$tmp/bin" && mv "$tmp/$asset" "$tmp/bin/rebar" && chmod 755 "$tmp/bin/rebar"
+  mkdir -p "$(dirname "$ROOT")" && rm -rf "$ROOT" && mv "$tmp/bin" "$ROOT"
+  rm -rf "$tmp"
 fi
 
-export REBAR_ROOT="$ROOT"
-export PATH="$ROOT/bin:$PATH"   # nested `rebar` calls get the same version
-exec "$ROOT/bin/rebar" "$@"
+export PATH="$ROOT:$PATH"   # nested `rebar` calls get the same version
+exec "$ROOT/rebar" "$@"
 ```
 
-The binary would find `$ROOT` through its own `../` anyway; `REBAR_ROOT` makes
-the choice explicit and wins over a stray `~/.rebar`. The project's
-`scripts/ci-check.sh` and `scripts/pre-commit.sh`, and the wrappers
-`rebar migrate` leaves for copies that other files call, run whatever `rebar`
-is on PATH. So a project script that CI runs directly should call the pinned
-wrapper (`scripts/rebar.sh run check-todos`), not those files, unless the CI
-job puts the pinned `bin/` on PATH. In CI, cache
-`$REBAR_CACHE_DIR` between runs if the build time matters. Without Go on the
-runner, use the installer instead:
-`setup-rebar.sh "$REBAR_PIN" --dir "$ROOT_BASE" --no-switch`, then run
-`"$ROOT_BASE/versions/$REBAR_PIN/bin/rebar"`.
+When you change `REBAR_PIN`, paste that release's
+`rebar_<ver>_checksums.txt` into `REBAR_SHA256`, after checking the file's
+build provenance:
+
+```bash
+gh release download v4.0.0 -R willackerly/rebar -p 'rebar_4.0.0_checksums.txt'
+gh attestation verify rebar_4.0.0_checksums.txt --repo willackerly/rebar
+```
+
+(`gh attestation verify <binary> --repo willackerly/rebar` checks a
+downloaded binary the same way: it was built by rebar's release workflow
+from the tagged commit.)
+
+The project's `scripts/ci-check.sh` and `scripts/pre-commit.sh`, and the
+wrappers `rebar migrate` leaves for copies that other files call, run
+whatever `rebar` is on PATH, so a project script that CI runs directly should
+call the pinned wrapper (`scripts/rebar.sh run check-todos`), unless the CI
+job puts `$ROOT` on PATH. Cache `$REBAR_CACHE_DIR` between runs to skip the
+download. (Before 4.0 the binary ran the scripts of the rebar tree beside it,
+so a wrapper had to keep the whole tree of the pinned commit. Such a wrapper
+works with 4.0 once its pin, commit and `.rebar-version` name a 4.0 release,
+except for one common guard: 3.x called a tree complete when it held
+`scripts/steward.sh` and `templates/project-bootstrap/`, and a 4.0 tree has
+no `scripts/steward.sh` (a 4.0 install, as in `REBAR_BIN=~/.rebar/current/bin/rebar`,
+has neither), so drop such a check. Its `REBAR_ROOT` export is harmless; the
+tree itself is no longer needed.)
+
+**Where a rebar tree still matters.** Almost nowhere: rebar is a single
+binary, and its checks never read a rebar tree. `rebar doc` resolves
+`rebar:<kind>/<name>` references from a checkout when it finds one, and
+`rebar migrate` reads a checkout's release history to recognize old copies
+(the binary carries the list of released scripts, so it does not need one).
+They look in `$REBAR_ROOT`, else the directory above the binary, the current
+directory, then `~/.rebar/current`, `~/.rebar`, `~/dev/rebar`, `~/src/rebar`,
+`~/code/rebar` (`findRebarRoot` in `cli/cmd/init.go`).
 
 ## Step 1: Pick Your Profiles
 
@@ -229,13 +278,14 @@ in a fresh directory and makes the first commit (see
 points, `ci-check.sh` and `pre-commit.sh`, which run `rebar check`. Existing
 files are left alone; the badge is added to an existing README.
 
-**Copying by hand** instead works from the install tree, which holds the same
-templates (`~/.rebar/current`; any rebar checkout works too). The copied
-`scripts/` entry points call `rebar`, so rebar must still be on your PATH:
+**Copying by hand** instead works from a rebar checkout (`git clone
+https://github.com/willackerly/rebar`), which holds the same templates. The
+copied `scripts/` entry points call `rebar`, so rebar must still be on your
+PATH:
 
 ```bash
 PROJECT=/path/to/your/project
-R=~/.rebar/current
+R=~/src/rebar                    # a rebar checkout
 BOOTSTRAP="$R/templates/project-bootstrap"
 
 # The Cold Start Quad (required)
@@ -311,7 +361,7 @@ The universal first-read. Every agent, every session, no exceptions.
 
 1. **Rebar badge** — First line after `# Title` MUST be the rebar badge:
    ```markdown
-   > **rebar v3.1.2** | **Tier 2: ADOPTED**
+   > **rebar v4.0.0** | **Tier 2: ADOPTED**
    ```
    This is validated by `check-compliance` (part of `rebar check`) against
    `.rebar-version`. Update both when you upgrade rebar
