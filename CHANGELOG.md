@@ -18,7 +18,15 @@ All notable changes to rebar. Versioned with [semver](https://semver.org/).
 
 ## Unreleased
 
-Fixes from field-testing v4.0.0-rc.1.
+_Nothing yet._
+
+---
+
+## v4.0.0-rc.2 — 2026-11-19
+
+Second release candidate for 4.0.0, still a **pre-release** (default
+"latest" stays on v3.1.2). Fixes from field-testing v4.0.0-rc.1; the
+breaking changes are in the CHANGELOG's v4.0.0-rc.1 section and UPGRADING.md.
 
 - **Installer: the shell RC.** `setup-rebar.sh --dir PATH` (or `REBAR_DIR`)
   no longer edits your shell RC; it prints the `export PATH=…` line instead
@@ -41,6 +49,8 @@ Fixes from field-testing v4.0.0-rc.1.
   pinned wrapper which refuses a tree without `scripts/steward.sh` must drop
   that test for 4.0; UPGRADING.md's "From 3.1.x" path lists migrate, the
   `.rebar-version`/badge bump and the CI pin.
+
+---
 
 ## v4.0.0-rc.1 — 2026-11-19
 

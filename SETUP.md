@@ -24,7 +24,7 @@ That installs v3.1.2, the latest stable release, and puts `~/.rebar/current/bin`
 source the RC) and check with `rebar version`. Fetch `setup-rebar.sh` from the
 tag you install, as above: the copy on `main` is whatever `main` holds. With no
 version argument the installer takes the latest stable release: the highest
-published GitHub Release that is not a pre-release such as `v4.0.0-rc.1`,
+published GitHub Release that is not a pre-release such as `v4.0.0-rc.2`,
 looked up through GitHub's API (unauthenticated, 60 requests/hour per IP; past
 that it says so; name the version instead). A tag that is pushed but not yet
 published as a Release, and draft Releases, never count. Variants (`…` is the
@@ -38,7 +38,7 @@ published as a Release, and draft Releases, never count. Variants (`…` is the
 | `… \| bash -s -- v3.1.2 --no-switch` | side by side, without changing the active version |
 | `… \| bash -s -- v3.1.2 --source` | from source with your Go (needed for a tag without prebuilt assets) |
 | `… \| bash -s -- v3.1.2 --dir /opt/rebar` | under `/opt/rebar` instead of `~/.rebar` (CI); from 4.0 your shell RC is left alone |
-| `… \| bash -s -- v4.0.0-rc.1 --no-modify-rc` | in `~/.rebar` without editing your shell RC |
+| `… \| bash -s -- v4.0.0-rc.2 --no-modify-rc` | in `~/.rebar` without editing your shell RC |
 
 **Your shell RC.** The installer runs the version's `rebar-install`, which
 adds `~/.rebar/current/bin` (and the shell completions) to the RC file your
@@ -89,23 +89,23 @@ that already uses rebar: [UPGRADING.md](UPGRADING.md).
 
 ### Testing a release candidate
 
-Release candidates are tags like `v4.0.0-rc.1`, published as GitHub
+Release candidates are tags like `v4.0.0-rc.2`, published as GitHub
 pre-releases; the default "latest" install skips them. The current one is
-**v4.0.0-rc.1**, the first candidate for rebar 4.0 (its breaking changes:
+**v4.0.0-rc.2**, the second candidate for rebar 4.0 (its breaking changes:
 [UPGRADING.md § Upgrading from 3.x to 4.0](UPGRADING.md#upgrading-from-3x-to-40)).
 The stable examples in this guide stay on v3.1.2 until v4.0.0 is final. Use the installer from
 the candidate's own tag (or `--pre` for the newest pre-release):
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/willackerly/rebar/v4.0.0-rc.1/setup-rebar.sh \
-  | bash -s -- v4.0.0-rc.1 --no-switch
-~/.rebar/versions/v4.0.0-rc.1/bin/rebar version     # rebar v4.0.0-rc.1
+curl -fsSL https://raw.githubusercontent.com/willackerly/rebar/v4.0.0-rc.2/setup-rebar.sh \
+  | bash -s -- v4.0.0-rc.2 --no-switch
+~/.rebar/versions/v4.0.0-rc.2/bin/rebar version     # rebar v4.0.0-rc.2
 ```
 
 `--no-switch` keeps your current version active (except on a first versioned
 install, which always becomes current), so you can try the candidate by path
 on one project, then switch with
-`ln -sfn versions/v4.0.0-rc.1 ~/.rebar/current`. Then follow
+`ln -sfn versions/v4.0.0-rc.2 ~/.rebar/current`. Then follow
 [QUICKSTART.md](QUICKSTART.md) for a new project or
 [UPGRADING.md](UPGRADING.md) for an existing one, and report problems as
 issues on the repository.
@@ -134,7 +134,7 @@ binary of the version you pin, no rebar tree and no `REBAR_ROOT`.
       - uses: actions/checkout@v4
       - name: Install rebar
         env:
-          REBAR_VERSION: v3.1.2   # latest stable; v4.0.0-rc.1 to try 4.0
+          REBAR_VERSION: v3.1.2   # latest stable; v4.0.0-rc.2 to try 4.0
         run: |
           curl -fsSL "https://raw.githubusercontent.com/willackerly/rebar/${REBAR_VERSION}/setup-rebar.sh" \
             | bash -s -- "$REBAR_VERSION" --dir "$RUNNER_TEMP/rebar"
@@ -165,7 +165,7 @@ means a release asset replaced later cannot reach your CI.
 # Usage: scripts/rebar.sh check | run <check> | ...
 set -euo pipefail
 
-REBAR_PIN="v4.0.0"   # a release from 4.0 on (self-contained binary; v4.0.0-rc.1 until 4.0.0 is out)
+REBAR_PIN="v4.0.0"   # a release from 4.0 on (self-contained binary; v4.0.0-rc.2 until 4.0.0 is out)
 # The pinned release's rebar_<ver>_checksums.txt (at least this platform's
 # binary line); a download that does not match is refused.
 REBAR_SHA256="

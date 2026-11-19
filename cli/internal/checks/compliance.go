@@ -45,7 +45,7 @@ var (
 // ComplianceExampleVersion is the release the script's hints name (the
 // version to write to .rebar-version and the badge); rebar's release bumps
 // it with the script (TestComplianceExampleVersion).
-const ComplianceExampleVersion = "v4.0.0-rc.1"
+const ComplianceExampleVersion = "v4.0.0-rc.2"
 
 // tierLabel is the badge level of a tier.
 func tierLabel(tier string) string {

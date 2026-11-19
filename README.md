@@ -1,8 +1,8 @@
 # rebar
 
-> **rebar v4.0.0-rc.1** | **Tier 3: ENFORCED**
+> **rebar v4.0.0-rc.2** | **Tier 3: ENFORCED**
 
-[![rebar v4.0.0-rc.1](https://img.shields.io/badge/rebar-v4.0.0--rc.1-orange)](DESIGN.md)
+[![rebar v4.0.0-rc.2](https://img.shields.io/badge/rebar-v4.0.0--rc.2-orange)](DESIGN.md)
 [![Tier 3: Enforced](https://img.shields.io/badge/tier-3_enforced-brightgreen)](DESIGN.md)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
@@ -95,7 +95,7 @@ afterwards. v3.1.2 is the latest stable release; **rebar 4.0 is at its
 first release candidate**, which you can install beside it:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/willackerly/rebar/v4.0.0-rc.1/setup-rebar.sh | bash -s -- v4.0.0-rc.1 --no-switch
+curl -fsSL https://raw.githubusercontent.com/willackerly/rebar/v4.0.0-rc.2/setup-rebar.sh | bash -s -- v4.0.0-rc.2 --no-switch
 ```
 
 The install examples stay on v3.1.2 until v4.0.0 is final; 4.0's breaking
@@ -341,7 +341,7 @@ later. See `feedback/2026-04-21-...`, `2026-04-22-...`, and
 Every rebar repo declares its version and tier at the top of README.md:
 
 ```markdown
-> **rebar v4.0.0-rc.1** | **Tier 2: ADOPTED**
+> **rebar v4.0.0-rc.2** | **Tier 2: ADOPTED**
 ```
 
 This is validated by `check-compliance` (run by `rebar check`) against the

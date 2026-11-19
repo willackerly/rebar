@@ -1,7 +1,7 @@
 # QUICKCONTEXT — rebar (main, v3 line)
 
-last-synced: 2026-11-18
-<!-- freshness: 2026-11-18 -->
+last-synced: 2026-11-19
+<!-- freshness: 2026-11-19 -->
 **Branch:** main — **v3 line, graduated to `v3.0.0`** 2026-11-14 (plan D12); `v3.1.2` released 2026-11-18 (security; from `release/v3.1.2`)
 **Tier:** 3 (ENFORCED) — rebar dogfoods its own methodology
 
@@ -122,7 +122,7 @@ untracked). Merge plan: `release/v4.0.0-rc` from `main`, stack merged
 top-down, tag `v4.0.0-rc.1`, field-test, then `main` and `v4.0.0`.
 
 **Now — `v3.1.2` is out.** Install it (`… | bash -s -- v3.1.2`),
-run UPGRADING.md on adopters; 3.1.x fixes go to `main`, the Go-native stack ships as 4.0.0 (v4.0.0-rc.1 first).
+run UPGRADING.md on adopters; 3.1.x fixes go to `main`, the Go-native stack ships as 4.0.0 (v4.0.0-rc.1 tagged 2026-11-19 and field-tested; rc.2 with the field-test fixes, #61).
 
 **Done — `v3.0.0` tagged and released 2026-11-14.** After the release PR merges, tag
 the merge commit and announce (action 1).
