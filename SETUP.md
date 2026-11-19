@@ -19,7 +19,7 @@ parts to adopt.
 curl -fsSL https://raw.githubusercontent.com/willackerly/rebar/v3.1.2/setup-rebar.sh | bash -s -- v3.1.2
 ```
 
-That installs v3.1.2 and puts `~/.rebar/current/bin` (`rebar`, `ask`,
+That installs v3.1.2, the latest stable release, and puts `~/.rebar/current/bin` (`rebar`, `ask`,
 `ask-mcp-server`) on your PATH via your shell RC; open a new terminal (or
 source the RC) and check with `rebar version`. Fetch `setup-rebar.sh` from the
 tag you install, as above: the copy on `main` is whatever `main` holds. With no
@@ -73,7 +73,10 @@ that already uses rebar: [UPGRADING.md](UPGRADING.md).
 ### Testing a release candidate
 
 Release candidates are tags like `v4.0.0-rc.1`, published as GitHub
-pre-releases; the default "latest" install skips them. Use the installer from
+pre-releases; the default "latest" install skips them. The current one is
+**v4.0.0-rc.1**, the first candidate for rebar 4.0 (its breaking changes:
+[UPGRADING.md § Upgrading from 3.x to 4.0](UPGRADING.md#upgrading-from-3x-to-40)).
+The stable examples in this guide stay on v3.1.2 until v4.0.0 is final. Use the installer from
 the candidate's own tag (or `--pre` for the newest pre-release):
 
 ```bash
@@ -114,7 +117,7 @@ binary of the version you pin, no rebar tree and no `REBAR_ROOT`.
       - uses: actions/checkout@v4
       - name: Install rebar
         env:
-          REBAR_VERSION: v3.2.0
+          REBAR_VERSION: v3.1.2   # latest stable; v4.0.0-rc.1 to try 4.0
         run: |
           curl -fsSL "https://raw.githubusercontent.com/willackerly/rebar/${REBAR_VERSION}/setup-rebar.sh" \
             | bash -s -- "$REBAR_VERSION" --dir "$RUNNER_TEMP/rebar"
@@ -143,7 +146,7 @@ means a release asset replaced later cannot reach your CI.
 # Usage: scripts/rebar.sh check | run <check> | ...
 set -euo pipefail
 
-REBAR_PIN="v4.0.0"   # a release from 4.0 on (self-contained binary)
+REBAR_PIN="v4.0.0"   # a release from 4.0 on (self-contained binary; v4.0.0-rc.1 until 4.0.0 is out)
 # The pinned release's rebar_<ver>_checksums.txt (at least this platform's
 # binary line); a download that does not match is refused.
 REBAR_SHA256="
