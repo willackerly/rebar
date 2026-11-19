@@ -1,14 +1,25 @@
-# QUICKCONTEXT — rebar (main, v3 line)
+# QUICKCONTEXT — rebar (main, v4 line)
 
 last-synced: 2026-11-19
 <!-- freshness: 2026-11-19 -->
-**Branch:** main — **v3 line, graduated to `v3.0.0`** 2026-11-14 (plan D12); `v3.1.2` released 2026-11-18 (security; from `release/v3.1.2`)
+**Branch:** main — **`v4.0.0`** 2026-11-19 (Go-native, from `release/v4.0.0-rc`); 3.1 line at `v3.1.2` (2026-11-18, security) gets serious security fixes for now (SECURITY.md)
 **Tier:** 3 (ENFORCED) — rebar dogfoods its own methodology
 
 ---
 
 ## Current State
 
+- **`v4.0.0` (2026-11-19)** — rebar is one self-contained Go binary per
+  platform (darwin/linux × amd64/arm64): every check, the suites, steward,
+  the utilities, ASK and the MCP server (official Go MCP SDK) are native and
+  the bootstrap templates embedded; the bash/python implementations are
+  gone (`bin/ask*` remain as shims). Releases carry SHA-256 checksums and
+  build-provenance attestations and are govulncheck-gated. The Go-native
+  stack #23 → #53 merged into `release/v4.0.0-rc`; `v4.0.0-rc.1` and
+  `rc.2` (field-test fixes, #61) were field-tested (installers, attestation,
+  govulncheck, new+check, MCP stdio); 4.0.0 is rc.2 plus version strings and
+  docs. Breaking changes: CHANGELOG `## v4.0.0`, UPGRADING "3.x → 4.0".
+  `bin/rebar` is no longer tracked: `(cd cli && go build -o ../bin/rebar .)`.
 - **`v3.0.0` final released 2026-11-14** — graduation of the v3 line by
   **project-owner decision**, not by full measurement. Criteria 2–4 were met
   2026-08-02; criterion 1 (two migrated repos ≥2 weeks clean) was never
@@ -116,20 +127,17 @@ Ordered roughly by cost.
 
 ## What's Next — proposed go-forward
 
-**Next — `v4.0.0-rc.1`** (the Go-native stack #23 → #53, plus rc prep:
-4.0 naming, CHANGELOG breaking changes, UPGRADING "3.x → 4.0", `bin/rebar`
-untracked). Merge plan: `release/v4.0.0-rc` from `main`, stack merged
-top-down, tag `v4.0.0-rc.1`, field-test, then `main` and `v4.0.0`.
-
-**Now — `v3.1.2` is out.** Install it (`… | bash -s -- v3.1.2`),
-run UPGRADING.md on adopters; 3.1.x fixes go to `main`, the Go-native stack ships as 4.0.0 (v4.0.0-rc.1 tagged 2026-11-19 and field-tested; rc.2 with the field-test fixes, #61).
+**Now — `v4.0.0` is out.** Install it (`… | bash -s -- v4.0.0`) and
+move adopters with UPGRADING.md § "Upgrading from 3.x to 4.0" (`rebar
+migrate`, version bump, CI pin). 3.1.x gets serious security fixes only,
+for now (SECURITY.md; the owner sets the end date). 4.1 drops the compatibility tarballs for the 3.1.x installers;
+move to go-sdk v1.9.0 when stable and drop the `"arguments": null` guard.
 
 **Done — `v3.0.0` tagged and released 2026-11-14.** After the release PR merges, tag
 the merge commit and announce (action 1).
 
-**Next — v3.1.0 on `release/v3.1.0-rc`.** #14, #8, `rebar migrate` and a
-versioned installer (see Current State). The `registry_impl_counts`
-default flip (to `false`) is in `v3.1.0-rc.1`.
+**Done — `v3.1.0` (2026-11-16), `v3.1.1`, `v3.1.2`.** #14, #8, `rebar
+migrate` and the versioned installer shipped in 3.1.0.
 
 **Also staged for v3.1+:**
 1. **`rebar watch` as a shipped command** (`_atlas` slice 1) — kills the

@@ -9,8 +9,14 @@ with no details.
 
 ## Supported versions
 
-Fixes go into the latest release. Upgrade with `setup-rebar.sh` (see
-[UPGRADING.md](UPGRADING.md)).
+| Version | Security fixes |
+|---------|----------------|
+| 4.0.x | Yes |
+| 3.1.x | Yes, for now: fixes for serious vulnerabilities, while projects move to 4.0. The end date will be announced here and in the CHANGELOG |
+| ≤ 3.0.x | No |
+
+Fixes go into the latest release of a supported line. Upgrade with
+`setup-rebar.sh` (see [UPGRADING.md](UPGRADING.md)).
 
 ## What is scanned, and when
 
@@ -42,8 +48,9 @@ vulnerabilities fixed in later Go releases; upgrade to v3.1.1 or later.
 ## ASK servers (`ask-server`, `ask-mcp-server`)
 
 In HTTP mode these are network services that run `ask` — and through it
-`claude` — on the host, with the server user's files and credentials. From
-v3.1.2:
+`claude` — on the host, with the server user's files and credentials (from
+4.0, `rebar ask serve` and `rebar mcp serve`; the old names are shims for
+them). From v3.1.2:
 
 - They bind `127.0.0.1` by default. Serving other machines needs
   `--host <addr>` **and** an API key (`--api-key` / `ASK_API_KEY`); a

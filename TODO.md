@@ -1,6 +1,6 @@
 # TODO — rebar
 
-**Last synced:** 2026-11-14
+**Last synced:** 2026-11-19
 
 The canonical, vote-shaped backlog lives in [`feedback/INVENTORY.md`](feedback/INVENTORY.md).
 This file holds short-horizon work that's actively in flight or imminent.
@@ -9,13 +9,16 @@ This file holds short-horizon work that's actively in flight or imminent.
 
 ## P0 — In Flight
 
-- [ ] **Assemble v3.1.0 on `release/v3.1.0-rc`.** Collects #14
-      (self-contained install) and #8 (`contract_namespace`), plus
-      `rebar migrate` and a versioned installer, both in progress.
+- [ ] **Ship `v4.0.0`.** Release PR into `release/v4.0.0-rc`, then
+      `release/v4.0.0-rc` → `main`, tag `v4.0.0` on that merge commit; the
+      release workflow publishes the binaries. Then announce and move
+      adopters (UPGRADING.md § 3.x → 4.0).
+- [x] **Assemble v3.1.0 on `release/v3.1.0-rc`.** Shipped as `v3.1.0`
+      (2026-11-16); the Go-native stack followed as 4.0.
 
 ## P1 — Imminent
 
-- [ ] **Leaked test watcher.** A test-spawned `inbox-watch.sh` ran for
+- [x] **Leaked test watcher.** A test-spawned `inbox-watch.sh` ran for
       **10 days** against a deleted `/var/folders/...` temp dir (found and
       killed 2026-08-12). Both `scripts/tests/inbox-watch*.test.sh` have
       EXIT traps and explicit kills, so the leak path is not obvious —
@@ -24,7 +27,7 @@ This file holds short-horizon work that's actively in flight or imminent.
       **Root cause found 2026-11-14:** `inbox-watch-lock.test.sh` calls
       `X="$(arm ...)"`, so `arm`'s `PIDS+=` ran in a subshell and never
       reached the EXIT cleanup. Fixed in #14 (b9fbb58, on
-      `release/v3.1.0-rc`); close this when that ships.
+      `release/v3.1.0-rc`); shipped in v3.1.0.
 - [ ] **A harness-backed watcher does not outlive its task.** Observed
       2026-08-12: `scripts/inbox-watch.sh` armed as a background task was
       reaped when the harness marked the task complete — it released its

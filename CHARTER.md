@@ -1,6 +1,6 @@
 # rebar Charter
 
-> **rebar v4.0.0-rc.2** | **Tier 3: ENFORCED**
+> **rebar v4.0.0** | **Tier 3: ENFORCED**
 
 The IS / IS NOT scope statement for rebar. **Authoritative for feature-request
 triage** — every `ask featurerequest` submission is scored against this doc

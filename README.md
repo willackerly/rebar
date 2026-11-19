@@ -1,8 +1,8 @@
 # rebar
 
-> **rebar v4.0.0-rc.2** | **Tier 3: ENFORCED**
+> **rebar v4.0.0** | **Tier 3: ENFORCED**
 
-[![rebar v4.0.0-rc.2](https://img.shields.io/badge/rebar-v4.0.0--rc.2-orange)](DESIGN.md)
+[![rebar v4.0.0](https://img.shields.io/badge/rebar-v4.0.0-green)](DESIGN.md)
 [![Tier 3: Enforced](https://img.shields.io/badge/tier-3_enforced-brightgreen)](DESIGN.md)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
@@ -86,23 +86,19 @@ contract; everything else is opt-in.
 ## Installation
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/willackerly/rebar/v3.1.2/setup-rebar.sh | bash -s -- v3.1.2
+curl -fsSL https://raw.githubusercontent.com/willackerly/rebar/v4.0.0/setup-rebar.sh | bash -s -- v4.0.0
 ```
 
-Installs rebar under `~/.rebar/versions/v3.1.2/` and puts
+Installs rebar under `~/.rebar/versions/v4.0.0/` and puts
 `~/.rebar/current/bin` (`rebar`, `ask`) on your PATH; open a new terminal
-afterwards. v3.1.2 is the latest stable release; **rebar 4.0 is at its
-first release candidate**, which you can install beside it:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/willackerly/rebar/v4.0.0-rc.2/setup-rebar.sh | bash -s -- v4.0.0-rc.2 --no-switch
-```
-
-The install examples stay on v3.1.2 until v4.0.0 is final; 4.0's breaking
-changes and their fixes: [UPGRADING.md § Upgrading from 3.x to 4.0](UPGRADING.md#upgrading-from-3x-to-40). From 4.0 a release is a single self-contained binary per
-platform (checksum-verified by the installer); the binary alone runs
-everything, so you can also download `rebar_<ver>_<os>_<arch>` from the
-GitHub Release, put it on your PATH as `rebar`, and run `rebar install-shims`
+afterwards. v4.0.0 is the current release: a single self-contained binary per
+platform (checksum-verified by the installer) with every check, ASK and the
+MCP server built in. Coming from 3.x? 4.0's breaking changes and their fixes:
+[UPGRADING.md § Upgrading from 3.x to 4.0](UPGRADING.md#upgrading-from-3x-to-40)
+(v3.1.2 remains installable the same way, with `v3.1.2` in place of
+`v4.0.0`). The binary alone runs everything, so you can also download
+`rebar_<ver>_<os>_<arch>` from the GitHub Release, put it on your PATH as
+`rebar`, and run `rebar install-shims`
 for the `ask` command and completions. Versions live side by side; options, CI, and release candidates:
 [SETUP.md § Install rebar](SETUP.md#install-rebar),
 [§ Testing a release candidate](SETUP.md#testing-a-release-candidate),
@@ -341,7 +337,7 @@ later. See `feedback/2026-04-21-...`, `2026-04-22-...`, and
 Every rebar repo declares its version and tier at the top of README.md:
 
 ```markdown
-> **rebar v4.0.0-rc.2** | **Tier 2: ADOPTED**
+> **rebar v4.0.0** | **Tier 2: ADOPTED**
 ```
 
 This is validated by `check-compliance` (run by `rebar check`) against the
