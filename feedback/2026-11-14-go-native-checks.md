@@ -6,8 +6,9 @@ rebar migrate, #20 CLI fixes), virtru-analyze as the acceptance adopter,
 2026-11-14
 **Type:** proposal (propose-then-ship) with a first proof slice in the same
 branch
-**Target:** 3.2 (not the 3.1 rc), delivered as a stack of PRs, S0 (#23,
-this branch) to S8
+**Target:** shipped as **4.0.0** (first candidate v4.0.0-rc.1), delivered
+as a stack of PRs, S0 (#23, this branch) to S9 (#53); planned as 3.2 until
+the owner's release decision of 2026-11-17 (see [Timeline](#timeline))
 **Status:** accepted with owner decisions (2026-11-15, [Owner decisions](#owner-decisions-2026-11-15));
 the remaining open questions keep their leans
 
@@ -35,9 +36,11 @@ Go check on the same fixtures (including the existing
 
 These override the plan and the leans below where they differ.
 
-- **The end state lands in this stack, not in 4.0.** The last PR (S8)
+- **The end state lands in this stack, not in a later phase.** The last PR (S8)
   deletes the ported scripts, `scripts/_rebar-config.sh` and the bash/Python
-  ASK tools: rebar becomes Go-binary-only.
+  ASK tools: rebar becomes Go-binary-only. (The earlier plan phased the
+  deletion to a 4.0 after 3.2/3.3; the stack itself now ships as 4.0.0, see
+  [Timeline](#timeline).)
 - **Go becomes the default per check as it is ported.** Each port PR flips
   the default for the checks it ports; `REBAR_CHECK_IMPL=shell` stays as the
   fallback until S8, and every port keeps a parity test against its script.
@@ -295,6 +298,7 @@ fixtures aside) may be split.
 | S6 | feat/go-native-6-ask | ASK in Go: `rebar ask`, the agent loop, the MCP server (stdio), ask-server; compat shims for `bin/ask*`; `rebar migrate` rewrites `.mcp.json` | ~4,000 (bash + Python) |
 | S7 | feat/go-native-7-distribution | `go:embed` the assets `new / adopt / init / migrate` read; the binary works without an install tree; release publishes per-platform binaries + SHA256; setup-rebar.sh downloads and verifies the binary; `rebar migrate` compares against the native checks | — |
 | S8 | feat/go-native-8-remove-shell | delete the ported scripts, `_rebar-config.sh` and the bash/Python ASK tools; parity tests → golden tests; template references; docs (README, SETUP, UPGRADING, CONFIGURATION, scripts/README, CHARTER / DESIGN wording); CHANGELOG | −5,000 and more |
+| S9 | feat/go-native-9-mcp-sdk | `rebar mcp serve` on the official MCP Go SDK (`github.com/modelcontextprotocol/go-sdk`): protocol negotiation, `isError` tool results, Streamable HTTP; Claude Code compatibility test | — |
 
 Stays bash: `setup-rebar.sh` (it downloads the binary) and rebar's own dev
 tooling: `scripts/tests/*`, `sync-bootstrap.sh`, `gen-released-blobs.sh`,
@@ -354,7 +358,7 @@ tooling: `scripts/tests/*`, `sync-bootstrap.sh`, `gen-released-blobs.sh`,
   `.rebarrc` keys are the answer. A request that needs a new key is a rebar
   change, as it already is since #14.
 - **Windows.** Go makes native Windows possible (scripts never were); paths
-  in output must stay `/`-joined (the walker already does). Not a 3.2 goal.
+  in output must stay `/`-joined (the walker already does). Not a 4.0 goal.
 - **Performance.** Go start-up plus an empty scan is ~8 ms [M]; during the transition a
   hand-off costs one bash start plus `_rebar-config.sh` (~20 ms [M]).
 - **Binary size and patching.** Embedded templates add ~0.4 MB; a site can
@@ -372,6 +376,22 @@ The stack table above replaces the earlier phase plan (alpha / beta / 3.3 /
 estimates per PR, Go incl. tests: S0 ~2,050 [M]; S1 ~2,000; S2 ~2,200; S3
 ~2,500; S4 ~1,200; S5 ~2,000; S6 ~2,500 (may split into S6a / S6b); S7 ~800
 + docs; S8 mostly deletions and golden fixtures.
+
+## Timeline
+
+- 2026-11-14: proposal and S0 (#23), targeting 3.2.
+- 2026-11-15: owner decisions above; S1–S8 stacked on #23, S9 (#53) added
+  for the MCP SDK.
+- 2026-11-17: **release decision (owner):** the stack ships as **v4.0.0**,
+  a major release, because the shell scripts adopters could call directly
+  (`scripts/*.sh`, `scripts/_rebar-config.sh`) are removed. Merge plan: cut
+  `release/v4.0.0-rc` from `main`, merge the stack top-down into it, tag
+  `v4.0.0-rc.1`, field-test, then merge to `main` and tag `v4.0.0`.
+- 2026-11-18: owner decision: `bin/rebar` is no longer tracked in git from
+  4.0 (releases ship per-platform binaries; contributors build it with
+  `go build -o bin/rebar ./cli`).
+- 2026-11-19: v4.0.0-rc.1 prepared (CHANGELOG `## v4.0.0-rc.1`, UPGRADING
+  "Upgrading from 3.x to 4.0").
 
 ## Open questions for the maintainer (lean in brackets)
 

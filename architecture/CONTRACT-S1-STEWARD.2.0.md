@@ -89,7 +89,7 @@ rebar run steward --summary
 rebar run steward --check C1
 ```
 
-(`scripts/steward.sh` until rebar 3.2, with the same arguments, output, exit
+(`scripts/steward.sh` until rebar 4.0, with the same arguments, output, exit
 codes and report files; a project's own copy of that script still runs
 through `rebar run steward`, with a deprecation notice.)
 
@@ -190,7 +190,7 @@ Migration for downstream parsers:
 
 ## Implementing Files
 
-- `cli/internal/steward/` — main scanner (`rebar run steward`; `scripts/steward.sh` until rebar 3.2)
+- `cli/internal/steward/` — main scanner (`rebar run steward`; `scripts/steward.sh` until rebar 4.0)
 - `cli/internal/config/`, `cli/internal/checks/gate.go` — tier resolution
 - `cli/internal/checks/` — individual checks orchestrated by the full suite
 - `cli/internal/suite/` — the suites (`rebar check`), whose last step runs the Steward

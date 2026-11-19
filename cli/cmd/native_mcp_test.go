@@ -24,7 +24,7 @@ import (
 // The MCP server (`rebar mcp serve`) and ask-server (`rebar ask serve`)
 // against transcripts in testdata/mcp: an MCP session over stdio and HTTP
 // request sequences. The MCP protocol layer is the official Go SDK since
-// rebar 3.2 (S9 of the go-native stack); the goldens were regenerated then
+// rebar 4.0 (S9 of the go-native stack); the goldens were regenerated then
 // and the PR lists every difference from the python server's transcripts.
 // The classic ASK API and ask-server still answer in python's json.dumps
 // format. tools/call runs a stub ask (--ask-bin); TestMCPNativeAsk runs the
@@ -590,7 +590,7 @@ func TestMCPNativeAsk(t *testing.T) {
 
 // TestMCPClientGolden: `rebar mcp client` (the SDK's Streamable HTTP
 // client) against the HTTP MCP server prints what bin/test-mcp-client
-// (python, removed in rebar 3.2) printed.
+// (python, removed in rebar 4.0) printed.
 func TestMCPClientGolden(t *testing.T) {
 	repos, stub := mcpFixture(t)
 	port := freePort(t)

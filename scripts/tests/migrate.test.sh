@@ -20,7 +20,7 @@
 #   T8  a clone of the rebar repo: refused
 #
 # Runs the rebar binary under test (lib.sh: REBAR_TEST_BIN). A legacy copy
-# of check-todos.sh is the last version before rebar 3.2 (kept in
+# of check-todos.sh is the last version before rebar 4.0 (kept in
 # cli/internal/migrate/testdata/legacy).
 # Usage: bash scripts/tests/migrate.test.sh
 # Bash 3.2 compatible (macOS default).

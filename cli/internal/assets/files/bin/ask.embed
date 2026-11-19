@@ -5,10 +5,10 @@
 # Shim: runs `rebar ask` with the same arguments — the rebar beside this
 # script (through symlinks) if it runs on this machine, else REBAR_BIN, else
 # the one on PATH — so PATH entries, .mcp.json files and scripts naming bin/ask keep working.
-# REBAR_ASK_HANDOFF is set for the rebar it runs: a rebar older than 3.2,
+# REBAR_ASK_HANDOFF is set for the rebar it runs: a rebar older than 4.0,
 # whose `rebar ask` runs this script, would otherwise loop.
 if [ -n "${REBAR_ASK_HANDOFF:-}" ]; then
-  echo "ask: this rebar has no built-in ASK (it ran ask back); install rebar 3.2 or later" >&2
+  echo "ask: this rebar has no built-in ASK (it ran ask back); install rebar 4.0 or later" >&2
   exit 127
 fi
 self=$0

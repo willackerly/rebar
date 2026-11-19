@@ -24,7 +24,7 @@ last-synced: 2026-11-18
   Dependabot, script fixes, bash 3.2 decay-patterns crash, SIGPIPE-proof tests.
 - **`v3.1.0` (2026-11-16)** — the 3.1 line graduated after three release
   candidates field-tested on virtru-analyze (#457); plus `metrics_strict`
-  failing on zero declarations. Next: the Go-native stack (#23 → …) for 3.2.
+  failing on zero declarations. Next: the Go-native stack (#23 → …) for 4.0.
 - **`v3.1.0-rc.3` (2026-11-16) on `release/v3.1.0-rc`** — #33, fixes from
   running rc.2 in virtru-analyze's CI (#457): root flags before `run`,
   SETUP CI snippet cleanup, migrate keeps sourced ground-truth copies,
@@ -38,7 +38,7 @@ last-synced: 2026-11-18
   `rebar migrate`, #22, #24 runbooks (UPGRADING.md). CI runs on PRs into
   `main` and `release/**` (#15). Test it, fix forward into the rc branch, tag
   `rc.N`; when happy, PR `release/v3.1.0-rc` → `main` and tag `v3.1.0`.
-  Draft for 3.2: #23 (Go-native checks).
+  Draft for 4.0: #23 (Go-native checks).
 - **main has been the v3 line since 2026-07-04**: built, tagged
   `v3.0.0-beta`, adversarially reviewed, merged here, then annealed through
   `-beta.2` (2026-08-02), `-beta.3` and `-beta.4` (2026-11-14).
@@ -117,7 +117,7 @@ Ordered roughly by cost.
 ## What's Next — proposed go-forward
 
 **Now — `v3.1.2` is out.** Install it (`… | bash -s -- v3.1.2`),
-run UPGRADING.md on adopters; 3.1.x fixes go to `main`, the Go-native stack targets 3.2.
+run UPGRADING.md on adopters; 3.1.x fixes go to `main`, the Go-native stack ships as 4.0.0 (v4.0.0-rc.1 first).
 
 **Done — `v3.0.0` tagged and released 2026-11-14.** After the release PR merges, tag
 the merge commit and announce (action 1).

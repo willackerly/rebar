@@ -211,7 +211,7 @@ original host name as `localhost`.
 
 ---
 
-## Protocol (rebar 3.2)
+## Protocol (rebar 4.0)
 
 The server is built on the official MCP Go SDK. It negotiates the protocol
 version with the client (2024-11-05 through 2025-11-25 over `initialize`,

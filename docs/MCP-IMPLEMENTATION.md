@@ -1,6 +1,6 @@
 # MCP Implementation for ASK - Complete Technical Guide
 
-> **Implementation status (rebar 3.2):** the MCP server is native Go in the
+> **Implementation status (rebar 4.0):** the MCP server is native Go in the
 > `rebar` binary — `rebar mcp serve` (package `cli/internal/mcp`) — built on
 > the official MCP Go SDK, `github.com/modelcontextprotocol/go-sdk` (v1.8.0).
 > The SDK owns the protocol: version negotiation (2024-11-05 through
@@ -12,7 +12,7 @@
 > and input schemas are the python server's, unchanged.
 >
 > The python snippets below are the original design (the python server was
-> removed in rebar 3.2). The python server's wire format survives only in
+> removed in rebar 4.0). The python server's wire format survives only in
 > git history (`cli/cmd/testdata/mcp` before S9 of the go-native stack); the
 > goldens there now record the SDK server, and
 > `cli/cmd/native_mcp_compat_test.go` replays sessions recorded from Claude
@@ -343,7 +343,7 @@ rebar mcp client http://localhost:7232
 
 ---
 
-## Wire behaviour (rebar 3.2)
+## Wire behaviour (rebar 4.0)
 
 | Situation | Answer |
 |-----------|--------|
@@ -474,7 +474,7 @@ ask://agent/repo:role   → agents/role/AGENT.md
 
 **Challenge:** Map ASK errors to MCP
 
-**Solution (rebar 3.2):** a failing ask is a *tool execution error* — an
+**Solution (rebar 4.0):** a failing ask is a *tool execution error* — an
 `isError: true` result carrying the ask's stderr, exit code, command and
 working directory — so the model sees why and can retry or rephrase. Only
 protocol problems are JSON-RPC errors (-32602 unknown tool or resource /

@@ -140,7 +140,7 @@ This is the latest version. No predecessor.
 
 - `cli/internal/ask/` — the CLI and agent loop (native Go; `rebar ask`, `rebar ask-agent-loop`)
 - `cli/cmd/ask.go` — the `rebar ask` / `rebar ask-agent-loop` commands
-- `bin/ask` — sh shim running `rebar ask` (the bash implementation was removed in rebar 3.2)
+- `bin/ask` — sh shim running `rebar ask` (the bash implementation was removed in rebar 4.0)
 - `bin/ask-server` — sh shim running `rebar ask serve` (the enterprise HTTP server, `cli/internal/mcp`)
 - `bin/ask-agent-loop` — sh shim running `rebar ask-agent-loop` (agent-loop harness)
 - `bin/rebar-install` — PATH installer + dependency check (`bin/install` before v3.1.2: on PATH that name shadowed install(1))

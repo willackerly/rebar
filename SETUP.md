@@ -24,7 +24,7 @@ That installs v3.1.2 and puts `~/.rebar/current/bin` (`rebar`, `ask`,
 source the RC) and check with `rebar version`. Fetch `setup-rebar.sh` from the
 tag you install, as above: the copy on `main` is whatever `main` holds. With no
 version argument the installer takes the latest stable release: the highest
-published GitHub Release that is not a pre-release such as `v3.2.0-rc.1`,
+published GitHub Release that is not a pre-release such as `v4.0.0-rc.1`,
 looked up through GitHub's API (unauthenticated, 60 requests/hour per IP; past
 that it says so; name the version instead). A tag that is pushed but not yet
 published as a Release, and draft Releases, never count. Variants (`…` is the
@@ -42,7 +42,7 @@ published as a Release, and draft Releases, never count. Variants (`…` is the
 Each version lives in `~/.rebar/versions/<version>/`; `~/.rebar/current` is
 a symlink to the active one, so switching never edits your RC again
 (`ln -sfn versions/<version> ~/.rebar/current` switches by hand;
-`rm -rf ~/.rebar/versions/<version>` removes one). From 3.2 a release is one
+`rm -rf ~/.rebar/versions/<version>` removes one). From 4.0 a release is one
 self-contained binary per platform, `rebar_<ver>_<os>_<arch>`: the installer
 verifies it against the release's SHA-256 checksums (a mismatch aborts), puts
 it at `versions/<version>/bin/rebar` and runs `rebar install-shims`, which
@@ -72,20 +72,20 @@ that already uses rebar: [UPGRADING.md](UPGRADING.md).
 
 ### Testing a release candidate
 
-Release candidates are tags like `v3.2.0-rc.1`, published as GitHub
+Release candidates are tags like `v4.0.0-rc.1`, published as GitHub
 pre-releases; the default "latest" install skips them. Use the installer from
 the candidate's own tag (or `--pre` for the newest pre-release):
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/willackerly/rebar/v3.2.0-rc.1/setup-rebar.sh \
-  | bash -s -- v3.2.0-rc.1 --no-switch
-~/.rebar/versions/v3.2.0-rc.1/bin/rebar version     # rebar v3.2.0-rc.1
+curl -fsSL https://raw.githubusercontent.com/willackerly/rebar/v4.0.0-rc.1/setup-rebar.sh \
+  | bash -s -- v4.0.0-rc.1 --no-switch
+~/.rebar/versions/v4.0.0-rc.1/bin/rebar version     # rebar v4.0.0-rc.1
 ```
 
 `--no-switch` keeps your current version active (except on a first versioned
 install, which always becomes current), so you can try the candidate by path
 on one project, then switch with
-`ln -sfn versions/v3.2.0-rc.1 ~/.rebar/current`. Then follow
+`ln -sfn versions/v4.0.0-rc.1 ~/.rebar/current`. Then follow
 [QUICKSTART.md](QUICKSTART.md) for a new project or
 [UPGRADING.md](UPGRADING.md) for an existing one, and report problems as
 issues on the repository.
@@ -104,7 +104,7 @@ below).
 
 ## Run rebar in CI
 
-From 3.2 the `rebar` binary is self-contained: the checks, the suites, ASK,
+From 4.0 the `rebar` binary is self-contained: the checks, the suites, ASK,
 the MCP server and the bootstrap templates are built in, so CI needs only the
 binary of the version you pin, no rebar tree and no `REBAR_ROOT`.
 
@@ -200,9 +200,9 @@ wrappers `rebar migrate` leaves for copies that other files call, run
 whatever `rebar` is on PATH, so a project script that CI runs directly should
 call the pinned wrapper (`scripts/rebar.sh run check-todos`), unless the CI
 job puts `$ROOT` on PATH. Cache `$REBAR_CACHE_DIR` between runs to skip the
-download. (Before 3.2 the binary ran the scripts of the rebar tree beside it,
+download. (Before 4.0 the binary ran the scripts of the rebar tree beside it,
 so a wrapper had to keep the whole tree of the pinned commit; such a
-wrapper keeps working with 3.2, it just no longer needs the tree.)
+wrapper keeps working with 4.0, it just no longer needs the tree.)
 
 **Where a rebar tree still matters.** Almost nowhere: rebar is a single
 binary, and its checks never read a rebar tree. `rebar doc` resolves

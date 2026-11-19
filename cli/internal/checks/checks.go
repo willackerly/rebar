@@ -3,7 +3,7 @@
 // scripts/check-todos.sh) and behaves like the script: same arguments, same
 // .rebarrc settings, same output and exit code.
 //
-// The scripts are gone (rebar 3.2): these are rebar's only implementation.
+// The scripts are gone (rebar 4.0): these are rebar's only implementation.
 // `rebar check` and `rebar run` run them; a project's own copy of a script
 // still runs instead, as the adopter's code (see cmd/scripts.go).
 package checks

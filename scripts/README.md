@@ -5,7 +5,7 @@ built into `rebar` (`rebar check`, `rebar run <name>`; the list and the
 `SKIP_*` variables are in [docs/CONFIGURATION.md](../docs/CONFIGURATION.md#what-rebar-check-runs)).
 Adopting projects carry no copies of rebar's scripts; `templates/project-bootstrap/scripts/`
 holds two thin entry points that call the CLI. Projects with copies made
-before rebar 3.2: [UPGRADING.md](../UPGRADING.md).
+before rebar 4.0: [UPGRADING.md](../UPGRADING.md).
 
 This directory holds the tooling that maintains rebar itself. It runs only in
 a rebar checkout.

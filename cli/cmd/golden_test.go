@@ -68,7 +68,7 @@ func filler(n int) string {
 // expected output and exit code in a golden file (runGolden). The goldens
 // were captured from the check scripts while they existed (the go-native port ran
 // both and required the same output), so they hold the scripts' behaviour;
-// rebar 3.2 deleted the scripts. divergesOn documents a case where the
+// rebar 4.0 deleted the scripts. divergesOn documents a case where the
 // script's behaviour depended on the platform's userland ("bsd" or "gnu"
 // grep, find and date; "all" where the script failed in a way that named
 // itself, like bash's "unbound variable"): the check picks the other

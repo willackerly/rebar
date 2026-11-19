@@ -168,7 +168,7 @@ This is the latest version. No predecessor.
 
 - `cli/internal/mcp/` — the server (native Go on the MCP Go SDK: `rebar mcp serve`; `compat.go` aliases, `stdio.go` stdio hygiene)
 - `cli/cmd/mcp.go` — the `rebar mcp serve` / `rebar mcp client` commands
-- `bin/ask-mcp-server` — sh shim running `rebar mcp serve` (the python original was removed in rebar 3.2)
+- `bin/ask-mcp-server` — sh shim running `rebar mcp serve` (the python original was removed in rebar 4.0)
 - `cli/cmd/init.go` — writes `.mcp.json` running `rebar mcp serve` (`ensureMCPConfig`, `findRebarCommand`)
 - `cli/internal/migrate/mcpjson.go` — `rebar migrate` rewrites `.mcp.json` servers from `ask-mcp-server` to `rebar mcp serve`
 - `cli/cmd/adopt.go` — same, in the adoption flow
@@ -188,4 +188,4 @@ This is the latest version. No predecessor.
 | Version | Date | Change | Migration |
 |---------|------|--------|-----------|
 | 1.0 | 2026-04-25 | Initial contract — formalizing Wave 2.5 + 2026-04-22→25 fixes | — |
-| 1.0 (amended) | 2026-11-17 | Server moved onto the official MCP Go SDK (rebar 3.2): protocol negotiation incl. 2026-07-28, Streamable HTTP, SDK error shapes; tool names, schemas and result envelope unchanged | None for Claude Code; HTTP clients must speak Streamable HTTP |
+| 1.0 (amended) | 2026-11-17 | Server moved onto the official MCP Go SDK (rebar 4.0): protocol negotiation incl. 2026-07-28, Streamable HTTP, SDK error shapes; tool names, schemas and result envelope unchanged | None for Claude Code; HTTP clients must speak Streamable HTTP |

@@ -3,7 +3,7 @@
 // inbox-watch and flush-notifications. They are registered with the checks
 // package under their scripts' names, so `rebar run <name>` and `rebar
 // native <name>` find them, and they behave like the scripts did (deleted
-// in rebar 3.2): same arguments, environment variables, output, files and
+// in rebar 4.0): same arguments, environment variables, output, files and
 // exit codes.
 package utils
 
