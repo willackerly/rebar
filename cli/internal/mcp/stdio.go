@@ -488,6 +488,10 @@ func (w *stdoutTracker) isBroken() bool {
 }
 
 func (w *stdoutTracker) Write(b []byte) (int, error) {
+	// Settle first: a client may reuse an id (or send what the negotiated
+	// version allows) as soon as it reads the answer, which can be before
+	// this goroutine returns from the write.
+	w.settle(b)
 	w.mu.Lock()
 	n, err := w.out.Write(fixErrorCodes(b))
 	w.mu.Unlock()
@@ -495,8 +499,14 @@ func (w *stdoutTracker) Write(b []byte) (int, error) {
 		n = len(b)
 	} else if errors.Is(err, syscall.EPIPE) || errors.Is(err, os.ErrClosed) {
 		w.once.Do(func() { close(w.broken) })
-		return n, err
 	}
+	return n, err
+}
+
+// settle records what the responses in b (a message or a batch) answer:
+// their ids are no longer in use, and an initialize result sets the
+// protocol version.
+func (w *stdoutTracker) settle(b []byte) {
 	var batch []json.RawMessage
 	raws := []json.RawMessage{bytes.TrimSpace(b)}
 	if json.Unmarshal(raws[0], &batch) == nil {
@@ -515,7 +525,6 @@ func (w *stdoutTracker) Write(b []byte) (int, error) {
 			}
 		}
 	}
-	return n, err
 }
 
 func (w *stdoutTracker) Close() error { return nil }

@@ -9,6 +9,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/modelcontextprotocol/go-sdk/jsonrpc"
 )
 
 func TestPyDumps(t *testing.T) {
@@ -107,6 +109,42 @@ func TestStdinFilter(t *testing.T) {
 		if !strings.Contains(log.String(), want) {
 			t.Errorf("log lacks %q:\n%s", want, log.String())
 		}
+	}
+}
+
+// clientWriter is stdout as the client sees it: when an answer arrives it
+// sends its next request at once, here a check of whether that request's
+// id would be refused.
+type clientWriter struct {
+	p        *pending
+	id       jsonrpc.ID
+	inUseNow bool
+}
+
+func (c *clientWriter) Write(b []byte) (int, error) {
+	c.inUseNow = c.p.has(c.id)
+	return len(b), nil
+}
+
+// TestStdoutTrackerSettlesBeforeWriting: an id is free again by the time
+// its answer reaches the client, which may reuse it right away (it used to
+// be settled after the write: under load the reused id was refused as
+// "still running", seen as a TestMCPCancelThenReuseID failure).
+func TestStdoutTrackerSettlesBeforeWriting(t *testing.T) {
+	p := newPending()
+	id, err := jsonrpc.MakeID(float64(2))
+	if err != nil {
+		t.Fatal(err)
+	}
+	p.add(id)
+	c := &clientWriter{p: p, id: id}
+	w := &stdoutTracker{out: c, pending: p, broken: make(chan struct{})}
+	w.Write([]byte(`{"jsonrpc":"2.0","id":2,"result":{}}` + "\n"))
+	if c.inUseNow {
+		t.Error("id 2 still in use when its answer was written")
+	}
+	if p.has(id) {
+		t.Error("id 2 still in use after its answer")
 	}
 }
 
