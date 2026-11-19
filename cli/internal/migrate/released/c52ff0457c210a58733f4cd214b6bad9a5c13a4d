@@ -1,0 +1,99 @@
+#!/usr/bin/env bash
+# check-contract-headers.sh — Verify every source file has a CONTRACT: or Architecture: header
+# rebar-scripts: 2026.03.20
+#
+# Usage: ./scripts/check-contract-headers.sh [directories...]
+# Default: scans src/ internal/ cmd/ client/ packages/ lib/ app/
+#
+# Exit code: 0 = all files have headers, 1 = missing headers found
+
+set -euo pipefail
+
+# Tier gate: contract headers are Tier 2+ (skip for Tier 1 / partial adoption)
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+if [ -f "$SCRIPT_DIR/_rebar-config.sh" ]; then
+  source "$SCRIPT_DIR/_rebar-config.sh"
+  # Under `REBAR_CHECK_IMPL=go rebar check` (the default) the CLI's native port runs instead.
+  _rebar_native check-contract-headers "$@"
+  _rebar_skip 2 check-contract-headers && exit 0
+fi
+
+# Configurable: file extensions to check (env CONTRACT_EXTENSIONS, then
+# .rebarrc `source_extensions`, then the default list)
+SOURCE_DIRS="src internal cmd client packages lib app"
+EXTENSIONS=".go .ts .tsx .js .jsx .py .rs"
+if type _rebar_config >/dev/null 2>&1; then
+  SOURCE_DIRS=$(_rebar_config source_dirs _REBAR_NO_ENV "$SOURCE_DIRS")
+  EXTENSIONS=$(_rebar_config source_extensions CONTRACT_EXTENSIONS "$EXTENSIONS")
+fi
+EXTENSIONS="${CONTRACT_EXTENSIONS:-$EXTENSIONS}"
+
+# Configurable: directories to scan (args, then .rebarrc `source_dirs`)
+if [ $# -gt 0 ]; then
+  DIRS=("$@")
+else
+  DIRS=()
+  for d in $SOURCE_DIRS; do
+    [ -d "$d" ] && DIRS+=("$d")
+  done
+fi
+
+if [ ${#DIRS[@]} -eq 0 ]; then
+  echo "No source directories found. Pass directories as arguments."
+  exit 0
+fi
+
+# Build find expression for extensions
+FIND_ARGS=()
+first=true
+for ext in $EXTENSIONS; do
+  if $first; then
+    FIND_ARGS+=(-name "*.${ext#.}")
+    first=false
+  else
+    FIND_ARGS+=(-o -name "*.${ext#.}")
+  fi
+done
+
+missing=0
+total=0
+
+while IFS= read -r file; do
+  # Skip test files, generated files, vendor, node_modules
+  case "$file" in
+    *_test.go|*.test.ts|*.test.tsx|*.test.js|*.spec.ts|*.spec.tsx|*.spec.js) continue ;;
+    */vendor/*|*/node_modules/*|*/dist/*|*/build/*|*/.git/*) continue ;;
+    *_generated*|*.gen.*|*.pb.go|*.pb.ts) continue ;;
+  esac
+
+  total=$((total + 1))
+
+  # Check first 15 lines for CONTRACT: or Architecture:
+  if ! head -15 "$file" | grep -q "CONTRACT:\|Architecture:"; then
+    echo "MISSING: $file"
+    missing=$((missing + 1))
+  fi
+done < <(find "${DIRS[@]}" \( "${FIND_ARGS[@]}" \) -type f 2>/dev/null)
+
+echo ""
+echo "Scanned $total source files, $missing missing contract headers."
+
+if [ "$missing" -gt 0 ]; then
+  # NOTE: literal CONTRACT prefix split via variable so the shadow-ref
+  # detector in compute-registry.sh doesn't false-positive on these example
+  # strings. See feedback/processed/2026-04-25-bootstrap-template-script-drift-and-bash3.2.md
+  # for the related cli/cmd/context.go fix.
+  P="CONTRACT:"
+  echo ""
+  echo "Every source file must declare which contract it implements:"
+  echo "  // ${P}C1-BLOBSTORE.2.1"
+  echo "  // Architecture: ${P}S2-API-GATEWAY.1.0"
+  ns=""
+  type _rebar_contract_namespace >/dev/null 2>&1 && ns=$(_rebar_contract_namespace)
+  [ -n "$ns" ] && echo "  // ${P}${ns}:C1-BLOBSTORE.2.1   (namespaced form, contract_namespace = $ns)"
+  echo ""
+  echo "See architecture/README.md for the full convention."
+  exit 1
+fi
+
+exit 0
