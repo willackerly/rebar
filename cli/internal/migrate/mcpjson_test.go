@@ -128,6 +128,25 @@ func TestMCPJSONRewrite(t *testing.T) {
 	}
 }
 
+// A server running a 3.x install's ask-mcp-server (what v3.1.2's `rebar
+// new` wrote: versions/v3.1.2/bin/ask-mcp-server) is not pointed at the
+// rebar beside it, which has no `mcp serve`, but at the running rebar.
+func TestPlanMCPOldSiblingRebar(t *testing.T) {
+	p := t.TempDir()
+	old := t.TempDir()
+	testutil.WriteExecutable(t, old, "bin/ask-mcp-server", "#!/bin/sh\n")
+	testutil.WriteExecutable(t, old, "bin/rebar",
+		"#!/bin/sh\necho 'rebar: unknown command \"'\"$1\"'\" for \"rebar\"' >&2\nexit 1\n")
+	testutil.WriteFile(t, p, ".mcp.json", `{"mcpServers": {"rebar-ask": {"command": "`+old+`/bin/ask-mcp-server", "args": ["--stdio"]}}}`)
+	edit, err := PlanMCP(p, "/home/u/.rebar/current/bin/rebar")
+	if err != nil || edit == nil || len(edit.Servers) != 1 {
+		t.Fatalf("PlanMCP = %+v, %v", edit, err)
+	}
+	if got, want := edit.Servers[0].To, "/home/u/.rebar/current/bin/rebar mcp serve --stdio"; got != want {
+		t.Errorf("rewritten to %q, want %q (the 3.x rebar beside ask-mcp-server has no mcp serve)", got, want)
+	}
+}
+
 // Nothing to do without .mcp.json or ask-mcp-server servers; an unreadable
 // one is a note, not an error.
 func TestPlanMCPNothingToDo(t *testing.T) {

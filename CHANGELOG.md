@@ -27,6 +27,11 @@ Fixes from field-testing v4.0.0-rc.1.
   as `$HOME/…`, `${HOME}/…` or `~/…` no longer gets a second block, from the
   installer or from `bin/rebar-install`. Every rc.1 install with `--dir`
   (CI, tests) appended a PATH and completions block per directory.
+- **`rebar migrate` and a 3.1.x `.mcp.json`.** v3.1.2's `rebar new` writes
+  `~/.rebar/versions/v3.1.2/bin/ask-mcp-server` into `.mcp.json`; migrate
+  pointed that at the 3.1.2 `bin/rebar` beside it, which has no `mcp serve`,
+  so Claude Code's ASK tools stopped working. A rebar beside the old server is
+  now used only if it serves MCP; otherwise the running rebar is.
 
 ## v4.0.0-rc.1 — 2026-11-19
 
